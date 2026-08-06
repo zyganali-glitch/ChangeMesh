@@ -112,8 +112,8 @@ Schedule is risk control, not permission to skip gates.
 
 | Phase | Title | Status | Dependency |
 |---|---|---|---|
-| `P-00` | Frozen Charter and Governance Baseline | `PENDING` | `-` |
-| `P-01` | Competition Rule and Eligibility Freeze | `PENDING` | `P-00` |
+| `P-00` | Frozen Charter and Governance Baseline | `DONE` | `-` |
+| `P-01` | Competition Rule and Eligibility Freeze | `IN_PROGRESS` | `P-00` |
 | `P-02` | Google Service Access and Feasibility Spike | `PENDING` | `P-01` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `PENDING` | `P-02` |
 | `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
@@ -166,55 +166,55 @@ Schedule is risk control, not permission to skip gates.
 
 # P-00 — Frozen Charter and Governance Baseline
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-00.01 — Create local and GitHub repositories, extract this starter pack, initialize Git, and commit the untouched governance baseline
 
-- **Status:** `IN_PROGRESS`
+- **Status:** `DONE`
 - **Required action:** Create local and GitHub repositories, extract this starter pack, initialize Git, and commit the untouched governance baseline.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Local and remote repositories exist with identical name; baseline commit contains only starter files; Git status is clean.
-- **Required evidence:** Git init/remote/status/commit evidence; remote default branch visible.
+- **Required evidence:** Local Git initialized; commit `45680fb` created; remote `https://github.com/zyganali-glitch/ChangeMesh.git` linked; branch `main` pushed and tracking.
 - **Mandatory documentation sync:** README, handoff, environment state, submission manifest.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-00.02 — Verify Antigravity discovers all workspace rules, skills, and four read-only development subagents
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Verify Antigravity discovers all workspace rules, skills, and four read-only development subagents.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Rules are active; skills/agents appear; no subagent has governance write authority.
-- **Required evidence:** Screenshots or sanitized discovery output; manual checklist.
+- **Required evidence:** Rules `.agents/rules/*` active; skills `.agents/skills/*` discovered; subagent invocation verified (`repo-researcher` ID `679bbf14-2b17-4ff2-b237-22c32956ec97`).
 - **Mandatory documentation sync:** Environment/API and handoff.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-00.03 — Review every starter document for path, naming, language, and charter consistency before implementation
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Review every starter document for path, naming, language, and charter consistency before implementation.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No stale Universal Agent OS product names, Phase-0 demands, false implemented claims, or broken relative links.
-- **Required evidence:** Repository-wide search and link check.
+- **Required evidence:** Repository-wide search audit clean (0 TODOs/FIXMEs, paths and links verified).
 - **Mandatory documentation sync:** All affected docs.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-00.04 — Freeze governance baseline with a tagged or clearly named commit and record its SHA
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Freeze governance baseline with a tagged or clearly named commit and record its SHA.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** A safe rollback point exists and is recorded.
-- **Required evidence:** Git log/show evidence.
+- **Required evidence:** Git tag `v0.0.0-governance-baseline` created on SHA `45680fb` and pushed to remote `origin`.
 - **Mandatory documentation sync:** Environment/API, handoff, plan header.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-01 — Competition Rule and Eligibility Freeze
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-01.01 — Re-open official Devpost Overview, Rules, FAQ, Resources, schedule, and track pages; transcribe binding requirements and record capture date
 
-- **Status:** `PENDING`
+- **Status:** `IN_PROGRESS`
 - **Required action:** Re-open official Devpost Overview, Rules, FAQ, Resources, schedule, and track pages; transcribe binding requirements and record capture date.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Requirements include model, framework, cloud, category, deployment proof, video, repository, architecture, and submission fields; conflicts resolved from official rules.
