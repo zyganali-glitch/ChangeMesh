@@ -114,7 +114,7 @@ Schedule is risk control, not permission to skip gates.
 |---|---|---|---|
 | `P-00` | Frozen Charter and Governance Baseline | `DONE` | `-` |
 | `P-01` | Competition Rule and Eligibility Freeze | `IN_PROGRESS` | `P-00` |
-| `P-02` | Google Service Access and Feasibility Spike | `PENDING` | `P-01` |
+| `P-02` | Google Service Access and Feasibility Spike | `IN_PROGRESS` | `P-01` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `PENDING` | `P-02` |
 | `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
@@ -288,7 +288,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.04 — Verify Cloud Run, Firestore, and Pub/Sub availability in chosen region using disposable resources, then delete/scale down
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Verify Cloud Run, Firestore, and Pub/Sub availability in chosen region using disposable resources, then delete/scale down.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each mandatory service proven accessible; resource names and teardown recorded.

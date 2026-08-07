@@ -12,9 +12,9 @@ Record actual environment only; do not fill unknown values with guesses.
 - Vertex AI access: `ENABLED` (Provisioned via UI)
 - Gemini model ID: `gemini-3.6-flash`
 - Python SDK Requirement: `google-genai` (Legacy `vertexai` SDK is deprecated and returns 404 for Gemini 3.5+)
-- Cloud Run: `API_ENABLED`
-- Firestore: `API_ENABLED`
-- Pub/Sub: `API_ENABLED`
+- Cloud Run: `VERIFIED`
+- Firestore: `VERIFIED`
+- Pub/Sub: `VERIFIED`
 - Agent Runtime: `VERIFIED` (via local python script)
 - Memory Bank: `NOT_VERIFIED`
 - Agent Registry: `NOT_VERIFIED`
