@@ -214,7 +214,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-01.01 — Re-open official Devpost Overview, Rules, FAQ, Resources, schedule, and track pages; transcribe binding requirements and record capture date
 
-- **Status:** `IN_PROGRESS`
+- **Status:** `DONE`
 - **Required action:** Re-open official Devpost Overview, Rules, FAQ, Resources, schedule, and track pages; transcribe binding requirements and record capture date.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Requirements include model, framework, cloud, category, deployment proof, video, repository, architecture, and submission fields; conflicts resolved from official rules.

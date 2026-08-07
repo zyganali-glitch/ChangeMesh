@@ -36,3 +36,10 @@
 - Consequences:
 - Evidence:
 - Supersedes:
+
+## ADR-0005 — Freeze Devpost Requirements
+- Date: 2026-08-07
+- Status: Accepted
+- Context: Competition details fetched from Devpost.
+- Decision: Confirmed requirements: Gemini, ADK, Google Cloud, Fortified Enterprise Fleet track, 2026-08-31 20:00 EDT deadline.
+- Consequences: Architecture must strictly use ADK and Gemini API/Vertex AI. No deviation allowed.
