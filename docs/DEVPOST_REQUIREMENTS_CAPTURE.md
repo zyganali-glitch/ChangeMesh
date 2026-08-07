@@ -15,8 +15,8 @@
 6. **Deployment Proof:** Must provide evidence of real Google Cloud deployment.
 
 ## Submission Fields Required
-- Project Name, Tagline, Category/Track.
-- "Problem", "What it does", "How we built it", "Challenges", "Accomplishments", "What we learned", "What's next".
+- Project Name, Tagline, Category/Track (See `docs/PRODUCT_NARRATIVE.md` for Tagline).
+- "Problem", "What it does", "How we built it", "Challenges", "Accomplishments", "What we learned", "What's next" (Sourced from `docs/PRODUCT_NARRATIVE.md` and `docs/PRODUCT_BRIEF.md`).
 - Demo video (approx. 3-4 minutes).
 - Code repository (public GitHub).
 - Architecture diagram.

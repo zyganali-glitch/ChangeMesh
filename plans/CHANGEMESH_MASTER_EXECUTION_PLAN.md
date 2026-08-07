@@ -115,7 +115,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-00` | Frozen Charter and Governance Baseline | `DONE` | `-` |
 | `P-01` | Competition Rule and Eligibility Freeze | `IN_PROGRESS` | `P-00` |
 | `P-02` | Google Service Access and Feasibility Spike | `IN_PROGRESS` | `P-01` |
-| `P-03` | Product Thesis, User, and Outcome Contract | `IN_PROGRESS` | `P-02` |
+| `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
 | `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
 | `P-06` | Local Development Environment and Dependency Freeze | `PENDING` | `P-05` |
@@ -352,7 +352,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-03.04 — Freeze one-sentence, ten-second, thirty-second, and independent-product narratives
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Freeze one-sentence, ten-second, thirty-second, and independent-product narratives.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** All versions express same product truth without feature inflation.

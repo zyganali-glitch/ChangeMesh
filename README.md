@@ -2,7 +2,7 @@
 
 > **Rehearse every critical change. Trust only proven agents. Execute with evidence.**
 
-**ChangeMesh** is an autonomous enterprise change rehearsal and execution fleet for long-running, cross-department work. It discovers the right agents, verifies their exact capabilities, rehearses risky changes in a controlled shadow environment, applies least-authority policies, executes approved work asynchronously, and produces a tamper-evident **Change Evidence Passport**.
+**ChangeMesh** is a policy-governed agent fleet that safely rehearses and executes high-risk enterprise architecture changes. It treats an enterprise change as a long-lived distributed transaction, not a chat session. Using the Google Agent Development Kit and Gemini, it discovers dependencies, rehearses migrations in a shadow environment, and compresses weeks of manual coordination into a single, tamper-evident Change Evidence Passport.
 
 ## Current status
 
