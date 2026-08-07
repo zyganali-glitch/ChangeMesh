@@ -51,3 +51,17 @@
 - Decision: Mapped Agent Registry to `capability` module, Agent Runtime to `orchestration`/ADK on Cloud Run, Memory Bank to `memory`/Firestore, Agent Identity to passports, Agent Gateway to `orchestration` router, Model Armor to `policy` boundaries, and Agent Observability to OpenTelemetry traces.
 - Consequences: All future development must strictly align with these mappings. Generic wording is eliminated.
 - Evidence: `docs/CATEGORY_MAPPING.md`
+
+### DECISION-20260807-01: Google Cloud Region Selection
+- Date/time: 2026-08-07 11:38 GMT+3
+- Active task: P-02.01
+- Decision: Use europe-west3 (Frankfurt) for Google Cloud resources.
+- Rationale: User is located in Turkey; europe-west3 provides optimal low latency and broad service availability.
+- Status: ACTIVE
+
+### DECISION-20260807-03: Vertex AI SDK and Region Selection
+- Date/time: 2026-08-07 13:12 GMT+3
+- Active task: P-02.02
+- Decision: Use `google-genai` SDK and the `global` region for Vertex AI to access `gemini-3.6-flash`.
+- Rationale: The legacy `vertexai.generative_models` SDK is deprecated (removed June 2026). The `us-central1` and `europe-west3` Vertex AI endpoints returned 404 for Gemini 3.5+ until UI initialization. The UI provisioned the `gemini-3.6-flash` model in the `global` region which correctly resolves via the new SDK.
+- Status: ACTIVE

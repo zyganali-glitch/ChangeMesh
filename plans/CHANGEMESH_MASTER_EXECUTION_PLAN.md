@@ -210,7 +210,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-01 — Competition Rule and Eligibility Freeze
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-01.01 — Re-open official Devpost Overview, Rules, FAQ, Resources, schedule, and track pages; transcribe binding requirements and record capture date
 
@@ -254,11 +254,11 @@ Schedule is risk control, not permission to skip gates.
 
 # P-02 — Google Service Access and Feasibility Spike
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-02.01 — Create dedicated Google Cloud project and enable only minimum APIs needed for feasibility
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create dedicated Google Cloud project and enable only minimum APIs needed for feasibility.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Project/region recorded; no long-lived key file; APIs and teardown documented.
@@ -268,7 +268,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.02 — Verify exact competition-eligible Gemini 3
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Verify exact competition-eligible Gemini 3.5+ model through Vertex AI or Gemini API with one minimal structured-output call.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Exact model ID, SDK version, region, latency, cost recorded; output validates tiny schema.
