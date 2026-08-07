@@ -298,7 +298,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.05 — Individually verify Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, and Observability
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Individually verify Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, and Observability.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each service classified AVAILABLE, PREVIEW_BLOCKED, REGION_BLOCKED, PERMISSION_BLOCKED, or DEFERRED; no guessing.

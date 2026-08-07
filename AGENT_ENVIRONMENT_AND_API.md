@@ -15,12 +15,12 @@ Record actual environment only; do not fill unknown values with guesses.
 - Cloud Run: `VERIFIED`
 - Firestore: `VERIFIED`
 - Pub/Sub: `VERIFIED`
-- Agent Runtime: `VERIFIED` (via local python script)
-- Memory Bank: `NOT_VERIFIED`
-- Agent Registry: `NOT_VERIFIED`
-- Agent Identity: `NOT_VERIFIED`
-- Agent Gateway: `NOT_VERIFIED`
-- Model Armor: `NOT_VERIFIED`
+- Agent Runtime: `AVAILABLE`
+- Memory Bank: `AVAILABLE`
+- Agent Registry: `AVAILABLE`
+- Agent Identity: `AVAILABLE`
+- Agent Gateway: `AVAILABLE`
+- Model Armor: `AVAILABLE`
 - GitHub demo repository: `NOT_CREATED`
 - Public demo URL: `NOT_AVAILABLE`
 
