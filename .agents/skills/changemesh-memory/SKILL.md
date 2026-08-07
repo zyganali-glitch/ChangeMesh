@@ -1,5 +1,5 @@
 ---
-name: agentos-memory
+name: changemesh-memory
 description: Loads and synchronizes ChangeMesh Collective Memory before and after every development task.
 ---
 

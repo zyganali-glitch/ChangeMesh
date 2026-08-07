@@ -5,7 +5,7 @@
 Read and obey:
 
 @../../AGENTS.md
-@../../AGENT_OS_RULES.md
+@../../CHANGEMESH_RULES.md
 @../../plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md
 @../../AGENT_MEMORY_AND_LESSONS.md
 @../../AGENT_ARCHITECTURE_AND_PATTERNS.md

@@ -16,22 +16,25 @@ def test_firestore_access(project: str):
     doc_ref = db.collection("changemesh_p02").document("feasibility_spike")
     
     test_val = str(uuid.uuid4())
-    logger.info("Writing to Firestore...")
-    doc_ref.set({"test_id": test_val})
-    
-    logger.info("Reading from Firestore...")
-    doc = doc_ref.get()
-    if not doc.exists:
-        logger.error("Assertion Failed: Document not found after write.")
-        sys.exit(1)
+    try:
+        logger.info("Writing to Firestore...")
+        doc_ref.set({"test_id": test_val})
         
-    data = doc.to_dict()
-    if data.get("test_id") != test_val:
-        logger.error("Assertion Failed: Read-back values do not match.")
-        sys.exit(1)
-        
-    logger.info("Firestore assertions passed. Cleaning up...")
-    doc_ref.delete()
+        logger.info("Reading from Firestore...")
+        doc = doc_ref.get()
+        if not doc.exists:
+            logger.error("Assertion Failed: Document not found after write.")
+            sys.exit(1)
+            
+        data = doc.to_dict()
+        if data.get("test_id") != test_val:
+            logger.error("Assertion Failed: Read-back values do not match.")
+            sys.exit(1)
+            
+        logger.info("Firestore assertions passed.")
+    finally:
+        logger.info("Cleaning up Firestore...")
+        doc_ref.delete()
 
 def test_pubsub_access(project: str):
     logger.info("Running Pub/Sub access tests...")
@@ -81,30 +84,55 @@ def test_pubsub_access(project: str):
     finally:
         logger.info("Cleaning up Pub/Sub resources...")
         try:
-            subscriber.delete_subscription(request={"name": sub_path})
+            subscriber.delete_subscription(request={"subscription": sub_path})
         except Exception as e:
             logger.warning(f"Cleanup error (subscription): {e}")
         try:
-            publisher.delete_topic(request={"name": topic_path})
+            publisher.delete_topic(request={"topic": topic_path})
         except Exception as e:
             logger.warning(f"Cleanup error (topic): {e}")
 
 def test_cloud_run_access(project: str):
     logger.info("Running Cloud Run Admin access tests...")
     client = run_v2.ServicesClient()
-    parent = f"projects/{project}/locations/us-central1"
+    location = "europe-west3"
+    parent = f"projects/{project}/locations/{location}"
+    service_id = f"cm-spike-{uuid.uuid4().hex[:8]}"
+    service_name = f"{parent}/services/{service_id}"
     
-    logger.info("Listing Cloud Run services to verify admin access...")
-    request = run_v2.ListServicesRequest(parent=parent)
+    logger.info(f"Creating disposable Cloud Run service {service_id}...")
+    service = run_v2.Service()
+    service.template.containers = [run_v2.Container(image="us-docker.pkg.dev/cloudrun/container/hello")]
+    
+    request = run_v2.CreateServiceRequest(
+        parent=parent,
+        service_id=service_id,
+        service=service
+    )
+    
     try:
-        page_result = client.list_services(request=request)
-        # Just enumerating the first page confirms admin viewer access
-        for service in page_result:
-            break
-        logger.info("Cloud Run Admin access verified.")
+        operation = client.create_service(request=request)
+        logger.info("Waiting for deployment operation to complete...")
+        response = operation.result()
+        logger.info(f"Service deployed. Resource: {response.name}")
+        logger.info(f"Service URI: {response.uri}")
+        
+        # Verify it exists
+        get_request = run_v2.GetServiceRequest(name=service_name)
+        client.get_service(request=get_request)
+        logger.info("Cloud Run service verified.")
     except Exception as e:
-        logger.error(f"Assertion Failed: Could not list Cloud Run services. {e}")
+        logger.error(f"Assertion Failed: Cloud Run test error. {e}")
         sys.exit(1)
+    finally:
+        logger.info("Cleaning up Cloud Run service...")
+        try:
+            delete_request = run_v2.DeleteServiceRequest(name=service_name)
+            delete_op = client.delete_service(request=delete_request)
+            delete_op.result()
+            logger.info("Cloud Run service deleted successfully.")
+        except Exception as e:
+            logger.warning(f"Cleanup error (Cloud Run): {e}")
 
 def run_tests():
     logger.info("Starting P-02.04 GCP Access Tests...")

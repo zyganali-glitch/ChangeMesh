@@ -108,12 +108,12 @@ source_behavior:
 reuse_method: ADAPTED
 target_paths_or_contracts:
   - AGENTS.md
-  - AGENT_OS_RULES.md
-  - AGENT_OS_PLAN_TEMPLATE.md
+  - CHANGEMESH_RULES.md
+  - CHANGEMESH_PLAN_TEMPLATE.md
   - plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md
-  - .agents/rules/changemesh_policy.md
-  - .agents/rules/opradox-governance.md
-  - .agents/skills/agentos-memory/SKILL.md
+  - .agents/rules/00-changemesh-constitution.md
+  - .agents/rules/10-live-plan-and-docs-lock.md
+  - .agents/skills/changemesh-memory/SKILL.md
   - .agents/skills/donor-reuse-preflight/SKILL.md
   - .agents/skills/task-closure-integrity/SKILL.md
   - .agents/skills/competition-claim-audit/SKILL.md
@@ -156,7 +156,7 @@ target_paths_or_contracts:
   - AGENT_ARCHITECTURE_AND_PATTERNS.md
   - AGENT_ENVIRONMENT_AND_API.md
   - AGENT_USER_PREFERENCES.md
-  - .agents/skills/agentos-memory/SKILL.md
+  - .agents/skills/changemesh-memory/SKILL.md
 required_transformations:
   - store durable project facts only; add donor manifest/handoff; no private chain-of-thought or secrets
 forbidden_carry_over:
@@ -408,6 +408,8 @@ required_tests:
   - no old claims
   - no invalid evidence
   - malformed screenshot fails
+  - path traversal (security)
+  - malicious command injection (security)
   - no provider names/old competition language (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
@@ -505,6 +507,8 @@ forbidden_carry_over:
 required_tests:
   - unsupported-claim scanner and cross-document parity
   - ambiguous claim fails
+  - prompt injection on claim parsing (security)
+  - XSS from external devpost text (security)
   - no old claims, scores, or provider names (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
@@ -767,6 +771,8 @@ required_tests:
   - unavailable API
   - owner ambiguity
   - honest NOT_RUN
+  - malicious MR payload spoofing (security)
+  - path traversal in impact_scout (security)
   - no GitLab Duo/Orbit/GraphQL dependency carry-over
 competition_introduction_commit: PENDING
 evidence:

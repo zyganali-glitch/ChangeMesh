@@ -161,40 +161,7 @@ Expected demonstration:
 10. A Change Evidence Passport and Google Cloud traces are shown.
 
 ## Target architecture
-
-```mermaid
-flowchart LR
-    U[User goal] --> O[Agent Gateway (networkservices) + ChangeMesh Policy Guardian]
-    O --> R[Agent Registry / Capability Resolver]
-    R --> ID[Agent Identity]
-    R --> A1[Impact Scout]
-    R --> A2[Policy Guardian]
-    A2 --> MA[Model Armor]
-    R --> A3[Migration Engineer]
-    R --> A4[Evidence Auditor]
-    R --> A5[Release Steward]
-
-    O <--> E[Pub/Sub Event Backbone]
-    O <--> S[Firestore Change State]
-    O <--> M[Memory Trust Layer / Memory Bank]
-    O --> L[ShadowLab Rehearsal]
-    L --> G[Reversibility Gate]
-    G -->|authorized| X[Tool and Agent Gateway]
-    G -->|irreducible authority| H[Approval Compression Card]
-
-    X --> GH[GitHub Demo Repository]
-    X --> DG[Enterprise Metadata Graph]
-    X --> PR[Draft Pull Request]
-
-    A1 --> P[Evidence Ledger]
-    A2 --> P
-    A3 --> P
-    A4 --> P
-    A5 --> P
-    P --> C[Change Evidence Passport]
-
-    O --> T[OpenTelemetry / Cloud Observability]
-```
+> **Note:** The target component architecture diagram is PENDING implementation contracts freeze (Phase P-04). Do not publish the final diagram here until contracts are approved.
 
 ## Google-native implementation policy
 
@@ -217,7 +184,7 @@ Where a target enterprise service is unavailable because of preview access, acco
 Before changing code, every development agent must read:
 
 1. `AGENTS.md`
-2. `AGENT_OS_RULES.md`
+2. `CHANGEMESH_RULES.md`
 3. `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`
 4. `AGENT_MEMORY_AND_LESSONS.md`
 5. `AGENT_ARCHITECTURE_AND_PATTERNS.md`

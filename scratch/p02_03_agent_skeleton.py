@@ -43,7 +43,7 @@ def main():
         # Use Vertex AI as required for enterprise governance
         agent = LlmAgent(
             name="schema_verifier",
-            model=Gemini(model="gemini-1.5-flash", client_kwargs={"vertexai": True, "project": project, "location": "us-central1"}),
+            model=Gemini(model="gemini-3.6-flash", client_kwargs={"vertexai": True, "project": project, "location": "global"}),
             instruction="You are a schema verification agent. Use the verify_schema_change tool to check database change requests.",
             tools=[verify_schema_change],
             output_schema=SchemaVerificationResult
@@ -66,13 +66,24 @@ def main():
         final_result = None
         for event in events:
             if getattr(event, 'author', None):
-                logger.info(f"Agent Event from {event.author}")
+                logger.info(f"Agent Event from {event.author}: {dir(event)}")
+                if hasattr(event, 'message') and event.message:
+                     logger.info(f"Message content: {event.message}")
             if event.error_code:
                 logger.error(f"Agent Error: {event.error_message}")
                 sys.exit(1)
             
-            if event.output:
-                final_result = event.output
+            if hasattr(event, 'message') and event.message and hasattr(event.message, 'parts'):
+                for part in event.message.parts:
+                    if hasattr(part, 'function_call') and part.function_call and part.function_call.name == 'set_model_response':
+                        final_result = SchemaVerificationResult(**part.function_call.args)
+                    elif hasattr(part, 'text') and part.text and 'permitted' in part.text:
+                        import json
+                        try:
+                            data = json.loads(part.text)
+                            final_result = SchemaVerificationResult(**data)
+                        except:
+                            pass
         
         if final_result:
             logger.info(f"Final Structured Output: {final_result}")

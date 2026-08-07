@@ -19,7 +19,7 @@ Questions must never substitute for inspecting the repository.
 
 Before code, commands, file edits, or architectural proposals:
 
-1. Read `AGENT_OS_RULES.md`.
+1. Read `CHANGEMESH_RULES.md`.
 2. Read `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
 3. Read all four Collective Memory files.
 4. Read `docs/HANDOFF.md`.

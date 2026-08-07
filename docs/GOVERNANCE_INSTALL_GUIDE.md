@@ -7,8 +7,8 @@ The generic package contains mandatory Phase-0 interview, locale packs, examples
 ## Mandatory root files
 
 - `AGENTS.md`
-- `AGENT_OS_RULES.md`
-- `AGENT_OS_PLAN_TEMPLATE.md`
+- `CHANGEMESH_RULES.md`
+- `CHANGEMESH_PLAN_TEMPLATE.md`
 - `GEMINI.md`
 - four Collective Memory files
 - `README.md`
@@ -28,10 +28,10 @@ Place these directories unchanged:
 | ChangeMesh file | Universal Agent OS donor concept | Action |
 |---|---|---|
 | `AGENTS.md` | root/tr `AGENTS.md` | Adapted; Phase-0 removed, integrity locks retained |
-| `AGENT_OS_RULES.md` | `tr/AGENT_OS_RULES.md` | Adapted to ChangeMesh contracts |
-| `AGENT_OS_PLAN_TEMPLATE.md` | `tr/AGENT_OS_PLAN_TEMPLATE.md` | Simplified child-plan template |
+| `CHANGEMESH_RULES.md` | `tr/CHANGEMESH_RULES.md` | Adapted to ChangeMesh contracts |
+| `CHANGEMESH_PLAN_TEMPLATE.md` | `tr/CHANGEMESH_PLAN_TEMPLATE.md` | Simplified child-plan template |
 | Four memory files | Collective Memory pillars | Retained and pre-seeded |
-| `.agents/skills/agentos-memory` | `skills/agent-os-memory/SKILL.md` | Migrated to current Antigravity path |
+| `.agents/skills/changemesh-memory` | `skills/agent-os-memory/SKILL.md` | Migrated to current Antigravity path |
 | `.agents/rules/*` | legacy `.agent/rules/global-governance.md` | Updated to current `.agents/rules` standard |
 | `plans/` and `plans/completed/` | Agent OS plan portfolio | Retained |
 

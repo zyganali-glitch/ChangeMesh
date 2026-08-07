@@ -12,4 +12,4 @@ Enforce exact repository pins, license review states, and strict forbidden carry
 
 ## Result
 **Status:** `PASS`
-**Next:** Run `donor-reuse-auditor` to finalize Phase 5.
+**Next:** Run `donor-reuse-auditor` to finalize Phase P-02D.

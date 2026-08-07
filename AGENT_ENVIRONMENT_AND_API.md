@@ -18,7 +18,7 @@ Record actual environment only; do not fill unknown values with guesses.
 - Agent Runtime/Platform: `AVAILABLE`
 - Memory Bank: `AVAILABLE` (via ChangeMesh Memory Trust Layer + Firestore)
 - Agent Registry: `AVAILABLE`
-- Agent Identity: `AVAILABLE` (SPIFFE-based + ChangeMesh Capability Passport)
+- Agent Identity: `UNAVAILABLE` (Deferred to local adapter)
 - Agent Gateway: `AVAILABLE` (networkservices + ChangeMesh Policy Guardian)
 - Model Armor: `AVAILABLE`
 - Observability: `AVAILABLE` (ADK OpenTelemetry -> Cloud Logging/Trace)
@@ -50,7 +50,7 @@ Commands are added only after clean-checkout verification.
 
 | Purpose | Command | Status | Last verified |
 |---|---|---|---|
-| Install | `pip install -r requirements.txt` | `PASS` | 2026-08-07 |
+| Install | `pip install -r requirements.txt` | `FAIL` (File missing) | 2026-08-07 |
 | Unit tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |

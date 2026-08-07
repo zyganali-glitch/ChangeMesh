@@ -7,7 +7,7 @@
 
 ## Requirements Summary
 
-1. **Model Requirement:** Must use Gemini models (e.g., Gemini 1.5 Pro, 1.5 Flash, 2.0).
+1. **Model Requirement:** Must use Gemini models (e.g., Gemini 3.5+, Gemini 1.5 Pro, 2.0).
 2. **Framework Requirement:** Must use Google's open-source Agent Development Kit (ADK) or at least one Google agent framework.
 3. **Cloud Requirement:** Must use Google Cloud infrastructure services (e.g., Cloud Run, Firestore, Pub/Sub).
 4. **Category / Track:** "The Fortified Enterprise Fleet" or other official tracks.

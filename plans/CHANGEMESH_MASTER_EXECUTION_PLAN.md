@@ -58,7 +58,7 @@ Read all four root memory files and `docs/HANDOFF.md` before every task.
 
 ## 0.2 Master Integrity Lock Registry
 
-IL-01 through IL-20 in `AGENT_OS_RULES.md` are binding. Any violation makes active task `BLOCKED`.
+IL-01 through IL-20 in `CHANGEMESH_RULES.md` are binding. Any violation makes active task `BLOCKED`.
 
 ## 1. Scope lock
 
@@ -113,8 +113,9 @@ Schedule is risk control, not permission to skip gates.
 | Phase | Title | Status | Dependency |
 |---|---|---|---|
 | `P-00` | Frozen Charter and Governance Baseline | `DONE` | `-` |
-| `P-01` | Competition Rule and Eligibility Freeze | `IN_PROGRESS` | `P-00` |
-| `P-02` | Google Service Access and Feasibility Spike | `IN_PROGRESS` | `P-01` |
+| `P-01` | Competition Rule and Eligibility Freeze | `DONE` | `P-00` |
+| `P-02` | Google Service Access and Feasibility Spike | `DONE` | `P-01` |
+| `P-02D` | Donor Repository Harvest and Reuse Freeze | `DONE` | `P-02` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
 | `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
@@ -254,7 +255,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-02 — Google Service Access and Feasibility Spike
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-02.01 — Create dedicated Google Cloud project and enable only minimum APIs needed for feasibility
 
@@ -278,7 +279,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.03 — Create and run smallest Google ADK agent locally using verified model
 
-- **Status:** `IN_PROGRESS`
+- **Status:** `DONE`
 - **Required action:** Create and run smallest Google ADK agent locally using verified model.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Agent starts, invokes deterministic local tool, returns schema-valid output.
@@ -288,7 +289,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.04 — Verify Cloud Run, Firestore, and Pub/Sub availability in chosen region using disposable resources, then delete/scale down
 
-- **Status:** `IN_PROGRESS`
+- **Status:** `DONE`
 - **Required action:** Verify Cloud Run, Firestore, and Pub/Sub availability in chosen region using disposable resources, then delete/scale down.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each mandatory service proven accessible; resource names and teardown recorded.
@@ -298,7 +299,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.05 — Individually verify Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, and Observability
 
-- **Status:** `IN_PROGRESS`
+- **Status:** `DONE`
 - **Required action:** Individually verify Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, and Observability.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each service classified AVAILABLE, PREVIEW_BLOCKED, REGION_BLOCKED, PERMISSION_BLOCKED, or DEFERRED; no guessing.
@@ -318,7 +319,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-03 — Product Thesis, User, and Outcome Contract
 
-**Phase status:** `PENDING`
+**Phase status:** `DONE`
 
 ## P-03.01 — Define primary buyer, operator, affected teams, and initial wedge around high-risk schema/API changes
 
@@ -2249,7 +2250,7 @@ An agent's memory, a prior chat summary, repository README text, or broad code s
 
 | Phase | Title | Status | Hard dependency/effect |
 |---|---|---|---|
-| `P-02D` | Donor Repository Harvest and Reuse Freeze | `PENDING` | Starts only after `P-02`; **hard-blocks `P-03` and every donor-sensitive implementation phase** |
+| `P-02D` | Donor Repository Harvest and Reuse Freeze | `DONE` | Starts only after `P-02`; **hard-blocks `P-03` and every donor-sensitive implementation phase** |
 | `P-DΩ` | Continuous Donor Provenance and Reuse Integrity | `ALWAYS_ACTIVE` | Runs after every donor inspection, mapping, implementation, test, refactor, documentation change, and release task |
 
 The earlier registry row showing `P-03` dependent on `P-02` remains historically preserved, but execution eligibility is now stricter: **P-03 may not begin until both P-02 and P-02D are `DONE`.**
@@ -2263,10 +2264,8 @@ The earlier registry row showing `P-03` dependent on `P-02` remains historically
 | `D-CCT` | `zyganali-glitch/codex-control-tower` | `65ee1b72faf9a7202d9166eed43fb671804815a8` | locked evidence states, Flight Recorder, destructive preflight, blind semantic challenge, judge package | no Codex/OpenAI/GPT-specific runtime dependency or model-overwrites-facts behavior |
 | `D-ZEROKIT` | `zyganali-glitch/zerokit-ai-control-plane` | `d663db8c706cb914e1af5caf651df08edb5c50c0` | privacy preflight, synthetic-data boundary, strict artifact validation, hash manifest, claim audit | no ZeroKit product/admin semantics or Codex/GPT provider assumptions |
 | `D-CONTEXTSEAL` | `zyganali-glitch/ContextSeal` | `0dc924db9d82037d2e813548bdee27af5f180889` | lineage/blast radius, expand–migrate–contract, bounded writeback, passport/evidence contract | no hard DataHub coupling or unapproved live writeback |
-| `D-QWEN` | `gitlab.com/zyganali/universal-agent-os-qwen` | `PIN_REQUIRED_BEFORE_REUSE` | hybrid recall, freshness/importance/decay, shared memory bus | no Qwen runtime dependency, Phase-0 carry-over, or memory-as-truth |
-| `D-GITLAB` | `gitlab.com/zyganali/universal-agent-os-gitlab-edition` | `PIN_REQUIRED_BEFORE_REUSE` | real MR overlap/blast-radius, ownership/conflict context, unavailable-tool honesty | no GitLab Duo/Orbit dependency in GitHub-first MVP or fabricated GraphQL evidence |
-
-`PIN_REQUIRED_BEFORE_REUSE` is a blocking state, not permission to use a moving branch. Qwen and GitLab Edition may inform only high-level planning until P-02D records exact immutable commits, source paths, and license status.
+| `D-QWEN` | `gitlab.com/zyganali/universal-agent-os-qwen` | `a43b3411856f41a4be9424d11c01a5e637cdc410` | hybrid recall, freshness/importance/decay, shared memory bus | no Qwen runtime dependency, Phase-0 carry-over, or memory-as-truth |
+| `D-GITLAB` | `gitlab.com/zyganali/universal-agent-os-gitlab-edition` | `3c4a412b6040d8a8154c15325943c409be9105f2` | real MR overlap/blast-radius, ownership/conflict context, unavailable-tool honesty | no GitLab Duo/Orbit dependency in GitHub-first MVP or fabricated GraphQL evidence |
 
 ## 12.5 Controlled reuse methods
 
@@ -2297,16 +2296,16 @@ No component may change reuse method silently. A method change requires plan sta
 
 # P-02D — Donor Repository Harvest and Reuse Freeze
 
-**Phase status:** `PENDING`  
+**Phase status:** `DONE`  
 **Hard dependency:** `P-02`  
 **Hard blocks:** `P-03` onward and all donor-derived implementation  
 **Write scope:** ChangeMesh documentation/governance only; donor repositories remain read-only; no product implementation in this phase.
 
 ## P-02D.01 — Freeze donor governance, read-only access, and source-of-truth rules
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Declare all donor repositories read-only; prohibit commits, branches, issues, releases, tags, or configuration changes in donor repositories; define ChangeMesh as the only writable target.
-- **Mandatory inputs:** `AGENTS.md`, `AGENT_OS_RULES.md`, this additive amendment, and all donor repository URLs.
+- **Mandatory inputs:** `AGENTS.md`, `CHANGEMESH_RULES.md`, this additive amendment, and all donor repository URLs.
 - **Required outputs:** `docs/DONOR_REUSE_MANIFEST.md` governance section, donor access matrix, and explicit read-only declaration.
 - **Forbidden shortcuts:** Do not clone a donor into the ChangeMesh source tree; do not use a moving branch as implementation evidence; do not assume ownership removes license or competition-disclosure duties.
 - **Acceptance criteria:** Every donor has a stable ID, repository URL, writable/read-only classification, source pin state, and named owner phase; all donors are read-only.
@@ -2315,7 +2314,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.02 — Bind donor reuse to verified competition and intellectual-property rules
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Use the completed `P-01.02` result to determine whether pre-existing source may be copied, adapted, clean-room reimplemented, or used only as an idea/reference. Record any rule that limits build-period claims.
 - **Mandatory inputs:** Official competition rules captured by P-01, owner eligibility/IP checklist, donor ownership and license evidence.
 - **Required outputs:** A reuse-policy decision table for `COPIED`, `ADAPTED`, `CLEAN_ROOM_REIMPLEMENTED`, `IDEA_ONLY`, and `REFERENCE_ONLY`.
@@ -2326,7 +2325,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.03 — Create the canonical donor manifest schema and controlled vocabulary
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define the mandatory fields for every donor component: donor ID, repository, pinned commit, source paths, source behavior, license, reuse method, target paths, transformation, forbidden carry-over, required parity tests, introduction commit, evidence, reviewer, and status.
 - **Mandatory inputs:** Current `docs/COMPONENT_PROVENANCE.md`, donor list, evidence-state vocabulary.
 - **Required outputs:** Machine-checkable or consistently structured manifest entries and status vocabulary.
@@ -2337,9 +2336,9 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.04 — Harvest Universal Agent OS governance invariants
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Read only the pinned `D-UAOS` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
-- **Mandatory inputs:** Donor `D-UAOS` at its pinned commit; exact paths: `AGENTS.md`, `tr/AGENT_OS_RULES.md`, `tr/AGENT_OS_PLAN_TEMPLATE.md`, `skills/agent-os-memory/SKILL.md`, `docs/INSTALLATION_MANIFEST.md`, `cli/verify.js`, `cli/status.js`.
+- **Mandatory inputs:** Donor `D-UAOS` at its pinned commit; exact paths: `AGENTS.md`, `tr/CHANGEMESH_RULES.md`, `tr/CHANGEMESH_PLAN_TEMPLATE.md`, `skills/agent-os-memory/SKILL.md`, `docs/INSTALLATION_MANIFEST.md`, `cli/verify.js`, `cli/status.js`.
 - **Required outputs:** Manifest entries describing: live plan, four memory pillars, evidence-first closure, live-doc sync, completed-plan archive, verification/status ideas; proposed ChangeMesh target: ChangeMesh development governance only; most of it is already adapted in the starter baseline; one source-to-target map per component.
 - **Forbidden shortcuts:** Do not copy a directory wholesale; do not import dependencies before method/license approval; exclude: generic Phase-0 interview, locale packs, donor CLI/runtime/MCP/examples, donor product wording.
 - **Acceptance criteria:** Every harvested behavior is tied to exact source paths and a proposed method; no implementation starts from this harvest task itself.
@@ -2348,7 +2347,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.05 — Harvest UiPath edition durable-state and authority invariants
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Read only the pinned `D-UIPATH` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
 - **Mandatory inputs:** Donor `D-UIPATH` at its pinned commit; exact paths: `backend/uipath_api_connector.py`, `tests/test_uipath_connector_modes.py`, `uipath_project/workflows/README.md`, `uipath_project/workflows/phase0_alignment.bpmn`, `docs/evidence_manifest.md`, `HANDOFF.md`, `docs/labs_evidence_checklist.md`, `backend/labs_smoke_test.py`.
 - **Required outputs:** Manifest entries describing: durable waiting/resume state, independently verified authority record, connector real/mock mode honesty, evidence checklist; proposed ChangeMesh target: Firestore saga, Approval Compression, pause/resume, connector-mode tests; one source-to-target map per component.
@@ -2359,7 +2358,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.06 — Harvest Codex Control Tower evidence and challenge invariants
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Read only the pinned `D-CCT` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
 - **Mandatory inputs:** Donor `D-CCT` at its pinned commit; exact paths: `cli/commands/evidence.js`, `tests/test_evidence_pack.js`, `core/workflows/flight-recorder.md`, `core/templates/FLIGHT_RECORDER_TEMPLATE.md`, `cli/commands/flight-recorder.js`, `cli/lib/destructiveActionPreflight.js`, `cli/commands/destructive-preflight.js`, `.codex/hooks/destructive-preflight.js`, `docs/ARCHITECTURE.md`, `JUDGE_START_HERE.md`, `docs/JUDGING_MAP.md`, `docs/DEMO_SCRIPT.md`, `docs/SUBMISSION_MANIFEST.md`, `DEVPOST_SCREENSHOTS.md`, `docs/TRACEABILITY_MATRIX.md`, `docs/BUILD_WEEK_DELTA.md`.
 - **Required outputs:** Manifest entries describing: locked deterministic states, Flight Recorder, destructive-target canonicalization, model/fact authority separation, blind semantic challenge, reconciliation, judge traceability; proposed ChangeMesh target: EvidenceRecord/Event Ledger, ShadowLab preflight, Evidence Auditor, dashboard, passport, judge package; one source-to-target map per component.
@@ -2370,7 +2369,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.07 — Harvest ZeroKit privacy and validator invariants
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Read only the pinned `D-ZEROKIT` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
 - **Mandatory inputs:** Donor `D-ZEROKIT` at its pinned commit; exact paths: `README.md`, `frontend/js/ai-config-preview.js`, `frontend/pages/ai-config-preview.html`, `ai-buildweek/evidence/school-saas.gpt-5.6.codex.config.manifest.json`, `ai-buildweek/reports/privacy-boundary.md`, `ai-buildweek/reports/validator-coverage.md`, `ai-buildweek/reports/jury-claim-audit.md`, `ai-buildweek/reports/build-week-delta.md`, `ai-buildweek/lib/codex-app-workflow.mjs`, `ai-buildweek/scripts/record-codex-run.mjs`, `ai-buildweek/demo/DEMO_SCRIPT.md`, `ai-buildweek/demo/SCREENSHOT_GUIDE.md`, `ai-buildweek/submission/DEVPOST_SUBMISSION_GUIDE.md`.
 - **Required outputs:** Manifest entries describing: privacy preflight, synthetic-only model input, strict generated-artifact validation, manifest hash, field/endpoint policy patterns, jury claim audit; proposed ChangeMesh target: Policy Guardian, model-input boundary, contract validation, evidence manifest, security/claim gates; one source-to-target map per component.
@@ -2381,7 +2380,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.08 — Harvest ContextSeal change-certification invariants
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Read only the pinned `D-CONTEXTSEAL` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
 - **Mandatory inputs:** Donor `D-CONTEXTSEAL` at its pinned commit; exact paths: `src/core/passport.js`, `src/core/workflow.js`, `src/core/risk.js`, `src/datahub/live-context.js`, `src/datahub/writeback.js`, `scripts/build-pr-bundle.js`, `scripts/validate-evidence.js`, `config/policy.json`, `skills/datahub-schema-change-certification/SKILL.md`, `skills/datahub-schema-change-certification/README.md`, `skills/datahub-schema-change-certification/scripts/certify_change.py`, `skills/datahub-schema-change-certification/references/evidence-contract.md`, `skills/datahub-schema-change-certification/references/policy-v1.json`, `skills/datahub-schema-change-certification/templates/certification-report.template.md`, `docs/ARCHITECTURE.md`, `docs/EVIDENCE_BOUNDARY.md`, `docs/BUILD_PERIOD_DISCLOSURE.md`, `docs/PR_REVIEW_PACKET.md`, `docs/BRANCH_RECONCILIATION_MATRIX.md`.
 - **Required outputs:** Manifest entries describing: multi-hop lineage, path-preserving blast radius, expand–migrate–contract, bounded writeback, risk policy, evidence contract, passport/hash, PR bundle; proposed ChangeMesh target: Impact Scout, Migration Engineer, Release Steward, Change Evidence Passport, demo fixture; one source-to-target map per component.
@@ -2392,7 +2391,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.09 — Pin and harvest Qwen MemoryAgent source before any memory reuse
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Resolve the immutable GitLab commit SHA, default branch, license, and exact files implementing hybrid retrieval, freshness/importance, decay, and shared memory bus. Read only those paths and record them.
 - **Mandatory inputs:** `D-QWEN` public GitLab project; project tree and immutable commit endpoint; current manifest placeholder.
 - **Required outputs:** Pinned SHA, exact source-path allowlist, extracted memory invariants, and P-11/P-20 target mapping.
@@ -2403,7 +2402,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.10 — Pin and harvest GitLab Edition conflict-analysis source before any reuse
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Resolve the immutable GitLab commit SHA, license, and exact files implementing MR overlap, repository context, ownership/conflict analysis, and unavailable-tool honesty.
 - **Mandatory inputs:** `D-GITLAB` public GitLab project; immutable commit and tree; current manifest placeholder.
 - **Required outputs:** Pinned SHA, exact source-path allowlist, extracted conflict-analysis invariants, and P-15/P-19 target mapping.
@@ -2414,7 +2413,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.11 — Detect cross-donor overlap, contradictions, and duplicate implementations
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Compare all harvested components by responsibility, state model, evidence authority, data contract, and external dependency. Select one canonical ChangeMesh implementation for each responsibility.
 - **Mandatory inputs:** All completed donor entries from P-02D.04 through P-02D.10.
 - **Required outputs:** Cross-donor convergence matrix: canonical invariant, rejected alternatives, reason, and migration notes.
@@ -2425,7 +2424,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.12 — Freeze reuse method and exact source-to-target mapping for every approved component
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Assign `COPIED`, `ADAPTED`, `CLEAN_ROOM_REIMPLEMENTED`, `IDEA_ONLY`, or `REFERENCE_ONLY`; name exact target files/modules and transformations; record forbidden carry-over.
 - **Mandatory inputs:** Completed convergence matrix, license/IP decision, target architecture evidence available at this point.
 - **Required outputs:** Approved component records with exact source paths, exact target paths or a named target contract to be created, method, rationale, and reviewer.
@@ -2436,7 +2435,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.13 — Verify license, notice, attribution, and owner-authorship obligations
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Inspect each donor license and relevant file headers; decide whether notices, copied copyright text, or attribution are required; prepare a third-party/donor notice plan.
 - **Mandatory inputs:** Pinned donor sources, LICENSE/NOTICE files, competition IP rules.
 - **Required outputs:** License matrix and notice obligations per component.
@@ -2447,7 +2446,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.14 — Security-quarantine donor code and configuration before adaptation
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Scan allowlisted donor files for secrets, hard-coded endpoints, unsafe shell commands, broad filesystem/network access, stale dependencies, generated artifacts, fixture identifiers, and provider-specific assumptions.
 - **Mandatory inputs:** Approved source-path allowlists and donor snapshots.
 - **Required outputs:** Per-component security findings, redaction list, prohibited snippets, and sanitization requirements.
@@ -2458,7 +2457,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.15 — Define behavior-parity and regression tests before donor-derived implementation
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** For every approved donor behavior, write the observable invariants, positive cases, negative cases, forbidden outcomes, and evidence-state expectations that ChangeMesh must preserve or intentionally change.
 - **Mandatory inputs:** Approved manifest entries and donor reference behavior.
 - **Required outputs:** Donor behavior test matrix, golden fixtures where legally/technically appropriate, and ChangeMesh-specific extensions.
@@ -2469,7 +2468,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.16 — Freeze donor snapshot and manifest baseline
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Record immutable source SHAs, source file hashes where practical, manifest revision, reviewer, and approval timestamp; commit the manifest before any donor-derived product implementation.
 - **Mandatory inputs:** All completed P-02D tasks and clean ChangeMesh working tree.
 - **Required outputs:** A donor baseline commit/tag or clearly named commit and a manifest hash.
@@ -2480,7 +2479,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.17 — Synchronize donor decisions with product architecture and competition disclosure
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Update architecture, decision log, build-period disclosure, README status where relevant, and judging documentation so reuse is transparent without overstating pre-existing work as new.
 - **Mandatory inputs:** Frozen donor baseline and competition rule mapping.
 - **Required outputs:** Consistent public/private disclosure language and architecture references.
@@ -2491,7 +2490,7 @@ No component may change reuse method silently. A method change requires plan sta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-02D.18 — Close donor harvest and unlock implementation phases
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Run donor manifest completeness, source-pin, license, security, parity-test, no-bulk-copy, and cross-document gates; execute P-DΩ and P-Ω.
 - **Mandatory inputs:** All outputs of P-02D.01–17.
 - **Required outputs:** P-02D closure record and the exact list of phases/components unlocked.

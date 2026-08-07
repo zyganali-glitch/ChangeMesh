@@ -7,7 +7,7 @@
 - `.agents/rules/00-changemesh-constitution.md`
 - `.agents/rules/10-live-plan-and-docs-lock.md`
 - `.agents/rules/20-evidence-and-autonomy-boundary.md`
-- `.agents/skills/agentos-memory/SKILL.md`
+- `.agents/skills/changemesh-memory/SKILL.md`
 - `.agents/skills/competition-claim-audit/SKILL.md`
 - `.agents/skills/task-closure-integrity/SKILL.md`
 - `.codex/AGENTS.md`
@@ -17,8 +17,8 @@
 - `AGENT_ARCHITECTURE_AND_PATTERNS.md`
 - `AGENT_ENVIRONMENT_AND_API.md`
 - `AGENT_MEMORY_AND_LESSONS.md`
-- `AGENT_OS_PLAN_TEMPLATE.md`
-- `AGENT_OS_RULES.md`
+- `CHANGEMESH_PLAN_TEMPLATE.md`
+- `CHANGEMESH_RULES.md`
 - `AGENT_USER_PREFERENCES.md`
 - `GEMINI.md`
 - `JUDGE_START_HERE.md`
@@ -42,3 +42,11 @@
 - `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`
 - `plans/README.md`
 - `plans/completed/.gitkeep`
+- .agents/agents/donor-reuse-auditor/agent.md
+- .agents/rules/30-donor-provenance-lock.md
+- .agents/skills/donor-reuse-preflight/SKILL.md
+- docs/DONOR_REUSE_MANIFEST.md
+- docs/DEVPOST_REQUIREMENTS_CAPTURE.md
+- docs/P-02D_DONOR_AUDIT_REPORT.md
+- docs/P-OMEGA_AUDIT_REPORT.md
+- docs/P-02D_CLOSURE_RECORD.md

@@ -15,7 +15,7 @@ coverage/
 service-account*.json
 credentials*.json
 .gemini/
-.agentos-backups/
+.changemesh-backups/
 tmp/
 artifacts/private/
 .vscode/

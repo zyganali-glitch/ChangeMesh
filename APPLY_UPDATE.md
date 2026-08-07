@@ -6,7 +6,7 @@ This package is an additive patch built from the current GitHub master plan whos
 
 - `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`
 - `AGENTS.md`
-- `AGENT_OS_RULES.md`
+- `CHANGEMESH_RULES.md`
 - `docs/COMPONENT_PROVENANCE.md`
 
 Each replacement preserves the prior file as an exact prefix and appends stricter donor controls.
@@ -27,7 +27,7 @@ Do not overwrite `docs/HANDOFF.md`; the repository already contains newer live s
 Use a dedicated documentation/governance commit before product code, for example:
 
 ```powershell
-git add AGENTS.md AGENT_OS_RULES.md plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md docs/COMPONENT_PROVENANCE.md docs/DONOR_REUSE_MANIFEST.md .agents/rules/30-donor-provenance-lock.md .agents/skills/donor-reuse-preflight/SKILL.md .agents/agents/donor-reuse-auditor/agent.md
+git add AGENTS.md CHANGEMESH_RULES.md plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md docs/COMPONENT_PROVENANCE.md docs/DONOR_REUSE_MANIFEST.md .agents/rules/30-donor-provenance-lock.md .agents/skills/donor-reuse-preflight/SKILL.md .agents/agents/donor-reuse-auditor/agent.md
 git commit -m "docs: add binding donor reuse and provenance control plane"
 git push
 ```
