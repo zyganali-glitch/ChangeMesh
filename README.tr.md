@@ -2,7 +2,7 @@
 
 > **Her kritik değişikliği önce prova et. Yalnızca kanıtlanmış ajanlara güven. Kanıtla yürüt.**
 
-ChangeMesh; kod, veri, güvenlik, uyumluluk ve operasyon sınırlarını aşan uzun süreli kurumsal değişiklikleri otonom biçimde yürüten, fakat geri döndürülemez yetki sınırlarında yalnızca gerekli insan kararını isteyen bir ajan filosudur.
+**ChangeMesh**, yüksek riskli kurumsal mimari değişikliklerini güvenle prova eden ve yürüten, kural-yönetimli (policy-governed) bir ajan filosudur. Kurumsal bir değişikliği bir sohbet oturumu olarak değil, uzun ömürlü dağıtık bir işlem (transaction) olarak ele alır. Google Agent Development Kit ve Gemini kullanarak bağımlılıkları keşfeder, gölge ortamda provalar yapar ve haftalar sürecek manuel koordinasyon sürecini tek bir kriptografik Değişim Kanıt Pasaportuna (Change Evidence Passport) dönüştürür.
 
 ## Durum
 

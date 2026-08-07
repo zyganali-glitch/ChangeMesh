@@ -18,7 +18,7 @@
 - **Primary agent framework:** Google Agent Development Kit (ADK)
 - **Required cloud proof:** Google Cloud deployment and runtime evidence
 - **Planned core services:** Cloud Run, Firestore, Pub/Sub
-- **Target enterprise services:** Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, Agent Observability (Access Verified)
+- **Target enterprise services:** Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, Agent Observability (Pending complete integration validation)
 
 ## The problem
 

@@ -1,5 +1,6 @@
 # ChangeMesh Plan Preservation Report
 
+> **Note:** This report reflects the state of the plan at the time of the initial repository setup and donor baseline. It is a historical snapshot and does not represent live plan state during Phase execution.
 - Canonical source: GitHub `main` plan reconstructed from current repository state.
 - Original Git blob SHA: `a91661a5e3e83195b70d53695e9bce3722501254`
 - Original bytes: `138163`

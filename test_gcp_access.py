@@ -32,7 +32,9 @@ def test_pubsub():
     print(f"Testing Pub/Sub in project {PROJECT_ID}...")
     try:
         publisher = pubsub_v1.PublisherClient()
+        subscriber = pubsub_v1.SubscriberClient()
         topic_path = publisher.topic_path(PROJECT_ID, "changemesh_spike_topic")
+        subscription_path = subscriber.subscription_path(PROJECT_ID, "changemesh_spike_sub")
         
         # Try to create topic
         try:
@@ -43,6 +45,16 @@ def test_pubsub():
                 print("  - Topic already exists.")
             else:
                 raise create_e
+                
+        # Try to create subscription
+        try:
+            subscriber.create_subscription(request={"name": subscription_path, "topic": topic_path})
+            print(f"  - Subscription created: {subscription_path}")
+        except Exception as create_e:
+            if "AlreadyExists" in str(create_e):
+                print("  - Subscription already exists.")
+            else:
+                raise create_e
         
         # Try to publish
         data = b"Hello from ChangeMesh Spike"
@@ -50,7 +62,21 @@ def test_pubsub():
         message_id = future.result()
         print(f"  - Message published. ID: {message_id}")
         
-        # Try to delete topic
+        # Try to consume
+        response = subscriber.pull(
+            request={"subscription": subscription_path, "max_messages": 1},
+            timeout=10.0,
+        )
+        for msg in response.received_messages:
+            print(f"  - Message consumed: {msg.message.data}")
+            subscriber.acknowledge(
+                request={"subscription": subscription_path, "ack_ids": [msg.ack_id]}
+            )
+            print("  - Message acknowledged.")
+        
+        # Cleanup
+        subscriber.delete_subscription(request={"subscription": subscription_path})
+        print("  - Subscription deleted successfully.")
         publisher.delete_topic(request={"topic": topic_path})
         print("  - Topic deleted successfully.")
         return True
@@ -63,18 +89,33 @@ def test_cloud_run():
     try:
         client = run_v2.ServicesClient()
         parent = f"projects/{PROJECT_ID}/locations/{REGION}"
+        service_id = "changemesh-spike-svc"
+        service_name = f"{parent}/services/{service_id}"
         
-        # Just listing services to verify API access is enabled. 
-        # Creating a service requires detailed config, listing is a good enough proxy for API access.
-        print(f"  - Listing Cloud Run services in {parent}...")
-        request = run_v2.ListServicesRequest(parent=parent)
-        page_result = client.list_services(request=request)
+        print(f"  - Attempting to create Cloud Run service '{service_id}'...")
+        service = run_v2.Service(
+            template=run_v2.RevisionTemplate(
+                containers=[run_v2.Container(image="us-docker.pkg.dev/cloudrun/container/hello")]
+            )
+        )
+        request = run_v2.CreateServiceRequest(
+            parent=parent,
+            service_id=service_id,
+            service=service
+        )
         
-        count = 0
-        for response in page_result:
-            count += 1
-            
-        print(f"  - Success! Found {count} services (API is accessible).")
+        # Deploy service
+        operation = client.create_service(request=request)
+        print("  - Deployment operation started, waiting for completion...")
+        response = operation.result()
+        print(f"  - Success! Service deployed at: {response.uri}")
+        
+        # Cleanup
+        print("  - Deleting disposable service...")
+        del_request = run_v2.DeleteServiceRequest(name=service_name)
+        del_operation = client.delete_service(request=del_request)
+        del_operation.result()
+        print("  - Disposable service deleted successfully.")
         return True
     except Exception as e:
         print(f"  - Cloud Run error: {e}")

@@ -63,9 +63,13 @@
 - Date: 2026-08-07
 - Status: Accepted
 - Context: P-02.06 required choosing the MVP tier based on real service access and documenting fallbacks for any blocked components.
-- Decision: Use real Google Cloud managed services for all components (Cloud Run, Firestore, Pub/Sub, Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, Observability).
-- Alternatives: Local deterministic adapters would have been used for any unavailable services.
-- Consequences: All components will target real GCP infrastructure. Local adapters will still be built for fast inner-loop development and labeled explicitly as `LOCAL_FIXTURE` to avoid false managed-service claims, but the production pathway is guaranteed to be fully managed.
+- ### Decision
+For the Hackathon MVP, we will use **Google Cloud Managed Services** for data and event layers (Firestore, Pub/Sub, Cloud Run) as they have been fully verified. However, the Google ADK/Reasoning Engine is marked **DEFERRED** locally due to SDK unavailability (`google-cloud-aiplatform` missing `reasoning_engine`).
+
+### Consequences
+- We will rely on real GCP resources for state and event bus.
+- If the official ADK remains blocked, we will use `google-genai` directly as a fallback orchestrator, explicitly labeling it as `LOCAL_FIXTURE` / fallback.
+- We will NOT claim we are using Reasoning Engine unless it is actually deployed.
 - Evidence: `docs/P-02.04_EVIDENCE.md` and `docs/P-02.05_EVIDENCE.md` confirm 100% availability in project `project-af5e1c99-3bc4-424f-b53`.
 
 ## ADR-0008 — Product Buyer and Initial Wedge
