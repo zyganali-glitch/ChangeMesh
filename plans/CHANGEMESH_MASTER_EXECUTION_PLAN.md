@@ -224,7 +224,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-01.02 — Verify owner eligibility, excluded countries, team rules, IP rules, pre-existing code policy, public/private repository rules, and deadline timezone
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Verify owner eligibility, excluded countries, team rules, IP rules, pre-existing code policy, public/private repository rules, and deadline timezone.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No unresolved eligibility or reuse blocker.

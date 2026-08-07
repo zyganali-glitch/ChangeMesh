@@ -16,7 +16,12 @@ ChangeMesh is a new product/repository. Design benefits from ideas in owner's ea
 
 ## Mandatory final disclosure
 
-Record original path, license, source commit, copied/adapted/clean-room status, competition-period introduction commit, tests proving new behavior, and why ChangeMesh contribution is materially new.
+Record original path, license, source commit, copied/adapted/clean-room status, competition-period introduction commit, tests proving new behavior, and why ChangeMesh contribution is materially new. 
+
+Per the official Hackathon rules, any reused components must:
+1. Comply with applicable open-source licenses.
+2. Be fully disclosed if pre-existing.
+3. Be enhanced/built upon to create materially new software during the Submission Period.
 
 
 ## Binding detailed ledger
