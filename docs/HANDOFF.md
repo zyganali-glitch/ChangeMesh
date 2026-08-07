@@ -1,11 +1,12 @@
 # ChangeMesh Live Handoff
 
-- Last updated: 2026-08-07 00:01 GMT+3
-- Repository state: Local Git repository initialized; committed baseline `45680fb`; pushed to remote `https://github.com/zyganali-glitch/ChangeMesh.git`; tagged `v0.0.0-governance-baseline`
+- Last updated: 2026-08-07 10:45 GMT+3
+- Repository state: Local Git repository updated with binding donor reuse and provenance control plane package (`ChangeMesh_Donor_Reuse_Update.zip`).
 - Active phase: `P-01 — Competition Rule and Eligibility Freeze`
 - Last completed micro-task: `P-00.04 — Freeze governance baseline with a tagged or clearly named commit and record its SHA`
 - Next exact micro-task: `P-01.01 — Re-open official Devpost Overview, Rules, FAQ, Resources, schedule, and track pages; transcribe binding requirements and record capture date`
-- Required first reads: constitution, master plan, four memory files
-- Known blockers: Google Cloud and Gemini service access not yet verified (Phase P-02)
+- Master plan update: `P-02D — Binding Donor Repository and Provenance Audit` hard gate added (must follow P-02 and blocks P-03).
+- Required first reads: constitution, master plan, four memory files, `docs/DONOR_REUSE_MANIFEST.md`, `docs/COMPONENT_PROVENANCE.md`
+- Known blockers: Google Cloud and Gemini service access not yet verified (Phase P-02); P-02D donor reuse lock blocks Phase P-03 until executed.
 - Claims boundary: all product features remain `PLANNED`; setup/deployment `NOT_RUN`
 - Operator instruction: Follow plan in order. Proceed with P-01 competition eligibility freeze.

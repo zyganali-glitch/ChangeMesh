@@ -17,3 +17,24 @@ ChangeMesh is a new product/repository. Design benefits from ideas in owner's ea
 ## Mandatory final disclosure
 
 Record original path, license, source commit, copied/adapted/clean-room status, competition-period introduction commit, tests proving new behavior, and why ChangeMesh contribution is materially new.
+
+
+## Binding detailed ledger
+
+The canonical component-level ledger is [`DONOR_REUSE_MANIFEST.md`](DONOR_REUSE_MANIFEST.md). The high-level table above is a summary only and never authorizes implementation.
+
+A component is reusable only when the detailed ledger records:
+
+- immutable donor commit;
+- exact source paths;
+- verified license/notice state;
+- observable source behavior;
+- explicit reuse method;
+- exact ChangeMesh target path or contract;
+- required transformations and forbidden carry-over;
+- positive, failure, boundary, security, and forbidden-carry-over tests;
+- competition-period introduction commit;
+- reviewer and evidence;
+- final `VERIFIED` status.
+
+P-02D, each relevant P-xx.00 preflight, P-DΩ, and P-Ω.12 are mandatory. Donor repositories remain read-only.

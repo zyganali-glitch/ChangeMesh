@@ -130,3 +130,21 @@ Every completion report must contain:
 9. next eligible micro-task.
 
 Do not provide a confidence-only completion summary.
+
+
+## 10. Donor Repository Reuse Lock — Binding Addendum
+
+Before any donor-sensitive implementation, the primary agent must:
+
+1. read `docs/DONOR_REUSE_MANIFEST.md` and the master-plan donor amendment;
+2. confirm `P-02D` is `DONE`;
+3. open the relevant `P-xx.00` donor preflight and mark it `IN_PROGRESS`;
+4. inspect the exact immutable donor commit and allowlisted source paths;
+5. confirm license state, approved reuse method, exact target mapping, forbidden carry-over, and required tests;
+6. run the read-only `donor-reuse-auditor`;
+7. update the donor manifest before product code;
+8. run P-DΩ and P-Ω before closure.
+
+Donor repositories are read-only. No agent may modify them, import them wholesale, use a moving branch as provenance, or implement from remembered behavior. An incomplete or unpinned donor entry makes the task `BLOCKED`.
+
+Shared donor/governance/provenance files remain single-writer surfaces owned by the primary agent. Subagents may inspect and challenge but may not edit them.

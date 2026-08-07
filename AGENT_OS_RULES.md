@@ -79,3 +79,25 @@ Repeating near-identical edits is forbidden.
 ## 7. Final truth
 
 Edited is not validated. Validated is not deployed. Deployed is not production-proven. Simulated is not real. Model confidence is not evidence.
+
+
+## 8. Donor Reuse Integrity Locks — Binding Addendum
+
+- **IL-21 — Donor Provenance Lock:** No donor-derived code, prompt, schema, test, UI, workflow, policy, fixture, or documentation structure enters ChangeMesh without a complete approved `docs/DONOR_REUSE_MANIFEST.md` entry.
+- **IL-22 — Immutable Source and Read-Only Donor Lock:** Donor repositories are read-only; exact immutable commit and source paths are mandatory. Moving branches, broad repository memory, and README-only claims are not evidence.
+- **IL-23 — Reuse Method, Parity, and Anti-Duplicate Lock:** Every component declares `COPIED`, `ADAPTED`, `CLEAN_ROOM_REIMPLEMENTED`, `IDEA_ONLY`, or `REFERENCE_ONLY`, passes its required parity/intentional-delta tests, and converges on one canonical ChangeMesh implementation.
+
+### Mandatory donor gate
+
+A donor-sensitive task may not move from `PENDING` to implementation until its `P-xx.00` preflight passes. It may not become `DONE` until P-DΩ and P-Ω.12 pass. Unknown source pin, source path, license, reuse method, target mapping, or tests is `BLOCKED`.
+
+### Forbidden donor behavior
+
+- no donor-repository writes;
+- no bulk repository copy;
+- no hidden copied snippet;
+- no stale provider/runtime dependency;
+- no donor fixture/customer/project identity;
+- no duplicate evidence/passport/memory/policy implementation;
+- no pre-existing feature described as competition-period creation;
+- no source-method change without manifest, plan, tests, and disclosure update.

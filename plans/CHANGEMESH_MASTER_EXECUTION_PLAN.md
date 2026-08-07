@@ -2212,3 +2212,606 @@ Append files changed, tests, evidence states, docs updated, contradictions fixed
 # 11. Final definition of done
 
 Competition-complete only when mandatory phases DONE; required technologies proven; deployed E2E reproducible; real/fixture/simulation visible; no required FAIL/unexplained NOT_RUN; release/cloud/video/screenshots/README/Devpost/judge docs agree; final P-Ω passes; signed-out submission verified; independent roadmap separated from competition claims.
+
+
+---
+
+# 12. BINDING ADDITIVE DONOR REUSE CONTROL PLANE
+
+> **Amendment date:** 2026-08-07 GMT+3  
+> **Amendment status:** `BINDING / ADDITIVE / PRE-IMPLEMENTATION`  
+> **Preservation guarantee:** Every byte of the GitHub master plan that existed before this heading is preserved above. This amendment adds controls and tasks; it does not delete, shorten, replace, or waive any earlier phase, micro-task, gate, risk, or definition of done.  
+> **Canonical pre-amendment Git blob SHA:** `a91661a5e3e83195b70d53695e9bce3722501254`  
+> **Conflict rule:** When this amendment is stricter than an earlier generic instruction, the stricter donor-provenance requirement applies. Earlier scope, quality, evidence, autonomy, cloud, demo, and documentation duties remain fully binding.
+
+## 12.1 Donor Integrity Lock expansion
+
+The Integrity Lock registry is expanded from IL-01–IL-20 to **IL-01–IL-23**:
+
+- **IL-21 — Donor Provenance Lock:** No donor-derived code, prompt, schema, workflow, test, UI, policy, documentation structure, or fixture may enter ChangeMesh before a complete approved manifest entry exists.
+- **IL-22 — Immutable Source and Read-Only Donor Lock:** Donor repositories are read-only. Every reused component must be tied to an immutable commit and exact allowlisted source paths. Moving branches, remembered behavior, or README-only claims are insufficient.
+- **IL-23 — Reuse Method, Parity, and No-Duplicate Lock:** Every component must declare `COPIED`, `ADAPTED`, `CLEAN_ROOM_REIMPLEMENTED`, `IDEA_ONLY`, or `REFERENCE_ONLY`; pass its behavior-parity/intentional-delta tests; and converge on one canonical ChangeMesh implementation without zombie duplicate logic.
+
+Violation of IL-21, IL-22, or IL-23 immediately makes the active task `BLOCKED`, reopens any falsely closed dependent task, and requires a P-DΩ/P-Ω audit.
+
+## 12.2 Mandatory startup expansion
+
+Before every donor-sensitive task, agents must additionally read:
+
+1. `docs/DONOR_REUSE_MANIFEST.md`
+2. `docs/COMPONENT_PROVENANCE.md`
+3. the relevant `P-xx.00` donor preflight below
+4. the exact pinned donor files listed in the manifest
+
+An agent's memory, a prior chat summary, repository README text, or broad code search is never a substitute for exact pinned-source inspection.
+
+## 12.3 Master registry additive overlay
+
+| Phase | Title | Status | Hard dependency/effect |
+|---|---|---|---|
+| `P-02D` | Donor Repository Harvest and Reuse Freeze | `PENDING` | Starts only after `P-02`; **hard-blocks `P-03` and every donor-sensitive implementation phase** |
+| `P-DΩ` | Continuous Donor Provenance and Reuse Integrity | `ALWAYS_ACTIVE` | Runs after every donor inspection, mapping, implementation, test, refactor, documentation change, and release task |
+
+The earlier registry row showing `P-03` dependent on `P-02` remains historically preserved, but execution eligibility is now stricter: **P-03 may not begin until both P-02 and P-02D are `DONE`.**
+
+## 12.4 Donor source snapshot registry
+
+| Donor ID | Repository | Pinned source | Primary reusable value | Hard prohibition |
+|---|---|---|---|---|
+| `D-UAOS` | `zyganali-glitch/Universal-Agent-OS` | `6b83b06212101c238ec28076a2ba7ae819f483f2` | live plan, Collective Memory, evidence-first closure, completed-plan archive | no generic Phase-0, no donor runtime/CLI/MCP bulk copy |
+| `D-UIPATH` | `zyganali-glitch/universal-agent-os-uipath` | `dc2267939c2aef0aba2737da65f53352c5cf8fb2` | durable process state, independently verified authority decision, real/mock connector honesty | no UiPath runtime, Action Center, Data Service, or Phase-0 dependency |
+| `D-CCT` | `zyganali-glitch/codex-control-tower` | `65ee1b72faf9a7202d9166eed43fb671804815a8` | locked evidence states, Flight Recorder, destructive preflight, blind semantic challenge, judge package | no Codex/OpenAI/GPT-specific runtime dependency or model-overwrites-facts behavior |
+| `D-ZEROKIT` | `zyganali-glitch/zerokit-ai-control-plane` | `d663db8c706cb914e1af5caf651df08edb5c50c0` | privacy preflight, synthetic-data boundary, strict artifact validation, hash manifest, claim audit | no ZeroKit product/admin semantics or Codex/GPT provider assumptions |
+| `D-CONTEXTSEAL` | `zyganali-glitch/ContextSeal` | `0dc924db9d82037d2e813548bdee27af5f180889` | lineage/blast radius, expand–migrate–contract, bounded writeback, passport/evidence contract | no hard DataHub coupling or unapproved live writeback |
+| `D-QWEN` | `gitlab.com/zyganali/universal-agent-os-qwen` | `PIN_REQUIRED_BEFORE_REUSE` | hybrid recall, freshness/importance/decay, shared memory bus | no Qwen runtime dependency, Phase-0 carry-over, or memory-as-truth |
+| `D-GITLAB` | `gitlab.com/zyganali/universal-agent-os-gitlab-edition` | `PIN_REQUIRED_BEFORE_REUSE` | real MR overlap/blast-radius, ownership/conflict context, unavailable-tool honesty | no GitLab Duo/Orbit dependency in GitHub-first MVP or fabricated GraphQL evidence |
+
+`PIN_REQUIRED_BEFORE_REUSE` is a blocking state, not permission to use a moving branch. Qwen and GitLab Edition may inform only high-level planning until P-02D records exact immutable commits, source paths, and license status.
+
+## 12.5 Controlled reuse methods
+
+| Method | Meaning | Required treatment |
+|---|---|---|
+| `COPIED` | Source is carried substantially unchanged | exact file/line provenance, compatible license, retained notices, target hash, direct tests |
+| `ADAPTED` | Source structure/logic is materially retained but changed | exact source map, transformation notes, license/notices, parity and intentional-delta tests |
+| `CLEAN_ROOM_REIMPLEMENTED` | Behavior/invariant is specified from the donor, then independently implemented for ChangeMesh | invariant/spec record, no source copy during implementation, behavior tests, originality note |
+| `IDEA_ONLY` | Only a general concept influences design | no code-level equivalence claim, decision-log citation, ChangeMesh-native implementation/tests |
+| `REFERENCE_ONLY` | Donor is read for comparison or documentation discipline but not used in product implementation | record inspected paths and lessons; no source-to-target code mapping |
+
+No component may change reuse method silently. A method change requires plan status update, manifest edit, license/security recheck, target diff review, tests, and P-DΩ/P-Ω.
+
+## 12.6 Universal donor preflight — mandatory before every donor-sensitive implementation
+
+1. Confirm P-02D is `DONE` and the donor entry is not `PIN_REQUIRED`, `BLOCKED`, or incomplete.
+2. Mark the phase's `P-xx.00` task `IN_PROGRESS` before opening donor source.
+3. Verify the donor repository, immutable commit SHA, license state, and exact source-path allowlist.
+4. Read only the relevant source files plus the minimum tests/docs required to understand behavior.
+5. Write the source behavior as observable invariants; separate fact from README/marketing claims.
+6. Compare against existing ChangeMesh contracts and reject duplicate or conflicting implementations.
+7. Confirm the approved reuse method and exact target path/contract.
+8. List provider/framework/product identifiers that must not cross into ChangeMesh.
+9. Define positive, failure, boundary, security, and forbidden-carry-over tests before implementation.
+10. Run the read-only `donor-reuse-auditor`; resolve every blocking finding.
+11. Record the preflight evidence in `docs/DONOR_REUSE_MANIFEST.md` and the active plan task.
+12. Only then unlock the original `P-xx.01` implementation task.
+
+# P-02D — Donor Repository Harvest and Reuse Freeze
+
+**Phase status:** `PENDING`  
+**Hard dependency:** `P-02`  
+**Hard blocks:** `P-03` onward and all donor-derived implementation  
+**Write scope:** ChangeMesh documentation/governance only; donor repositories remain read-only; no product implementation in this phase.
+
+## P-02D.01 — Freeze donor governance, read-only access, and source-of-truth rules
+
+- **Status:** `PENDING`
+- **Required action:** Declare all donor repositories read-only; prohibit commits, branches, issues, releases, tags, or configuration changes in donor repositories; define ChangeMesh as the only writable target.
+- **Mandatory inputs:** `AGENTS.md`, `AGENT_OS_RULES.md`, this additive amendment, and all donor repository URLs.
+- **Required outputs:** `docs/DONOR_REUSE_MANIFEST.md` governance section, donor access matrix, and explicit read-only declaration.
+- **Forbidden shortcuts:** Do not clone a donor into the ChangeMesh source tree; do not use a moving branch as implementation evidence; do not assume ownership removes license or competition-disclosure duties.
+- **Acceptance criteria:** Every donor has a stable ID, repository URL, writable/read-only classification, source pin state, and named owner phase; all donors are read-only.
+- **Required evidence:** Repository scan showing no nested donor copy/submodule and a completed governance checklist.
+- **Mandatory documentation sync:** Donor manifest, component provenance, build-period disclosure, decision log, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.02 — Bind donor reuse to verified competition and intellectual-property rules
+
+- **Status:** `PENDING`
+- **Required action:** Use the completed `P-01.02` result to determine whether pre-existing source may be copied, adapted, clean-room reimplemented, or used only as an idea/reference. Record any rule that limits build-period claims.
+- **Mandatory inputs:** Official competition rules captured by P-01, owner eligibility/IP checklist, donor ownership and license evidence.
+- **Required outputs:** A reuse-policy decision table for `COPIED`, `ADAPTED`, `CLEAN_ROOM_REIMPLEMENTED`, `IDEA_ONLY`, and `REFERENCE_ONLY`.
+- **Forbidden shortcuts:** Do not interpret silence as permission; do not begin donor-derived implementation while P-01.02 is unresolved; do not label pre-existing behavior as competition-period creation.
+- **Acceptance criteria:** Every reuse method has an allowed/forbidden rule and disclosure requirement; any ambiguity is `BLOCKED` rather than guessed.
+- **Required evidence:** Rule citations/screenshots, ADR, and completed reuse-policy matrix.
+- **Mandatory documentation sync:** Donor manifest, component provenance, build-period disclosure, judging map, decision log.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.03 — Create the canonical donor manifest schema and controlled vocabulary
+
+- **Status:** `PENDING`
+- **Required action:** Define the mandatory fields for every donor component: donor ID, repository, pinned commit, source paths, source behavior, license, reuse method, target paths, transformation, forbidden carry-over, required parity tests, introduction commit, evidence, reviewer, and status.
+- **Mandatory inputs:** Current `docs/COMPONENT_PROVENANCE.md`, donor list, evidence-state vocabulary.
+- **Required outputs:** Machine-checkable or consistently structured manifest entries and status vocabulary.
+- **Forbidden shortcuts:** No free-form entry may omit source paths, source pin, license state, target mapping, or tests; no `main`/`master` moving reference may count as a pin.
+- **Acceptance criteria:** A missing mandatory field makes the entry `BLOCKED`; manifest examples validate against the schema/checklist.
+- **Required evidence:** Manifest linter/checklist output and one valid plus one intentionally invalid sample.
+- **Mandatory documentation sync:** Donor manifest, component provenance, evidence boundary, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.04 — Harvest Universal Agent OS governance invariants
+
+- **Status:** `PENDING`
+- **Required action:** Read only the pinned `D-UAOS` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
+- **Mandatory inputs:** Donor `D-UAOS` at its pinned commit; exact paths: `AGENTS.md`, `tr/AGENT_OS_RULES.md`, `tr/AGENT_OS_PLAN_TEMPLATE.md`, `skills/agent-os-memory/SKILL.md`, `docs/INSTALLATION_MANIFEST.md`, `cli/verify.js`, `cli/status.js`.
+- **Required outputs:** Manifest entries describing: live plan, four memory pillars, evidence-first closure, live-doc sync, completed-plan archive, verification/status ideas; proposed ChangeMesh target: ChangeMesh development governance only; most of it is already adapted in the starter baseline; one source-to-target map per component.
+- **Forbidden shortcuts:** Do not copy a directory wholesale; do not import dependencies before method/license approval; exclude: generic Phase-0 interview, locale packs, donor CLI/runtime/MCP/examples, donor product wording.
+- **Acceptance criteria:** Every harvested behavior is tied to exact source paths and a proposed method; no implementation starts from this harvest task itself.
+- **Required evidence:** Read log, source-path inventory, extracted invariant checklist, and manifest diff.
+- **Mandatory documentation sync:** Donor manifest, component provenance, architecture memory where relevant, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.05 — Harvest UiPath edition durable-state and authority invariants
+
+- **Status:** `PENDING`
+- **Required action:** Read only the pinned `D-UIPATH` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
+- **Mandatory inputs:** Donor `D-UIPATH` at its pinned commit; exact paths: `backend/uipath_api_connector.py`, `tests/test_uipath_connector_modes.py`, `uipath_project/workflows/README.md`, `uipath_project/workflows/phase0_alignment.bpmn`, `docs/evidence_manifest.md`, `HANDOFF.md`, `docs/labs_evidence_checklist.md`, `backend/labs_smoke_test.py`.
+- **Required outputs:** Manifest entries describing: durable waiting/resume state, independently verified authority record, connector real/mock mode honesty, evidence checklist; proposed ChangeMesh target: Firestore saga, Approval Compression, pause/resume, connector-mode tests; one source-to-target map per component.
+- **Forbidden shortcuts:** Do not copy a directory wholesale; do not import dependencies before method/license approval; exclude: UiPath runtime, Action Center, Data Service, Maestro, Phase-0 interview, UiPath-specific IDs.
+- **Acceptance criteria:** Every harvested behavior is tied to exact source paths and a proposed method; no implementation starts from this harvest task itself.
+- **Required evidence:** Read log, source-path inventory, extracted invariant checklist, and manifest diff.
+- **Mandatory documentation sync:** Donor manifest, component provenance, architecture memory where relevant, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.06 — Harvest Codex Control Tower evidence and challenge invariants
+
+- **Status:** `PENDING`
+- **Required action:** Read only the pinned `D-CCT` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
+- **Mandatory inputs:** Donor `D-CCT` at its pinned commit; exact paths: `cli/commands/evidence.js`, `tests/test_evidence_pack.js`, `core/workflows/flight-recorder.md`, `core/templates/FLIGHT_RECORDER_TEMPLATE.md`, `cli/commands/flight-recorder.js`, `cli/lib/destructiveActionPreflight.js`, `cli/commands/destructive-preflight.js`, `.codex/hooks/destructive-preflight.js`, `docs/ARCHITECTURE.md`, `JUDGE_START_HERE.md`, `docs/JUDGING_MAP.md`, `docs/DEMO_SCRIPT.md`, `docs/SUBMISSION_MANIFEST.md`, `DEVPOST_SCREENSHOTS.md`, `docs/TRACEABILITY_MATRIX.md`, `docs/BUILD_WEEK_DELTA.md`.
+- **Required outputs:** Manifest entries describing: locked deterministic states, Flight Recorder, destructive-target canonicalization, model/fact authority separation, blind semantic challenge, reconciliation, judge traceability; proposed ChangeMesh target: EvidenceRecord/Event Ledger, ShadowLab preflight, Evidence Auditor, dashboard, passport, judge package; one source-to-target map per component.
+- **Forbidden shortcuts:** Do not copy a directory wholesale; do not import dependencies before method/license approval; exclude: Codex event format, OpenAI/GPT runtime, Codex hooks, provider-specific prompts, fictional InvoiceFlow names, expected-answer leakage.
+- **Acceptance criteria:** Every harvested behavior is tied to exact source paths and a proposed method; no implementation starts from this harvest task itself.
+- **Required evidence:** Read log, source-path inventory, extracted invariant checklist, and manifest diff.
+- **Mandatory documentation sync:** Donor manifest, component provenance, architecture memory where relevant, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.07 — Harvest ZeroKit privacy and validator invariants
+
+- **Status:** `PENDING`
+- **Required action:** Read only the pinned `D-ZEROKIT` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
+- **Mandatory inputs:** Donor `D-ZEROKIT` at its pinned commit; exact paths: `README.md`, `frontend/js/ai-config-preview.js`, `frontend/pages/ai-config-preview.html`, `ai-buildweek/evidence/school-saas.gpt-5.6.codex.config.manifest.json`, `ai-buildweek/reports/privacy-boundary.md`, `ai-buildweek/reports/validator-coverage.md`, `ai-buildweek/reports/jury-claim-audit.md`, `ai-buildweek/reports/build-week-delta.md`, `ai-buildweek/lib/codex-app-workflow.mjs`, `ai-buildweek/scripts/record-codex-run.mjs`, `ai-buildweek/demo/DEMO_SCRIPT.md`, `ai-buildweek/demo/SCREENSHOT_GUIDE.md`, `ai-buildweek/submission/DEVPOST_SUBMISSION_GUIDE.md`.
+- **Required outputs:** Manifest entries describing: privacy preflight, synthetic-only model input, strict generated-artifact validation, manifest hash, field/endpoint policy patterns, jury claim audit; proposed ChangeMesh target: Policy Guardian, model-input boundary, contract validation, evidence manifest, security/claim gates; one source-to-target map per component.
+- **Forbidden shortcuts:** Do not copy a directory wholesale; do not import dependencies before method/license approval; exclude: ZeroKit UI/product semantics, school-SaaS fixture, Codex/GPT provider assumptions, unrelated configuration surfaces.
+- **Acceptance criteria:** Every harvested behavior is tied to exact source paths and a proposed method; no implementation starts from this harvest task itself.
+- **Required evidence:** Read log, source-path inventory, extracted invariant checklist, and manifest diff.
+- **Mandatory documentation sync:** Donor manifest, component provenance, architecture memory where relevant, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.08 — Harvest ContextSeal change-certification invariants
+
+- **Status:** `PENDING`
+- **Required action:** Read only the pinned `D-CONTEXTSEAL` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
+- **Mandatory inputs:** Donor `D-CONTEXTSEAL` at its pinned commit; exact paths: `src/core/passport.js`, `src/core/workflow.js`, `src/core/risk.js`, `src/datahub/live-context.js`, `src/datahub/writeback.js`, `scripts/build-pr-bundle.js`, `scripts/validate-evidence.js`, `config/policy.json`, `skills/datahub-schema-change-certification/SKILL.md`, `skills/datahub-schema-change-certification/README.md`, `skills/datahub-schema-change-certification/scripts/certify_change.py`, `skills/datahub-schema-change-certification/references/evidence-contract.md`, `skills/datahub-schema-change-certification/references/policy-v1.json`, `skills/datahub-schema-change-certification/templates/certification-report.template.md`, `docs/ARCHITECTURE.md`, `docs/EVIDENCE_BOUNDARY.md`, `docs/BUILD_PERIOD_DISCLOSURE.md`, `docs/PR_REVIEW_PACKET.md`, `docs/BRANCH_RECONCILIATION_MATRIX.md`.
+- **Required outputs:** Manifest entries describing: multi-hop lineage, path-preserving blast radius, expand–migrate–contract, bounded writeback, risk policy, evidence contract, passport/hash, PR bundle; proposed ChangeMesh target: Impact Scout, Migration Engineer, Release Steward, Change Evidence Passport, demo fixture; one source-to-target map per component.
+- **Forbidden shortcuts:** Do not copy a directory wholesale; do not import dependencies before method/license approval; exclude: mandatory DataHub coupling, unrestricted writeback, ContextSeal product names, old competition claims, fixed JavaScript architecture.
+- **Acceptance criteria:** Every harvested behavior is tied to exact source paths and a proposed method; no implementation starts from this harvest task itself.
+- **Required evidence:** Read log, source-path inventory, extracted invariant checklist, and manifest diff.
+- **Mandatory documentation sync:** Donor manifest, component provenance, architecture memory where relevant, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.09 — Pin and harvest Qwen MemoryAgent source before any memory reuse
+
+- **Status:** `PENDING`
+- **Required action:** Resolve the immutable GitLab commit SHA, default branch, license, and exact files implementing hybrid retrieval, freshness/importance, decay, and shared memory bus. Read only those paths and record them.
+- **Mandatory inputs:** `D-QWEN` public GitLab project; project tree and immutable commit endpoint; current manifest placeholder.
+- **Required outputs:** Pinned SHA, exact source-path allowlist, extracted memory invariants, and P-11/P-20 target mapping.
+- **Forbidden shortcuts:** Do not use README claims as code-path proof; do not reuse Qwen/provider runtime; do not proceed while source pin or license is unknown.
+- **Acceptance criteria:** `D-QWEN` has no `PIN_REQUIRED` or unknown source path; every selected behavior has an exact path and test plan.
+- **Required evidence:** GitLab commit/tree evidence and manifest entries.
+- **Mandatory documentation sync:** Donor manifest, component provenance, architecture memory, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.10 — Pin and harvest GitLab Edition conflict-analysis source before any reuse
+
+- **Status:** `PENDING`
+- **Required action:** Resolve the immutable GitLab commit SHA, license, and exact files implementing MR overlap, repository context, ownership/conflict analysis, and unavailable-tool honesty.
+- **Mandatory inputs:** `D-GITLAB` public GitLab project; immutable commit and tree; current manifest placeholder.
+- **Required outputs:** Pinned SHA, exact source-path allowlist, extracted conflict-analysis invariants, and P-15/P-19 target mapping.
+- **Forbidden shortcuts:** Do not carry GitLab Duo/Orbit runtime into the GitHub-first MVP; do not fabricate GraphQL tool output; do not proceed with an unresolved pin.
+- **Acceptance criteria:** `D-GITLAB` is fully pinned and every selected behavior is tied to exact source paths and tests.
+- **Required evidence:** GitLab commit/tree evidence and manifest entries.
+- **Mandatory documentation sync:** Donor manifest, component provenance, architecture memory, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.11 — Detect cross-donor overlap, contradictions, and duplicate implementations
+
+- **Status:** `PENDING`
+- **Required action:** Compare all harvested components by responsibility, state model, evidence authority, data contract, and external dependency. Select one canonical ChangeMesh implementation for each responsibility.
+- **Mandatory inputs:** All completed donor entries from P-02D.04 through P-02D.10.
+- **Required outputs:** Cross-donor convergence matrix: canonical invariant, rejected alternatives, reason, and migration notes.
+- **Forbidden shortcuts:** Do not combine two evidence-state systems, two passport formats, or two memory-trust models without a single normalized contract; do not keep duplicate adapters as dead code.
+- **Acceptance criteria:** Every overlapping donor idea has exactly one ChangeMesh authority and no unresolved semantic collision.
+- **Required evidence:** Convergence review signed by primary agent and donor-reuse auditor.
+- **Mandatory documentation sync:** Donor manifest, architecture memory, decision log, plan, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.12 — Freeze reuse method and exact source-to-target mapping for every approved component
+
+- **Status:** `PENDING`
+- **Required action:** Assign `COPIED`, `ADAPTED`, `CLEAN_ROOM_REIMPLEMENTED`, `IDEA_ONLY`, or `REFERENCE_ONLY`; name exact target files/modules and transformations; record forbidden carry-over.
+- **Mandatory inputs:** Completed convergence matrix, license/IP decision, target architecture evidence available at this point.
+- **Required outputs:** Approved component records with exact source paths, exact target paths or a named target contract to be created, method, rationale, and reviewer.
+- **Forbidden shortcuts:** No component may use vague phrases such as “use donor logic”; no copying before a `COPIED`/`ADAPTED` approval; no target path may be invented without architecture alignment.
+- **Acceptance criteria:** Every planned donor-derived implementation has a complete mapping and `APPROVED_FOR_IMPLEMENTATION` status.
+- **Required evidence:** Manifest completeness report and target-path existence/planning check.
+- **Mandatory documentation sync:** Donor manifest, component provenance, architecture memory, decision log.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.13 — Verify license, notice, attribution, and owner-authorship obligations
+
+- **Status:** `PENDING`
+- **Required action:** Inspect each donor license and relevant file headers; decide whether notices, copied copyright text, or attribution are required; prepare a third-party/donor notice plan.
+- **Mandatory inputs:** Pinned donor sources, LICENSE/NOTICE files, competition IP rules.
+- **Required outputs:** License matrix and notice obligations per component.
+- **Forbidden shortcuts:** Do not assume public equals permissively licensed; do not strip headers; do not place incompatible code into the competition build.
+- **Acceptance criteria:** No approved component has unknown or incompatible license state; unresolved components remain `REFERENCE_ONLY` or `BLOCKED`.
+- **Required evidence:** License-file hashes/links and legal-compatibility checklist (not legal advice).
+- **Mandatory documentation sync:** Donor manifest, component provenance, build-period disclosure, future NOTICE/LICENSE files.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.14 — Security-quarantine donor code and configuration before adaptation
+
+- **Status:** `PENDING`
+- **Required action:** Scan allowlisted donor files for secrets, hard-coded endpoints, unsafe shell commands, broad filesystem/network access, stale dependencies, generated artifacts, fixture identifiers, and provider-specific assumptions.
+- **Mandatory inputs:** Approved source-path allowlists and donor snapshots.
+- **Required outputs:** Per-component security findings, redaction list, prohibited snippets, and sanitization requirements.
+- **Forbidden shortcuts:** Never execute donor scripts during harvest; never copy credentials, API URLs, private IDs, logs, generated evidence, or customer-like data.
+- **Acceptance criteria:** Every implementation-approved component has a completed security review and no unresolved critical finding.
+- **Required evidence:** Secret/static scan results and manual review checklist.
+- **Mandatory documentation sync:** Donor manifest, lessons memory, threat model, environment/API, handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.15 — Define behavior-parity and regression tests before donor-derived implementation
+
+- **Status:** `PENDING`
+- **Required action:** For every approved donor behavior, write the observable invariants, positive cases, negative cases, forbidden outcomes, and evidence-state expectations that ChangeMesh must preserve or intentionally change.
+- **Mandatory inputs:** Approved manifest entries and donor reference behavior.
+- **Required outputs:** Donor behavior test matrix, golden fixtures where legally/technically appropriate, and ChangeMesh-specific extensions.
+- **Forbidden shortcuts:** Do not copy implementation and then infer tests from it; do not require byte-for-byte output when semantics are intentionally redesigned; do not omit negative tests.
+- **Acceptance criteria:** Each approved component has at least one positive, one failure, one boundary, and one forbidden-carry-over test.
+- **Required evidence:** Test-spec review and traceability links.
+- **Mandatory documentation sync:** Donor manifest, P-25 test plan, architecture, evidence boundary.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.16 — Freeze donor snapshot and manifest baseline
+
+- **Status:** `PENDING`
+- **Required action:** Record immutable source SHAs, source file hashes where practical, manifest revision, reviewer, and approval timestamp; commit the manifest before any donor-derived product implementation.
+- **Mandatory inputs:** All completed P-02D tasks and clean ChangeMesh working tree.
+- **Required outputs:** A donor baseline commit/tag or clearly named commit and a manifest hash.
+- **Forbidden shortcuts:** Do not freeze while any selected donor has `PIN_REQUIRED`, unknown license, unresolved critical security issue, or missing parity tests.
+- **Acceptance criteria:** All selected components are approved or explicitly excluded; donor baseline is reproducible.
+- **Required evidence:** Git commit/SHA, manifest hash, and clean-tree evidence.
+- **Mandatory documentation sync:** Plan, donor manifest, component provenance, handoff, submission/build disclosure skeleton.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.17 — Synchronize donor decisions with product architecture and competition disclosure
+
+- **Status:** `PENDING`
+- **Required action:** Update architecture, decision log, build-period disclosure, README status where relevant, and judging documentation so reuse is transparent without overstating pre-existing work as new.
+- **Mandatory inputs:** Frozen donor baseline and competition rule mapping.
+- **Required outputs:** Consistent public/private disclosure language and architecture references.
+- **Forbidden shortcuts:** Do not expose irrelevant donor implementation detail in the pitch; do not hide material reuse; do not claim copied behavior as competition-period originality.
+- **Acceptance criteria:** All donor-related claims agree across manifest, provenance, build disclosure, README, Devpost draft, and judging map.
+- **Required evidence:** Repository-wide claim search and consistency report.
+- **Mandatory documentation sync:** All named documents plus handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-02D.18 — Close donor harvest and unlock implementation phases
+
+- **Status:** `PENDING`
+- **Required action:** Run donor manifest completeness, source-pin, license, security, parity-test, no-bulk-copy, and cross-document gates; execute P-DΩ and P-Ω.
+- **Mandatory inputs:** All outputs of P-02D.01–17.
+- **Required outputs:** P-02D closure record and the exact list of phases/components unlocked.
+- **Forbidden shortcuts:** Do not mark P-02D done with any required donor entry `BLOCKED`, `PIN_REQUIRED`, or missing mandatory field; excluded donors may remain unused only with explicit reason.
+- **Acceptance criteria:** All required donor gates pass; P-03 and donor-sensitive implementation phases are formally eligible.
+- **Required evidence:** Closure report, manifest hash, test matrix, git status, and P-Ω report.
+- **Mandatory documentation sync:** Master plan status, handoff, donor manifest, component provenance, build-period disclosure.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+
+
+# 12.7 Binding donor preflight overlay for existing phases
+
+The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` tasks. They are mandatory unlock gates executed immediately before the corresponding existing phase implementation.
+
+## P-04.00 — Architecture donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-04.01` task or any implementation in this phase, run the donor-reuse preflight for D-UAOS, D-UIPATH, D-CCT, D-ZEROKIT, D-CONTEXTSEAL. Extract only architecture/authority invariants; resolve conflicting state/evidence models before P-04.01.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Architecture source-to-target memo and rejected-alternative record.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-05.00 — Domain-contract donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-05.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT, D-CONTEXTSEAL. Inspect evidence, manifest, policy, passport, and workflow contracts; normalize them into ChangeMesh-owned versioned schemas before P-05.01.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Contract invariant matrix and no-provider-leak checklist.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-08.00 — Gemini boundary donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-08.01` task or any implementation in this phase, run the donor-reuse preflight for D-ZEROKIT, D-CCT. Inspect privacy preflight, strict validation, blind audit, and model/fact separation; translate provider-specific assumptions to Gemini/ADK.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Prompt/input/output boundary memo and adversarial test list.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-10.00 — Saga persistence donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-10.01` task or any implementation in this phase, run the donor-reuse preflight for D-UIPATH, D-CONTEXTSEAL. Inspect durable workflow, connector modes, workflow transitions, and bounded writeback; define what is clean-room reimplemented in Firestore.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Saga source-target map, idempotency/compensation invariants, excluded UiPath dependencies.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-11.00 — Memory Trust donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-11.01` task or any implementation in this phase, run the donor-reuse preflight for D-QWEN, D-UIPATH, D-CCT. Inspect pinned memory retrieval/decay/bus paths and durable handoff patterns; separate retrieval relevance from epistemic trust.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Memory invariant matrix, exact source paths, trust-layer extensions, poisoning tests.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-12.00 — Capability Passport donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-12.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-CONTEXTSEAL. Reuse evidence immutability/passport integrity patterns only; document that capability qualification is a new ChangeMesh layer rather than a donor claim.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Originality boundary, passport invariant map, revision/expiry/revocation tests.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-13.00 — ShadowLab donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-13.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT, D-UIPATH. Inspect destructive preflight, validator failure paths, connector real/mock modes, and smoke/evidence checklists; transform into labeled scenario rehearsal.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Scenario-source map, simulation labeling contract, no-command-executed rules.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-14.00 — Autonomy and approval donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-14.01` task or any implementation in this phase, run the donor-reuse preflight for D-UIPATH, D-CCT, D-CONTEXTSEAL. Inspect independent approval verification, destructive preflight, risk/policy rules; redesign as autonomous-by-default Reversibility Gate and Approval Compression.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Authority/reversibility map and explicit rejection of routine approval carry-over.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-15.00 — Impact Scout donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-15.01` task or any implementation in this phase, run the donor-reuse preflight for D-CONTEXTSEAL, D-GITLAB. Inspect exact lineage, risk, live-context, MR conflict, ownership, and unavailable-tool paths; preserve explanatory dependency paths.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Graph/scan source-target map, GitHub adaptation plan, honesty tests.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-16.00 — Policy Guardian donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-16.01` task or any implementation in this phase, run the donor-reuse preflight for D-ZEROKIT, D-CCT, D-CONTEXTSEAL. Inspect privacy boundary, validation, destructive preflight, and deterministic policy; select canonical policy authority.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Policy convergence matrix, forbidden carry-over, security tests.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-17.00 — Migration Engineer donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-17.01` task or any implementation in this phase, run the donor-reuse preflight for D-CONTEXTSEAL. Inspect workflow, certification skill, policy, PR bundle, and evidence contract; extract expand–migrate–contract and bounded artifact-generation invariants.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Migration source-target map, artifact schema list, no-live-write boundary.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-18.00 — Evidence Auditor donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-18.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT. Inspect blind semantic challenge, reconciliation, evidence pack, validator coverage, and claim audit; remove GPT/Codex assumptions.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Gemini auditor transformation memo, expected-answer leakage check, fact-lock tests.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-19.00 — Release Steward donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-19.01` task or any implementation in this phase, run the donor-reuse preflight for D-CONTEXTSEAL, D-GITLAB, D-UIPATH. Inspect bounded writeback/PR bundle, conflict checks, connector-mode honesty, and approval evidence; adapt to GitHub draft-PR only.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** External-write allowlist, idempotency contract, receipt mapping.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-20.00 — Long-running orchestration donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-20.01` task or any implementation in this phase, run the donor-reuse preflight for D-UIPATH, D-QWEN, D-CCT. Inspect durable waiting/resume, memory bus, handoff, and flight-recorder patterns; unify them under ADK + Pub/Sub + Firestore.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Recovery/resume invariant map and no-duplicate-write test plan.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-21.00 — Dashboard donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-21.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT, D-CONTEXTSEAL. Inspect Flight Recorder, destructive-preflight, config-preview, passport, and judge-facing panels only as UX references; define ChangeMesh-native information architecture.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** UI reference matrix, fixture/real labels, accessibility and no-fake-progress rules.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-22.00 — Evidence ledger/passport donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-22.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-CONTEXTSEAL, D-ZEROKIT. Inspect evidence pack, flight recorder, passport/hash, evidence validator, and manifest; choose one canonical serialization and authority model.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Evidence convergence decision, source-target map, tamper tests.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-24.00 — Demo fixture donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-24.01` task or any implementation in this phase, run the donor-reuse preflight for D-CONTEXTSEAL, D-CCT, D-ZEROKIT, D-UIPATH, D-GITLAB, D-QWEN. Inspect donor fixtures only to derive failure shapes and evidence patterns; create a new fictional billing fixture without donor customer/project names.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Fixture originality matrix and synthetic-data declaration.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-25.00 — Test-suite donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-25.01` task or any implementation in this phase, run the donor-reuse preflight for ALL APPROVED DONORS. Collect donor tests tied to approved components; translate behavior into ChangeMesh tests without copying irrelevant provider/framework fixtures.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Donor-test traceability matrix with positive/failure/boundary/forbidden cases.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-26.00 — Security donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-26.01` task or any implementation in this phase, run the donor-reuse preflight for D-ZEROKIT, D-CCT, D-CONTEXTSEAL, D-QWEN. Inspect privacy boundary, preflight, evidence integrity, writeback, and memory-poisoning risks; merge into one threat model.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Threat/control/test source map and residual-risk list.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-29.00 — Productization donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-29.01` task or any implementation in this phase, run the donor-reuse preflight for D-UAOS, D-CONTEXTSEAL, D-CCT, D-ZEROKIT. Separate reusable platform patterns from competition/demo-specific code and documents; avoid recreating donor products wholesale.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Product boundary/originality memo and extension-contract decisions.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-30.00 — Competition-document donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-30.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-UIPATH. Inspect judge-start, judging map, build delta, claim audit, evidence manifest, and disclosure documents; reuse structure, never stale claims or numbers.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Judge-document source map and stale-claim denylist.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-31.00 — Demo-production donor preflight
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-31.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-UIPATH. Inspect demo scripts, timing plans, screenshot guides, captions, and recording runbooks; adapt only production discipline and evidence sequencing.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** ChangeMesh-specific shot list, timing map, and prohibited donor visuals/names.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+## P-32.00 — Final donor provenance freeze
+
+- **Status:** `PENDING`
+- **Required action:** Before the existing `P-32.01` task or any implementation in this phase, run the donor-reuse preflight for ALL APPROVED DONORS. Verify every donor-derived target against the frozen manifest, competition-introduction commit, license/notice, tests, and final public disclosure before tagging.
+- **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
+- **Required outputs:** Final donor provenance report and manifest hash bound to release.
+- **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
+- **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
+- **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+
+
+# P-DΩ — Continuous Donor Provenance and Reuse Integrity
+
+**Status:** `ALWAYS_ACTIVE`  
+**This phase never closes before the final frozen release. It runs in addition to P-Ω.**
+
+## P-DΩ.01 — Immutable source parity
+
+Verify every active donor entry still points to the frozen repository, commit, and exact source paths. Detect moving-ref drift, deleted/renamed paths, or unrecorded source expansion. Any drift blocks closure until the manifest is intentionally revised.
+
+## P-DΩ.02 — Manifest completeness parity
+
+Verify every donor-derived changed file has a complete manifest entry with method, source paths, target paths, transformation, license state, forbidden carry-over, tests, introduction commit, reviewer, and evidence. Unmapped changed code is a blocking orphan.
+
+## P-DΩ.03 — Source-to-target behavioral traceability
+
+For each donor-derived target, verify the named invariant is implemented and tested, and that intentional deviations are documented. A passing generic test is insufficient when the donor invariant is untested.
+
+## P-DΩ.04 — License, notice, and authorship parity
+
+Verify copied/adapted content preserves required notices and that public competition documents distinguish pre-existing owner work, third-party libraries, and new ChangeMesh work. Unknown or incompatible license state blocks release.
+
+## P-DΩ.05 — Forbidden carry-over and provider-leak audit
+
+Search code, prompts, UI, fixtures, environment variables, docs, and tests for prohibited donor names, provider/runtime dependencies, IDs, endpoints, secrets, customer-like data, competition claims, and Phase-0/approval behavior. Remove or explicitly justify every match.
+
+## P-DΩ.06 — Canonical implementation and anti-zombie audit
+
+Detect duplicate evidence models, passport formats, memory engines, policy tables, connector abstractions, and dead donor-derived code. Exactly one canonical ChangeMesh authority must remain for each responsibility.
+
+## P-DΩ.07 — Competition-period commit and disclosure parity
+
+Bind every implemented donor component to the ChangeMesh introduction commit and ensure `docs/BUILD_PERIOD_DISCLOSURE.md`, `docs/COMPONENT_PROVENANCE.md`, Devpost text, README, and judge materials agree on what was pre-existing versus newly built.
+
+## P-DΩ.08 — Donor test and security parity
+
+Run all required donor behavior-parity, intentional-delta, negative, security, and forbidden-carry-over tests. Any required `FAIL` or `NOT_RUN` blocks the donor-sensitive task from `DONE`.
+
+## P-Ω.12 — Donor provenance parity
+
+This is an additive mandatory P-Ω check. Execute P-DΩ.01–08; confirm the donor manifest, component provenance, build-period disclosure, architecture, tests, README, Devpost, demo, and frozen release all describe the same source-to-target history. Record the result in the active task closure.
+
+# 13. Additive final definition of done — donor reuse
+
+The earlier final definition of done remains fully binding. In addition, competition completion requires:
+
+- P-02D is `DONE`;
+- every used donor is pinned to an immutable source commit;
+- every donor-derived component has exact source paths, method, target mapping, license state, forbidden carry-over, tests, and introduction commit;
+- Qwen and GitLab Edition contain no unresolved `PIN_REQUIRED` entry if they are used;
+- no donor repository was modified;
+- no bulk donor dump, hidden copied code, duplicate implementation, stale provider dependency, or donor fixture identity remains;
+- donor parity and intentional-delta tests pass;
+- component provenance, build-period disclosure, README, Devpost, judge documents, demo, screenshots, final tag, and cloud revision agree;
+- final P-DΩ and P-Ω.12 both pass.
