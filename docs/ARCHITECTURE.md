@@ -9,3 +9,5 @@ During P-04 this file must gain component diagram, trust/authority boundaries, a
 Do not publish a final diagram before implementation contracts are frozen.
 
 Per ADR-0006, all architecture must strictly align with the `docs/CATEGORY_MAPPING.md` which maps the "Fortified Enterprise Fleet" category requirements (Registry, Runtime, Memory Bank, Identity, Gateway, Armor, Observability) to concrete modules.
+
+Per ADR-0007, the MVP architecture will utilize real Google Cloud managed services for all components, as full access was verified during the P-02 spike.

@@ -308,7 +308,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.06 — Choose MVP managed-service tier based on real access and document honest fallbacks
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Choose MVP managed-service tier based on real access and document honest fallbacks.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Mandatory competition path remains real; optional unavailable services use labeled deterministic adapters and managed claims remain NOT_RUN.

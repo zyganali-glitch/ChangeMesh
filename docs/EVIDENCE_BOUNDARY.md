@@ -26,3 +26,5 @@
 ## Separation
 
 Fixture data is not customer data. Synthetic graph is not live DataHub. Local simulation is not managed Google proof. Model explanation is not test evidence. Deployment screenshot without revision/logs is weak evidence. Public claims must link current sanitized artifacts.
+
+*Note (ADR-0007): All managed service claims (Cloud Run, Firestore, Pub/Sub, Agent Platform) must point to actual Google Cloud deployment evidence, not local simulators.*
