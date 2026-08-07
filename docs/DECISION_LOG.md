@@ -67,6 +67,14 @@
 - Alternatives: Local deterministic adapters would have been used for any unavailable services.
 - Consequences: All components will target real GCP infrastructure. Local adapters will still be built for fast inner-loop development and labeled explicitly as `LOCAL_FIXTURE` to avoid false managed-service claims, but the production pathway is guaranteed to be fully managed.
 - Evidence: `docs/P-02.04_EVIDENCE.md` and `docs/P-02.05_EVIDENCE.md` confirm 100% availability in project `project-af5e1c99-3bc4-424f-b53`.
+
+## ADR-0008 — Product Buyer and Initial Wedge
+- Date: 2026-08-07
+- Status: Accepted
+- Context: P-03.01 required defining the primary buyer, operator, affected teams, and initial wedge.
+- Decision: Primary buyer is VP of Engineering / CTO. Operator is Senior Staff / Platform Engineer. Initial wedge is high-risk schema and API changes (e.g., `customer_id` to `account_id`). Generic platform sprawl is rejected.
+- Consequences: All marketing, UI, and demo efforts will focus exclusively on the schema change use case and appeal to platform engineering leadership.
+- Evidence: `docs/PRODUCT_BRIEF.md`
 ### DECISION-20260807-03: Vertex AI SDK and Region Selection
 - Date/time: 2026-08-07 13:12 GMT+3
 - Active task: P-02.02

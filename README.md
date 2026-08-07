@@ -41,7 +41,7 @@ A conventional coding agent can change files. It usually cannot prove that it:
 
 ## Product thesis
 
-ChangeMesh treats an enterprise change as a **long-lived distributed transaction**, not a chat session.
+ChangeMesh treats an enterprise change as a **long-lived distributed transaction**, not a chat session. *(See [Product Brief](docs/PRODUCT_BRIEF.md) for full buyer, operator, and wedge definitions).*
 
 Every change moves through eight explicit stages:
 
