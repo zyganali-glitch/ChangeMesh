@@ -11,7 +11,7 @@ ChangeMesh is a proof-carrying enterprise change system. It is not a generic cha
 - API/web deployment: Agent Runtime/Platform + Cloud Run for supporting services
 - Async events: Pub/Sub
 - Durable operational state: Firestore (Operational State)
-- Long-term memory target: ChangeMesh Memory Trust Layer + Firestore
+- Long-term memory target: ChangeMesh Memory Trust Layer + Agent Platform Memory Bank
 - Registry target: Agent Registry
 - Governance target: Agent Identity (SPIFFE-based) + ChangeMesh Capability Passport, Agent Gateway (networkservices) + ChangeMesh Policy Guardian, Model Armor
 - Telemetry: ADK OpenTelemetry -> Cloud Logging/Trace
@@ -21,7 +21,7 @@ Managed-service integrations remain conditional on real access and must be label
 
 ## 3. Agent architecture
 
-- `Agent Gateway (networkservices) + ChangeMesh Policy Guardian`: owns saga state and routing.
+- `Change Orchestrator (Google ADK)`: owns saga state and routing.
 - `Impact Scout`: read-only blast-radius collection.
 - `Policy Guardian`: deterministic and model-assisted policy checks.
 - `Migration Engineer`: scoped artifact generation.

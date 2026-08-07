@@ -166,8 +166,10 @@ Expected demonstration:
 flowchart LR
     U[User goal] --> O[Agent Gateway (networkservices) + ChangeMesh Policy Guardian]
     O --> R[Agent Registry / Capability Resolver]
+    R --> ID[Agent Identity]
     R --> A1[Impact Scout]
     R --> A2[Policy Guardian]
+    A2 --> MA[Model Armor]
     R --> A3[Migration Engineer]
     R --> A4[Evidence Auditor]
     R --> A5[Release Steward]

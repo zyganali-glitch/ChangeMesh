@@ -10,4 +10,4 @@ Do not publish a final diagram before implementation contracts are frozen.
 
 Per ADR-0006, all architecture must strictly align with the `docs/CATEGORY_MAPPING.md` which maps the "Fortified Enterprise Fleet" category requirements (Registry, Runtime, Memory Bank, Identity, Gateway, Armor, Observability) to concrete modules.
 
-Per ADR-0007, the MVP architecture will utilize real Google Cloud managed services for all components, as full access was verified during the P-02 spike.
+Per ADR-0007, the MVP architecture local environment lacks Application Default Credentials (ADC), yielding PERMISSION_BLOCKED. Implementation is frozen until credentials are provided.

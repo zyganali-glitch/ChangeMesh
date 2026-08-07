@@ -48,7 +48,7 @@
 - Date: 2026-08-07
 - Status: Accepted
 - Context: Requirement to map every category expectation to a concrete architectural artifact (P-01.04).
-- Decision: Mapped Agent Registry to `capability` module, Agent Runtime to Agent Runtime/Platform + Cloud Run for supporting services, Memory Bank to ChangeMesh Memory Trust Layer + Firestore (Operational State), Agent Identity to Agent Identity (SPIFFE-based) + ChangeMesh Capability Passport, Agent Gateway to Agent Gateway (networkservices) + ChangeMesh Policy Guardian, Model Armor to `policy` boundaries, and Agent Observability to ADK OpenTelemetry -> Cloud Logging/Trace.
+- Decision: Mapped Agent Registry to `capability` module, Agent Runtime to Agent Runtime/Platform + Cloud Run for supporting services, Memory Bank to ChangeMesh Memory Trust Layer + Agent Platform Memory Bank, Agent Identity to Agent Identity (SPIFFE-based) + ChangeMesh Capability Passport, Agent Gateway to Agent Gateway (networkservices), Change Orchestrator to Google ADK for saga state, Model Armor to `policy` boundaries, and Agent Observability to ADK OpenTelemetry -> Cloud Logging/Trace.
 - Consequences: All future development must strictly align with these mappings. Generic wording is eliminated.
 - Evidence: `docs/CATEGORY_MAPPING.md`
 
@@ -66,7 +66,7 @@
 - Decision: Use real Google Cloud managed services for all components (Cloud Run, Firestore, Pub/Sub, Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, Observability).
 - Alternatives: Local deterministic adapters would have been used for any unavailable services.
 - Consequences: All components will target real GCP infrastructure. Local adapters will still be built for fast inner-loop development and labeled explicitly as `LOCAL_FIXTURE` to avoid false managed-service claims, but the production pathway is guaranteed to be fully managed.
-- Evidence: `docs/P-02.04_EVIDENCE.md` and `docs/P-02.05_EVIDENCE.md` confirm API available but resource pending in project `project-af5e1c99-3bc4-424f-b53`.
+- Evidence: `docs/P-02.04_EVIDENCE.md` and `docs/P-02.05_EVIDENCE.md` confirm FATAL authentication error and PERMISSION_BLOCKED status due to missing Application Default Credentials.
 
 ## ADR-0008 — Product Buyer and Initial Wedge
 - Date: 2026-08-07

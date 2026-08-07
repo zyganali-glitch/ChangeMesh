@@ -4,7 +4,7 @@
 > **Plan ID:** `CM-MASTER-2026-001`  
 > **Owner:** Mehmet Aydoğan + primary development agent  
 > **Created:** 2026-08-06 23:17 GMT+3  
-> **Competition deadline observed in owner-supplied Devpost capture:** 2026-09-01 03:00 GMT+3 — reverify from official rules  
+> **Competition deadline observed in owner-supplied Devpost capture:** 2026-08-31 20:00 EDT deadline  
 > **Target:** Web/API/Cloud multi-agent enterprise product  
 > **Primary category:** Fortified Enterprise Fleet  
 > **Single source of execution truth:** this file  
@@ -104,7 +104,7 @@ No history rewrite/force-push, secrets, production merge/deploy, evidence weaken
 - Aug 29: final recording/screenshots
 - Aug 30: submission candidate/freeze
 - Aug 31: buffer/signed-out verification
-- Sep 1 03:00 GMT+3: observed deadline; official time must be reverified
+- Aug 31 20:00 EDT: official deadline
 
 Schedule is risk control, not permission to skip gates.
 
@@ -114,7 +114,7 @@ Schedule is risk control, not permission to skip gates.
 |---|---|---|---|
 | `P-00` | Frozen Charter and Governance Baseline | `DONE` | `-` |
 | `P-01` | Competition Rule and Eligibility Freeze | `IN_PROGRESS` | `P-00` |
-| `P-02` | Google Service Access and Feasibility Spike | `DONE` | `P-01` |
+| `P-02` | Google Service Access and Feasibility Spike | `IN_PROGRESS` | `P-01` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
 | `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
@@ -254,7 +254,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-02 — Google Service Access and Feasibility Spike
 
-**Phase status:** `DONE`
+**Phase status:** `IN_PROGRESS`
 
 ## P-02.01 — Create dedicated Google Cloud project and enable only minimum APIs needed for feasibility
 
@@ -278,7 +278,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.03 — Create and run smallest Google ADK agent locally using verified model
 
-- **Status:** `DONE`
+- **Status:** `IN_PROGRESS`
 - **Required action:** Create and run smallest Google ADK agent locally using verified model.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Agent starts, invokes deterministic local tool, returns schema-valid output.
@@ -288,7 +288,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.04 — Verify Cloud Run, Firestore, and Pub/Sub availability in chosen region using disposable resources, then delete/scale down
 
-- **Status:** `DONE`
+- **Status:** `IN_PROGRESS`
 - **Required action:** Verify Cloud Run, Firestore, and Pub/Sub availability in chosen region using disposable resources, then delete/scale down.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each mandatory service proven accessible; resource names and teardown recorded.
@@ -298,7 +298,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.05 — Individually verify Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, and Observability
 
-- **Status:** `DONE`
+- **Status:** `IN_PROGRESS`
 - **Required action:** Individually verify Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, and Observability.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each service classified AVAILABLE, PREVIEW_BLOCKED, REGION_BLOCKED, PERMISSION_BLOCKED, or DEFERRED; no guessing.

@@ -111,8 +111,12 @@ target_paths_or_contracts:
   - AGENT_OS_RULES.md
   - AGENT_OS_PLAN_TEMPLATE.md
   - plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md
-  - .agents/rules/*
-  - .agents/skills/*
+  - .agents/rules/changemesh_policy.md
+  - .agents/rules/opradox-governance.md
+  - .agents/skills/agentos-memory/SKILL.md
+  - .agents/skills/donor-reuse-preflight/SKILL.md
+  - .agents/skills/task-closure-integrity/SKILL.md
+  - .agents/skills/competition-claim-audit/SKILL.md
 required_transformations:
   - remove generic Phase-0; preserve frozen charter, autonomy, donor lock, P-Ω
 forbidden_carry_over:
@@ -148,7 +152,10 @@ source_behavior:
   - read/update lessons, architecture, environment/API, and user preferences
 reuse_method: ADAPTED
 target_paths_or_contracts:
-  - four root memory files
+  - AGENT_MEMORY_AND_LESSONS.md
+  - AGENT_ARCHITECTURE_AND_PATTERNS.md
+  - AGENT_ENVIRONMENT_AND_API.md
+  - AGENT_USER_PREFERENCES.md
   - .agents/skills/agentos-memory/SKILL.md
 required_transformations:
   - store durable project facts only; add donor manifest/handoff; no private chain-of-thought or secrets
@@ -158,6 +165,7 @@ required_tests:
   - startup-read references
   - task-closure updates
   - no-secret/no-private-reasoning checks
+  - no generic initialization overwrite (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -193,6 +201,8 @@ required_tests:
   - timeout
   - cancellation
   - compensation
+  - no UiPath dependency carry-over
+  - unauthorized state transition (security test)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -226,6 +236,7 @@ required_tests:
   - expired/scope-mismatched decision rejected
   - valid reusable decision accepted
   - local adapter labeled
+  - no UiPath API contract / routine approval (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -259,6 +270,7 @@ required_tests:
   - blocked remains not-run
   - simulated remains simulated
   - tamper detection
+  - no Codex/GPT/InvoiceFlow fixtures (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -292,6 +304,8 @@ required_tests:
   - causal ordering
   - redaction
   - restart continuity
+  - tamper protection and immutability validation
+  - no Codex events/UI styling (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -325,6 +339,7 @@ required_tests:
   - no command executed
   - ambiguous target fails closed
   - reversible action classified separately
+  - no Codex hook dependencies (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -358,6 +373,7 @@ required_tests:
   - uncited decisive answer rejection
   - deterministic reconciliation
   - controlled mission gap
+  - no GPT-5.6/Codex runtime (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -374,8 +390,8 @@ donor_id: D-CCT
 repository: zyganali-glitch/codex-control-tower
 source_commit: 65ee1b72faf9a7202d9166eed43fb671804815a8
 source_paths:
-  - src/audit/judge_packaging.py
-  - tests/test_judge_pack.py
+  - src/audit/judge_packaging.js
+  - tests/test_judge_pack.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - fast judge route, requirement-to-evidence map, demo timing, immutable release, build-period delta, screenshot/claim discipline
@@ -392,6 +408,7 @@ required_tests:
   - no old claims
   - no invalid evidence
   - malformed screenshot fails
+  - no provider names/old competition language (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -424,6 +441,7 @@ required_tests:
   - secret/PII fixture blocked/redacted
   - synthetic mode explicit
   - model request contains only allowlisted fields
+  - no school-SaaS data or ZeroKit semantics (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -454,6 +472,8 @@ forbidden_carry_over:
   - ZeroKit configuration schema, frontend globals, GPT-specific manifest fields
 required_tests:
   - missing/extra/wrong-type/path traversal/unsafe endpoint/unknown action cases
+  - positive validation test
+  - no ZeroKit product semantics (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -470,8 +490,8 @@ donor_id: D-ZEROKIT
 repository: zyganali-glitch/zerokit-ai-control-plane
 source_commit: d663db8c706cb914e1af5caf651df08edb5c50c0
 source_paths:
-  - src/audit/jury_claim_auditor.py
-  - tests/test_claim_audit.py
+  - src/audit/jury_claim_auditor.js
+  - tests/test_claim_audit.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - map public statements to evidence and distinguish build-period work
@@ -485,6 +505,7 @@ forbidden_carry_over:
 required_tests:
   - unsupported-claim scanner and cross-document parity
   - ambiguous claim fails
+  - no old claims, scores, or provider names (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -510,7 +531,7 @@ source_behavior:
   - preserve multi-hop dependency paths, owners, truncation/incompleteness, and risk context
 reuse_method: ADAPTED
 target_paths_or_contracts:
-  - src/git/impact_scout.py
+  - src/git/impact_scout.py (unified)
 required_transformations:
   - GitHub repository findings plus synthetic metadata graph; optional DataHub adapter
 forbidden_carry_over:
@@ -522,6 +543,8 @@ required_tests:
   - missing owner
   - duplicate merge
   - contradictory sources
+  - unauthorized access across repository boundary (security test)
+  - no DataHub/ContextSeal terminology (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -540,6 +563,7 @@ source_commit: 0dc924db9d82037d2e813548bdee27af5f180889
 source_paths:
   - src/core/workflow.js
   - skills/datahub-schema-change-certification/scripts/certify_change.py
+  - tests/test_migration.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - reject direct breaking mutation; create additive migration, compatibility, verification, rollback, and deferred-removal plan
@@ -557,6 +581,8 @@ required_tests:
   - rollback
   - deferred removal
   - missing dependency
+  - unauthorized schema change rejection
+  - no DataHub artifacts/demo claims (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -575,6 +601,7 @@ source_commit: 0dc924db9d82037d2e813548bdee27af5f180889
 source_paths:
   - src/core/passport.js
   - scripts/validate-evidence.js
+  - tests/test_passport.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - bind change context, policy, evidence, artifact hashes, and review packet into a verifiable package
@@ -592,6 +619,7 @@ required_tests:
   - wrong revision
   - stale approval
   - deterministic verify
+  - no ContextSeal field names carry-over
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -610,6 +638,7 @@ source_commit: 0dc924db9d82037d2e813548bdee27af5f180889
 source_paths:
   - src/datahub/writeback.js
   - scripts/build-pr-bundle.js
+  - tests/test_writeback.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - constrain external write, generate review packet, preserve branch/change reconciliation
@@ -627,6 +656,7 @@ required_tests:
   - outside target
   - conflict
   - receipt creation
+  - no DataHub writeback/automatic merge (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -644,6 +674,7 @@ repository: gitlab.com/zyganali/universal-agent-os-qwen
 source_commit: a43b3411856f41a4be9424d11c01a5e637cdc410
 source_paths:
   - src/memory/hybrid.py
+  - tests/test_hybrid_memory.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - BM25/embedding/keyword recall, freshness, importance, decay
@@ -663,6 +694,7 @@ required_tests:
   - high-importance retention
   - deterministic trust override
   - poisoned-memory quarantine
+  - no Qwen runtime/Phase-0/RAG infrastructure (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -680,12 +712,14 @@ repository: gitlab.com/zyganali/universal-agent-os-qwen
 source_commit: a43b3411856f41a4be9424d11c01a5e637cdc410
 source_paths:
   - src/memory/saga_bus.py
+  - tests/test_saga_bus.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - multi-agent memory exchange/MCP tools
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
   - src/memory/saga_bus.py
+  - tests/test_saga_bus.py
 required_transformations:
   - scoped memory references and saga handoff
 forbidden_carry_over:
@@ -696,6 +730,7 @@ required_tests:
   - provenance
   - replay
   - no-secret tests mandatory
+  - no unrestricted shared mutable memory (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -713,12 +748,13 @@ repository: gitlab.com/zyganali/universal-agent-os-gitlab-edition
 source_commit: 3c4a412b6040d8a8154c15325943c409be9105f2
 source_paths:
   - src/git/conflict.py
+  - tests/test_conflict.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - real overlapping MR blast radius, ownership and parallel-change risk
-reuse_method: CLEAN_ROOM_REIMPLEMENTED
+reuse_method: ADAPTED
 target_paths_or_contracts:
-  - src/git/conflict_check.py
+  - src/git/impact_scout.py (unified)
 required_transformations:
   - Impact Scout and GitHub pre-draft-PR conflict check
 forbidden_carry_over:
@@ -731,6 +767,7 @@ required_tests:
   - unavailable API
   - owner ambiguity
   - honest NOT_RUN
+  - no GitLab Duo/Orbit/GraphQL dependency carry-over
 competition_introduction_commit: PENDING
 evidence:
   - source inspection
@@ -748,18 +785,22 @@ repository: gitlab.com/zyganali/universal-agent-os-gitlab-edition
 source_commit: 3c4a412b6040d8a8154c15325943c409be9105f2
 source_paths:
   - src/connectors/boundary.py
+  - tests/test_boundary.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - preserve unavailable external/tool results rather than fabricate success
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
   - src/connectors/boundary.py
+  - tests/test_boundary.py
 required_transformations:
   - connector/evidence boundary across GitHub, metadata graph, and optional managed services
 forbidden_carry_over:
   - fabricated API responses
 required_tests:
   - unavailable/permission/timeout/rate-limit states remain explicit
+  - positive test for available API
+  - no fabricated API responses (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
   - source inspection

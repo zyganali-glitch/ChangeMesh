@@ -5,8 +5,8 @@ Status: `PLANNED`
 | Requirement / concern | Planned evidence | Current state |
 |---|---|---|
 | Gemini 3.5+ | exact model config and sanitized trace | `VERIFIED/PASS` |
-| Google agent framework | ADK source/runtime trace | `VERIFIED/PASS` |
-| Google Cloud | Cloud Run + Firestore + Pub/Sub | `VERIFIED/PASS` |
+| Google agent framework | ADK source/runtime trace | `NOT_RUN` |
+| Google Cloud | Cloud Run + Firestore + Pub/Sub | `NOT_RUN` |
 | Autonomous background work | async event timeline and recovery | `NOT_RUN` |
 | Complex workflow | end-to-end schema-change saga | `NOT_RUN` |
 | Cross-session context | trusted memory resume | `NOT_RUN` |
