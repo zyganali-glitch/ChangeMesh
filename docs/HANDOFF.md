@@ -1,17 +1,19 @@
-# ChangeMesh Handoff State
+# ChangeMesh Development Handoff
 
-**Current Active Phase:** `P-02D / Recovery Audit`  
-**Next Task:** `Phase 8 — P-Ω / P-DΩ`
+## Current State
+- **Branch:** CM-pre-p04-final-gate-fix
+- **Active Phase:** P-03
+- **Latest Commit:** docs: complete pre-p04 hard gate repairs, donor audit, and P-Omega sync
 
-The recovery implementation has passed through Phase 1 to Phase 7.
-- P-02.03 was rewritten with real `google-adk` and honestly fails due to missing ADC.
-- P-02.04 tests were strengthened and honestly fail due to missing ADC.
-- P-02.05 seven-component verifier was created and honestly labels availability as PERMISSION_BLOCKED.
-- Architectural terminology was updated across all documents.
-- `JUDGING_MAP.md` evidence states were reverted to honest levels.
-- Donor reuse manifest was pinned with correct SHAs for GitLab repos, and the evidence matrix was completed.
+## Status Summary
+1. All P-02 feasibility checks (P-02.03, P-02.04, P-02.05) have been implemented as honest, failing tests. They correctly return PERMISSION_BLOCKED due to missing Application Default Credentials (ADC) in the local environment.
+2. The DONOR_REUSE_MANIFEST.md has been successfully repaired and has passed the donor-reuse-preflight audit.
+3. The P-? cross-document consistency audit passed after syncing docs/ARCHITECTURE.md, docs/DECISION_LOG.md, README.md, and plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md.
+4. The local workspace is clean, scratch files are deleted, and all fixes are committed.
 
-**Next agent must:**
-1. Complete Phase 8 (P-Ω 20-point audit to verify no secrets/tokens, cross-doc parity, and existence of all docs).
-2. Complete Phase 9 (Merge branch `CM-task-recovery-audit-fix` to `main` and push).
-3. Only then, the repository will be genuinely eligible to begin `P-04`.
+## Blocking Issues
+- The local environment lacks GOOGLE_CLOUD_PROJECT and Application Default Credentials. Any tests against GCP services will correctly fail until this is addressed.
+
+## Next Micro-Task
+- **P-03.01 � Define primary buyer, operator, affected teams, and initial wedge around high-risk schema/API changes** (or proceed straight to P-04 if product definitions are considered complete, but plan shows P-04 as PENDING).
+- Ensure ADC is configured locally before attempting to run ADK or Google Cloud tests again.
