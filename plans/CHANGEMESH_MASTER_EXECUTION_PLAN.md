@@ -342,7 +342,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-03.03 — Write non-goals and product red lines
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Write non-goals and product red lines.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No automatic production merge/deploy, real customer data, generic marketplace, formal-verification claim, or unsupported compliance claim.

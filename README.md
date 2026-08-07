@@ -257,7 +257,7 @@ They will be added only after the dependency, local environment, and deployment 
 
 The initial product wedge is **high-risk schema and API change coordination**. A credible post-competition path can expand into regulated release assurance, data-platform change certification, cross-repository migration orchestration, agent capability certification, institutional memory governance, and enterprise-agent fleet control.
 
-The product should remain focused on proof-carrying change rather than becoming a generic chatbot, generic workflow builder, or generic agent marketplace.
+The product should remain focused on proof-carrying change rather than becoming a generic chatbot, generic workflow builder, or generic agent marketplace. *(See [Non-Goals and Red Lines](docs/NON_GOALS.md) for strict boundaries).*
 
 ## License
 
