@@ -44,3 +44,14 @@ This is the durable minefield and lessons record, not a chronological chat log.
 ### LESSON-20260806-05 — A blocked action did not run
 - Prevention rule: `BLOCKED` preserves execution state as `NOT_RUN`; never claim a safety control executed the underlying action.
 - Status: `ACTIVE`
+
+### LESSON-20260807-06 — Local Google Cloud Authentication Pitfall
+- Date/time: 2026-08-07
+- Active task: P-02.03
+- Symptom: `google.auth.exceptions.DefaultCredentialsError` occurred even after user ran `gcloud auth login`.
+- Root cause: `gcloud auth login` only authorizes the CLI, it does not create the `application_default_credentials.json` required by the Python SDK (`google-genai`).
+- Incorrect approach: Assuming `gcloud auth login` is sufficient for Vertex AI local execution.
+- Correct approach: Must explicitly run `gcloud auth application-default login` to generate the `.json` file for the SDK. Also, when running from PowerShell scripts, bypass execution policy if needed: `gcloud.cmd auth application-default login`.
+- Prevention rule: Before running local Vertex AI agent code, verify ADC file exists or prompt user to run `gcloud auth application-default login`.
+- Status: `ACTIVE`
+

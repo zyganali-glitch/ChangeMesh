@@ -15,7 +15,7 @@ Record actual environment only; do not fill unknown values with guesses.
 - Cloud Run: `API_ENABLED`
 - Firestore: `API_ENABLED`
 - Pub/Sub: `API_ENABLED`
-- Agent Runtime: `NOT_VERIFIED`
+- Agent Runtime: `VERIFIED` (via local python script)
 - Memory Bank: `NOT_VERIFIED`
 - Agent Registry: `NOT_VERIFIED`
 - Agent Identity: `NOT_VERIFIED`
@@ -49,7 +49,7 @@ Commands are added only after clean-checkout verification.
 
 | Purpose | Command | Status | Last verified |
 |---|---|---|---|
-| Install | `NOT_DEFINED` | `NOT_RUN` | - |
+| Install | `pip install -r requirements.txt` | `PASS` | 2026-08-07 |
 | Unit tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |

@@ -278,7 +278,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.03 — Create and run smallest Google ADK agent locally using verified model
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create and run smallest Google ADK agent locally using verified model.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Agent starts, invokes deterministic local tool, returns schema-valid output.
