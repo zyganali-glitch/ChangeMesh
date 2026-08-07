@@ -48,8 +48,8 @@ A blank or inferred field is invalid. Unknown license, source pin, source path, 
 | `D-CCT` | `zyganali-glitch/codex-control-tower` | `65ee1b72faf9a7202d9166eed43fb671804815a8` | locked evidence states, Flight Recorder, destructive preflight, blind semantic challenge, judge package | no Codex/OpenAI/GPT-specific runtime dependency or model-overwrites-facts behavior |
 | `D-ZEROKIT` | `zyganali-glitch/zerokit-ai-control-plane` | `d663db8c706cb914e1af5caf651df08edb5c50c0` | privacy preflight, synthetic-data boundary, strict artifact validation, hash manifest, claim audit | no ZeroKit product/admin semantics or Codex/GPT provider assumptions |
 | `D-CONTEXTSEAL` | `zyganali-glitch/ContextSeal` | `0dc924db9d82037d2e813548bdee27af5f180889` | lineage/blast radius, expand–migrate–contract, bounded writeback, passport/evidence contract | no hard DataHub coupling or unapproved live writeback |
-| `D-QWEN` | `gitlab.com/zyganali/universal-agent-os-qwen` | `PIN_REQUIRED_BEFORE_REUSE` | hybrid recall, freshness/importance/decay, shared memory bus | no Qwen runtime dependency, Phase-0 carry-over, or memory-as-truth |
-| `D-GITLAB` | `gitlab.com/zyganali/universal-agent-os-gitlab-edition` | `PIN_REQUIRED_BEFORE_REUSE` | real MR overlap/blast-radius, ownership/conflict context, unavailable-tool honesty | no GitLab Duo/Orbit dependency in GitHub-first MVP or fabricated GraphQL evidence |
+| `D-QWEN` | `gitlab.com/zyganali/universal-agent-os-qwen` | `EXCLUDED_UNAVAILABLE` | hybrid recall, freshness/importance/decay, shared memory bus | no Qwen runtime dependency, Phase-0 carry-over, or memory-as-truth |
+| `D-GITLAB` | `gitlab.com/zyganali/universal-agent-os-gitlab-edition` | `EXCLUDED_UNAVAILABLE` | real MR overlap/blast-radius, ownership/conflict context, unavailable-tool honesty | no GitLab Duo/Orbit dependency in GitHub-first MVP or fabricated GraphQL evidence |
 
 ## 4. Component record schema
 
@@ -93,11 +93,12 @@ last_reviewed: ISO-8601
 
 #### UAOS-GOV-001 — Live plan and evidence-first closure
 
-- **Status:** `IMPLEMENTED_PENDING_PARITY` — adapted into the governance baseline before this donor manifest.
+- **Status:** `APPROVED_FOR_IMPLEMENTATION`
 - **Pinned commit:** `6b83b06212101c238ec28076a2ba7ae819f483f2`
 - **Source paths:** `AGENTS.md`; `tr/AGENT_OS_RULES.md`; `tr/AGENT_OS_PLAN_TEMPLATE.md`; `cli/verify.js`; `cli/status.js`.
 - **Source behavior:** one official task table, plan-before-code, gate/evidence closure, live documentation, completed-plan archive.
-- **Reuse method:** `ADAPTED` for governance text/patterns; exact final classification and license state must be frozen in P-02D.
+- **Reuse method:** `ADAPTED` for governance text/patterns.
+- **License State:** `VERIFIED_COMPATIBLE` (MIT)
 - **ChangeMesh target paths:** `AGENTS.md`; `AGENT_OS_RULES.md`; `AGENT_OS_PLAN_TEMPLATE.md`; `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`; `.agents/rules/*`; `.agents/skills/*`.
 - **Required transformation:** remove generic Phase-0; preserve frozen charter, autonomy, donor lock, P-Ω.
 - **Forbidden carry-over:** donor CLI/runtime/MCP/examples, locale packs, generic product claims, mandatory interview.

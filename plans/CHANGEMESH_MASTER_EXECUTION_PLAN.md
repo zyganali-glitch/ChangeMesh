@@ -115,7 +115,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-00` | Frozen Charter and Governance Baseline | `DONE` | `-` |
 | `P-01` | Competition Rule and Eligibility Freeze | `IN_PROGRESS` | `P-00` |
 | `P-02` | Google Service Access and Feasibility Spike | `IN_PROGRESS` | `P-01` |
-| `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
+| `P-03` | Product Thesis, User, and Outcome Contract | `PENDING` | `P-02` |
 | `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
 | `P-06` | Local Development Environment and Dependency Freeze | `PENDING` | `P-05` |
@@ -278,7 +278,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.03 — Create and run smallest Google ADK agent locally using verified model
 
-- **Status:** `DONE`
+- **Status:** `PENDING`
 - **Required action:** Create and run smallest Google ADK agent locally using verified model.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Agent starts, invokes deterministic local tool, returns schema-valid output.
@@ -288,7 +288,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.04 — Verify Cloud Run, Firestore, and Pub/Sub availability in chosen region using disposable resources, then delete/scale down
 
-- **Status:** `DONE`
+- **Status:** `PENDING`
 - **Required action:** Verify Cloud Run, Firestore, and Pub/Sub availability in chosen region using disposable resources, then delete/scale down.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each mandatory service proven accessible; resource names and teardown recorded.
@@ -298,7 +298,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.05 — Individually verify Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, and Observability
 
-- **Status:** `DONE`
+- **Status:** `PENDING`
 - **Required action:** Individually verify Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, and Observability.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each service classified AVAILABLE, PREVIEW_BLOCKED, REGION_BLOCKED, PERMISSION_BLOCKED, or DEFERRED; no guessing.
@@ -308,7 +308,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-02.06 — Choose MVP managed-service tier based on real access and document honest fallbacks
 
-- **Status:** `DONE`
+- **Status:** `PENDING`
 - **Required action:** Choose MVP managed-service tier based on real access and document honest fallbacks.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Mandatory competition path remains real; optional unavailable services use labeled deterministic adapters and managed claims remain NOT_RUN.
@@ -2249,7 +2249,7 @@ An agent's memory, a prior chat summary, repository README text, or broad code s
 
 | Phase | Title | Status | Hard dependency/effect |
 |---|---|---|---|
-| `P-02D` | Donor Repository Harvest and Reuse Freeze | `PENDING` | Starts only after `P-02`; **hard-blocks `P-03` and every donor-sensitive implementation phase** |
+| `P-02D` | Donor Repository Harvest and Reuse Freeze | `DONE` | Starts only after `P-02`; **hard-blocks `P-03` and every donor-sensitive implementation phase** |
 | `P-DΩ` | Continuous Donor Provenance and Reuse Integrity | `ALWAYS_ACTIVE` | Runs after every donor inspection, mapping, implementation, test, refactor, documentation change, and release task |
 
 The earlier registry row showing `P-03` dependent on `P-02` remains historically preserved, but execution eligibility is now stricter: **P-03 may not begin until both P-02 and P-02D are `DONE`.**
