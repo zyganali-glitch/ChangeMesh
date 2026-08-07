@@ -7,7 +7,7 @@ Record actual environment only; do not fill unknown values with guesses.
 - Local implementation stack: `NOT_DECIDED`
 - Python version: `NOT_DECIDED`
 - Node version: `NOT_DECIDED`
-- Google Cloud project: `NOT_CONFIGURED`
+- Google Cloud project: `project-af5e1c99-3bc4-424f-b53`
 - Region: `NOT_CONFIGURED`
 - Vertex AI access: `NOT_VERIFIED`
 - Gemini model ID: `NOT_VERIFIED`
@@ -36,7 +36,7 @@ Record actual environment only; do not fill unknown values with guesses.
 
 | Variable | Purpose | Required | Secret | Safe example | Owner phase |
 |---|---|---:|---:|---|---|
-| `GOOGLE_CLOUD_PROJECT` | Cloud project ID | TBD | No | `changemesh-demo` | P-02/P-28 |
+| `GOOGLE_CLOUD_PROJECT` | Cloud project ID | TBD | No | `project-af5e1c99-3bc4-424f-b53` | P-02/P-28 |
 | `GOOGLE_CLOUD_LOCATION` | Deployment region | TBD | No | `us-central1` | P-02/P-28 |
 | `GEMINI_MODEL` | Exact model ID | TBD | No | `TBD` | P-08 |
 | `GITHUB_TOKEN` | Optional live draft-PR action | TBD | Yes | never commit | P-19 |
