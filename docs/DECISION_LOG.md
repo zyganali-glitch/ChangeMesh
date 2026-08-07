@@ -43,3 +43,11 @@
 - Context: Competition details fetched from Devpost.
 - Decision: Confirmed requirements: Gemini, ADK, Google Cloud, Fortified Enterprise Fleet track, 2026-08-31 20:00 EDT deadline.
 - Consequences: Architecture must strictly use ADK and Gemini API/Vertex AI. No deviation allowed.
+
+## ADR-0006 — Fortified Enterprise Fleet Mapping
+- Date: 2026-08-07
+- Status: Accepted
+- Context: Requirement to map every category expectation to a concrete architectural artifact (P-01.04).
+- Decision: Mapped Agent Registry to `capability` module, Agent Runtime to `orchestration`/ADK on Cloud Run, Memory Bank to `memory`/Firestore, Agent Identity to passports, Agent Gateway to `orchestration` router, Model Armor to `policy` boundaries, and Agent Observability to OpenTelemetry traces.
+- Consequences: All future development must strictly align with these mappings. Generic wording is eliminated.
+- Evidence: `docs/CATEGORY_MAPPING.md`

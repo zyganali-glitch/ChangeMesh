@@ -16,3 +16,6 @@ Status: `PLANNED`
 | Real action | GitHub draft PR | `NOT_RUN` |
 | Reduced friction | Approval Compression metrics | `NOT_RUN` |
 | Reproducibility | clean-checkout setup/test | `NOT_RUN` |
+
+## Fortified Enterprise Fleet Category Mapping
+Please refer to [`CATEGORY_MAPPING.md`](CATEGORY_MAPPING.md) for the exact architectural mapping of each track requirement (Registry, Runtime, Memory, Identity, Gateway, Armor, Observability).

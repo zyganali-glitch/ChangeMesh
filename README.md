@@ -13,7 +13,7 @@
 ## Competition target
 
 - **Hackathon:** All Things Agentic Hackathon
-- **Primary category:** Fortified Enterprise Fleet
+- **Primary category:** Fortified Enterprise Fleet (See [`docs/CATEGORY_MAPPING.md`](docs/CATEGORY_MAPPING.md) for concrete architectural mapping)
 - **Required model path:** Gemini 3.5 or newer through Vertex AI or the Gemini API
 - **Primary agent framework:** Google Agent Development Kit (ADK)
 - **Required cloud proof:** Google Cloud deployment and runtime evidence

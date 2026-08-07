@@ -244,7 +244,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-01.04 — Freeze Fortified Enterprise Fleet as primary category and map each category sentence to a concrete artifact
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Freeze Fortified Enterprise Fleet as primary category and map each category sentence to a concrete artifact.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Every category expectation has planned evidence; no generic wording remains.
