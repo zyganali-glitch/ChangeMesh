@@ -332,7 +332,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-03.02 — Define measurable outcomes: human touches compressed, autonomous steps, recovery behavior, evidence completeness, time-to-safe-draft-PR
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define measurable outcomes: human touches compressed, autonomous steps, recovery behavior, evidence completeness, time-to-safe-draft-PR.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Metrics have formulas, data sources, and demo targets; no invented customer impact.

@@ -19,3 +19,6 @@ Status: `PLANNED`
 
 ## Fortified Enterprise Fleet Category Mapping
 Please refer to [`CATEGORY_MAPPING.md`](CATEGORY_MAPPING.md) for the exact architectural mapping of each track requirement (Registry, Runtime, Memory, Identity, Gateway, Armor, Observability).
+
+## Outcome Metrics Mapping
+The planned evidence strictly aligns with the measurable success metrics defined in [`OUTCOME_CONTRACT.md`](OUTCOME_CONTRACT.md) (Human touches compressed, Autonomous steps, Recovery behavior, Evidence completeness, Time-to-safe-draft-PR).

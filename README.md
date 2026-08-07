@@ -73,6 +73,8 @@ Instead of many meetings, messages, and repeated explanations, ChangeMesh produc
 - the recommended safe decision;
 - the effect of approval or rejection.
 
+*(See [Outcome Contract](docs/OUTCOME_CONTRACT.md) for strict metrics on how Approval Compression reduces human touches).*
+
 ## Core innovations
 
 ### ShadowLab — Change Rehearsal Twin
