@@ -1,12 +1,17 @@
-# ChangeMesh Live Handoff
+# ChangeMesh Handoff State
 
-- Last updated: 2026-08-07 16:10 GMT+3
-- Repository state: Product narratives (1-sentence, 10s, 30s) frozen in docs/PRODUCT_NARRATIVE.md and README updated.
-- Active phase: `P-04 — Architecture and Authority Map`
-- Last completed micro-task: `P-03.04 — Freeze one-sentence, ten-second, thirty-second, and independent-product narratives`
-- Next exact micro-task: `P-04.01 — Map Fortified Enterprise Fleet track requirements directly to Google/Vertex APIs and ADK architecture`
-- Master plan update: `P-03.04` is marked `DONE`. Phase P-03 is completed.
-- Required first reads: constitution, master plan, four memory files, `docs/DONOR_REUSE_MANIFEST.md`, `docs/COMPONENT_PROVENANCE.md`
-- Known blockers: None.
-- Claims boundary: all product features remain `PLANNED`; setup/deployment `NOT_RUN`
-- Operator instruction: Ready to begin P-04.01 (Architecture mapping).
+**Current Active Phase:** `P-02D / Recovery Audit`  
+**Next Task:** `Phase 8 — P-Ω / P-DΩ`
+
+The recovery implementation has passed through Phase 1 to Phase 7.
+- P-02.03 was rewritten with real `google-adk` and honestly fails due to missing ADC.
+- P-02.04 tests were strengthened and honestly fail due to missing ADC.
+- P-02.05 seven-component verifier was created and honestly labels availability as PERMISSION_BLOCKED.
+- Architectural terminology was updated across all documents.
+- `JUDGING_MAP.md` evidence states were reverted to honest levels.
+- Donor reuse manifest was pinned with correct SHAs for GitLab repos, and the evidence matrix was completed.
+
+**Next agent must:**
+1. Complete Phase 8 (P-Ω 20-point audit to verify no secrets/tokens, cross-doc parity, and existence of all docs).
+2. Complete Phase 9 (Merge branch `CM-task-recovery-audit-fix` to `main` and push).
+3. Only then, the repository will be genuinely eligible to begin `P-04`.

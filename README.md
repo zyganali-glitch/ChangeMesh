@@ -17,8 +17,8 @@
 - **Required model path:** Gemini 3.5 or newer through Vertex AI or the Gemini API
 - **Primary agent framework:** Google Agent Development Kit (ADK)
 - **Required cloud proof:** Google Cloud deployment and runtime evidence
-- **Planned core services:** Cloud Run, Firestore, Pub/Sub
-- **Target enterprise services:** Agent Runtime, Memory Bank, Agent Registry, Agent Identity, Agent Gateway, Model Armor, Agent Observability (Access Verified)
+- **Planned core services:** Agent Runtime/Platform + Cloud Run for supporting services, Firestore (Operational State), Pub/Sub
+- **Target enterprise services:** Agent Runtime/Platform, ChangeMesh Memory Trust Layer + Firestore, Agent Registry, Agent Identity (SPIFFE-based) + ChangeMesh Capability Passport, Agent Gateway (networkservices) + ChangeMesh Policy Guardian, Model Armor, ADK OpenTelemetry -> Cloud Logging/Trace (Access Verified)
 
 ## The problem
 
@@ -134,7 +134,7 @@ The final passport binds mission, agent/tool identities, delegation and event ch
 
 | Agent | Primary responsibility | Default authority |
 |---|---|---|
-| **Change Orchestrator** | Goal interpretation, dynamic routing, saga state, recovery | Coordinate; no unrestricted production mutation |
+| **Agent Gateway (networkservices) + ChangeMesh Policy Guardian** | Goal interpretation, dynamic routing, saga state, recovery | Coordinate; no unrestricted production mutation |
 | **Impact Scout** | Repository, dependency, lineage, ownership, and conflict analysis | Read-only |
 | **Policy Guardian** | Privacy, prompt injection, identity, tool and data policy evaluation | Block or constrain; no implementation writes |
 | **Migration Engineer** | Safe expand–migrate–contract artifacts and tests | Write only to scoped branch/worktree |
@@ -164,7 +164,7 @@ Expected demonstration:
 
 ```mermaid
 flowchart LR
-    U[User goal] --> O[ADK Change Orchestrator]
+    U[User goal] --> O[Agent Gateway (networkservices) + ChangeMesh Policy Guardian]
     O --> R[Agent Registry / Capability Resolver]
     R --> A1[Impact Scout]
     R --> A2[Policy Guardian]

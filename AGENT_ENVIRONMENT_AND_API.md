@@ -12,15 +12,16 @@ Record actual environment only; do not fill unknown values with guesses.
 - Vertex AI access: `ENABLED` (Provisioned via UI)
 - Gemini model ID: `gemini-3.6-flash`
 - Python SDK Requirement: `google-genai` (Legacy `vertexai` SDK is deprecated and returns 404 for Gemini 3.5+)
-- Cloud Run: `VERIFIED`
-- Firestore: `VERIFIED`
+- Cloud Run: `VERIFIED` (as supporting services)
+- Firestore: `VERIFIED` (as Operational State)
 - Pub/Sub: `VERIFIED`
-- Agent Runtime: `AVAILABLE`
-- Memory Bank: `AVAILABLE`
+- Agent Runtime/Platform: `AVAILABLE`
+- Memory Bank: `AVAILABLE` (via ChangeMesh Memory Trust Layer + Firestore)
 - Agent Registry: `AVAILABLE`
-- Agent Identity: `AVAILABLE`
-- Agent Gateway: `AVAILABLE`
+- Agent Identity: `AVAILABLE` (SPIFFE-based + ChangeMesh Capability Passport)
+- Agent Gateway: `AVAILABLE` (networkservices + ChangeMesh Policy Guardian)
 - Model Armor: `AVAILABLE`
+- Observability: `AVAILABLE` (ADK OpenTelemetry -> Cloud Logging/Trace)
 - GitHub demo repository: `NOT_CREATED`
 - Public demo URL: `NOT_AVAILABLE`
 

@@ -114,7 +114,7 @@ Schedule is risk control, not permission to skip gates.
 |---|---|---|---|
 | `P-00` | Frozen Charter and Governance Baseline | `DONE` | `-` |
 | `P-01` | Competition Rule and Eligibility Freeze | `IN_PROGRESS` | `P-00` |
-| `P-02` | Google Service Access and Feasibility Spike | `IN_PROGRESS` | `P-01` |
+| `P-02` | Google Service Access and Feasibility Spike | `DONE` | `P-01` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
 | `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
@@ -254,7 +254,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-02 — Google Service Access and Feasibility Spike
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-02.01 — Create dedicated Google Cloud project and enable only minimum APIs needed for feasibility
 
