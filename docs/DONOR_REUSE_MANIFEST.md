@@ -722,8 +722,8 @@ source_behavior:
   - multi-agent memory exchange/MCP tools
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
-  - backend/vector_store.py
-  - tests/test_vector_store.py
+  - src/memory/shared_memory_bus.py
+  - tests/memory/test_shared_memory_bus.py
 required_transformations:
   - scoped memory references and saga handoff
 forbidden_carry_over:
@@ -797,8 +797,8 @@ source_behavior:
   - preserve unavailable external/tool results rather than fabricate success
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
-  - tools/orbit_client.py
-  - tests/test_orbit_client.py
+  - src/connectors/external_tool_boundary.py
+  - tests/connectors/test_external_tool_boundary.py
 required_transformations:
   - connector/evidence boundary across GitHub, metadata graph, and optional managed services
 forbidden_carry_over:
