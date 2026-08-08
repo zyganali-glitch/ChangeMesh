@@ -186,8 +186,8 @@ source_paths:
   - tests/test_phase0_interview.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
-  - persisted workflow state, wait/resume, explicit process transitions and handoff (concept only, not fully implemented in donor backend)
-reuse_method: IDEA_ONLY / REFERENCE_ONLY
+  - persistent process/interview state and gate-controlled progression (ChangeMesh durable saga semantics are a new native design inspired only conceptually)
+reuse_method: IDEA_ONLY
 target_paths_or_contracts:
   - src/orchestrator/firestore_saga.py
 required_transformations:
