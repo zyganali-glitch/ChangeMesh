@@ -186,8 +186,8 @@ source_paths:
   - tests/test_phase0_interview.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
-  - persisted workflow state, wait/resume, explicit process transitions and handoff
-reuse_method: CLEAN_ROOM_REIMPLEMENTED
+  - persisted workflow state, wait/resume, explicit process transitions and handoff (concept only, not fully implemented in donor backend)
+reuse_method: IDEA_ONLY / REFERENCE_ONLY
 target_paths_or_contracts:
   - src/orchestrator/firestore_saga.py
 required_transformations:
@@ -356,7 +356,7 @@ donor_id: D-CCT
 repository: zyganali-glitch/codex-control-tower
 source_commit: 65ee1b72faf9a7202d9166eed43fb671804815a8
 source_paths:
-  - cli/lib/reportWriter.js
+  - cli/commands/codex-review.js
   - tests/test_codex_review.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:

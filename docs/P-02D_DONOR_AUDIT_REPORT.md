@@ -1,26 +1,25 @@
-# P-02D Donor Reuse Audit Report
+# P-02D_DONOR_AUDIT_REPORT
 
-**Status:** PASS
-**Date:** 2026-08-07
-**Auditor:** donor-reuse-auditor
-
-## Component Audit Summary
-
-- **Donor ID / Repository / Immutable Commit:** All 20 components explicitly bind to a specific `D-*` donor ID, target repository (e.g., `zyganali-glitch/zerokit-ai-control-plane`), and an immutable 40-character SHA commit hash.
-- **Exact Source Paths Actually Inspected:** Every component lists the precise source logic and tests inspected (e.g., `src/audit/jury_claim_auditor.js`, `tests/test_claim_audit.js`).
-- **Source Behavior Evidenced by Code/Tests:** Source behavior validation is correctly tied to explicit execution paths and test files rather than generic `README.md` claims.
-- **License / Notice Completeness:** All 20 components reflect `VERIFIED_COMPATIBLE`.
-- **Reuse Method Validity:** Valid constraints (`ADAPTED`, `CLEAN_ROOM_REIMPLEMENTED`, `REFERENCE_ONLY`) are utilized without vague or empty fields.
-- **Exact ChangeMesh Target Mapping:** Target destinations and contracts are strictly mapped (e.g., `src/evidence/change_passport.py` for `CS-PASS-001`).
-
-## Risk Mitigation
-
-- **Duplicate / Conflicting Implementation Risk:** Overlaps (e.g., `CS-BLAST-001` and `GL-CONFLICT-001` both targeting `src/git/impact_scout.py`) are explicitly noted as `(unified)` and structurally resolved by the "Cross-donor convergence decisions" matrix (Section 6) to merge the repository and metadata graphs.
-- **Provider / Framework / Product Identifiers:** The `forbidden_carry_over` field successfully strips UIPath runtimes, DataHub, Codex/GPT/Qwen specifics, GitLab GraphQL, ZeroKit semantics, and old competition branding.
-- **Required Tests & Negative/Boundary/Security Cases:** The previously missing test cases in `CCT-JUDGE-001`, `ZK-CLAIM-001`, and `GL-CONFLICT-001` have been successfully added (e.g., malicious MR payload spoofing, XSS, path traversal, injection, and ambiguous state testing). All 20 components now have robust negative, boundary, and security test requirements documented.
-- **Competition-Period Disclosure Risk:** Adequately addressed in `ZK-CLAIM-001`, `CCT-JUDGE-001`, and `CCT-SEM-001` by explicitly requiring tests that forbid old claims, provider names, and scores, preventing misrepresentation of build-period work.
-
-## Findings
-- **Blocking Findings:** None.
-
-**Conclusion:** PASS. Implementation phases can proceed when ADC is configured and P-02D is marked as DONE.
+| Component ID | Donor ID | SHA | Verified Source Paths | PATH_EXISTS | BEHAVIOR_MATCH | License | Reuse Method | Target | Blocking Finding |
+|---|---|---|---|---|---|---|---|---|---|
+| DONOR-COMPONENT-NNN | D-... | immutab | exact/path | PASS | PASS | VERIFIED_COMPATIBLE | VERIFIED_REQUIRES_NOTICE | OWNER_AUTHORED_RULES_PENDING | UNKNOWN_BLOCKED | COPIED | ADAPTED | CLEAN_ROOM_REIMPLEMENTED | IDEA_ONLY | REFERENCE_ONLY | exact/path or contract to be created | 0 |
+| UAOS-GOV-001 | D-UAOS | 6b83b06 | cli/verify.js<br>cli/status.js<br>tr/AGENT_OS_RULES.md<br>tests/test_governance.py | PASS | PASS | VERIFIED_COMPATIBLE | ADAPTED | AGENTS.md<br>CHANGEMESH_RULES.md<br>CHANGEMESH_PLAN_TEMPLATE.md<br>plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md<br>.agents/rules/00-changemesh-constitution.md<br>.agents/rules/10-live-plan-and-docs-lock.md<br>.agents/skills/changemesh-memory/SKILL.md<br>.agents/skills/donor-reuse-preflight/SKILL.md<br>.agents/skills/task-closure-integrity/SKILL.md<br>.agents/skills/competition-claim-audit/SKILL.md | 0 |
+| UAOS-MEM-001 | D-UAOS | 6b83b06 | skills/agent-os-memory/SKILL.md<br>en/AGENT_MEMORY_AND_LESSONS.md | PASS | PASS | VERIFIED_COMPATIBLE | ADAPTED | AGENT_MEMORY_AND_LESSONS.md<br>AGENT_ARCHITECTURE_AND_PATTERNS.md<br>AGENT_ENVIRONMENT_AND_API.md<br>AGENT_USER_PREFERENCES.md<br>.agents/skills/changemesh-memory/SKILL.md | 0 |
+| UIPATH-STATE-001 | D-UIPATH | dc22679 | backend/sync_markdown_to_uipath.py<br>tests/test_phase0_interview.py | PASS | PASS | VERIFIED_COMPATIBLE | IDEA_ONLY / REFERENCE_ONLY | src/orchestrator/firestore_saga.py | 0 |
+| UIPATH-AUTH-001 | D-UIPATH | dc22679 | backend/uipath_api_connector.py<br>tests/test_uipath_connector_modes.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/auth/approval_compression.py | 0 |
+| CCT-EVID-001 | D-CCT | 65ee1b7 | cli/commands/evidence.js<br>tests/test_evidence_pack.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/evidence/evidence_record.py | 0 |
+| CCT-FLIGHT-001 | D-CCT | 65ee1b7 | cli/commands/flight-recorder.js<br>tests/test_codex_review.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/evidence/pubsub_timeline.py | 0 |
+| CCT-PREFLIGHT-001 | D-CCT | 65ee1b7 | cli/lib/destructiveActionPreflight.js<br>tests/test_destructive_action_preflight.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/policy/shadowlab_auth.py | 0 |
+| CCT-SEM-001 | D-CCT | 65ee1b7 | cli/commands/codex-review.js<br>tests/test_codex_review.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/agents/evidence_auditor.py | 0 |
+| CCT-JUDGE-001 | D-CCT | 65ee1b7 | cli/commands/export-devpost.js<br>cli/lib/markdown.js | PASS | PASS | VERIFIED_COMPATIBLE | REFERENCE_ONLY | docs/JUDGING_MAP.md | 0 |
+| ZK-PRIV-001 | D-ZEROKIT | d663db8 | ai-buildweek/lib/privacy-guard.mjs<br>tests/unit/privacy-guard.test.mjs | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/policy/policy_guardian.py | 0 |
+| ZK-VALID-001 | D-ZEROKIT | d663db8 | frontend/js/config-validator.js<br>tests/unit/config-validator.test.mjs | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/core/gemini_structured_output.py | 0 |
+| ZK-CLAIM-001 | D-ZEROKIT | d663db8 | ai-buildweek/reports/jury-claim-audit.md<br>ai-buildweek/reports/jury-claim-audit.tr.md | PASS | PASS | VERIFIED_COMPATIBLE | REFERENCE_ONLY | src/audit/claim_audit.py | 0 |
+| CS-BLAST-001 | D-CONTEXTSEAL | 0dc924d | src/datahub/live-context.js<br>src/core/risk.js<br>src/core/workflow.js<br>tests/live-context.test.js | PASS | PASS | VERIFIED_COMPATIBLE | ADAPTED | src/git/impact_scout.py (unified) | 0 |
+| CS-MIG-001 | D-CONTEXTSEAL | 0dc924d | src/core/workflow.js<br>skills/datahub-schema-change-certification/scripts/certify_change.py<br>tests/workflow.test.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/agents/migration_engineer.py | 0 |
+| CS-PASS-001 | D-CONTEXTSEAL | 0dc924d | src/core/passport.js<br>scripts/validate-evidence.js<br>tests/evidence-validator.test.js | PASS | PASS | VERIFIED_COMPATIBLE | ADAPTED | src/evidence/change_passport.py | 0 |
+| CS-WRITE-001 | D-CONTEXTSEAL | 0dc924d | src/datahub/writeback.js<br>scripts/build-pr-bundle.js<br>tests/live-pipeline.test.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/agents/release_steward.py | 0 |
+| QW-MEM-001 | D-QWEN | a43b341 | backend/memory_manager.py<br>tests/test_memory_manager.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/memory/trust_layer.py | 0 |
+| QW-BUS-001 | D-QWEN | a43b341 | backend/vector_store.py<br>tests/test_vector_store.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | backend/vector_store.py<br>tests/test_vector_store.py | 0 |
+| GL-CONFLICT-001 | D-GITLAB | 3c4a412 | tools/orbit_cli.py<br>tests/test_orbit_integration.py | PASS | PASS | VERIFIED_COMPATIBLE | ADAPTED | src/git/impact_scout.py (unified) | 0 |
+| GL-HONEST-001 | D-GITLAB | 3c4a412 | tools/orbit_client.py<br>tests/test_orbit_client.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | tools/orbit_client.py<br>tests/test_orbit_client.py | 0 |

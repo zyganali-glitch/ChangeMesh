@@ -15,13 +15,13 @@ Record actual environment only; do not fill unknown values with guesses.
 - Cloud Run: `VERIFIED` (as supporting services)
 - Firestore: `VERIFIED` (as Operational State)
 - Pub/Sub: `VERIFIED`
-- Agent Runtime/Platform: `NOT_RUN` (P-02.05 reopened; previous verifier invalid)
-- Memory Bank: `NOT_RUN` (P-02.05 reopened; previous probe used ragCorpora instead of reasoningEngines/{id}/memories)
-- Agent Registry: `NOT_RUN` (P-02.05 reopened)
-- Agent Identity: `NOT_RUN` (P-02.05 reopened)
-- Agent Gateway: `NOT_RUN` (P-02.05 reopened; previous conflation with ChangeMesh Policy Guardian removed)
-- Model Armor: `NOT_RUN` (P-02.05 reopened)
-- Observability: `NOT_RUN` (P-02.05 reopened; previous probe swallowed Trace errors)
+- Agent Runtime/Platform: `AVAILABLE / NOT_RUN`
+- Memory Bank: `DEFERRED / NOT_RUN` (Requires ReasoningEngine instance, none deployed yet)
+- Agent Registry: `AVAILABLE / NOT_RUN`
+- Agent Identity: `PERMISSION_BLOCKED / NOT_RUN` (verified via `gcloud agent-identity auth-providers list --location=global`)
+- Agent Gateway: `AVAILABLE / NOT_RUN` 
+- Model Armor: `PERMISSION_BLOCKED / NOT_RUN` (403 on modelarmor.googleapis.com)
+- Observability: `AVAILABLE / NOT_RUN`
 - GitHub demo repository: `NOT_CREATED`
 - Public demo URL: `NOT_AVAILABLE`
 

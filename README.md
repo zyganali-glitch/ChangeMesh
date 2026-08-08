@@ -17,8 +17,8 @@
 - **Required model path:** Gemini 3.5 or newer through Vertex AI or the Gemini API
 - **Primary agent framework:** Google Agent Development Kit (ADK)
 - **Required cloud proof:** Google Cloud deployment and runtime evidence
-- **Planned core services:** Agent Runtime/Platform + Cloud Run for supporting services, Firestore (Operational State), Pub/Sub
-- **Target enterprise services:** Agent Runtime/Platform, ChangeMesh Memory Trust Layer + Firestore, Agent Registry, Agent Identity (SPIFFE-based) + ChangeMesh Capability Passport, Agent Gateway (networkservices) + ChangeMesh Policy Guardian, Model Armor, ADK OpenTelemetry -> Cloud Logging/Trace (Access Verified)
+- **Planned core services:** Agent Runtime/Platform + Cloud Run for supporting services, Firestore (Operational saga state), Pub/Sub
+- **Target enterprise services:** Agent Runtime/Platform (AVAILABLE), Agent Platform Memory Bank + ChangeMesh Memory Trust Layer (DEFERRED), Agent Registry (AVAILABLE), Agent Identity (SPIFFE-based) + ChangeMesh Capability Passport (PERMISSION_BLOCKED), Agent Gateway (networkservices) + ChangeMesh Policy Guardian (AVAILABLE), Model Armor (PERMISSION_BLOCKED), ADK OpenTelemetry -> Cloud Logging/Trace (AVAILABLE)
 
 ## The problem
 

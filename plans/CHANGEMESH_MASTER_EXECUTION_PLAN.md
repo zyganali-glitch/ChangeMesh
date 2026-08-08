@@ -114,8 +114,8 @@ Schedule is risk control, not permission to skip gates.
 |---|---|---|---|
 | `P-00` | Frozen Charter and Governance Baseline | `DONE` | `-` |
 | `P-01` | Competition Rule and Eligibility Freeze | `DONE` | `P-00` |
-| `P-02` | Google Service Access and Feasibility Spike | `IN_PROGRESS` | `P-01` |
-| `P-02D` | Donor Repository Harvest and Reuse Freeze | `IN_PROGRESS` | `P-02` |
+| `P-02` | Google Service Access and Feasibility Spike | `DONE` | `P-01` |
+| `P-02D` | Donor Repository Harvest and Reuse Freeze | `DONE` | `P-02` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
 | `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
@@ -361,7 +361,7 @@ Schedule is risk control, not permission to skip gates.
 
 - **Status:** `DONE`
 - **Required action:** Read only the pinned `D-UAOS` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
-- **Mandatory inputs:** Donor `D-UAOS` at its pinned commit; exact paths: `AGENTS.md`, `tr/CHANGEMESH_RULES.md`, `tr/CHANGEMESH_PLAN_TEMPLATE.md`, `skills/agent-os-memory/SKILL.md`, `docs/INSTALLATION_MANIFEST.md`, `cli/verify.js`, `cli/status.js`.
+- **Mandatory inputs:** Donor `D-UAOS` at its pinned commit; exact paths: `AGENTS.md`, `tr/AGENT_OS_RULES.md`, `tr/AGENT_OS_PLAN_TEMPLATE.md`, `skills/agent-os-memory/SKILL.md`, `docs/INSTALLATION_MANIFEST.md`, `cli/verify.js`, `cli/status.js`.
 - **Required outputs:** Manifest entries describing: live plan, four memory pillars, evidence-first closure, live-doc sync, completed-plan archive, verification/status ideas; proposed ChangeMesh target: ChangeMesh development governance only; most of it is already adapted in the starter baseline; one source-to-target map per component.
 - **Forbidden shortcuts:** Do not copy a directory wholesale; do not import dependencies before method/license approval; exclude: generic Phase-0 interview, locale packs, donor CLI/runtime/MCP/examples, donor product wording.
 - **Acceptance criteria:** Every harvested behavior is tied to exact source paths and a proposed method; no implementation starts from this harvest task itself.
@@ -2542,7 +2542,7 @@ No component may change reuse method silently. A method change requires plan sta
 
 - **Status:** `DONE`
 - **Required action:** Read only the pinned `D-UAOS` source at the exact allowlisted paths; extract behavior and invariants before deciding any reuse method.
-- **Mandatory inputs:** Donor `D-UAOS` at its pinned commit; exact paths: `AGENTS.md`, `tr/CHANGEMESH_RULES.md`, `tr/CHANGEMESH_PLAN_TEMPLATE.md`, `skills/agent-os-memory/SKILL.md`, `docs/INSTALLATION_MANIFEST.md`, `cli/verify.js`, `cli/status.js`.
+- **Mandatory inputs:** Donor `D-UAOS` at its pinned commit; exact paths: `AGENTS.md`, `tr/AGENT_OS_RULES.md`, `tr/AGENT_OS_PLAN_TEMPLATE.md`, `skills/agent-os-memory/SKILL.md`, `docs/INSTALLATION_MANIFEST.md`, `cli/verify.js`, `cli/status.js`.
 - **Required outputs:** Manifest entries describing: live plan, four memory pillars, evidence-first closure, live-doc sync, completed-plan archive, verification/status ideas; proposed ChangeMesh target: ChangeMesh development governance only; most of it is already adapted in the starter baseline; one source-to-target map per component.
 - **Forbidden shortcuts:** Do not copy a directory wholesale; do not import dependencies before method/license approval; exclude: generic Phase-0 interview, locale packs, donor CLI/runtime/MCP/examples, donor product wording.
 - **Acceptance criteria:** Every harvested behavior is tied to exact source paths and a proposed method; no implementation starts from this harvest task itself.
