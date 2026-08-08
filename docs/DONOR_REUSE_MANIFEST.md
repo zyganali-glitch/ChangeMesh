@@ -100,7 +100,7 @@ source_commit: 6b83b06212101c238ec28076a2ba7ae819f483f2
 source_paths:
   - cli/verify.js
   - cli/status.js
-  - scripts/validate_governance.py
+  - tr/AGENT_OS_RULES.md
   - tests/test_governance.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
@@ -145,8 +145,8 @@ donor_id: D-UAOS
 repository: zyganali-glitch/Universal-Agent-OS
 source_commit: 6b83b06212101c238ec28076a2ba7ae819f483f2
 source_paths:
-  - scripts/sync_memory.js
-  - tests/test_memory_sync.js
+  - skills/agent-os-memory/SKILL.md
+  - en/AGENT_MEMORY_AND_LESSONS.md
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - read/update lessons, architecture, environment/API, and user preferences
@@ -177,13 +177,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: UIPATH-STATE-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-UIPATH
 repository: zyganali-glitch/universal-agent-os-uipath
 source_commit: dc2267939c2aef0aba2737da65f53352c5cf8fb2
 source_paths:
-  - src/orchestrator/firestore_saga.py
-  - tests/test_firestore_saga.py
+  - backend/sync_markdown_to_uipath.py
+  - tests/test_phase0_interview.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - persisted workflow state, wait/resume, explicit process transitions and handoff
@@ -214,7 +214,7 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: UIPATH-AUTH-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-UIPATH
 repository: zyganali-glitch/universal-agent-os-uipath
 source_commit: dc2267939c2aef0aba2737da65f53352c5cf8fb2
@@ -248,7 +248,7 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: CCT-EVID-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-CCT
 repository: zyganali-glitch/codex-control-tower
 source_commit: 65ee1b72faf9a7202d9166eed43fb671804815a8
@@ -282,13 +282,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: CCT-FLIGHT-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-CCT
 repository: zyganali-glitch/codex-control-tower
 source_commit: 65ee1b72faf9a7202d9166eed43fb671804815a8
 source_paths:
   - cli/commands/flight-recorder.js
-  - tests/test_flight_recorder.js
+  - tests/test_codex_review.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - chronological execution/evidence record and judge-inspectable summary
@@ -317,13 +317,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: CCT-PREFLIGHT-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-CCT
 repository: zyganali-glitch/codex-control-tower
 source_commit: 65ee1b72faf9a7202d9166eed43fb671804815a8
 source_paths:
   - cli/lib/destructiveActionPreflight.js
-  - tests/test_preflight.js
+  - tests/test_destructive_action_preflight.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - canonicalize target, compare protected boundaries, block before execution, preserve NOT_RUN
@@ -351,13 +351,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: CCT-SEM-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-CCT
 repository: zyganali-glitch/codex-control-tower
 source_commit: 65ee1b72faf9a7202d9166eed43fb671804815a8
 source_paths:
-  - src/audit/semantic_auditor.js
-  - tests/test_semantic_audit.js
+  - cli/lib/reportWriter.js
+  - tests/test_codex_review.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - independent model assesses whether evidence semantically proves mission; expected result withheld; conflict triggers review but cannot overwrite facts
@@ -390,8 +390,8 @@ donor_id: D-CCT
 repository: zyganali-glitch/codex-control-tower
 source_commit: 65ee1b72faf9a7202d9166eed43fb671804815a8
 source_paths:
-  - src/audit/judge_packaging.js
-  - tests/test_judge_pack.js
+  - cli/commands/export-devpost.js
+  - cli/lib/markdown.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - fast judge route, requirement-to-evidence map, demo timing, immutable release, build-period delta, screenshot/claim discipline
@@ -422,13 +422,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: ZK-PRIV-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-ZEROKIT
 repository: zyganali-glitch/zerokit-ai-control-plane
 source_commit: d663db8c706cb914e1af5caf651df08edb5c50c0
 source_paths:
-  - src/security/privacy_boundary.js
-  - tests/test_privacy_boundary.js
+  - ai-buildweek/lib/privacy-guard.mjs
+  - tests/unit/privacy-guard.test.mjs
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - prevent sensitive/real data from entering model workflow; explicitly separate synthetic fixture
@@ -455,13 +455,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: ZK-VALID-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-ZEROKIT
 repository: zyganali-glitch/zerokit-ai-control-plane
 source_commit: d663db8c706cb914e1af5caf651df08edb5c50c0
 source_paths:
-  - frontend/js/ai-config-preview.js
-  - tests/test_config_validator.js
+  - frontend/js/config-validator.js
+  - tests/unit/config-validator.test.mjs
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - generated artifact must match explicit schema/allowlist and manifest; malformed/extra fields fail
@@ -487,13 +487,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: ZK-CLAIM-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-ZEROKIT
 repository: zyganali-glitch/zerokit-ai-control-plane
 source_commit: d663db8c706cb914e1af5caf651df08edb5c50c0
 source_paths:
-  - src/audit/jury_claim_auditor.js
-  - tests/test_claim_audit.js
+  - ai-buildweek/reports/jury-claim-audit.md
+  - ai-buildweek/reports/jury-claim-audit.tr.md
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - map public statements to evidence and distinguish build-period work
@@ -521,7 +521,7 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: CS-BLAST-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-CONTEXTSEAL
 repository: zyganali-glitch/ContextSeal
 source_commit: 0dc924db9d82037d2e813548bdee27af5f180889
@@ -529,7 +529,7 @@ source_paths:
   - src/datahub/live-context.js
   - src/core/risk.js
   - src/core/workflow.js
-  - tests/test_lineage.js
+  - tests/live-context.test.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - preserve multi-hop dependency paths, owners, truncation/incompleteness, and risk context
@@ -560,14 +560,14 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: CS-MIG-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-CONTEXTSEAL
 repository: zyganali-glitch/ContextSeal
 source_commit: 0dc924db9d82037d2e813548bdee27af5f180889
 source_paths:
   - src/core/workflow.js
   - skills/datahub-schema-change-certification/scripts/certify_change.py
-  - tests/test_migration.js
+  - tests/workflow.test.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - reject direct breaking mutation; create additive migration, compatibility, verification, rollback, and deferred-removal plan
@@ -598,14 +598,14 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: CS-PASS-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-CONTEXTSEAL
 repository: zyganali-glitch/ContextSeal
 source_commit: 0dc924db9d82037d2e813548bdee27af5f180889
 source_paths:
   - src/core/passport.js
   - scripts/validate-evidence.js
-  - tests/test_passport.js
+  - tests/evidence-validator.test.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - bind change context, policy, evidence, artifact hashes, and review packet into a verifiable package
@@ -635,14 +635,14 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: CS-WRITE-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-CONTEXTSEAL
 repository: zyganali-glitch/ContextSeal
 source_commit: 0dc924db9d82037d2e813548bdee27af5f180889
 source_paths:
   - src/datahub/writeback.js
   - scripts/build-pr-bundle.js
-  - tests/test_writeback.js
+  - tests/live-pipeline.test.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - constrain external write, generate review packet, preserve branch/change reconciliation
@@ -672,13 +672,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: QW-MEM-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-QWEN
 repository: gitlab.com/zyganali/universal-agent-os-qwen
 source_commit: a43b3411856f41a4be9424d11c01a5e637cdc410
 source_paths:
-  - src/memory/hybrid.py
-  - tests/test_hybrid_memory.py
+  - backend/memory_manager.py
+  - tests/test_memory_manager.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - BM25/embedding/keyword recall, freshness, importance, decay
@@ -710,20 +710,20 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: QW-BUS-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-QWEN
 repository: gitlab.com/zyganali/universal-agent-os-qwen
 source_commit: a43b3411856f41a4be9424d11c01a5e637cdc410
 source_paths:
-  - src/memory/saga_bus.py
-  - tests/test_saga_bus.py
+  - backend/vector_store.py
+  - tests/test_vector_store.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - multi-agent memory exchange/MCP tools
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
-  - src/memory/saga_bus.py
-  - tests/test_saga_bus.py
+  - backend/vector_store.py
+  - tests/test_vector_store.py
 required_transformations:
   - scoped memory references and saga handoff
 forbidden_carry_over:
@@ -746,13 +746,13 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: GL-CONFLICT-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-GITLAB
 repository: gitlab.com/zyganali/universal-agent-os-gitlab-edition
 source_commit: 3c4a412b6040d8a8154c15325943c409be9105f2
 source_paths:
-  - src/git/conflict.py
-  - tests/test_conflict.py
+  - tools/orbit_cli.py
+  - tests/test_orbit_integration.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - real overlapping MR blast radius, ownership and parallel-change risk
@@ -785,20 +785,20 @@ last_reviewed: 2026-08-07T17:25:00Z
 
 ```yaml
 component_id: GL-HONEST-001
-status: UNDER_REVIEW
+status: APPROVED_FOR_IMPLEMENTATION
 donor_id: D-GITLAB
 repository: gitlab.com/zyganali/universal-agent-os-gitlab-edition
 source_commit: 3c4a412b6040d8a8154c15325943c409be9105f2
 source_paths:
-  - src/connectors/boundary.py
-  - tests/test_boundary.py
+  - tools/orbit_client.py
+  - tests/test_orbit_client.py
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
   - preserve unavailable external/tool results rather than fabricate success
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
-  - src/connectors/boundary.py
-  - tests/test_boundary.py
+  - tools/orbit_client.py
+  - tests/test_orbit_client.py
 required_transformations:
   - connector/evidence boundary across GitHub, metadata graph, and optional managed services
 forbidden_carry_over:

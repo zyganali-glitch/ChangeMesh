@@ -15,13 +15,13 @@ Record actual environment only; do not fill unknown values with guesses.
 - Cloud Run: `VERIFIED` (as supporting services)
 - Firestore: `VERIFIED` (as Operational State)
 - Pub/Sub: `VERIFIED`
-- Agent Runtime/Platform: `AVAILABLE`
-- Memory Bank: `AVAILABLE` (via ChangeMesh Memory Trust Layer + Firestore)
-- Agent Registry: `AVAILABLE`
-- Agent Identity: `UNAVAILABLE` (Deferred to local adapter)
-- Agent Gateway: `AVAILABLE` (networkservices + ChangeMesh Policy Guardian)
-- Model Armor: `AVAILABLE`
-- Observability: `AVAILABLE` (ADK OpenTelemetry -> Cloud Logging/Trace)
+- Agent Runtime/Platform: `NOT_RUN` (P-02.05 reopened; previous verifier invalid)
+- Memory Bank: `NOT_RUN` (P-02.05 reopened; previous probe used ragCorpora instead of reasoningEngines/{id}/memories)
+- Agent Registry: `NOT_RUN` (P-02.05 reopened)
+- Agent Identity: `NOT_RUN` (P-02.05 reopened)
+- Agent Gateway: `NOT_RUN` (P-02.05 reopened; previous conflation with ChangeMesh Policy Guardian removed)
+- Model Armor: `NOT_RUN` (P-02.05 reopened)
+- Observability: `NOT_RUN` (P-02.05 reopened; previous probe swallowed Trace errors)
 - GitHub demo repository: `NOT_CREATED`
 - Public demo URL: `NOT_AVAILABLE`
 
@@ -50,7 +50,7 @@ Commands are added only after clean-checkout verification.
 
 | Purpose | Command | Status | Last verified |
 |---|---|---|---|
-| Install | `pip install -r requirements.txt` | `FAIL` (File missing) | 2026-08-07 |
+| Install | `pip install -r requirements.txt` | `VERIFIED` | 2026-08-08 |
 | Unit tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |

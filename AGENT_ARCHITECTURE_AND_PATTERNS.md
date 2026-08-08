@@ -13,7 +13,7 @@ ChangeMesh is a proof-carrying enterprise change system. It is not a generic cha
 - Durable operational state: Firestore (Operational State)
 - Long-term memory target: ChangeMesh Memory Trust Layer + Agent Platform Memory Bank
 - Registry target: Agent Registry
-- Governance target: Agent Identity (SPIFFE-based) + ChangeMesh Capability Passport, Agent Gateway (networkservices) + ChangeMesh Policy Guardian, Model Armor
+- Governance target: Agent Identity (SPIFFE-based) + ChangeMesh Capability Passport, Agent Gateway (networkservices), ChangeMesh Policy Guardian, Model Armor
 - Telemetry: ADK OpenTelemetry -> Cloud Logging/Trace
 - Source-control action: GitHub draft PR against a synthetic demo repository
 

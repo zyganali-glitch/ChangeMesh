@@ -134,7 +134,7 @@ The final passport binds mission, agent/tool identities, delegation and event ch
 
 | Agent | Primary responsibility | Default authority |
 |---|---|---|
-| **Agent Gateway (networkservices) + ChangeMesh Policy Guardian** | Goal interpretation, dynamic routing, saga state, recovery | Coordinate; no unrestricted production mutation |
+| **ChangeMesh Orchestrator** | Goal interpretation, dynamic routing, saga state, recovery | Coordinate; no unrestricted production mutation |
 | **Impact Scout** | Repository, dependency, lineage, ownership, and conflict analysis | Read-only |
 | **Policy Guardian** | Privacy, prompt injection, identity, tool and data policy evaluation | Block or constrain; no implementation writes |
 | **Migration Engineer** | Safe expand–migrate–contract artifacts and tests | Write only to scoped branch/worktree |

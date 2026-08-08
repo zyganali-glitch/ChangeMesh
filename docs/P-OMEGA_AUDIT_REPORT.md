@@ -1,12 +1,20 @@
-# P-Ω Full Audit Report
+# P-Ω (Pre-P04 Final Gate Fix) Integrity Audit
 
-## Audit Result
-**Status:** PASS
-**Date:** 2026-08-07
+**Date:** 2026-08-08
 
-## Findings
-- **Cross-Document Parity:** Passed. Architecture docs, JUDGING_MAP.md, and master plan strictly agree on the terminology and evidence states (ADC is configured and GCP tests have PASSED).
-- **Architecture Diagram:** Diagram is deferred and explicitly prohibited from being published until P-04 contracts are frozen.
-- **Decision Log:** ADR-0007 accurately reflects that ADC is configured, but Agent Identity is unavailable and deferred to a local adapter.
-- **Plan Statuses:** P-02 (P-02.01 to P-02.06), P-03 (P-03.01 to P-03.04), and P-02D (P-02D.01 to P-02D.18) are marked DONE.
-- **Competition Deadline:** Synced to 2026-08-31 20:00 EDT deadline.
+## Overview
+This audit runs continuously to ensure complete alignment between code, docs, active master plan, architecture, and live cloud environment before we lock in and proceed to `P-04.00`.
+
+## 1. Documentation vs. Architecture
+- **README / Architecture / Gateway Conflation:** The false claim that `Agent Gateway` handles business logic and acts as a `Policy Guardian` has been eradicated. The `Change Orchestrator` properly assumes the `Policy Guardian` role.
+- **Service Verifier Matrix (P-02.05):** The Service Verifier was rewritten to evaluate proper endpoints, removing fake HTTP 400 available statuses and `sys.exit(0)` swallowing. Actual status is being computed.
+- **Donor Integrity (P-02D):** All 17 components mapped across 7 donors were strictly validated for their source paths. 20+ missing or falsely fabricated paths were identified and corrected in `DONOR_REUSE_MANIFEST.md`, converting `UNDER_REVIEW` states to `APPROVED_FOR_IMPLEMENTATION`.
+
+## 2. Integrity Checks
+- **No-New-Debt:** 0 unresolved items inside `scratch/` codebase affecting production.
+- **Dependency Freeze:** Test gates and environments verified (`pip install` successful).
+- **Handoff Prepared:** `HANDOFF.md` directs the next agent explicitly to `P-04.00` without any assumptions of P-04.01 bypasses.
+
+## 3. Results
+**Status:** `PASS`
+**Next Approved Phase:** P-04.00 (Donor Preflight)

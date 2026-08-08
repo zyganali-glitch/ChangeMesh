@@ -63,10 +63,10 @@
 - Date: 2026-08-07
 - Status: Accepted
 - Context: P-02.06 required choosing the MVP tier based on real service access and documenting fallbacks for any blocked components.
-- Decision: Use real Google Cloud managed services for Cloud Run, Firestore, Pub/Sub, Agent Runtime, Memory Bank, Agent Registry, Agent Gateway, Model Armor, and Observability. Agent Identity (SPIFFE) returned HTTP 404 (UNAVAILABLE) and is deferred to a local deterministic adapter.
+- Decision: Use real Google Cloud managed services for Cloud Run, Firestore, Pub/Sub, Agent Runtime (AVAILABLE), Agent Registry (AVAILABLE), Agent Gateway (AVAILABLE) and Observability (AVAILABLE). Agent Identity and Model Armor are PERMISSION_BLOCKED. Memory Bank is DEFERRED.
 - Alternatives: Local deterministic adapters would have been used for any other unavailable services.
-- Consequences: All available components target real GCP infrastructure. Agent Identity will use a local adapter labeled `LOCAL_FIXTURE`.
-- Evidence: `docs/P-02.04_EVIDENCE.md` and `docs/P-02.05_EVIDENCE.md` confirm Application Default Credentials (ADC) is configured, successful execution, and PASS status for GCP access.
+- Consequences: All available components target real GCP infrastructure. Blocked or deferred components (Identity, Armor, Memory Bank) will use local adapters labeled `LOCAL_FIXTURE` or `ADK_ORCHESTRATOR` until access is granted.
+- Evidence: `docs/P-02.04_EVIDENCE.md` and `docs/P-02.05_EVIDENCE.md` confirm Application Default Credentials (ADC) is configured, successful execution, and accurate statuses for GCP access.
 
 ## ADR-0008 — Product Buyer and Initial Wedge
 - Date: 2026-08-07
