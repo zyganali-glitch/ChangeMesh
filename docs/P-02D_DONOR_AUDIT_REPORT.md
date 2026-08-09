@@ -19,6 +19,6 @@
 | CS-PASS-001 | D-CONTEXTSEAL | 0dc924d | src/core/passport.js<br>scripts/validate-evidence.js<br>tests/evidence-validator.test.js | PASS | PASS | VERIFIED_COMPATIBLE | ADAPTED | src/evidence/change_passport.py | 0 |
 | CS-WRITE-001 | D-CONTEXTSEAL | 0dc924d | src/datahub/writeback.js<br>scripts/build-pr-bundle.js<br>tests/live-pipeline.test.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/agents/release_steward.py | 0 |
 | QW-MEM-001 | D-QWEN | a43b341 | backend/memory_manager.py<br>tests/test_memory_manager.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/memory/trust_layer.py | 0 |
-| QW-BUS-001 | D-QWEN | a43b341 | backend/vector_store.py<br>tests/test_vector_store.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | backend/vector_store.py<br>tests/test_vector_store.py | 0 |
+| QW-BUS-001 | D-QWEN | a43b341 | backend/vector_store.py<br>tests/test_vector_store.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/memory/shared_memory_bus.py<br>tests/memory/test_shared_memory_bus.py | 0 |
 | GL-CONFLICT-001 | D-GITLAB | 3c4a412 | tools/orbit_cli.py<br>tests/test_orbit_integration.py | PASS | PASS | VERIFIED_COMPATIBLE | ADAPTED | src/git/impact_scout.py (unified) | 0 |
-| GL-HONEST-001 | D-GITLAB | 3c4a412 | tools/orbit_client.py<br>tests/test_orbit_client.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | tools/orbit_client.py<br>tests/test_orbit_client.py | 0 |
+| GL-HONEST-001 | D-GITLAB | 3c4a412 | tools/orbit_client.py<br>tests/test_orbit_client.py | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/connectors/external_tool_boundary.py<br>tests/connectors/test_external_tool_boundary.py | 0 |
