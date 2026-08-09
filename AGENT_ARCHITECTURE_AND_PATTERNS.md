@@ -19,16 +19,23 @@ ChangeMesh is a proof-carrying enterprise change system. It is not a generic cha
 
 Managed-service integrations remain conditional on real access and must be labeled honestly.
 
-## 3. Agent architecture
+## 3. Agent architecture and target components
 
-- `Change Orchestrator (Google ADK)`: owns saga state and routing.
-- `Impact Scout`: read-only blast-radius collection.
-- `Policy Guardian`: deterministic and model-assisted policy checks.
-- `Migration Engineer`: scoped artifact generation.
-- `Evidence Auditor`: independent semantic sufficiency review.
-- `Release Steward`: reversible handoff and draft release preparation.
+- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): owns saga state, preflight validation (CCT-PREFLIGHT-001), and routing.
+- `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection and migration boundaries (CS-BLAST-001, CS-MIG-001).
+- `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks (CCT-FLIGHT-001).
+- `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation.
+- `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent semantic sufficiency review and evidence extraction (CCT-EVID-001, CCT-SEM-001).
+- `Release Steward` (`src/agents/release_steward.py`): reversible handoff, enforced pipeline writebacks, and judge format exports (CS-WRITE-001, CCT-JUDGE-001).
 
 No agent receives unrestricted credentials. Every tool call is scoped by role, change ID, action class, and data class.
+Additional core targets:
+- `Authority Evaluator` (`src/policy/authority_evaluator.py`): defines autonomous vs escalation boundaries (UIPATH-AUTH-001).
+- `Sandbox Manager` (`src/policy/sandbox_manager.py`): minimal necessary privilege environments (ZK-PRIV-001).
+- `Change Passport` (`src/evidence/change_passport.py`): immutable passporting context (CS-PASS-001).
+- `Firestore Saga` (`src/orchestrator/firestore_saga.py`): persistent saga state (UIPATH-STATE-001).
+- `Secure Deserialization` (`src/connectors/secure_deserialization.py`): zero trust deserialization (ZK-VALID-001).
+- `Claim Verifier` (`src/orchestrator/claim_verifier.py`): hard proof of claims (ZK-CLAIM-001).
 
 ## 4. Core modules
 

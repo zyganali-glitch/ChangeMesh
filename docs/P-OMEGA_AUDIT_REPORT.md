@@ -26,9 +26,10 @@ The full donor integrity audit explicitly verified the following:
 ## 3. General Governance Alignment
 - **Master registry vs detailed phases:** 100% matched.
 - **Handoff parity:** 100% matched.
-- **P-04 Status:** PENDING.
-- **P-04.00 Status:** PENDING.
+- **P-04 Status:** IN_PROGRESS.
+- **P-04.00 Status:** DONE.
+- **P-04.01 Status:** PENDING.
 
 ## 4. Results
 **Status:** `PASS`
-**Next Approved Phase:** P-04.00 (Donor Preflight)
+**Next Approved Phase:** P-04.01 (Create component architecture and explicit dependency directions)

@@ -117,7 +117,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-02` | Google Service Access and Feasibility Spike | `DONE` | `P-01` |
 | `P-02D` | Donor Repository Harvest and Reuse Freeze | `DONE` | `P-02` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
-| `P-04` | Architecture and Authority Map | `PENDING` | `P-03` |
+| `P-04` | Architecture and Authority Map | `IN_PROGRESS` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
 | `P-06` | Local Development Environment and Dependency Freeze | `PENDING` | `P-05` |
 | `P-07` | Google ADK Agent Skeleton | `PENDING` | `P-06` |
@@ -2711,7 +2711,7 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 
 ## P-04.00 — Architecture donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-04.01` task or any implementation in this phase, run the donor-reuse preflight for D-UAOS, D-UIPATH, D-CCT, D-ZEROKIT, D-CONTEXTSEAL. Extract only architecture/authority invariants; resolve conflicting state/evidence models before P-04.01.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Architecture source-to-target memo and rejected-alternative record.
