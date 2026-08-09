@@ -582,7 +582,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-04.02 — Create authority map separating deterministic code, Gemini semantic judgment, organizational policy, and human authority
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create authority map separating deterministic code, Gemini semantic judgment, organizational policy, and human authority.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Every decision type has one authority; no model overwrites execution facts.

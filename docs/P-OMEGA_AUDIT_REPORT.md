@@ -1,77 +1,50 @@
-# P-Ω Post-P04.01 Integrity Audit
+# P-Ω Post-P04.02 Integrity Audit
 
 **Date:** 2026-08-09
 
 ## Overview
-This audit verifies whole-repository alignment after P-04.01 (component architecture and explicit dependency directions) completion and before P-04.02 begins.
+This audit verifies whole-repository alignment after P-04.02 (Create authority map separating deterministic code, Gemini semantic judgment, organizational policy, and human authority) completion and before P-04.03 begins.
 
 ## 1. Plan ↔ HANDOFF Parity
 - **P-04 Status:** IN_PROGRESS ✅
 - **P-04.00 Status:** DONE ✅
 - **P-04.01 Status:** DONE ✅
-- **P-04.02 Status:** PENDING ✅
-- **HANDOFF Completed:** includes P-04.01 ✅
-- **HANDOFF Next Exact Task:** P-04.02 ✅
+- **P-04.02 Status:** DONE ✅
+- **P-04.03 Status:** PENDING ✅
+- **HANDOFF Completed:** includes P-04.02 ✅
+- **HANDOFF Next Exact Task:** P-04.03 ✅
 
-## 2. Architecture Memory ↔ docs/ARCHITECTURE.md
-- `AGENT_ARCHITECTURE_AND_PATTERNS.md` §10 references dependency direction invariants ✅
-- `docs/ARCHITECTURE.md` contains full dependency matrix ✅
-- Canonical ownership table matches in both documents ✅
+## 2. Authority Map Completeness
+- `docs/AUTHORITY_MAP.md` exists and defines four authority classes. ✅
+- 15+ decision types cleanly mapped to one authority. ✅
+- No duplicate or zero authority for decision types. ✅
 
-## 3. README ↔ Architecture
-- README Target Architecture section links to `docs/ARCHITECTURE.md` ✅
-- README still says pre-implementation ✅
-- README saga-state ambiguity resolved (Orchestrator = coordination, Firestore Saga = durable state) ✅
-- No implemented claim made ✅
+## 3. Invariant Verifications
+- **Deterministic fact non-overwrite:** Explicitly documented that Gemini and Human cannot overwrite execution facts. ✅
+- **Policy/human separation:** Policy dictates rules; human authority operates strictly within policy-defined slots. ✅
+- **Approval Compression boundary:** Packages authority but cannot self-approve. ✅
+- **Evidence Auditor boundary:** Assesses semantics but cannot rewrite Evidence Record facts. ✅
+- **Executor self-authorization ban:** Executors (e.g. Release Steward) cannot authorize themselves. ✅
 
-## 4. CATEGORY_MAPPING ↔ Package Map
-- Stale `.ts` paths fixed to align with P-04.00 canonical targets ✅
-- Capability Passport logical planned target = `capability/` (stale `passport.ts` mapping removed) ✅
-- Change Passport canonical donor target = `src/evidence/change_passport.py` (CS-PASS-001) ✅
-- `router.ts` → `src/agents/change_orchestrator.py` ✅
-- `armor.ts` → `src/agents/policy_guardian.py` (ZK-PRIV-001) ✅
-- Evidence locations now reference canonical targets or logical modules ✅
+## 4. Passport Parity
+- `Capability Passport` remains conceptually separate from `Change Passport`. ✅
+- No semantic collision introduced. ✅
 
-## 5. Donor Manifest ↔ Architecture Target Paths
-- All 20 P-04.00 canonical targets preserved without modification ✅
-- Manifest SHA unchanged: `434ed7893b022ec3d991d8e2a9dd3fd80fd26c11130d4b4b1b85b1f986778849` ✅
-- Donor manifest lint: PASS ✅
+## 5. Architecture & Provider Independence
+- Architecture updated with authority summary. ✅
+- No provider SDK leaked into domain boundaries. ✅
+- Authority concepts remain provider-neutral. ✅
 
-## 6. Provider-Independence Gate
-- Domain contracts → Google SDK: FORBIDDEN ✅
-- Domain contracts → ADK: FORBIDDEN ✅
-- Domain contracts → UI: FORBIDDEN ✅
-- Domain contracts → Fixtures: FORBIDDEN ✅
-- Adapters → domain contracts: REQUIRED (inward) ✅
-- Adapter replaceability examples documented ✅
+## 6. Managed-Service Honesty
+- Current runtime claims remain NOT_RUN or unchanged. No false implementation claims made. ✅
 
-## 7. Implementation Honesty
-- `src/` directory does not exist: confirmed ✅
-- No product code changes: confirmed ✅
-- No dependency changes: confirmed ✅
-- All components labeled PLANNED: confirmed ✅
+## 7. Product-Code Scope
+- Zero changes to `src/**`. No implementation code written. ✅
 
-## 8. Scope Boundaries
-- P-04.02 authority map: NOT implemented ✅
-- P-04.03 trust boundaries: NOT implemented ✅
-- P-04.04 mode boundaries: NOT implemented ✅
-- P-04.05 autonomy review: NOT implemented ✅
-- P-05 domain schemas: NOT implemented ✅
-- P-06 stack freeze: NOT implemented ✅
-
-## 9. Decision Log
-- ADR-0010 added for provider-neutral domain contracts ✅
-- ADR-0009 preserved without modification ✅
-
-## 10. P-04.01 Closure Repair Audit
-- **Repair A (GCP Claim Honesty):** False umbrella claim removed from `ARCHITECTURE.md`. Canonical states (`AVAILABLE`, `PERMISSION_BLOCKED`, `DEFERRED`) accurately reflected. ✅
-- **Repair B (Category Mapping Honesty):** Mapping verified as logical only. Managed-service state claims separated from architecture mapping in `CATEGORY_MAPPING.md`. ✅
-- **Repair C (Passport Separation):** Capability Passport logically separated from Change Passport (`src/evidence/change_passport.py`) in `CATEGORY_MAPPING.md`. ✅
-- **Repair D (Agent Identity):** Agent Identity correctly listed as `PERMISSION_BLOCKED / NOT_RUN`. ✅
-- **Repair E (Agent Gateway):** Agent Gateway correctly separated from Orchestrator/Policy Guardian logic. Listed as `AVAILABLE / NOT_RUN`. ✅
-- **Repair F (Model Armor):** Model Armor integration clearly separated from internal ZK boundary logic. Listed as `PERMISSION_BLOCKED / NOT_RUN`. ✅
-- **Repair G (Core vs Adapter):** Core Application owners (e.g., Firestore Saga, Impact Scout) explicitly separated from their provider-specific transport/persistence adapters in `ARCHITECTURE.md`. Replaceability diagram updated for Firestore Saga. ✅
+## 8. Donor Manifest Parity
+- All 20 canonical targets preserved without modification. ✅
+- Manifest lint passes. ✅
 
 ## Results
 **Status:** `PASS`
-**Next Approved Task:** P-04.02 (Create authority map separating deterministic code, Gemini semantic judgment, organizational policy, and human authority)
+**Next Approved Task:** P-04.03 — Create trust boundaries for user, agent, subagent, tool, GitHub, metadata graph, Google Cloud, and public judge UI

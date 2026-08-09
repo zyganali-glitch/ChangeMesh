@@ -11,10 +11,10 @@ Status: `PLANNED`
 | Complex workflow | end-to-end schema-change saga | `NOT_RUN` |
 | Cross-session context | trusted memory resume | `NOT_RUN` |
 | Agent discovery | registry/capability selection | `NOT_RUN` |
-| Security/governance | identity/gateway/model-armor or honest boundary | `NOT_RUN` |
+| Security/governance | identity/gateway/model-armor or honest boundary, plus four-lane authority map | `NOT_RUN` |
 | Observability | correlated trace | `NOT_RUN` |
 | Real action | GitHub draft PR | `NOT_RUN` |
-| Reduced friction | Approval Compression metrics | `NOT_RUN` |
+| Reduced friction | Approval Compression metrics, human-on-the-loop exception path | `NOT_RUN` |
 | Reproducibility | clean-checkout setup/test | `NOT_RUN` |
 
 ## Fortified Enterprise Fleet Category Mapping

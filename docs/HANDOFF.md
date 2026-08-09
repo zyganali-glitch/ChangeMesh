@@ -8,11 +8,12 @@ P-02D
 P-03
 P-04.00
 P-04.01
+P-04.02
 
 **Active Phase:**
 P-04 — Architecture and Authority Map
 
 **Next Exact Task:**
-P-04.02 — Create authority map separating deterministic code, Gemini semantic judgment, organizational policy, and human authority
+P-04.03 — Create trust boundaries for user, agent, subagent, tool, GitHub, metadata graph, Google Cloud, and public judge UI
 
-P-04.02 is PENDING.
+P-04.03 is PENDING.

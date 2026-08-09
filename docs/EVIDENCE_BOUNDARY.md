@@ -12,16 +12,26 @@
 
 ## Authorities
 
+Authority in ChangeMesh is strictly separated into four lanes:
+
+1. **Execution facts**: Deterministic code.
+2. **Semantic adequacy**: Gemini semantic authority artifact.
+3. **Organizational constraints**: Organizational policy authority.
+4. **Human decision**: Only for policy-defined human authority slots.
+
 | Question | Authority |
 |---|---|
-| Did command run? | Recorded local/cloud execution evidence |
-| Did tool call occur? | Event ledger and correlated trace |
-| Did test pass? | Test runner output and artifact hash |
-| Is memory valid? | Memory Trust Layer deterministic policy |
-| Is agent revision qualified? | Capability Passport validator |
-| Is action autonomously allowed? | Reversibility Gate policy |
-| Does evidence semantically cover goal? | Independent Gemini assessment, advisory |
-| May irreversible work proceed? | Organizational policy and compressed human authority |
+| Did command run? | Recorded local/cloud execution evidence (`DETERMINISTIC_CODE`) |
+| Did tool call occur? | Event ledger and correlated trace (`DETERMINISTIC_CODE`) |
+| Did test pass? | Test runner output and artifact hash (`DETERMINISTIC_CODE`) |
+| Is memory valid? | Memory Trust Layer deterministic policy (`DETERMINISTIC_CODE`) |
+| Is agent revision qualified? | Capability Passport validator (`DETERMINISTIC_CODE`) |
+| Is action autonomously allowed? | Organizational policy authority (`ORGANIZATIONAL_POLICY`) |
+| Does evidence semantically cover goal? | Gemini semantic assessment, advisory (`GEMINI_SEMANTIC_JUDGMENT`) |
+| May irreversible work proceed? | Compressed human authority (`HUMAN_AUTHORITY`) |
+
+> [!IMPORTANT]
+> Human approval does not convert deterministic `FAIL`/`NOT_RUN` into `PASS` and does not silently bypass hard organizational policy.
 
 ## Separation
 

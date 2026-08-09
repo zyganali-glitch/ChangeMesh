@@ -77,6 +77,16 @@ External systems are accessed through typed adapters. Demo fixtures and real con
 
 UI and adapters depend on domain/application contracts. Domain logic does not depend on Google SDK clients, UI frameworks, or repository fixtures.
 
+### 5.6 Authority Map Invariants (P-04.02)
+
+ChangeMesh implements a strict, four-lane authority model:
+*   **One authority per decision type**: Every decision is owned by exactly one authority class.
+*   **Deterministic facts are immutable**: Execution facts cannot be overwritten by Gemini semantic judgment or Human authority.
+*   **Policy separation**: Organizational Policy is the source of normative rules; Policy Guardian merely enforces them.
+*   **Human authority is bounded**: Human decisions are only permitted within slots explicitly defined by Organizational Policy. Approval Compression packages this authority but cannot synthesize it.
+*   **No self-authorization**: Executors (e.g. Release Steward) cannot authorize their own actions.
+*   **Detailed canonical map**: The full mapping of decisions to authorities lives in [`docs/AUTHORITY_MAP.md`](docs/AUTHORITY_MAP.md).
+
 ## 6. State labels
 
 Evidence: `PASS|WARN|FAIL|NOT_RUN|SIMULATED|BLOCKED|QUARANTINED`

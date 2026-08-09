@@ -1,9 +1,9 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04.01 COMPONENT DEPENDENCY ARCHITECTURE — PLANNED / PRE-IMPLEMENTATION`
-> **Produced by:** P-04.01 — Create component architecture and explicit dependency directions
+> **Status:** `P-04.01 COMPONENT DEPENDENCY ARCHITECTURE & P-04.02 AUTHORITY MAP — PLANNED / PRE-IMPLEMENTATION`
+> **Produced by:** P-04.01 and P-04.02
 > **Date:** 2026-08-09
-> **Implementation state:** All components are `PLANNED`. No product code exists yet.
+> **Implementation state:** All components and authority maps are `PLANNED`. No product code exists yet.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 
@@ -18,9 +18,10 @@ This document defines the component boundaries, dependency directions, and canon
 2. **Google-native runtime:** The product runtime uses Google ADK + Gemini + Google Cloud. Provider independence means domain contracts do not carry Google SDK types — it does not mean removing Google from the runtime.
 3. **One canonical owner per responsibility:** Each architectural concern has exactly one canonical component. No duplicate owners.
 4. **Deterministic facts before model judgment:** Deterministic code owns execution facts. Gemini provides semantic evaluation but cannot rewrite those facts.
-5. **Adapters are replaceable:** Changing a provider adapter (e.g., GitHub → synthetic, Firestore → test double) must not require changes to domain contracts.
-6. **Fixtures are outer-layer test adapters:** Production runtime never imports fixture/test code. Fixtures depend inward on contracts.
-7. **Fail closed for unknown:** Unknown capability, expired memory, missing evidence, invalid schema, or uncertain irreversible target must not become authorization.
+5. **Component vs Authority distinction:** Authority is conceptually separated into deterministic code, Gemini judgment, organizational policy, and human decision. Executors cannot self-authorize.
+6. **Adapters are replaceable:** Changing a provider adapter (e.g., GitHub → synthetic, Firestore → test double) must not require changes to domain contracts.
+7. **Fixtures are outer-layer test adapters:** Production runtime never imports fixture/test code. Fixtures depend inward on contracts.
+8. **Fail closed for unknown:** Unknown capability, expired memory, missing evidence, invalid schema, or uncertain irreversible target must not become authorization.
 
 ## 2. Component Architecture Diagram
 
@@ -359,13 +360,27 @@ All canonical target paths established during P-04.00 donor preflight are preser
 > It does NOT own durable workflow state — that is exclusively owned by Firestore Saga.
 > The Orchestrator coordinates; the Saga persists.
 
-## 9. Explicitly Deferred Architecture Work
+## 9. Authority Map (P-04.02)
+
+ChangeMesh enforces strict separation of authority across four distinct lanes. See the canonical detailed map in [`AUTHORITY_MAP.md`](AUTHORITY_MAP.md).
+
+1.  **Deterministic Code**: Owns objective execution facts (e.g., test PASS/FAIL, command outputs).
+2.  **Gemini Semantic Judgment**: Owns advisory semantic evaluations (e.g., goal alignment).
+3.  **Organizational Policy**: Owns normative rules and bounds.
+4.  **Human Authority**: Owns irreversible business decisions inside explicitly permitted policy slots.
+
+**Key Invariants:**
+*   **Non-Overwrite**: Gemini and human operators cannot overwrite deterministic execution facts.
+*   **No Self-Authorization**: Executors (e.g., Release Steward) cannot synthesize their own authorization.
+*   **Fail Closed**: Duplicate or unknown authority configurations fail closed.
+
+## 10. Explicitly Deferred Architecture Work
 
 The following architecture decisions are explicitly deferred to their designated phases:
 
 | Deferred Topic | Designated Phase | Current Status |
 |---|---|---|
-| Authority map (deterministic code vs Gemini judgment vs org policy vs human authority) | P-04.02 | `PENDING` |
+| Authority map (deterministic code vs Gemini judgment vs org policy vs human authority) | P-04.02 | `DONE` |
 | Trust boundaries (user, agent, subagent, tool, GitHub, metadata, GCP, public UI) | P-04.03 | `PENDING` |
 | Execution/evidence mode contract (fixture, simulation, recorded-cloud, live-write) | P-04.04 | `PENDING` |
 | Autonomy and friction review | P-04.05 | `PENDING` |

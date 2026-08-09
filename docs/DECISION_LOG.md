@@ -113,3 +113,19 @@
     - Adapters implement domain port interfaces and remain swappable.
     - Production runtime never imports fixture/test code.
 - Evidence: `docs/ARCHITECTURE.md` §3 (Package Map), §4 (Dependency Matrix), §5 (Provider-Neutral Domain Boundary), §6 (Adapter Replaceability)
+
+## ADR-0011 — Authority segregation and non-overwrite model
+- Date: 2026-08-09
+- Status: Accepted
+- Context: P-04.02 required defining which entity owns which decisions to prevent model hallucinations from bypassing policy, or humans from bypassing hard rules.
+- Decision: Establish four distinct authority classes (Deterministic Code, Gemini Semantic Judgment, Organizational Policy, Human Authority). One authority per decision type. Deterministic facts cannot be overwritten by Gemini/human. Organizational policy defines normative permissions. Human authority operates only within policy-defined slots. Executors cannot self-authorize. Unknown/duplicate authority fails closed.
+- Alternatives:
+    - Shared/ambiguous authority (Rejected: leads to unpredictable override behavior).
+    - Gemini as fact authority (Rejected: models cannot own deterministic execution truth).
+    - Human omnipotent override (Rejected: breaks enterprise compliance rules).
+    - Orchestrator as global authority (Rejected: Orchestrator coordinates, doesn't own facts).
+    - Executor self-authorization (Rejected: violates separation of duties).
+- Consequences:
+    - Clear boundaries for Approval Compression and Policy Guardian.
+    - Architecture requires distinct modules for facts, semantic assessments, and policies.
+- Evidence: `docs/AUTHORITY_MAP.md`
