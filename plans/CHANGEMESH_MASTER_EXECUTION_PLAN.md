@@ -567,7 +567,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-04 — Architecture and Authority Map
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-04.01 — Create component architecture and explicit dependency directions
 
@@ -2711,7 +2711,7 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 
 ## P-04.00 — Architecture donor preflight
 
-- **Status:** `DONE`
+- **Status:** `IN_PROGRESS`
 - **Required action:** Before the existing `P-04.01` task or any implementation in this phase, run the donor-reuse preflight for D-UAOS, D-UIPATH, D-CCT, D-ZEROKIT, D-CONTEXTSEAL. Extract only architecture/authority invariants; resolve conflicting state/evidence models before P-04.01.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Architecture source-to-target memo and rejected-alternative record.

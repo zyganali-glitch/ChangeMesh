@@ -21,21 +21,22 @@ Managed-service integrations remain conditional on real access and must be label
 
 ## 3. Agent architecture and target components
 
-- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): owns saga state, preflight validation (CCT-PREFLIGHT-001), and routing.
-- `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection and migration boundaries (CS-BLAST-001, CS-MIG-001).
-- `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks (CCT-FLIGHT-001).
-- `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation.
+- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): owns saga state and routing.
+- `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection (CS-BLAST-001).
+- `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks (ZK-PRIV-001).
+- `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation and migration boundaries (CS-MIG-001).
 - `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent semantic sufficiency review and evidence extraction (CCT-EVID-001, CCT-SEM-001).
 - `Release Steward` (`src/agents/release_steward.py`): reversible handoff, enforced pipeline writebacks, and judge format exports (CS-WRITE-001, CCT-JUDGE-001).
 
 No agent receives unrestricted credentials. Every tool call is scoped by role, change ID, action class, and data class.
 Additional core targets:
-- `Authority Evaluator` (`src/policy/authority_evaluator.py`): defines autonomous vs escalation boundaries (UIPATH-AUTH-001).
-- `Sandbox Manager` (`src/policy/sandbox_manager.py`): minimal necessary privilege environments (ZK-PRIV-001).
+- `Approval Compression` (`src/auth/approval_compression.py`): defines autonomous vs escalation boundaries (UIPATH-AUTH-001).
+- `ShadowLab Auth` (`src/policy/shadowlab_auth.py`): preflight validation and destructive action boundaries (CCT-PREFLIGHT-001).
 - `Change Passport` (`src/evidence/change_passport.py`): immutable passporting context (CS-PASS-001).
 - `Firestore Saga` (`src/orchestrator/firestore_saga.py`): persistent saga state (UIPATH-STATE-001).
-- `Secure Deserialization` (`src/connectors/secure_deserialization.py`): zero trust deserialization (ZK-VALID-001).
-- `Claim Verifier` (`src/orchestrator/claim_verifier.py`): hard proof of claims (ZK-CLAIM-001).
+- `Gemini Structured Output` (`src/core/gemini_structured_output.py`): zero trust deserialization and contract validation (ZK-VALID-001).
+- `Claim Audit` (`src/audit/claim_audit.py`): hard proof of claims and cross-document parity (ZK-CLAIM-001).
+- `PubSub Timeline` (`src/evidence/pubsub_timeline.py`): chronological execution and causal ordering (CCT-FLIGHT-001).
 
 ## 4. Core modules
 
