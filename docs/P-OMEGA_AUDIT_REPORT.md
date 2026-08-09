@@ -62,6 +62,15 @@ This audit verifies whole-repository alignment after P-04.01 (component architec
 - ADR-0010 added for provider-neutral domain contracts ✅
 - ADR-0009 preserved without modification ✅
 
+## 10. P-04.01 Closure Repair Audit
+- **Repair A (GCP Claim Honesty):** False umbrella claim removed from `ARCHITECTURE.md`. Canonical states (`AVAILABLE`, `PERMISSION_BLOCKED`, `DEFERRED`) accurately reflected. ✅
+- **Repair B (Category Mapping Honesty):** Mapping verified as logical only. Managed-service state claims separated from architecture mapping in `CATEGORY_MAPPING.md`. ✅
+- **Repair C (Passport Separation):** Capability Passport logically separated from Change Passport (`src/evidence/change_passport.py`) in `CATEGORY_MAPPING.md`. ✅
+- **Repair D (Agent Identity):** Agent Identity correctly listed as `PERMISSION_BLOCKED / NOT_RUN`. ✅
+- **Repair E (Agent Gateway):** Agent Gateway correctly separated from Orchestrator/Policy Guardian logic. Listed as `AVAILABLE / NOT_RUN`. ✅
+- **Repair F (Model Armor):** Model Armor integration clearly separated from internal ZK boundary logic. Listed as `PERMISSION_BLOCKED / NOT_RUN`. ✅
+- **Repair G (Core vs Adapter):** Core Application owners (e.g., Firestore Saga, Impact Scout) explicitly separated from their provider-specific transport/persistence adapters in `ARCHITECTURE.md`. Replaceability diagram updated for Firestore Saga. ✅
+
 ## Results
 **Status:** `PASS`
 **Next Approved Task:** P-04.02 (Create authority map separating deterministic code, Gemini semantic judgment, organizational policy, and human authority)

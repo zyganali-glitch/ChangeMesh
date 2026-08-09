@@ -576,7 +576,7 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Domain contracts do not depend on Google SDK, UI, or fixtures; adapters replaceable.
 - **Required evidence:** Architecture diagram and package map.
-- **Evidence:** Component architecture diagram (Mermaid), canonical planned package map, explicit dependency matrix, adapter replaceability examples, and provider-neutral domain boundary documented in `docs/ARCHITECTURE.md`. ADR-0010 recorded in `docs/DECISION_LOG.md`. README target architecture section updated. CATEGORY_MAPPING path parity fixed.
+- **Evidence:** Component architecture diagram (Mermaid), canonical planned package map, explicit dependency matrix, adapter replaceability examples, and provider-neutral domain boundary documented in `docs/ARCHITECTURE.md`. ADR-0010 recorded in `docs/DECISION_LOG.md`. README target architecture section updated. CATEGORY_MAPPING path parity fixed. (Closure Repair: Claim Honesty, Passport Separation, Adapter Boundary completed).
 - **Mandatory documentation sync:** Architecture docs and README.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

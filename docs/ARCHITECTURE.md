@@ -139,14 +139,14 @@ Every package listed below is `PLANNED`. No implementation exists yet.
 |---|---|---|---|---|---|---|
 | **Domain Contracts** | `domain/contracts/` | Versioned schemas, enums, ports/interfaces, domain types | Core (depended upon by all) | Standard library primitives, other domain contracts | Google SDK, ADK, Firestore, PubSub, GitHub, UI, fixtures | Provider-neutral |
 | **Change Orchestrator** | `src/agents/change_orchestrator.py` | ADK routing, saga coordination, recovery, multi-agent orchestration | Inward (depends on domain contracts, saga) | Domain contracts, Firestore Saga, Approval Compression, PubSub Timeline | Direct Firestore/PubSub client calls bypassing ports | Provider-specific (ADK) |
-| **Firestore Saga** | `src/orchestrator/firestore_saga.py` | Durable workflow state persistence | Inward (depends on domain contracts) | Domain contracts, Firestore port/adapter | UI, fixtures, GitHub SDK | Provider-specific (Firestore) |
-| **Impact Scout** | `src/git/impact_scout.py` | Read-only blast-radius, repository overlap, parallel-change conflict detection (CS-BLAST-001 + GL-CONFLICT-001 unified) | Inward (depends on domain contracts) | Domain contracts, repository adapter port | Direct GitHub/GitLab SDK, UI | Provider-specific (GitHub adapter) |
+| **Firestore Saga** | `src/orchestrator/firestore_saga.py` | Durable workflow state persistence semantics | Inward (depends on domain contracts) | Domain contracts, Firestore adapter port | Direct Firestore SDK in core, UI, fixtures, GitHub SDK | Provider-neutral core + Firestore persistence adapter |
+| **Impact Scout** | `src/git/impact_scout.py` | Read-only blast-radius, repository overlap, parallel-change conflict detection (CS-BLAST-001 + GL-CONFLICT-001 unified) | Inward (depends on domain contracts) | Domain contracts, repository adapter port | Direct GitHub/GitLab SDK in core, UI | Provider-neutral core + repository adapter |
 | **Policy Guardian** | `src/agents/policy_guardian.py` | Deterministic and model-assisted policy checks, safety pre-checks (ZK-PRIV-001) | Inward (depends on domain contracts) | Domain contracts, ShadowLab Auth | Direct model SDK calls, UI | Provider-neutral core with provider-specific model adapter |
 | **Migration Engineer** | `src/agents/migration_engineer.py` | Scoped artifact generation and migration boundaries (CS-MIG-001) | Inward (depends on domain contracts) | Domain contracts | Direct external writes, UI | Provider-neutral |
 | **Evidence Record / Ledger** | `src/evidence/evidence_record.py` | Canonical deterministic fact and evidence authority (CCT-EVID-001) | Inward (depends on domain contracts) | Domain contracts | Model SDK, UI, fixtures | Provider-neutral |
 | **Evidence Auditor** | `src/agents/evidence_auditor.py` | Independent semantic sufficiency review (CCT-SEM-001). NOT the owner of CCT-EVID-001 | Inward (depends on domain contracts, Evidence Record) | Domain contracts, Evidence Record (read) | Direct model fact rewrite, UI | Provider-neutral core with provider-specific model adapter |
 | **Release Steward** | `src/agents/release_steward.py` | Reversible handoff, enforced pipeline writebacks (CS-WRITE-001). Consumes judge format from `docs/JUDGING_MAP.md` | Inward (depends on domain contracts, Change Passport) | Domain contracts, Change Passport, repository adapter port | Direct GitHub API calls bypassing adapter | Provider-neutral core with provider-specific adapter |
-| **PubSub Timeline** | `src/evidence/pubsub_timeline.py` | Chronological execution and causal ordering (CCT-FLIGHT-001) | Inward (depends on domain contracts) | Domain contracts, event port/adapter | Direct PubSub client | Provider-specific (PubSub adapter) |
+| **PubSub Timeline** | `src/evidence/pubsub_timeline.py` | Chronological execution and causal ordering (CCT-FLIGHT-001) | Inward (depends on domain contracts) | Domain contracts, event port/adapter | Direct PubSub SDK in core | Provider-neutral core + PubSub transport adapter |
 | **Change Passport** | `src/evidence/change_passport.py` | Immutable passporting context (CS-PASS-001) | Inward (depends on domain contracts) | Domain contracts, Evidence Record | UI, fixtures | Provider-neutral |
 | **Approval Compression** | `src/auth/approval_compression.py` | Autonomous vs escalation boundaries (UIPATH-AUTH-001) | Inward (depends on domain contracts) | Domain contracts | Direct model SDK, UI | Provider-neutral |
 | **ShadowLab Auth** | `src/policy/shadowlab_auth.py` | Preflight validation and destructive action boundaries (CCT-PREFLIGHT-001) | Inward (depends on domain contracts) | Domain contracts | Direct external execution, UI | Provider-neutral |
@@ -161,7 +161,7 @@ Every package listed below is `PLANNED`. No implementation exists yet.
 | **Web / Dashboard** | `web/` | Judge/operator dashboard | Outward (depends on domain contracts, Evidence Record) | Domain contracts, Evidence Record (read), application query interfaces | Durable workflow state, policy authority, evidence facts ownership | Provider-specific (UI framework) |
 | **Capability Module** | `capability/` | Passport generation, validation, expiry, revocation | Inward (depends on domain contracts) | Domain contracts | UI, fixtures | Provider-neutral |
 | **ShadowLab Scenarios** | `shadowlab/` | Scenario definitions, tool doubles, fault injection, results | Outward (depends on domain contracts) | Domain contracts | Production runtime import | Provider-neutral |
-| **Events Module** | `events/` | PubSub envelope, replay, dead-letter handling | Inward (depends on domain contracts) | Domain contracts, event port/adapter | Direct PubSub SDK in core | Provider-specific (PubSub adapter) |
+| **Events Module** | `events/` | PubSub envelope, replay, dead-letter handling | Inward (depends on domain contracts) | Domain contracts, event port/adapter | Direct PubSub SDK in core | Provider-neutral core + event transport adapter |
 | **Fixtures / Test Doubles** | `tests/`, `fixtures/` | Synthetic enterprise data, scenario fixtures, tool doubles | Outward (depends on domain contracts) | Domain contracts, application interfaces | Production runtime must NEVER import | Test-only |
 
 ### Logical Module vs Physical Target Distinction
@@ -286,7 +286,7 @@ This separation enables:
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  Change Orchestrator (Application Layer)         │
+│  Firestore Saga (Application Layer)              │
 │  Uses: SagaStatePort                             │
 │  Does not import: firestore client               │
 └──────────────┬───────────────────────────────────┘
@@ -304,11 +304,12 @@ This separation enables:
     │                     │
 ┌───┴──────────┐  ┌───────┴────────┐
 │ Firestore    │  │ In-Memory      │
-│ Saga (prod)  │  │ Test Double    │
+│ Persistence  │  │ Test Double    │
+│ Adapter      │  │ (test adapter) │
 └──────────────┘  └────────────────┘
 ```
 
-**Replaceability proof:** The Firestore Saga implements SagaStatePort. An in-memory test double implements the same port. The Change Orchestrator code does not change when the backing store changes.
+**Replaceability proof:** The Firestore persistence adapter implements SagaStatePort. An in-memory test double implements the same port. The Firestore Saga (application owner) code does not change when the backing store changes.
 
 ## 7. Mapping to P-04.00 Canonical Targets
 
@@ -401,6 +402,6 @@ The following architecture decisions are explicitly deferred to their designated
 
 Per ADR-0006, all architecture must strictly align with the `docs/CATEGORY_MAPPING.md` which maps the "Fortified Enterprise Fleet" category requirements to concrete modules.
 
-Per ADR-0007, the MVP architecture local environment is now fully configured with Application Default Credentials (ADC) and all GCP access tests have PASSED.
+Per ADR-0007, the MVP architecture local environment is configured with Application Default Credentials (ADC). Cloud Run, Firestore, and Pub/Sub verifications are VERIFIED. Other managed enterprise services maintain their actual status (`AVAILABLE / NOT_RUN`, `PERMISSION_BLOCKED / NOT_RUN`, `DEFERRED / NOT_RUN`) per canonical environment state. No availability status constitutes implementation proof.
 
 Per ADR-0009, architectural invariants and rejected alternatives from P-04.00 are preserved.
