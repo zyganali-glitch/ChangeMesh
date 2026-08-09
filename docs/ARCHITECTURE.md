@@ -393,7 +393,7 @@ The following architecture decisions are explicitly deferred to their designated
 |---|---|---|
 | Authority map (deterministic code vs Gemini judgment vs org policy vs human authority) | P-04.02 | `DONE` |
 | Trust boundaries (user, agent, subagent, tool, GitHub, metadata, GCP, public UI) | P-04.03 | `DONE` |
-| Execution/evidence mode contract (fixture, simulation, recorded-cloud, live-write) | P-04.04 | `PENDING` |
+| Execution/evidence mode contract (fixture, simulation, recorded-cloud, live-write) | P-04.04 | `DONE` (see `docs/MODE_CONTRACT.md`) |
 | Autonomy and friction review | P-04.05 | `PENDING` |
 | Concrete domain schemas and state machine (ChangeRequest, SuccessCriterion, etc.) | P-05 | `PENDING` |
 | Implementation stack and dependency freeze (Python/Node version, package manager) | P-06 | `PENDING` |

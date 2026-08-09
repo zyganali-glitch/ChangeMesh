@@ -1,6 +1,13 @@
 # ChangeMesh Evidence Boundary
 
-## States
+## Execution/Evidence Mode
+
+- `FIXTURE`: Static, predetermined, or synthetic test inputs/test doubles.
+- `SIMULATION`: Dynamic controlled rehearsal without real target mutation.
+- `RECORDED_CLOUD`: Read-only replay of evidence captured from an actual Google Cloud execution.
+- `LIVE_WRITE`: A real credential-backed action causing a real externally observable mutation.
+
+## Evidence State
 
 - `PASS`: named check/action executed and succeeded
 - `WARN`: evidence exists but needs attention
@@ -9,6 +16,8 @@
 - `SIMULATED`: executed in ShadowLab or fixture
 - `BLOCKED`: policy prevented execution; action remains `NOT_RUN`
 - `QUARANTINED`: excluded from decisions pending trust review
+
+**Invariant:** State cannot erase mode provenance. For example, a fixture success remains `FIXTURE PASS` and cannot be claimed as a live execution `PASS`.
 
 ## Authorities
 

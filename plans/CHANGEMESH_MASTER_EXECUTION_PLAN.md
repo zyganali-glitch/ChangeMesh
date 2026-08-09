@@ -602,11 +602,11 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-04.04 — Define fixture, simulation, recorded-cloud, and live-write boundaries
 
-- **Status:** `PENDING`
-- **Required action:** Define fixture, simulation, recorded-cloud, and live-write boundaries.
+- **Status:** `DONE`
+- **Required action:** Define fixture, simulation, recorded-cloud, and live-write boundaries to establish the limits of the rehearsal twin and demo presentation.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
-- **Acceptance criteria:** Every mode has visible labels; adapters cannot silently change mode.
-- **Required evidence:** Mode contract.
+- **Acceptance criteria:** Every mode has visible labels; adapters cannot silently change mode; failure in one mode remains failure in that mode.
+- **Required evidence:** Canonical Mode Contract (`docs/MODE_CONTRACT.md`), four-mode table, adapter no-silent-fallback contract, README/Evidence/Demo sync.
 - **Mandatory documentation sync:** Evidence boundary, README, demo script.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

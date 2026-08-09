@@ -123,11 +123,11 @@ Product must minimize approval count without weakening authority boundaries.
 
 ## 8. Evidence and fixture separation
 
-- Fixture data is synthetic.
-- ShadowLab output is `SIMULATED`.
-- Local adapters cannot prove managed Google services.
-- Recorded cloud evidence binds project, region, revision, timestamp, and sanitized trace IDs.
-- Public evidence contains no secrets or personal data.
+ChangeMesh defines four explicit execution/evidence modes (`FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`), which must be visibly labeled (see `docs/MODE_CONTRACT.md`).
+
+*   **No silent fallback:** Adapters execute the requested mode or fail closed.
+*   **Mode lock:** The mode is immutable per operation.
+*   **Provenance is immutable:** Simulation success does not overwrite a live failure; recorded-cloud replay is not current live execution.
 
 ## 9. Architecture-change protocol
 

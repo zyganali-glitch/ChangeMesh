@@ -206,6 +206,13 @@ The project charter is already agreed. **No Phase-0 interview is required.** Que
 
 ## Evidence boundary
 
+ChangeMesh enforces a strict boundary between execution modes and result states (see [`docs/MODE_CONTRACT.md`](docs/MODE_CONTRACT.md)):
+
+*   **Execution Modes:** `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`. Adapters execute the explicitly selected mode or fail; there is no silent fallback. Mode labels must be visible.
+*   **Evidence States:** The result of the executed operation.
+
+Simulation and fixtures are not live proof. Recorded-cloud is a replay of an actual past execution, not a live call. Live-write performs bounded real mutation (e.g., in a demo repository). Live-write does not automatically mean human approval is required, as organizational policy determines autonomy.
+
 | State | Meaning |
 |---|---|
 | `PASS` | A named check or action actually completed successfully |

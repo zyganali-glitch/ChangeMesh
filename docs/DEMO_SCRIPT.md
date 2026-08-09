@@ -12,10 +12,10 @@ Show two revisions; reject invalid Capability Passport; select proven revision.
 Show async timeline; find dependencies; block destructive path; user remains idle.
 
 ## 1:35–2:15 — ShadowLab/autonomous correction
-First rehearsal fails rollback or compatibility; system switches to expand–migrate–contract; second passes. Label simulation.
+First rehearsal fails rollback or compatibility; system switches to expand–migrate–contract; second passes. Mode: `SIMULATION`. Must visibly say simulated/rehearsed.
 
 ## 2:15–2:50 — Real reversible action
-Generate artifacts, run tests, create real branch/draft PR in synthetic repo.
+Generate artifacts, run tests, create real branch/draft PR in synthetic repo. Mode: `LIVE_WRITE` against controlled synthetic/demo repo (no production mutation implied). Human approval only if organizational policy requires it.
 
 ## 2:50–3:15 — Trusted cross-session memory
 Resume separate session, show provenance, reject stale/quarantined memory, continue.
@@ -24,6 +24,6 @@ Resume separate session, show provenance, reject stale/quarantined memory, conti
 One card only for irreversible boundary; do not perform production mutation.
 
 ## 3:35–4:00 — Passport/cloud proof
-Show passport, deployed revision, Firestore/PubSub, Gemini trace, observability.
+Show passport, deployed revision, Firestore/PubSub, Gemini trace, observability. If showing stored historical cloud evidence: mode is `RECORDED_CLOUD`. If demonstrating current live backend event: evidence must clearly say what actually ran.
 
 Rules: no fake typing, hidden state edits, or unsupported claims.

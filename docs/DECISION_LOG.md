@@ -145,3 +145,16 @@
     - All adapters must sanitize payloads before crossing the boundary inward.
     - Public Judge UI is restricted to sanitized, read-only artifacts.
 - Evidence: `docs/THREAT_MODEL.md`
+
+## ADR-0013 — Explicit execution-mode provenance and no-silent-fallback policy
+- Date: 2026-08-09
+- Status: Accepted
+- Context: P-04.04 required defining fixture, simulation, recorded-cloud, and live-write boundaries to ensure public evidence honesty and reproducibility.
+- Decision: ChangeMesh recognizes four explicit execution/evidence modes (`FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`). Operation mode is explicitly selected by policy/caller, and adapters are mode-locked (execute requested mode or fail closed). Silent adapter fallback is strictly forbidden. Any mode change requires a new explicit operation and evidence record. Public mode visibility is mandatory in all judge/operator surfaces.
+- Alternatives:
+    - Automatic live→simulation fallback (Rejected: causes silent loss of real-execution truth).
+    - Simulation presented as live (Rejected: dishonest claim).
+    - Recorded-cloud presented as current-live (Rejected: dishonest claim).
+    - Implicit adapter-selected mode (Rejected: orchestrator/policy must explicitly know execution boundary).
+- Consequences: Evidence state (`PASS`/`FAIL`) cannot erase mode provenance. All components must ensure mode labels survive to the Change Passport and dashboard. Live writes remain credential-isolated and do not inherently require human approval unless defined by policy.
+- Evidence: `docs/MODE_CONTRACT.md`
