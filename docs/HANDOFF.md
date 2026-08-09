@@ -9,11 +9,12 @@ P-03
 P-04.00
 P-04.01
 P-04.02
+P-04.03
 
 **Active Phase:**
 P-04 — Architecture and Authority Map
 
 **Next Exact Task:**
-P-04.03 — Create trust boundaries for user, agent, subagent, tool, GitHub, metadata graph, Google Cloud, and public judge UI
+P-04.04 — Define fixture, simulation, recorded-cloud, and live-write boundaries
 
-P-04.03 is PENDING.
+P-04.04 is PENDING.

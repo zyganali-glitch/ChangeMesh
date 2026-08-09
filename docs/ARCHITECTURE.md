@@ -19,9 +19,10 @@ This document defines the component boundaries, dependency directions, and canon
 3. **One canonical owner per responsibility:** Each architectural concern has exactly one canonical component. No duplicate owners.
 4. **Deterministic facts before model judgment:** Deterministic code owns execution facts. Gemini provides semantic evaluation but cannot rewrite those facts.
 5. **Component vs Authority distinction:** Authority is conceptually separated into deterministic code, Gemini judgment, organizational policy, and human decision. Executors cannot self-authorize.
-6. **Adapters are replaceable:** Changing a provider adapter (e.g., GitHub → synthetic, Firestore → test double) must not require changes to domain contracts.
-7. **Fixtures are outer-layer test adapters:** Production runtime never imports fixture/test code. Fixtures depend inward on contracts.
-8. **Fail closed for unknown:** Unknown capability, expired memory, missing evidence, invalid schema, or uncertain irreversible target must not become authorization.
+6. **Zero-Trust and Credential Isolation:** Trust domains are strictly bound. Credentials exist only at adapters and never propagate inward. External content is untrusted data. Trust boundary crossing never escalates authority.
+7. **Adapters are replaceable:** Changing a provider adapter (e.g., GitHub → synthetic, Firestore → test double) must not require changes to domain contracts.
+8. **Fixtures are outer-layer test adapters:** Production runtime never imports fixture/test code. Fixtures depend inward on contracts.
+9. **Fail closed for unknown:** Unknown capability, expired memory, missing evidence, invalid schema, or uncertain irreversible target must not become authorization.
 
 ## 2. Component Architecture Diagram
 
@@ -374,14 +375,24 @@ ChangeMesh enforces strict separation of authority across four distinct lanes. S
 *   **No Self-Authorization**: Executors (e.g., Release Steward) cannot synthesize their own authorization.
 *   **Fail Closed**: Duplicate or unknown authority configurations fail closed.
 
-## 10. Explicitly Deferred Architecture Work
+## 10. Trust Boundaries (P-04.03)
+
+ChangeMesh enforces strict boundaries between trust domains (e.g., User, Agent, Subagent, Tool, GitHub, Metadata, Google Cloud, Public Judge UI). See the canonical detailed model in [`THREAT_MODEL.md`](THREAT_MODEL.md).
+
+**Key Invariants:**
+*   **Credential Isolation**: Credentials exist only at the adapter boundary. They must never propagate inward to model prompts, evidence, or public UI.
+*   **External Content is Data**: Content from GitHub, tools, or metadata graphs is treated as untrusted data, never as system instructions.
+*   **Public UI is Low-Trust**: The public judge surface receives only sanitized, credential-free data. It holds no reusable external-write authority.
+*   **Authority Persists**: Crossing a trust boundary does not escalate authority (e.g., Gemini output cannot become deterministic execution truth).
+
+## 11. Explicitly Deferred Architecture Work
 
 The following architecture decisions are explicitly deferred to their designated phases:
 
 | Deferred Topic | Designated Phase | Current Status |
 |---|---|---|
 | Authority map (deterministic code vs Gemini judgment vs org policy vs human authority) | P-04.02 | `DONE` |
-| Trust boundaries (user, agent, subagent, tool, GitHub, metadata, GCP, public UI) | P-04.03 | `PENDING` |
+| Trust boundaries (user, agent, subagent, tool, GitHub, metadata, GCP, public UI) | P-04.03 | `DONE` |
 | Execution/evidence mode contract (fixture, simulation, recorded-cloud, live-write) | P-04.04 | `PENDING` |
 | Autonomy and friction review | P-04.05 | `PENDING` |
 | Concrete domain schemas and state machine (ChangeRequest, SuccessCriterion, etc.) | P-05 | `PENDING` |

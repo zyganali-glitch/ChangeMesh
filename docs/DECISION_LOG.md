@@ -129,3 +129,19 @@
     - Clear boundaries for Approval Compression and Policy Guardian.
     - Architecture requires distinct modules for facts, semantic assessments, and policies.
 - Evidence: `docs/AUTHORITY_MAP.md`
+
+## ADR-0012 — Zero-trust boundary and credential-isolation model
+- Date: 2026-08-09
+- Status: Accepted
+- Context: P-04.03 required explicitly defining data flows and credential handling to prevent subagents from confused-deputy attacks, protect model contexts from prompt injections, and prevent secret exposure on public UIs.
+- Decision: Adopt a zero-trust architecture. External inputs (GitHub, tools, metadata) are untrusted data, not system instructions. Credentials exist solely at adapter boundaries and never propagate to agents, models, memory, evidence, or public UI. Agent and subagent delegation must be strictly bounded. Boundary crossings do not alter authority classes.
+- Alternatives:
+    - Forwarding credentials through agent prompts (Rejected: high exfiltration risk).
+    - Trusting repository instructions (Rejected: prompt-injection vector).
+    - Subagent inheriting unrestricted parent privileges (Rejected: violates least privilege).
+    - Public UI holding live-write credentials (Rejected: exposes system to hostile edge).
+- Consequences:
+    - Development must use ADC locally and Workload Identity on Google Cloud.
+    - All adapters must sanitize payloads before crossing the boundary inward.
+    - Public Judge UI is restricted to sanitized, read-only artifacts.
+- Evidence: `docs/THREAT_MODEL.md`

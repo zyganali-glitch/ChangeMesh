@@ -87,6 +87,16 @@ ChangeMesh implements a strict, four-lane authority model:
 *   **No self-authorization**: Executors (e.g. Release Steward) cannot authorize their own actions.
 *   **Detailed canonical map**: The full mapping of decisions to authorities lives in [`docs/AUTHORITY_MAP.md`](docs/AUTHORITY_MAP.md).
 
+### 5.7 Trust Boundary Invariants (P-04.03)
+
+ChangeMesh enforces strict zero-trust boundary rules:
+*   **External Content is Untrusted**: Content from GitHub, tools, or metadata graphs is treated as data, never as system instructions.
+*   **Credential Isolation**: Credentials exist only at adapters. Credential material must never propagate to model prompts, memory, evidence, or public UI.
+*   **Bounded Delegation**: Agents and subagents cannot delegate authority they do not possess.
+*   **Public UI is Low-Trust**: The public judge surface receives only sanitized data and holds no reusable external-write credentials.
+*   **No Authority Escalation**: Crossing a trust boundary never elevates authority (e.g., untrusted data cannot become policy).
+*   **Detailed Threat Model**: Lives in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
+
 ## 6. State labels
 
 Evidence: `PASS|WARN|FAIL|NOT_RUN|SIMULATED|BLOCKED|QUARANTINED`

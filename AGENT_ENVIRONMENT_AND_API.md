@@ -27,6 +27,14 @@ Record actual environment only; do not fill unknown values with guesses.
 
 ## Rules
 
+### Credential Handling Architecture (P-04.03)
+
+- **Local:** Use Application Default Credentials (ADC) for local development.
+- **Cloud:** Target Workload Identity / Managed Identity. No service-account JSON key files should be used or distributed.
+- **Isolation:** Credentials (`GITHUB_TOKEN`, API Keys, etc.) exist only at external adapter boundaries.
+- **Inward Ban:** Credential material must **never** be propagated into model prompts, agent memory, evidence artifacts, Pub/Sub event payloads, or the public judge UI.
+- **Logging:** Secret environment variables and credential material must never be logged unredacted.
+
 - Never commit credentials, service-account keys, OAuth tokens, cookies, or personal access tokens.
 - Prefer Application Default Credentials locally and workload identity in Google Cloud.
 - Record exact service, project, region, resource name, required role, and teardown method.

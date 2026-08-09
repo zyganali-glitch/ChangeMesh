@@ -592,7 +592,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-04.03 — Create trust boundaries for user, agent, subagent, tool, GitHub, metadata graph, Google Cloud, and public judge UI
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create trust boundaries for user, agent, subagent, tool, GitHub, metadata graph, Google Cloud, and public judge UI.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Data/credentials crossing each boundary enumerated and minimized.
