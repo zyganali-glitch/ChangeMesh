@@ -25,8 +25,9 @@ This audit verifies whole-repository alignment after P-04.01 (component architec
 - No implemented claim made ✅
 
 ## 4. CATEGORY_MAPPING ↔ Package Map
-- Three stale `.ts` paths fixed to align with P-04.00 canonical targets ✅
-- `passport.ts` → `src/evidence/change_passport.py` (CS-PASS-001) ✅
+- Stale `.ts` paths fixed to align with P-04.00 canonical targets ✅
+- Capability Passport logical planned target = `capability/` (stale `passport.ts` mapping removed) ✅
+- Change Passport canonical donor target = `src/evidence/change_passport.py` (CS-PASS-001) ✅
 - `router.ts` → `src/agents/change_orchestrator.py` ✅
 - `armor.ts` → `src/agents/policy_guardian.py` (ZK-PRIV-001) ✅
 - Evidence locations now reference canonical targets or logical modules ✅
