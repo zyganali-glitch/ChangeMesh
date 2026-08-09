@@ -1,35 +1,67 @@
-# P-Ω Post-P04.00 Integrity Audit
+# P-Ω Post-P04.01 Integrity Audit
 
 **Date:** 2026-08-09
 
 ## Overview
-This audit verifies whole-repository alignment between code, docs, active master plan, architecture, and live cloud environment after P-04.00 completion and before P-04.01 begins.
+This audit verifies whole-repository alignment after P-04.01 (component architecture and explicit dependency directions) completion and before P-04.02 begins.
 
-## 1. Documentation vs. Architecture
-- **README / Architecture / Gateway Conflation:** The false claim that `Agent Gateway` handles business logic and acts as a `Policy Guardian` has been eradicated. The roles are strictly separated: Change Orchestrator handles goal interpretation, saga coordination, routing, and recovery. Policy Guardian handles policy, security, and autonomy evaluation. Agent Gateway provides managed network and governance enforcement.
-- **Service Verifier Matrix (P-02.05):** The Service Verifier was rewritten to evaluate proper endpoints, removing fake HTTP 400 available statuses and `sys.exit(0)` swallowing. Actual status is being computed.
+## 1. Plan ↔ HANDOFF Parity
+- **P-04 Status:** IN_PROGRESS ✅
+- **P-04.00 Status:** DONE ✅
+- **P-04.01 Status:** DONE ✅
+- **P-04.02 Status:** PENDING ✅
+- **HANDOFF Completed:** includes P-04.01 ✅
+- **HANDOFF Next Exact Task:** P-04.02 ✅
 
-## 2. Donor Integrity & Explicit Verification Metrics (P-DΩ)
-The full donor integrity audit explicitly verified the following:
-- **7 donors** were validated.
-- **20 actual components** mapped across the donors.
-- **0 schema/example components** exist in the active component registry.
-- **Canonical status vocabulary parity:** Confirmed; 0 non-canonical statuses found.
-- **Canonical reuse vocabulary parity:** Confirmed; 0 invalid reuse methods found.
-- **Manifest SHA-256:** `434ed7893b022ec3d991d8e2a9dd3fd80fd26c11130d4b4b1b85b1f986778849`
-- **Manifest vs donor-audit component parity:** 100% matched (0 missing/extra).
-- **Manifest vs donor-audit source-path parity:** 100% matched.
-- **Manifest vs donor-audit target-path parity:** 100% matched.
-- **Closure vs manifest metrics:** 100% matched.
-- **P-02D evidence matrix freshness:** Wording and metrics updated to reflect current exact facts.
+## 2. Architecture Memory ↔ docs/ARCHITECTURE.md
+- `AGENT_ARCHITECTURE_AND_PATTERNS.md` §10 references dependency direction invariants ✅
+- `docs/ARCHITECTURE.md` contains full dependency matrix ✅
+- Canonical ownership table matches in both documents ✅
 
-## 3. General Governance Alignment
-- **Master registry vs detailed phases:** 100% matched.
-- **Handoff parity:** 100% matched.
-- **P-04 Status:** IN_PROGRESS.
-- **P-04.00 Status:** DONE.
-- **P-04.01 Status:** PENDING.
+## 3. README ↔ Architecture
+- README Target Architecture section links to `docs/ARCHITECTURE.md` ✅
+- README still says pre-implementation ✅
+- README saga-state ambiguity resolved (Orchestrator = coordination, Firestore Saga = durable state) ✅
+- No implemented claim made ✅
 
-## 4. Results
+## 4. CATEGORY_MAPPING ↔ Package Map
+- Three stale `.ts` paths fixed to align with P-04.00 canonical targets ✅
+- `passport.ts` → `src/evidence/change_passport.py` (CS-PASS-001) ✅
+- `router.ts` → `src/agents/change_orchestrator.py` ✅
+- `armor.ts` → `src/agents/policy_guardian.py` (ZK-PRIV-001) ✅
+- Evidence locations now reference canonical targets or logical modules ✅
+
+## 5. Donor Manifest ↔ Architecture Target Paths
+- All 20 P-04.00 canonical targets preserved without modification ✅
+- Manifest SHA unchanged: `434ed7893b022ec3d991d8e2a9dd3fd80fd26c11130d4b4b1b85b1f986778849` ✅
+- Donor manifest lint: PASS ✅
+
+## 6. Provider-Independence Gate
+- Domain contracts → Google SDK: FORBIDDEN ✅
+- Domain contracts → ADK: FORBIDDEN ✅
+- Domain contracts → UI: FORBIDDEN ✅
+- Domain contracts → Fixtures: FORBIDDEN ✅
+- Adapters → domain contracts: REQUIRED (inward) ✅
+- Adapter replaceability examples documented ✅
+
+## 7. Implementation Honesty
+- `src/` directory does not exist: confirmed ✅
+- No product code changes: confirmed ✅
+- No dependency changes: confirmed ✅
+- All components labeled PLANNED: confirmed ✅
+
+## 8. Scope Boundaries
+- P-04.02 authority map: NOT implemented ✅
+- P-04.03 trust boundaries: NOT implemented ✅
+- P-04.04 mode boundaries: NOT implemented ✅
+- P-04.05 autonomy review: NOT implemented ✅
+- P-05 domain schemas: NOT implemented ✅
+- P-06 stack freeze: NOT implemented ✅
+
+## 9. Decision Log
+- ADR-0010 added for provider-neutral domain contracts ✅
+- ADR-0009 preserved without modification ✅
+
+## Results
 **Status:** `PASS`
-**Next Approved Task:** P-04.01 (Create component architecture and explicit dependency directions)
+**Next Approved Task:** P-04.02 (Create authority map separating deterministic code, Gemini semantic judgment, organizational policy, and human authority)

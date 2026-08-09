@@ -112,3 +112,15 @@ Product must minimize approval count without weakening authority boundaries.
 ## 9. Architecture-change protocol
 
 Architectural changes require decision-log entry, architecture-memory update, master-plan impact, migration note when contracts change, affected tests, and whole-repo consistency audit.
+
+## 10. Dependency direction invariants (P-04.01)
+
+Provider-specific outer layers depend inward on ChangeMesh domain contracts. Domain contracts never depend outward on providers.
+
+- `domain/contracts/` → Google SDK, ADK, Firestore, PubSub, GitHub, UI, fixtures: **FORBIDDEN**
+- Adapters, UI, fixtures → `domain/contracts/`: **REQUIRED** (inward)
+- Production code → fixture/test code: **FORBIDDEN**
+
+Adapters are architecturally replaceable: changing a provider adapter (e.g., GitHub → synthetic, Firestore → test double) must not require changes to domain contracts.
+
+Full dependency matrix and package map: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

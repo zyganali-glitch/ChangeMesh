@@ -98,3 +98,18 @@
     - Human authority boundaries are clearly defined (exception-only compression).
     - Google ADK owns orchestration without scattered runtime leakage.
     - Enforces strict adherence to ChangeMesh product constraints while borrowing proven invariants from donors.
+
+## ADR-0010 — Provider-neutral domain contracts and inward dependency direction
+- Date: 2026-08-09
+- Status: Accepted
+- Context: P-04.01 established component architecture with explicit dependency directions. The question was whether domain contracts should carry Google SDK types (Firestore, PubSub, ADK, Vertex) for convenience or remain provider-neutral.
+- Decision: Domain contracts (`domain/contracts/`) must never depend outward on Google SDK, ADK, Firestore SDK, PubSub SDK, GitHub SDK, UI frameworks, or fixture/test code. Provider-specific outer layers (adapters, UI, fixtures) depend inward on domain contracts. Google-native runtime (ADK + Gemini + Google Cloud) is preserved as the product runtime — provider independence means domain types do not carry provider SDK types, not that Google is removed. Adapters are architecturally replaceable: changing a provider adapter must not require changes to domain contracts.
+- Alternatives:
+    - Direct SDK coupling in domain types (Rejected: would prevent testability, create provider lock-in at the domain level, and violate clean architecture)
+    - Full provider abstraction removing all Google specificity (Rejected: product is Google-native per competition requirements and product charter)
+- Consequences:
+    - P-04.00 canonical component targets are preserved without modification.
+    - All implementation phases (P-05+) must validate that domain contracts carry no provider SDK imports.
+    - Adapters implement domain port interfaces and remain swappable.
+    - Production runtime never imports fixture/test code.
+- Evidence: `docs/ARCHITECTURE.md` §3 (Package Map), §4 (Dependency Matrix), §5 (Provider-Neutral Domain Boundary), §6 (Adapter Replaceability)

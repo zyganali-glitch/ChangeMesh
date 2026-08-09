@@ -134,7 +134,7 @@ The final passport binds mission, agent/tool identities, delegation and event ch
 
 | Agent | Primary responsibility | Default authority |
 |---|---|---|
-| **ChangeMesh Orchestrator** | Goal interpretation, dynamic routing, saga state, recovery | Coordinate; no unrestricted production mutation |
+| **ChangeMesh Orchestrator** | Goal interpretation, dynamic routing, saga coordination, recovery | Coordinate; no unrestricted production mutation; durable workflow state owned by Firestore Saga |
 | **Impact Scout** | Repository, dependency, lineage, ownership, and conflict analysis | Read-only |
 | **Policy Guardian** | Privacy, prompt injection, identity, tool and data policy evaluation | Block or constrain; no implementation writes |
 | **Migration Engineer** | Safe expand–migrate–contract artifacts and tests | Write only to scoped branch/worktree |
@@ -161,7 +161,17 @@ Expected demonstration:
 10. A Change Evidence Passport and Google Cloud traces are shown.
 
 ## Target architecture
-> **Note:** The target component architecture diagram is PENDING implementation contracts freeze (Phase P-04). Do not publish the final diagram here until contracts are approved.
+
+The P-04.01 component dependency architecture is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). It defines:
+
+- Component boundaries and canonical ownership
+- Explicit dependency directions (inward dependency principle)
+- Canonical planned package map
+- Provider-neutral domain boundary
+- Adapter replaceability contract
+
+> [!IMPORTANT]
+> This is a **planned component architecture**, not a final implemented architecture. Domain schemas are defined in P-05. Implementation stack is frozen in P-06. Runtime implementation begins in P-07+. All components remain `PLANNED`.
 
 ## Google-native implementation policy
 
