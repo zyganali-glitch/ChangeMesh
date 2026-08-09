@@ -1,6 +1,7 @@
 # ChangeMesh Component Provenance
 
-Status: `PLANNED / PRE-IMPLEMENTATION`
+Implementation status: `PLANNED / PRE-IMPLEMENTATION`
+Architecture donor preflight gate (P-04.00): `PASS`
 
 ChangeMesh is a new product/repository. Design benefits from ideas in owner's earlier repositories, but final competition implementation must document exactly what is reused, rewritten, or new.
 

@@ -21,12 +21,13 @@ Managed-service integrations remain conditional on real access and must be label
 
 ## 3. Agent architecture and target components
 
-- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): owns saga state and routing.
-- `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection (CS-BLAST-001).
+- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): owns ADK routing, saga coordination, and recovery; durable workflow state is owned by Firestore Saga.
+- `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection, repository overlap, and parallel-change conflict detection (CS-BLAST-001, GL-CONFLICT-001 unified).
 - `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks (ZK-PRIV-001).
 - `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation and migration boundaries (CS-MIG-001).
-- `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent semantic sufficiency review and evidence extraction (CCT-EVID-001, CCT-SEM-001).
-- `Release Steward` (`src/agents/release_steward.py`): reversible handoff, enforced pipeline writebacks, and judge format exports (CS-WRITE-001, CCT-JUDGE-001).
+- `Evidence Record / Ledger` (`src/evidence/evidence_record.py`): canonical deterministic fact and evidence authority (CCT-EVID-001).
+- `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent semantic sufficiency review (CCT-SEM-001).
+- `Release Steward` (`src/agents/release_steward.py`): reversible handoff and enforced pipeline writebacks (CS-WRITE-001). Consumes judge format from `docs/JUDGING_MAP.md` (CCT-JUDGE-001 canonical target) but is not the canonical owner of that component.
 
 No agent receives unrestricted credentials. Every tool call is scoped by role, change ID, action class, and data class.
 Additional core targets:

@@ -1,9 +1,9 @@
-# P-Ω (Pre-P04 Final Gate Fix) Integrity Audit
+# P-Ω Post-P04.00 Integrity Audit
 
 **Date:** 2026-08-09
 
 ## Overview
-This audit runs continuously to ensure complete alignment between code, docs, active master plan, architecture, and live cloud environment before we lock in and proceed to `P-04.00`.
+This audit verifies whole-repository alignment between code, docs, active master plan, architecture, and live cloud environment after P-04.00 completion and before P-04.01 begins.
 
 ## 1. Documentation vs. Architecture
 - **README / Architecture / Gateway Conflation:** The false claim that `Agent Gateway` handles business logic and acts as a `Policy Guardian` has been eradicated. The roles are strictly separated: Change Orchestrator handles goal interpretation, saga coordination, routing, and recovery. Policy Guardian handles policy, security, and autonomy evaluation. Agent Gateway provides managed network and governance enforcement.
@@ -16,7 +16,7 @@ The full donor integrity audit explicitly verified the following:
 - **0 schema/example components** exist in the active component registry.
 - **Canonical status vocabulary parity:** Confirmed; 0 non-canonical statuses found.
 - **Canonical reuse vocabulary parity:** Confirmed; 0 invalid reuse methods found.
-- **Manifest SHA-256:** `085a095d6152aead42ca86fe8f3d0a2ccceb45cf8b138496b42cf95181522199`
+- **Manifest SHA-256:** `434ed7893b022ec3d991d8e2a9dd3fd80fd26c11130d4b4b1b85b1f986778849`
 - **Manifest vs donor-audit component parity:** 100% matched (0 missing/extra).
 - **Manifest vs donor-audit source-path parity:** 100% matched.
 - **Manifest vs donor-audit target-path parity:** 100% matched.
@@ -32,4 +32,4 @@ The full donor integrity audit explicitly verified the following:
 
 ## 4. Results
 **Status:** `PASS`
-**Next Approved Phase:** P-04.01 (Create component architecture and explicit dependency directions)
+**Next Approved Task:** P-04.01 (Create component architecture and explicit dependency directions)
