@@ -11,7 +11,7 @@ This document enumerates the trust boundaries for the ChangeMesh application. It
 ## 2. Trust Assumptions
 - **Local Developer Environments:** Local machines (e.g. using Application Default Credentials) are outside the verifiable product proof but still require safe secret handling.
 - **Untrusted External Systems:** External systems (GitHub, APIs) may return malicious, hostile, or malformed content (prompt injections).
-- **Agent/Model Output is Advisory:** Agent and model semantic outputs are NOT trusted authority by default.
+- **Agent/Model Semantic Output:** Gemini output is authoritative only for the narrowly scoped semantic decision types assigned to `GEMINI_SEMANTIC_JUDGMENT` in `docs/AUTHORITY_MAP.md`; it remains untrusted for deterministic facts, organizational policy, human authority, and execution proof until required structural validation succeeds.
 - **Untrusted Public Inputs:** The public judge UI acts as a hostile/untrusted edge.
 - **Sensitive Credentials:** Adapter credentials and tokens are highly sensitive and must not be exposed.
 - **Cloud Infrastructure is Not a Pass:** Being on Google Cloud does not eliminate the need for application-level data minimization and validation.
@@ -51,7 +51,7 @@ flowchart TD
     App -->|TB-12: Sanitized Evidence| PublicUI
     App -->|TB-03: Bounded Mission| Agent
     App -->|TB-09: App State (No raw secrets)| GCP
-    App -->|TB-13: Authority Requests| User
+    App <-->|TB-13: Authority Request / Response| User
     Agent -->|TB-04: Bounded Delegation| Subagent
     Agent -->|TB-05: Typed Request (No raw secrets)| ToolB
     Subagent -->|TB-05: Typed Request| ToolB
@@ -82,7 +82,8 @@ flowchart TD
 | **TB-10** | App | Pub/Sub | Chronology | Events (no blobs) | Yes (Workload) | **NO** | Envelope schema | No blobs, only refs | Drop / Dead-letter |
 | **TB-11** | App | Observability | Telemetry | Traces, logs | Yes (Workload) | **NO** | Redaction filter | No CoT, no tokens | Log silently fails |
 | **TB-12** | App | Public UI | Display evidence | Sanitized Artifacts | No | **NO** | Redaction of secrets/internals | Sanitize CoT/tokens | Display error |
-| **TB-13** | User | App | Approval Compression | Decision, scope | Yes (Deferred) | **NO** | Check against policy slots | Minimal decision bits | Treat as DENY |
+| **TB-13 (App→User)** | App | User | Authority Request | Minimal authority question, bounded scope, policy reason | No | **NO** | Minimized decision-required context | Send only required context | Block request |
+| **TB-13 (User→App)** | User | App | Approval Compression | Decision (approve/deny), bounded scope, identity ref | Yes (Deferred) | **NO** | Check against policy slots, expected question | Minimal decision bits | Treat missing/invalid as DENY |
 
 ## 6. Zero-Trust and Credential Isolation Model
 - **Adapter-Only Credentials:** Credentials (e.g., `GITHUB_TOKEN`, API Keys) exist strictly at the external adapter boundary.
@@ -119,7 +120,7 @@ For every crossing, the payload must be purpose-bound. The system uses identifie
 | **T-05** | Evidence poisoning / fabricated tool execution | Deterministic Evidence Record; Gemini cannot manufacture facts. |
 | **T-06** | Public judge UI disclosure | Sanitized/minimized read surface; no reusable secrets/internals exposed. |
 | **T-07** | Sensitive logging/tracing | Log redaction/minimization; no tokens or private reasoning. |
-| **T-08** | Unauthorized external write | Release Steward policy check + human authority prerequisite. |
+| **T-08** | Unauthorized external write | Valid authorization required; human authority is additionally required only when organizational policy assigns that write to a human-approval slot. Release Steward cannot self-authorize. |
 | **T-09** | Stale/untrusted memory | Memory Trust Layer enforces provenance, TTL, and quarantine rules. |
 | **T-10** | Unvalidated Gemini output | Structured validation before consumption; no authority escalation allowed. |
 
