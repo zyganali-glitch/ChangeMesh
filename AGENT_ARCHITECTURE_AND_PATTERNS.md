@@ -101,15 +101,14 @@ ChangeMesh enforces strict zero-trust boundary rules:
 
 Evidence: `PASS|WARN|FAIL|NOT_RUN|SIMULATED|BLOCKED|QUARANTINED`
 
-Initial lifecycle:
+Lifecycle States (P-05.02):
 
-`RECEIVED → DISCOVERING → QUALIFYING → REHEARSING → GROUNDED → AUTHORIZED → EXECUTING → VERIFYING → AWAITING_AUTHORITY? → CERTIFYING → COMPLETE`
+`RECEIVED → DISCOVERING → QUALIFYING → REHEARSING → GROUNDED`
+*Authority:* `AWAITING_AUTHORITY`, `AUTHORIZED`
+*Execution:* `EXECUTING → VERIFYING → CERTIFYING → COMPLETE`
+*Branches/Terminals:* `BLOCKED`, `RETRY_SCHEDULED`, `COMPENSATING`, `FAILED`, `CANCELLED`.
 
-Failure branches:
-
-`BLOCKED`, `RETRY_SCHEDULED`, `COMPENSATING`, `FAILED`, `CANCELLED`.
-
-Exact schemas must be frozen during the domain-contract phase.
+Exact schemas are frozen in `domain/contracts/change_lifecycle.py`.
 
 ## 7. Autonomy policy
 

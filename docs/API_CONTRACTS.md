@@ -19,6 +19,12 @@ from domain.contracts import (
     ChangeRequest,
     AgentDescriptor,
     ToolDescriptor,
+    ChangeState,
+    IllegalTransitionError,
+    CHANGE_LIFECYCLE_VERSION,
+    can_transition,
+    require_transition,
+    is_terminal
 )
 ```
 
@@ -162,8 +168,42 @@ The following are explicitly deferred to later P-05 micro-tasks:
 
 | Contract | Owner Phase |
 |---|---|
-| Lifecycle state machine, transitions, terminal states | P-05.02 |
 | EvidenceRecord, EvidenceState, Provenance, TraceReference, ArtifactHash | P-05.03 |
 | MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard | P-05.04 |
 | Event envelope (event ID, change ID, causation, correlation) | P-05.05 |
 | Naming, enum, timestamp, hashing, redaction, serialization conventions | P-05.06 |
+
+---
+
+## 9. Change Lifecycle State Machine
+
+Typed lifecycle and transitions defining the safe progression of an enterprise change.
+
+### `ChangeState` (Enum)
+
+| State | Role |
+|---|---|
+| `RECEIVED` | Initial intake of ChangeRequest |
+| `DISCOVERING` | Agent/Tool/Impact gathering |
+| `QUALIFYING` | Passport/Capability validation |
+| `REHEARSING` | ShadowLab validation runs |
+| `GROUNDED` | Context loaded and validated |
+| `AWAITING_AUTHORITY` | Human policy-approval wait state |
+| `AUTHORIZED` | Safe for irreversible execution |
+| `EXECUTING` | Running change logic |
+| `VERIFYING` | Validating evidence and success criteria |
+| `CERTIFYING` | Sealing passport |
+| `RETRY_SCHEDULED` | Resuming after failure |
+| `COMPENSATING` | Rolling back state |
+| `BLOCKED` | **Terminal**: Policy/Safety denial |
+| `COMPLETE` | **Terminal**: Successfully certified |
+| `FAILED` | **Terminal**: Unrecoverable error |
+| `CANCELLED` | **Terminal**: User explicit abort |
+
+### Exposed Operations
+
+| Function | Signature | Purpose |
+|---|---|---|
+| `can_transition` | `(current: ChangeState, target: ChangeState) -> bool` | Safe boolean check if an edge exists. |
+| `require_transition` | `(current: ChangeState, target: ChangeState) -> None` | Enforces transition graph, raising `IllegalTransitionError` if blocked. |
+| `is_terminal` | `(state: ChangeState) -> bool` | Identifies if a state has no outgoing edges. |

@@ -594,19 +594,19 @@ class TestCONTRACT020:
     def test_required_schemas_exist(self):
         import domain.contracts as contracts
         
-        expected_surface = {
+        # Ensure the 5 + 1 P-05.01 elements are exported
+        required_p05_01_surface = {
             "ChangeRequest",
             "SuccessCriterion",
             "AgentDescriptor",
             "ToolDescriptor",
             "DataClass",
-            "DataClassLevel",
+            "DataClassLevel"
         }
-        
         actual_surface = set(contracts.__all__)
         
-        assert actual_surface == expected_surface, (
-            f"Public surface area mismatch. Expected exactly {expected_surface}, got {actual_surface}"
+        assert required_p05_01_surface.issubset(actual_surface), (
+            f"Public surface area missing P-05.01 contracts. Expected at least {required_p05_01_surface}, got {actual_surface}"
         )
         
         # Verify no old "DataClassification" exists in __all__

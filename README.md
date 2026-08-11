@@ -8,7 +8,7 @@
 
 > [!IMPORTANT]
 > **Pre-implementation / competition build.**
-> This repository currently contains the project charter, architecture constraints, governance system, and execution plan. Features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
+> This repository currently contains the project charter, architecture constraints, governance system, and execution plan. P-04 Architecture and P-05.01–P-05.02 core domain schemas and lifecycle states are `IMPLEMENTED`. Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
 
 ## Competition target
 

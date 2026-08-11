@@ -1,9 +1,9 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04 DONE; P-05.01 IMPLEMENTED`
-> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, and P-05.01
+> **Status:** `P-04 DONE; P-05.01, P-05.02 IMPLEMENTED`
+> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, P-05.01, and P-05.02
 > **Date:** 2026-08-11
-> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented in `domain/contracts/` (P-05.01). Remaining domain contracts, lifecycle state machine, agents, cloud services, and UI remain `PLANNED`.
+> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented (P-05.01). The lifecycle state machine is implemented (P-05.02). Remaining domain contracts, agents, cloud services, and UI remain `PLANNED`.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 
@@ -397,7 +397,8 @@ The following architecture decisions are explicitly deferred to their designated
 | Execution/evidence mode contract (fixture, simulation, recorded-cloud, live-write) | P-04.04 | `DONE` (see `docs/MODE_CONTRACT.md`) |
 | Autonomy and friction review | P-04.05 | `DONE` (see `docs/AUTONOMY_REVIEW.md`) |
 | Foundational domain schemas (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) | P-05.01 | `DONE` (see `docs/API_CONTRACTS.md`) |
-| Lifecycle state machine, remaining contracts, conventions | P-05.02–P-05.06 | `PENDING` |
+| Lifecycle state machine | P-05.02 | `DONE` (see `domain/contracts/change_lifecycle.py`) |
+| Remaining contracts, conventions | P-05.03–P-05.06 | `PENDING` |
 | Implementation stack and dependency freeze (Python/Node version, package manager) | P-06 | `PENDING` |
 | ADK agent skeleton implementation | P-07 | `PENDING` |
 | Gemini integration and structured reasoning boundary | P-08 | `PENDING` |

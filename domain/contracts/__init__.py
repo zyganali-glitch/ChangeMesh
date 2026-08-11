@@ -6,11 +6,20 @@ inward on these contracts.  These contracts never depend outward on
 providers.
 """
 
-from domain.contracts.data_class import DataClass, DataClassLevel
-from domain.contracts.success_criterion import SuccessCriterion
-from domain.contracts.change_request import ChangeRequest
-from domain.contracts.agent_descriptor import AgentDescriptor
-from domain.contracts.tool_descriptor import ToolDescriptor
+from .change_request import ChangeRequest
+from .success_criterion import SuccessCriterion
+from .agent_descriptor import AgentDescriptor
+from .tool_descriptor import ToolDescriptor
+from .data_class import DataClass, DataClassLevel
+
+from .change_lifecycle import (
+    ChangeState,
+    IllegalTransitionError,
+    CHANGE_LIFECYCLE_VERSION,
+    can_transition,
+    require_transition,
+    is_terminal,
+)
 
 __all__ = [
     "DataClassLevel",
@@ -19,4 +28,10 @@ __all__ = [
     "ChangeRequest",
     "AgentDescriptor",
     "ToolDescriptor",
+    "ChangeState",
+    "IllegalTransitionError",
+    "CHANGE_LIFECYCLE_VERSION",
+    "can_transition",
+    "require_transition",
+    "is_terminal",
 ]

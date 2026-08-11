@@ -14,11 +14,12 @@ P-04.04
 P-04.05
 P-04
 P-05.01
+P-05.02
 
 **Active Phase:**
 P-05
 
 **Next Exact Task:**
-P-05.02 — Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches
+P-05.03 — Define EvidenceRecord, EvidenceState, Provenance, TraceReference, ArtifactHash contracts
 
-P-05.01 completed with `domain/contracts/` schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass, plus tests in `tests/test_p05_01_contracts.py` and `docs/API_CONTRACTS.md`.
+P-05.02 completed with the deterministic ChangeMesh lifecycle state machine defined in `domain/contracts/change_lifecycle.py` and `tests/test_p05_02_lifecycle.py`.

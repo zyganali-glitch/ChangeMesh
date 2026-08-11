@@ -637,7 +637,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-05.02 — Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Illegal transitions fail closed; transition table executable/testable.
