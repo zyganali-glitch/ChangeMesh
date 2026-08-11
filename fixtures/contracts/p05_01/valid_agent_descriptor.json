@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "agent_id": "impact-scout-001",
+  "agent_revision": "rev-2026-08-11-a",
+  "role": "impact_scout",
+  "description": "Read-only blast-radius collection and conflict detection",
+  "declared_capabilities": ["repository_analysis", "blast_radius", "conflict_detection"],
+  "permitted_data_classifications": ["INTERNAL", "CONFIDENTIAL"],
+  "permitted_tool_ids": ["github-reader", "metadata-query"]
+}

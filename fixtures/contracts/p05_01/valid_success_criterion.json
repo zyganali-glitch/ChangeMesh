@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0.0",
+  "criterion_id": "SC-VALID-001",
+  "description": "All unit tests pass with zero failures",
+  "verification_method": "deterministic",
+  "required_evidence_types": ["test_result", "exit_code"]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "tool_id": "bad-data-class-tool",
+  "tool_revision": "rev-1",
+  "name": "Bad Tool",
+  "description": "Has invalid data classification level",
+  "declared_actions": ["read"],
+  "is_read_only": true,
+  "permitted_data_classifications": ["TOP_SECRET"]
+}

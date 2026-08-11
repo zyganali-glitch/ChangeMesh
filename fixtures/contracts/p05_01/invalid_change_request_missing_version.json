@@ -1,0 +1,10 @@
+{
+  "request_id": "CR-2026-0002",
+  "title": "Missing schema_version field",
+  "description": "This fixture is intentionally missing schema_version.",
+  "target_systems": ["test-system"],
+  "data_classification": "PUBLIC",
+  "success_criteria": [],
+  "requested_by": "test",
+  "requested_at": "2026-08-11T10:00:00Z"
+}

@@ -623,11 +623,11 @@ Schedule is risk control, not permission to skip gates.
 
 # P-05 — Domain Contracts and State Machine
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-05.01 — Define versioned schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, and DataClass
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define versioned schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, and DataClass.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Schemas validate valid/invalid fixtures; identifiers and versions explicit.

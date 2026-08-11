@@ -59,7 +59,7 @@ Commands are added only after clean-checkout verification.
 | Purpose | Command | Status | Last verified |
 |---|---|---|---|
 | Install | `pip install -r requirements.txt` | `VERIFIED` | 2026-08-08 |
-| Unit tests | `NOT_DEFINED` | `NOT_RUN` | - |
+| Unit tests | `python -m pytest tests/ -v --tb=short` | `VERIFIED` | 2026-08-11 |
 | Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |
 | Local web | `NOT_DEFINED` | `NOT_RUN` | - |

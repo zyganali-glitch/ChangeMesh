@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "request_id": "CR-2026-0003",
+  "title": "Bad nested criterion",
+  "description": "This fixture has a malformed SuccessCriterion.",
+  "target_systems": ["test-system"],
+  "data_classification": "INTERNAL",
+  "success_criteria": [
+    {
+      "schema_version": "1.0.0",
+      "criterion_id": 12345,
+      "description": "criterion_id should be a string, not int",
+      "verification_method": "deterministic",
+      "required_evidence_types": ["test"]
+    }
+  ],
+  "requested_by": "test",
+  "requested_at": "2026-08-11T10:00:00Z"
+}

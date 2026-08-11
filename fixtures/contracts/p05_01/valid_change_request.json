@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "request_id": "CR-2026-0001",
+  "title": "Add audit_log column to users table",
+  "description": "Add a nullable audit_log JSON column to the users table to support compliance tracking.",
+  "target_systems": ["enterprise-db", "user-service"],
+  "data_classification": "CONFIDENTIAL",
+  "success_criteria": [
+    {
+      "schema_version": "1.0.0",
+      "criterion_id": "SC-001",
+      "description": "Column exists in users table with correct type",
+      "verification_method": "deterministic",
+      "required_evidence_types": ["schema_diff", "migration_output"]
+    },
+    {
+      "schema_version": "1.0.0",
+      "criterion_id": "SC-002",
+      "description": "Existing queries continue to function",
+      "verification_method": "deterministic",
+      "required_evidence_types": ["test_result"]
+    }
+  ],
+  "requested_by": "compliance-team",
+  "requested_at": "2026-08-11T10:00:00Z"
+}

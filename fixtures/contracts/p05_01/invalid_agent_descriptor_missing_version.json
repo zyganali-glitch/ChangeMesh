@@ -1,0 +1,9 @@
+{
+  "agent_id": "missing-version-agent",
+  "agent_revision": "rev-1",
+  "role": "test_agent",
+  "description": "Missing schema_version",
+  "declared_capabilities": [],
+  "permitted_data_classifications": ["PUBLIC"],
+  "permitted_tool_ids": []
+}

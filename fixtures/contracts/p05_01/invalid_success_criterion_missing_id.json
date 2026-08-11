@@ -1,0 +1,6 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Missing criterion_id",
+  "verification_method": "deterministic",
+  "required_evidence_types": ["test"]
+}

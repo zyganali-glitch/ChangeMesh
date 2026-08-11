@@ -13,13 +13,12 @@ P-04.03
 P-04.04
 P-04.05
 P-04
+P-05.01
 
 **Active Phase:**
-None — P-04 complete.
+P-05
 
 **Next Exact Task:**
-P-05.01 — Define versioned schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, and DataClass
+P-05.02 — Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches
 
-P-04.05 completed with `docs/AUTONOMY_REVIEW.md`, `docs/ARCHITECTURE.md` §12, and `docs/DECISION_LOG.md` ADR-0014.
-P-04 is the final architecture phase. All sub-tasks (P-04.00 through P-04.05) are DONE.
-P-05 begins the domain-contract schema definition phase.
+P-05.01 completed with `domain/contracts/` schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClassification, plus tests in `tests/test_p05_01_contracts.py` and `docs/API_CONTRACTS.md`.

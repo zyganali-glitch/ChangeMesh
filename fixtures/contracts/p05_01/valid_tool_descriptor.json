@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "tool_id": "github-reader-001",
+  "tool_revision": "rev-2026-08-11",
+  "name": "GitHub Repository Reader",
+  "description": "Read-only access to GitHub repository content and metadata",
+  "declared_actions": ["read_file", "list_files", "get_commit", "get_diff"],
+  "is_read_only": true,
+  "permitted_data_classifications": ["PUBLIC", "INTERNAL"]
+}
