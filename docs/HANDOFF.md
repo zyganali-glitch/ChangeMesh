@@ -18,7 +18,7 @@ P-04
 None — P-04 complete.
 
 **Next Exact Task:**
-P-05.01 — Define domain entity schemas (ChangeRequest, SuccessCriterion, EvidenceRecord, etc.)
+P-05.01 — Define versioned schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, and DataClass
 
 P-04.05 completed with `docs/AUTONOMY_REVIEW.md`, `docs/ARCHITECTURE.md` §12, and `docs/DECISION_LOG.md` ADR-0014.
 P-04 is the final architecture phase. All sub-tasks (P-04.00 through P-04.05) are DONE.

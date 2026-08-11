@@ -41,7 +41,7 @@ This audit verifies whole-repository alignment after P-04.05 (Review architectur
 
 ## 6. Donor Manifest Parity
 - **Canonical Targets:** Preserved without modification. ✅
-- **Manifest Lint:** Passes. ✅
+- **Manifest Lint:** `NOT_RUN` in this closure repair (donor manifest was not modified by P-04.05; last verified manifest state remains unchanged). ✅
 
 ## Results
 **Status:** `PASS`
