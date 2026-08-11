@@ -3,7 +3,7 @@
 > **Status:** `P-04 DONE; P-05.01 IMPLEMENTED`
 > **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, and P-05.01
 > **Date:** 2026-08-11
-> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClassification) are implemented in `domain/contracts/` (P-05.01). Remaining domain contracts, lifecycle state machine, agents, cloud services, and UI remain `PLANNED`.
+> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented in `domain/contracts/` (P-05.01). Remaining domain contracts, lifecycle state machine, agents, cloud services, and UI remain `PLANNED`.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 
@@ -216,7 +216,7 @@ These invariants are binding for all subsequent implementation:
 ### What is provider-neutral
 
 The `domain/contracts/` boundary contains (P-05, partially implemented):
-- Domain types: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClassification (P-05.01 — **IMPLEMENTED**)
+- Domain types: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass (P-05.01 — **IMPLEMENTED**)
 - Additional contracts: EvidenceRecord, lifecycle state machine, CapabilityPassport, event envelope (P-05.02–P-05.06 — PENDING)
 - Versioned contract schemas
 - Enums and state labels
@@ -396,7 +396,7 @@ The following architecture decisions are explicitly deferred to their designated
 | Trust boundaries (user, agent, subagent, tool, GitHub, metadata, GCP, public UI) | P-04.03 | `DONE` |
 | Execution/evidence mode contract (fixture, simulation, recorded-cloud, live-write) | P-04.04 | `DONE` (see `docs/MODE_CONTRACT.md`) |
 | Autonomy and friction review | P-04.05 | `DONE` (see `docs/AUTONOMY_REVIEW.md`) |
-| Foundational domain schemas (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClassification) | P-05.01 | `DONE` (see `docs/API_CONTRACTS.md`) |
+| Foundational domain schemas (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) | P-05.01 | `DONE` (see `docs/API_CONTRACTS.md`) |
 | Lifecycle state machine, remaining contracts, conventions | P-05.02–P-05.06 | `PENDING` |
 | Implementation stack and dependency freeze (Python/Node version, package manager) | P-06 | `PENDING` |
 | ADK agent skeleton implementation | P-07 | `PENDING` |

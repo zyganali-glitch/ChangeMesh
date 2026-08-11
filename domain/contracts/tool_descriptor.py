@@ -1,6 +1,6 @@
 """ChangeMesh domain contracts — tool descriptor."""
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, StrictBool, field_validator
 
 from domain.contracts.data_class import DataClassLevel
 
@@ -35,10 +35,10 @@ class ToolDescriptor(BaseModel):
     name: str
     description: str
     declared_actions: list[str]
-    is_read_only: bool
+    is_read_only: StrictBool
     permitted_data_classifications: list[DataClassLevel]
 
-    @field_validator("tool_id", "schema_version")
+    @field_validator("tool_id", "schema_version", "tool_revision")
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
         if not v or not v.strip():

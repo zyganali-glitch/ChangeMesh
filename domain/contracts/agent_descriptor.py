@@ -36,7 +36,7 @@ class AgentDescriptor(BaseModel):
     permitted_data_classifications: list[DataClassLevel]
     permitted_tool_ids: list[str]
 
-    @field_validator("agent_id", "schema_version")
+    @field_validator("agent_id", "schema_version", "agent_revision")
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
         if not v or not v.strip():

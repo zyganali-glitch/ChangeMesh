@@ -59,7 +59,8 @@ Commands are added only after clean-checkout verification.
 | Purpose | Command | Status | Last verified |
 |---|---|---|---|
 | Install | `pip install -r requirements.txt` | `VERIFIED` | 2026-08-08 |
-| Unit tests | `python -m pytest tests/ -v --tb=short` | `VERIFIED` | 2026-08-11 |
+| Unit tests (Contracts) | `python -m pytest tests/test_p05_01_contracts.py` | `VERIFIED` | 2026-08-11 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (Missing `project` fixture in GCP tests) | 2026-08-11 |
 | Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |
 | Local web | `NOT_DEFINED` | `NOT_RUN` | - |

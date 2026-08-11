@@ -14,7 +14,7 @@ The `domain/contracts/` package contains the provider-neutral core contract laye
 ```python
 from domain.contracts import (
     DataClassLevel,
-    DataClassification,
+    DataClass,
     SuccessCriterion,
     ChangeRequest,
     AgentDescriptor,
@@ -39,11 +39,13 @@ Bounded set of data-classification levels derived from the ChangeMesh threat mod
 | `CONFIDENTIAL` | Sensitive business data, credentials |
 | `RESTRICTED` | Regulated data requiring special handling |
 
-**Type:** `StrEnum` — values are their own string representations.
+**Type:** Inherits from `str` and `Enum`.
+
+**Credentials Boundary:** Credentials, tokens, API keys, and reusable secret material are explicitly outside the ordinary DataClass permission surface and remain adapter-only regardless of DataClass level.
 
 ---
 
-## 3. DataClassification
+## 3. DataClass
 
 Typed data-classification contract.
 
@@ -112,7 +114,7 @@ Declared identity, role, and capabilities of an agent revision.
 |---|---|---|---|
 | `schema_version` | `str` | Yes | Must not be blank |
 | `agent_id` | `str` | Yes | Must not be blank |
-| `agent_revision` | `str` | Yes | — |
+| `agent_revision` | `str` | Yes | Must not be blank |
 | `role` | `str` | Yes | — |
 | `description` | `str` | Yes | — |
 | `declared_capabilities` | `list[str]` | Yes | — |
@@ -137,11 +139,11 @@ Describes a tool's interface and capability boundary.
 |---|---|---|---|
 | `schema_version` | `str` | Yes | Must not be blank |
 | `tool_id` | `str` | Yes | Must not be blank |
-| `tool_revision` | `str` | Yes | — |
+| `tool_revision` | `str` | Yes | Must not be blank |
 | `name` | `str` | Yes | — |
 | `description` | `str` | Yes | — |
 | `declared_actions` | `list[str]` | Yes | — |
-| `is_read_only` | `bool` | Yes | — |
+| `is_read_only` | `StrictBool` | Yes | Must be strict boolean (e.g., rejects `"true"`) |
 | `permitted_data_classifications` | `list[DataClassLevel]` | Yes | Valid enum values |
 
 **Purpose:** Description of a tool — its identity, declared actions, and data scope. Not a live tool client, SDK wrapper, or execution evidence.

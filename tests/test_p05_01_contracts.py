@@ -3,9 +3,9 @@
 Test matrix — CONTRACT-001 through CONTRACT-018.
 
 Covers: ChangeRequest, SuccessCriterion, AgentDescriptor,
-ToolDescriptor, DataClassification.  Validates positive instantiation,
+ToolDescriptor, DataClass.  Validates positive instantiation,
 negative rejection, scope separation, provider independence,
-fixture/test isolation, and serialization round-trip.
+fixture/test isolation, serialization round-trip, and type strictness.
 """
 
 import ast
@@ -18,7 +18,7 @@ from pydantic import ValidationError
 from domain.contracts import (
     AgentDescriptor,
     ChangeRequest,
-    DataClassification,
+    DataClass,
     DataClassLevel,
     SuccessCriterion,
     ToolDescriptor,
@@ -84,6 +84,15 @@ class TestCONTRACT003:
         data = _load_fixture("invalid_change_request_missing_version.json")
         with pytest.raises(ValidationError) as exc_info:
             ChangeRequest(**data)
+        errors = exc_info.value.errors()
+        field_names = {e["loc"][0] for e in errors}
+        assert "schema_version" in field_names
+
+    def test_missing_schema_version_agent(self):
+        """Use the unused fixture for missing version on agent descriptor."""
+        data = _load_fixture("invalid_agent_descriptor_missing_version.json")
+        with pytest.raises(ValidationError) as exc_info:
+            AgentDescriptor(**data)
         errors = exc_info.value.errors()
         field_names = {e["loc"][0] for e in errors}
         assert "schema_version" in field_names
@@ -228,37 +237,37 @@ class TestCONTRACT010:
 
 
 # ===========================================================================
-# CONTRACT-011 — Valid DataClassification accepted
+# CONTRACT-011 — Valid DataClass accepted
 # ===========================================================================
 
 
 class TestCONTRACT011:
-    """Valid DataClassification instantiates correctly."""
+    """Valid DataClass instantiates correctly."""
 
-    def test_valid_data_classification(self):
-        data = _load_fixture("valid_data_classification.json")
-        dc = DataClassification(**data)
+    def test_valid_data_class(self):
+        data = _load_fixture("valid_data_class.json")
+        dc = DataClass(**data)
         assert dc.schema_version == "1.0.0"
         assert dc.classification == DataClassLevel.CONFIDENTIAL
 
     def test_all_enum_values_valid(self):
         for level in DataClassLevel:
-            dc = DataClassification(schema_version="1.0.0", classification=level)
+            dc = DataClass(schema_version="1.0.0", classification=level)
             assert dc.classification == level
 
 
 # ===========================================================================
-# CONTRACT-012 — Invalid DataClassification rejected
+# CONTRACT-012 — Invalid DataClass rejected
 # ===========================================================================
 
 
 class TestCONTRACT012:
-    """DataClassification with invalid enum value is rejected."""
+    """DataClass with invalid enum value is rejected."""
 
     def test_invalid_classification_level(self):
-        data = _load_fixture("invalid_data_classification_bad_level.json")
+        data = _load_fixture("invalid_data_class_bad_level.json")
         with pytest.raises(ValidationError):
-            DataClassification(**data)
+            DataClass(**data)
 
 
 # ===========================================================================
@@ -271,8 +280,8 @@ class TestCONTRACT013:
 
     @pytest.mark.parametrize(
         "contract_cls",
-        [ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClassification],
-        ids=["ChangeRequest", "SuccessCriterion", "AgentDescriptor", "ToolDescriptor", "DataClassification"],
+        [ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass],
+        ids=["ChangeRequest", "SuccessCriterion", "AgentDescriptor", "ToolDescriptor", "DataClass"],
     )
     def test_schema_version_field_exists(self, contract_cls):
         assert "schema_version" in contract_cls.model_fields, (
@@ -311,9 +320,9 @@ class TestCONTRACT014:
             f"{cls_name} must have '{id_field}' identifier field"
         )
 
-    def test_data_classification_has_classification_field(self):
-        """DataClassification uses its enum value as identity."""
-        assert "classification" in DataClassification.model_fields
+    def test_data_class_has_classification_field(self):
+        """DataClass uses its enum value as identity."""
+        assert "classification" in DataClass.model_fields
 
 
 # ===========================================================================
@@ -425,11 +434,11 @@ class TestCONTRACT017:
         restored = ToolDescriptor.model_validate_json(serialized)
         assert original == restored
 
-    def test_data_classification_round_trip(self):
-        data = _load_fixture("valid_data_classification.json")
-        original = DataClassification(**data)
+    def test_data_class_round_trip(self):
+        data = _load_fixture("valid_data_class.json")
+        original = DataClass(**data)
         serialized = original.model_dump_json()
-        restored = DataClassification.model_validate_json(serialized)
+        restored = DataClass.model_validate_json(serialized)
         assert original == restored
 
 
@@ -444,7 +453,7 @@ class TestCONTRACT018:
     @pytest.mark.parametrize(
         "contract_cls,base_data",
         [
-            (DataClassification, {"schema_version": "1.0.0", "classification": "PUBLIC"}),
+            (DataClass, {"schema_version": "1.0.0", "classification": "PUBLIC"}),
             (
                 SuccessCriterion,
                 {
@@ -476,7 +485,7 @@ class TestCONTRACT018:
                 "permitted_data_classifications": [],
             }),
         ],
-        ids=["DataClassification", "SuccessCriterion", "AgentDescriptor", "ToolDescriptor"],
+        ids=["DataClass", "SuccessCriterion", "AgentDescriptor", "ToolDescriptor"],
     )
     def test_extra_field_rejected(self, contract_cls, base_data):
         bad_data = {**base_data, "unexpected_field": "should_fail"}
@@ -490,6 +499,15 @@ class TestCONTRACT018:
         with pytest.raises(ValidationError) as exc_info:
             ChangeRequest(**data)
         assert any("extra" in str(e).lower() for e in exc_info.value.errors())
+
+
+# ===========================================================================
+# CONTRACT-019 — String/Blank Validations and Type Strictness
+# ===========================================================================
+
+
+class TestCONTRACT019:
+    """Blank strings and wrong primitive types are correctly rejected."""
 
     def test_blank_identifier_rejected(self):
         """Blank identifiers are rejected by validators."""
@@ -516,3 +534,78 @@ class TestCONTRACT018:
                 requested_by="test",
                 requested_at="2026-08-11T10:00:00Z",
             )
+            
+        with pytest.raises(ValidationError):
+            DataClass(schema_version="  ", classification=DataClassLevel.PUBLIC)
+            
+        with pytest.raises(ValidationError):
+            DataClass(schema_version="", classification=DataClassLevel.PUBLIC)
+
+    def test_blank_agent_revision_rejected(self):
+        with pytest.raises(ValidationError):
+            AgentDescriptor(
+                schema_version="1.0",
+                agent_id="test",
+                agent_revision="   ",
+                role="test",
+                description="test",
+                declared_capabilities=[],
+                permitted_data_classifications=[],
+                permitted_tool_ids=[],
+            )
+            
+    def test_blank_tool_revision_rejected(self):
+        with pytest.raises(ValidationError):
+            ToolDescriptor(
+                schema_version="1.0",
+                tool_id="test",
+                tool_revision="",
+                name="test",
+                description="test",
+                declared_actions=[],
+                is_read_only=True,
+                permitted_data_classifications=[],
+            )
+
+    def test_wrong_primitive_type_strict_bool(self):
+        """A string 'true' should be rejected for a boolean field when StrictBool is used."""
+        with pytest.raises(ValidationError) as exc_info:
+            ToolDescriptor(
+                schema_version="1.0.0",
+                tool_id="test-tool",
+                tool_revision="r1",
+                name="name",
+                description="desc",
+                declared_actions=[],
+                is_read_only="true",
+                permitted_data_classifications=[],
+            )
+        errors = exc_info.value.errors()
+        assert any(e["type"] == "bool_type" for e in errors)
+
+
+# ===========================================================================
+# CONTRACT-020 — Public Surface Area Test
+# ===========================================================================
+
+class TestCONTRACT020:
+    """The public contracts exactly match the 5 required schemas."""
+    
+    def test_required_schemas_exist(self):
+        import domain.contracts as contracts
+        
+        expected_schemas = {
+            "ChangeRequest",
+            "SuccessCriterion",
+            "AgentDescriptor",
+            "ToolDescriptor",
+            "DataClass",
+        }
+        
+        actual = set(contracts.__all__)
+        
+        # We allow DataClassLevel as a supporting helper enum, but the schemas must match
+        assert expected_schemas.issubset(actual)
+        
+        # Verify no old "DataClassification" exists in __all__
+        assert "DataClassification" not in actual

@@ -1,16 +1,20 @@
 """ChangeMesh domain contracts — data classification."""
 
-from enum import StrEnum
+from enum import Enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
-class DataClassLevel(StrEnum):
+class DataClassLevel(str, Enum):
     """Bounded set of data-classification levels.
 
     Derived from the ChangeMesh threat model (§7) and trust-boundary
     architecture.  The four levels cover the operational spectrum from
     freely publishable information to regulated / secret material.
+    
+    Credentials, tokens, API keys, and reusable secret material are 
+    outside the ordinary DataClass permission surface and remain 
+    adapter-only regardless of DataClass level.
     """
 
     PUBLIC = "PUBLIC"
@@ -19,7 +23,7 @@ class DataClassLevel(StrEnum):
     RESTRICTED = "RESTRICTED"
 
 
-class DataClassification(BaseModel):
+class DataClass(BaseModel):
     """Typed data-classification contract.
 
     Provides a machine-readable, provider-neutral classification value
@@ -35,3 +39,10 @@ class DataClassification(BaseModel):
 
     schema_version: str
     classification: DataClassLevel
+
+    @field_validator("schema_version")
+    @classmethod
+    def _must_not_be_blank(cls, v: str, info) -> str:
+        if not v or not v.strip():
+            raise ValueError(f"{info.field_name} must not be blank")
+        return v
