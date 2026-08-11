@@ -36,7 +36,7 @@ Bounded set of data-classification levels derived from the ChangeMesh threat mod
 |---|---|
 | `PUBLIC` | Open / conceptual information |
 | `INTERNAL` | Organization-internal operational data |
-| `CONFIDENTIAL` | Sensitive business data, credentials |
+| `CONFIDENTIAL` | Sensitive business information requiring restricted organizational access |
 | `RESTRICTED` | Regulated data requiring special handling |
 
 **Type:** Inherits from `str` and `Enum`.

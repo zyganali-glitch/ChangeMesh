@@ -14,7 +14,7 @@ This audit verifies whole-repository alignment after P-05.01 (Define versioned s
 - **HANDOFF Next Exact Task:** P-05.02 — Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches ✅
 
 ## 2. Contracts and Fixtures Parity
-- **Contracts Created:** exactly five P-05.01 public contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass). ✅
+- **Contracts Created:** Five required P-05.01 schemas are present (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass), plus the supporting public DataClassLevel enum. ✅
 - **Identifiers & Versions:** explicit schema versions and identifiers are enforced. Verified all revisions and versions reject blank values. ✅
 - **Type Strictness:** Verified strict primitive typing is used where required (e.g. `StrictBool` for `is_read_only`). ✅
 - **Fixture Tests:** valid fixtures pass, invalid fixtures reject (41 unit tests passed). ✅

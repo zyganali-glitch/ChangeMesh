@@ -589,23 +589,22 @@ class TestCONTRACT019:
 # ===========================================================================
 
 class TestCONTRACT020:
-    """The public contracts exactly match the 5 required schemas."""
+    """The public contracts exactly match the 5 required schemas plus 1 enum."""
     
     def test_required_schemas_exist(self):
         import domain.contracts as contracts
         
-        expected_schemas = {
+        expected_surface = {
             "ChangeRequest",
             "SuccessCriterion",
             "AgentDescriptor",
             "ToolDescriptor",
             "DataClass",
+            "DataClassLevel",
         }
         
-        actual = set(contracts.__all__)
+        actual_surface = set(contracts.__all__)
         
-        # We allow DataClassLevel as a supporting helper enum, but the schemas must match
-        assert expected_schemas.issubset(actual)
-        
-        # Verify no old "DataClassification" exists in __all__
-        assert "DataClassification" not in actual
+        assert actual_surface == expected_surface, (
+            f"Public surface area mismatch. Expected exactly {expected_surface}, got {actual_surface}"
+        )
