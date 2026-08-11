@@ -158,3 +158,16 @@
     - Implicit adapter-selected mode (Rejected: orchestrator/policy must explicitly know execution boundary).
 - Consequences: Evidence state (`PASS`/`FAIL`) cannot erase mode provenance. All components must ensure mode labels survive to the Change Passport and dashboard. Live writes remain credential-isolated and do not inherently require human approval unless defined by policy.
 - Evidence: `docs/MODE_CONTRACT.md`
+
+## ADR-0014 — Autonomy and friction model freeze
+- Date: 2026-08-11
+- Status: Accepted
+- Context: P-04.05 required a repository-wide architecture review to ensure no unnecessary synchronous approval, interview, or manual routing remained, while preserving legitimate authority, safety, evidence, and trust boundaries.
+- Decision: Freeze the autonomy and friction model with these binding invariants: (1) human interaction is exception-based and authority-bound — only in explicitly defined `HUMAN_AUTHORITY` policy slots; (2) organizational policy determines autonomy classification, not executor convenience — `LIVE_WRITE` is not universally human-gated; (3) the Change Orchestrator and Capability Passport system own routing, not humans; (4) bounded retry, compensation, ShadowLab correction, and fail-closed behavior are preferred before human escalation; (5) no Phase-0 interview — information is derived from repository evidence, policy, and memory before asking the user; (6) safe independent work may continue while a narrow authority edge waits, where saga-step dependencies permit; (7) Gemini uncertainty does not create a human gate — it uses validation, retry, or fail-closed; (8) Approval Compression is minimal and cannot self-approve or infer from silence; (9) trusted cross-session memory reduces repeated questioning without bypassing trust checks; (10) deterministic facts require no approval.
+- Alternatives:
+    - Universal human approval for all external writes (Rejected: contradicts `LIVE_WRITE` policy-determined autonomy and blocks autonomous reversible demo work).
+    - Manual agent routing by operator (Rejected: Orchestrator owns routing per P-04.01 architecture).
+    - Gemini uncertainty triggers human approval (Rejected: model uncertainty is not authority; use deterministic validation or fail closed).
+    - Freeze all work while any authority decision is pending (Rejected: unnecessarily blocks safe independent saga edges).
+- Consequences: All subsequent implementation phases (P-05+) must comply with these autonomy invariants. Adding human approval where policy, rehearsal, and reversibility permit autonomous work violates IL-19 and this ADR.
+- Evidence: `docs/AUTONOMY_REVIEW.md`, `docs/ARCHITECTURE.md` §12

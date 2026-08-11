@@ -55,3 +55,13 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Prevention rule: Before running local Vertex AI agent code, verify ADC file exists or prompt user to run `gcloud auth application-default login`.
 - Status: `ACTIVE`
 
+### LESSON-20260811-01 — replace_file_content can duplicate content on mixed line endings
+- Date/time: 2026-08-11
+- Active task: P-04.05
+- Symptom: `replace_file_content` inserted a full duplicate of the file header and all ADRs when trying to append a new ADR to `DECISION_LOG.md`.
+- Root cause: The file had mixed CRLF/LF line endings. The replacement target content used LF but the file had CRLF up to the replacement point. The tool's best-effort matching duplicated the entire original content.
+- Incorrect approach: Attempting a single large replacement block that spans existing trailing content in a file with mixed line endings.
+- Correct approach: After any `replace_file_content` on mixed-ending files, immediately inspect the result. Prefer small, targeted replacements. When corruption occurs, fix with a subsequent call targeting the exact corrupted content, then verify again.
+- Prevention rule: Always verify file state after any `replace_file_content` that reports inaccuracies. Inspect both head and tail of the file.
+- Status: `ACTIVE`
+

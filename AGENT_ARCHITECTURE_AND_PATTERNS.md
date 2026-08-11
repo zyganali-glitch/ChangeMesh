@@ -121,6 +121,21 @@ Exact schemas must be frozen during the domain-contract phase.
 
 Product must minimize approval count without weakening authority boundaries.
 
+### 7.1 Binding Autonomy Invariants (P-04.05 / ADR-0014)
+
+1.  Human interaction is exception-based and authority-bound — only in explicitly defined `HUMAN_AUTHORITY` policy slots.
+2.  Organizational policy determines autonomy classification (`AUTO_EXECUTE` through `BLOCKED`), not executor convenience. `LIVE_WRITE` is not universally human-gated.
+3.  System-owned routing — Change Orchestrator and Capability Passport own all routing, coordination, and delegation.
+4.  Bounded retry before escalation — retry, compensation, ShadowLab correction, and alternate agents are preferred before human escalation.
+5.  No Phase-0 interview — information is derived from repository evidence, policy, and memory before asking the user.
+6.  Waiting-authority concurrency — safe independent work continues while a narrow authority edge waits, where saga-step dependencies permit.
+7.  Gemini uncertainty does not create authority — uses validation, retry, or fail-closed instead of human escalation.
+8.  Approval Compression is minimal — one bounded card; cannot self-approve or infer from silence.
+9.  Trusted cross-session memory reduces repeated questioning without bypassing trust checks.
+10. Deterministic facts require no approval — `DETERMINISTIC_CODE` is sovereign.
+
+Full review and evidence: [`docs/AUTONOMY_REVIEW.md`](docs/AUTONOMY_REVIEW.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §12.
+
 ## 8. Evidence and fixture separation
 
 ChangeMesh defines four explicit execution/evidence modes (`FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`), which must be visibly labeled (see `docs/MODE_CONTRACT.md`).

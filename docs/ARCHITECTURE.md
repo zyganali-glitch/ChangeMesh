@@ -1,7 +1,7 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04.01 COMPONENT DEPENDENCY ARCHITECTURE & P-04.02 AUTHORITY MAP — PLANNED / PRE-IMPLEMENTATION`
-> **Produced by:** P-04.01 and P-04.02
+> **Status:** `P-04.01 through P-04.05 — PLANNED / PRE-IMPLEMENTATION`
+> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, and P-04.05
 > **Date:** 2026-08-09
 > **Implementation state:** All components and authority maps are `PLANNED`. No product code exists yet.
 
@@ -394,11 +394,28 @@ The following architecture decisions are explicitly deferred to their designated
 | Authority map (deterministic code vs Gemini judgment vs org policy vs human authority) | P-04.02 | `DONE` |
 | Trust boundaries (user, agent, subagent, tool, GitHub, metadata, GCP, public UI) | P-04.03 | `DONE` |
 | Execution/evidence mode contract (fixture, simulation, recorded-cloud, live-write) | P-04.04 | `DONE` (see `docs/MODE_CONTRACT.md`) |
-| Autonomy and friction review | P-04.05 | `PENDING` |
+| Autonomy and friction review | P-04.05 | `DONE` (see `docs/AUTONOMY_REVIEW.md`) |
 | Concrete domain schemas and state machine (ChangeRequest, SuccessCriterion, etc.) | P-05 | `PENDING` |
 | Implementation stack and dependency freeze (Python/Node version, package manager) | P-06 | `PENDING` |
 | ADK agent skeleton implementation | P-07 | `PENDING` |
 | Gemini integration and structured reasoning boundary | P-08 | `PENDING` |
+
+## 12. Autonomy and Friction Invariants (P-04.05)
+
+ChangeMesh is autonomous by default. Human interaction is exception-based, authority-bound, and minimal. The following invariants are binding for all subsequent implementation:
+
+1.  **Exception-based human interaction:** Human approval exists only in explicitly defined `HUMAN_AUTHORITY` policy slots. All other work — discovery, qualification, rehearsal, retry, recovery, evidence collection, routing — proceeds autonomously.
+2.  **Policy-determined autonomy:** Organizational policy (not executor convenience) determines whether an action is `AUTO_EXECUTE`, `AUTO_EXECUTE_AND_NOTIFY`, `REHEARSE_THEN_EXECUTE`, `HUMAN_AUTHORITY_REQUIRED`, or `BLOCKED`. `LIVE_WRITE` is not universally human-gated.
+3.  **System-owned routing:** The Change Orchestrator and Capability Passport system own agent routing, multi-agent coordination, and delegation. Humans do not manually select agents or subagents for ordinary operation.
+4.  **Bounded retry before escalation:** Deterministic retry, bounded alternate strategy, compensation/recovery, ShadowLab correction, and capability-qualified alternate agents are preferred before human escalation. Human escalation is not the default error handler.
+5.  **No Phase-0 interview:** The product charter is frozen. Information is derived from user goal, repository state, metadata graph, trusted memory, deterministic evidence, organizational policy, and known environment state before asking the user anything.
+6.  **Waiting-authority concurrency:** A long-lived enterprise change does not freeze all safe independent work merely because one authority decision is pending. Where saga-step dependencies permit, safe work (impact analysis, evidence preparation, rehearsal, non-destructive artifact generation, rollback preparation, qualification checks) continues while a narrow authority edge waits. Work that depends on the unresolved decision must not bypass it.
+7.  **Gemini uncertainty does not create authority:** Model uncertainty uses deterministic validation, schema checks, bounded retry, semantic comparison, or conservative fail-closed behavior — not human escalation.
+8.  **Approval Compression is minimal:** Produces one bounded decision card containing completed work, evidence, uncertainty, smallest requested authority, recommended decision, and consequences. It cannot self-approve, auto-approve, or infer approval from silence.
+9.  **Trusted memory reduces friction:** Cross-session memory avoids re-asking already-valid trusted context. Stale, quarantined, or injection-suspected memory is rejected — not re-confirmed by human.
+10. **Deterministic facts require no approval:** Execution facts (`DETERMINISTIC_CODE`) are sovereign. No human, model, or policy may convert `FAIL` or `NOT_RUN` to `PASS`.
+
+See the full review in [`AUTONOMY_REVIEW.md`](AUTONOMY_REVIEW.md).
 
 ## 10. Acceptance Evidence
 

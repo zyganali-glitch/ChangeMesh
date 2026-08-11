@@ -117,7 +117,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-02` | Google Service Access and Feasibility Spike | `DONE` | `P-01` |
 | `P-02D` | Donor Repository Harvest and Reuse Freeze | `DONE` | `P-02` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
-| `P-04` | Architecture and Authority Map | `IN_PROGRESS` | `P-03` |
+| `P-04` | Architecture and Authority Map | `DONE` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
 | `P-06` | Local Development Environment and Dependency Freeze | `PENDING` | `P-05` |
 | `P-07` | Google ADK Agent Skeleton | `PENDING` | `P-06` |
@@ -567,7 +567,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-04 — Architecture and Authority Map
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-04.01 — Create component architecture and explicit dependency directions
 
@@ -612,7 +612,8 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-04.05 — Review architecture against autonomy and friction goals
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
+- **Completed:** 2026-08-11
 - **Required action:** Review architecture against autonomy and friction goals.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No unnecessary synchronous approval, interview, or manual routing remains.

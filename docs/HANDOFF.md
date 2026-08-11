@@ -11,11 +11,15 @@ P-04.01
 P-04.02
 P-04.03
 P-04.04
+P-04.05
+P-04
 
 **Active Phase:**
-P-04 — Architecture and Authority Map
+None — P-04 complete.
 
 **Next Exact Task:**
-P-04.05 — Review architecture against autonomy and friction goals
+P-05.01 — Define domain entity schemas (ChangeRequest, SuccessCriterion, EvidenceRecord, etc.)
 
-P-04.05 is PENDING.
+P-04.05 completed with `docs/AUTONOMY_REVIEW.md`, `docs/ARCHITECTURE.md` §12, and `docs/DECISION_LOG.md` ADR-0014.
+P-04 is the final architecture phase. All sub-tasks (P-04.00 through P-04.05) are DONE.
+P-05 begins the domain-contract schema definition phase.
