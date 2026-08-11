@@ -1,48 +1,37 @@
-# P-Ω Post-P04.05 Integrity Audit
+# P-Ω Post-P05.01 Integrity Audit
 
 **Date:** 2026-08-11
 
 ## Overview
-This audit verifies whole-repository alignment after P-04.05 (Review architecture against autonomy and friction goals) completion and before P-05.01 begins. P-04 is now officially closed.
+This audit verifies whole-repository alignment after P-05.01 (Define versioned schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, and DataClass) completion and before P-05.02 begins.
 
 ## 1. Plan ↔ HANDOFF Parity
 - **P-04 Status:** DONE ✅
-- **P-04.00 Status:** DONE ✅
-- **P-04.01 Status:** DONE ✅
-- **P-04.02 Status:** DONE ✅
-- **P-04.03 Status:** DONE ✅
-- **P-04.04 Status:** DONE ✅
-- **P-04.05 Status:** DONE ✅
-- **P-05 Status:** PENDING ✅
-- **P-05.01 Status:** PENDING ✅
-- **HANDOFF Completed:** includes P-04.05 and P-04 ✅
-- **HANDOFF Next Exact Task:** P-05.01 ✅
+- **P-05 Status:** IN_PROGRESS ✅
+- **P-05.01 Status:** DONE ✅
+- **P-05.02 Status:** PENDING ✅
+- **HANDOFF Completed:** includes P-05.01 ✅
+- **HANDOFF Next Exact Task:** P-05.02 — Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches ✅
 
-## 2. Autonomy and Friction Invariants (P-04.05)
-- **Exception-based Authority:** No unnecessary synchronous approval, interview, or manual routing remains architecturally. ✅
-- **LIVE_WRITE Gating:** `LIVE_WRITE` is not universally human-gated (policy determines autonomy). ✅
-- **System-Owned Routing:** Ordinary agent/subagent routing is system-owned, not user-routed. ✅
-- **Release Steward:** Cannot self-authorize. ✅
-- **Waiting-Authority Concurrency:** Safe independent work may continue while a narrow authority edge waits. ✅
-- **No Phase-0:** Repeated Phase-0/interview behavior is prohibited. ✅
+## 2. Contracts and Fixtures Parity
+- **Contracts Created:** exactly five P-05.01 public contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClassification). ✅
+- **Identifiers & Versions:** explicit schema versions and identifiers are enforced. ✅
+- **Fixture Tests:** valid fixtures pass, invalid fixtures reject (36 unit tests passed). ✅
+- **Scope Separation:** AgentDescriptor ≠ CapabilityPassport, SuccessCriterion ≠ EvidenceRecord. ✅
+- **Leakage Prevention:** no P-05.02+ implementation leakage. ✅
 
-## 3. Trust Boundary & Mode Contract Integrity
-- **Trust Boundaries:** Preserved from P-04.03. ✅
-- **Mode Contract:** Preserved from P-04.04. ✅
-- **Passport Parity:** `Capability Passport` remains logically separate from `Change Passport`. ✅
+## 3. Architecture & Provider Independence
+- **Provider-Independent Domain Boundary:** Verified. No provider SDK/framework imported in `domain/contracts/**`. ✅
+- **No Test Leakage:** no production-contract → fixture/test dependency. ✅
 
-## 4. Architecture & Provider Independence
-- **Provider-Independent Domain Boundary:** Preserved from P-04.01. ✅
-- **Managed-Service Honesty:** Blocked/NOT_RUN/deferred statuses stay honest. ✅
+## 4. Product-Code Scope
+- **No Lifecycle/Event Implementation:** No evidence/provenance implementation, no event-envelope implementation. ✅
 
-## 5. Product-Code Scope
-- **No Premature P-05 Implementation:** Zero changes to `src/**`. No implementation code written. ✅
-- **P-05.01 Status:** Explicitly deferred/pending. ✅
-
-## 6. Donor Manifest Parity
-- **Canonical Targets:** Preserved without modification. ✅
-- **Manifest Lint:** `NOT_RUN` in this closure repair (donor manifest was not modified by P-04.05; last verified manifest state remains unchanged). ✅
+## 5. Invariants
+- **Authority/Mode/Autonomy:** invariants preserved. ✅
+- **Managed-Service Honesty:** claims not inflated. ✅
+- **Cloud Mutation:** no cloud mutation. ✅
 
 ## Results
 **Status:** `PASS`
-**Next Approved Task:** P-05.01 — Define versioned schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, and DataClass
+**Next Approved Task:** P-05.02 — Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches
