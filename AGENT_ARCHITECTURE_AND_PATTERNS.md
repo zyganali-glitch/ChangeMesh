@@ -41,7 +41,7 @@ Additional core targets:
 
 ## 4. Core modules
 
-- `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClassification; remaining contracts PENDING P-05.02–P-05.06)
+- `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; remaining contracts PENDING P-05.02–P-05.06)
 - `orchestration`: ADK composition, routing, saga transitions
 - `events`: Pub/Sub envelope, replay, dead-letter handling
 - `state`: Firestore repositories and idempotency

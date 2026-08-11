@@ -608,3 +608,6 @@ class TestCONTRACT020:
         assert actual_surface == expected_surface, (
             f"Public surface area mismatch. Expected exactly {expected_surface}, got {actual_surface}"
         )
+        
+        # Verify no old "DataClassification" exists in __all__
+        assert "DataClassification" not in actual_surface

@@ -21,4 +21,4 @@ P-05
 **Next Exact Task:**
 P-05.02 — Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches
 
-P-05.01 completed with `domain/contracts/` schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClassification, plus tests in `tests/test_p05_01_contracts.py` and `docs/API_CONTRACTS.md`.
+P-05.01 completed with `domain/contracts/` schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass, plus tests in `tests/test_p05_01_contracts.py` and `docs/API_CONTRACTS.md`.
