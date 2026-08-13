@@ -118,7 +118,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-02D` | Donor Repository Harvest and Reuse Freeze | `DONE` | `P-02` |
 | `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
 | `P-04` | Architecture and Authority Map | `DONE` | `P-03` |
-| `P-05` | Domain Contracts and State Machine | `PENDING` | `P-04` |
+| `P-05` | Domain Contracts and State Machine | `IN_PROGRESS` | `P-04` |
 | `P-06` | Local Development Environment and Dependency Freeze | `PENDING` | `P-05` |
 | `P-07` | Google ADK Agent Skeleton | `PENDING` | `P-06` |
 | `P-08` | Gemini Integration and Structured Reasoning Boundary | `PENDING` | `P-07` |
