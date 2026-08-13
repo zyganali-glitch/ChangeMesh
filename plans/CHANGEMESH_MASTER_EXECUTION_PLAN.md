@@ -662,7 +662,7 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** All core innovations schema-first and versioned.
 - **Required evidence:** Contract tests.
-- **Evidence:** 176 tests in `tests/test_p05_04_core_innovation_contracts.py` (including hardening against tuple immutability and authority slot boundaries). Schemas in `domain/contracts/memory.py`, `domain/contracts/capability.py`, `domain/contracts/rehearsal.py`, `domain/contracts/autonomy.py`. All six contracts versioned, immutable, provider-neutral, credential-free, and correctly isolated.
+- **Evidence:** 175 current tests in `tests/test_p05_04_core_innovation_contracts.py`. The suite was 176 at P-05.04 closure; P-05.05 removed one obsolete forward-looking non-leakage assertion that required EventEnvelope to be absent. No P-05.04 behavioral coverage was weakened. (including hardening against tuple immutability and authority slot boundaries). Schemas in `domain/contracts/memory.py`, `domain/contracts/capability.py`, `domain/contracts/rehearsal.py`, `domain/contracts/autonomy.py`. All six contracts versioned, immutable, provider-neutral, credential-free, and correctly isolated.
 - **Mandatory documentation sync:** Architecture, docs.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
