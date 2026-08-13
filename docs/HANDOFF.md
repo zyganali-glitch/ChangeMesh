@@ -15,11 +15,12 @@ P-04.05
 P-04
 P-05.01
 P-05.02
+P-05.03
 
 **Active Phase:**
 P-05
 
 **Next Exact Task:**
-P-05.03 — Define EvidenceRecord, EvidenceState, Provenance, TraceReference, ArtifactHash contracts
+P-05.04 — Define MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, and ApprovalCompressionCard
 
-P-05.02 completed with the deterministic ChangeMesh lifecycle state machine defined in `domain/contracts/change_lifecycle.py` and `tests/test_p05_02_lifecycle.py`.
+P-05.03 completed with the deterministic EvidenceRecord and schemas defined in `domain/contracts/evidence.py` and `tests/test_p05_03_evidence_contracts.py`.

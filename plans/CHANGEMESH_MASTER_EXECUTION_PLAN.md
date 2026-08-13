@@ -647,7 +647,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-05.03 — Define EvidenceRecord, EvidenceState, Provenance, TraceReference, and ArtifactHash contracts
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define EvidenceRecord, EvidenceState, Provenance, TraceReference, and ArtifactHash contracts.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No evidence state ambiguous; source and collection mode mandatory.

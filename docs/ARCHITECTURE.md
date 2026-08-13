@@ -1,9 +1,9 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04 DONE; P-05.01, P-05.02 IMPLEMENTED`
-> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, P-05.01, and P-05.02
-> **Date:** 2026-08-11
-> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented (P-05.01). The lifecycle state machine is implemented (P-05.02). Remaining domain contracts, agents, cloud services, and UI remain `PLANNED`.
+> **Status:** `P-04 DONE; P-05.01, P-05.02, P-05.03 IMPLEMENTED`
+> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, P-05.01, P-05.02, and P-05.03
+> **Date:** 2026-08-13
+> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented (P-05.01). The lifecycle state machine is implemented (P-05.02). Evidence contracts are implemented (P-05.03) while the runtime Evidence Ledger service remains `PLANNED`. Remaining domain contracts, agents, cloud services, and UI remain `PLANNED`.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 

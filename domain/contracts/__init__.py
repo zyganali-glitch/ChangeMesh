@@ -12,6 +12,15 @@ from .agent_descriptor import AgentDescriptor
 from .tool_descriptor import ToolDescriptor
 from .data_class import DataClass, DataClassLevel
 
+from .evidence import (
+    EvidenceRecord,
+    EvidenceState,
+    ExecutionEvidenceMode,
+    Provenance,
+    TraceReference,
+    ArtifactHash,
+)
+
 from .change_lifecycle import (
     ChangeState,
     IllegalTransitionError,
@@ -34,4 +43,10 @@ __all__ = [
     "can_transition",
     "require_transition",
     "is_terminal",
+    "EvidenceRecord",
+    "EvidenceState",
+    "ExecutionEvidenceMode",
+    "Provenance",
+    "TraceReference",
+    "ArtifactHash",
 ]

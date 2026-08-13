@@ -1,9 +1,9 @@
 # ChangeMesh Domain Contract API Reference
 
-> **Status:** `P-05.01 — IMPLEMENTED`
-> **Produced by:** P-05.01
-> **Date:** 2026-08-11
-> **Implementation state:** The five foundational domain contracts defined below are implemented and tested. Additional contracts (EvidenceRecord, lifecycle state machine, CapabilityPassport, event envelope, etc.) remain `PENDING` in P-05.02–P-05.06.
+> **Status:** `P-05.03 — IMPLEMENTED`
+> **Produced by:** P-05.03
+> **Date:** 2026-08-13
+> **Implementation state:** The foundational domain contracts and evidence contracts defined below are implemented and tested. Additional contracts (CapabilityPassport, event envelope, etc.) remain `PENDING` in P-05.04–P-05.06.
 
 ## 1. Overview
 
@@ -24,7 +24,13 @@ from domain.contracts import (
     CHANGE_LIFECYCLE_VERSION,
     can_transition,
     require_transition,
-    is_terminal
+    is_terminal,
+    EvidenceRecord,
+    EvidenceState,
+    ExecutionEvidenceMode,
+    Provenance,
+    TraceReference,
+    ArtifactHash
 )
 ```
 
@@ -168,14 +174,66 @@ The following are explicitly deferred to later P-05 micro-tasks:
 
 | Contract | Owner Phase |
 |---|---|
-| EvidenceRecord, EvidenceState, Provenance, TraceReference, ArtifactHash | P-05.03 |
 | MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard | P-05.04 |
 | Event envelope (event ID, change ID, causation, correlation) | P-05.05 |
 | Naming, enum, timestamp, hashing, redaction, serialization conventions | P-05.06 |
 
 ---
 
-## 9. Change Lifecycle State Machine
+## 9. Evidence Contracts (P-05.03)
+
+The following provider-neutral contracts define how evidence facts are recorded without manufacturing execution proof or leaking provider dependencies.
+
+### `ExecutionEvidenceMode` (Enum)
+Canonical collection mode for execution evidence.
+- `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`
+
+### `EvidenceState` (Enum)
+Canonical evidence state describing the result of a check or action.
+- `PASS`, `WARN`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`
+
+### `ArtifactHash`
+Provider-neutral ArtifactHash contract.
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `algorithm` | `str` | Yes | Must not be blank |
+| `digest` | `str` | Yes | Must not be blank |
+
+### `TraceReference`
+Provider-neutral TraceReference contract for correlating an evidence record with an execution trace.
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `trace_id` | `str` | Yes | Must not be blank |
+| `span_id` | `Optional[str]` | No | Must not be blank if present |
+
+### `Provenance`
+Provenance contract describing origin, mode, and historical context.
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `source` | `str` | Yes | Must not be blank |
+| `collection_mode` | `ExecutionEvidenceMode` | Yes | Valid enum value |
+| `collection_timestamp` | `datetime` | Yes | — |
+| `source_execution_identifier` | `Optional[str]` | No | Must not be blank if present; required for `RECORDED_CLOUD` |
+| `source_execution_timestamp` | `Optional[datetime]`| No | Required for `RECORDED_CLOUD` |
+
+### `EvidenceRecord`
+Canonical provider-neutral evidence fact schema.
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `evidence_id` | `str` | Yes | Must not be blank |
+| `change_request_id` | `str` | Yes | Must not be blank |
+| `subject` | `str` | Yes | Must not be blank |
+| `state` | `EvidenceState` | Yes | Valid enum value |
+| `provenance` | `Provenance` | Yes | Nested validation; `SIMULATED` state demands `FIXTURE` or `SIMULATION` mode |
+| `trace` | `Optional[TraceReference]`| No | Nested validation |
+| `artifacts` | `list[ArtifactHash]` | No | Must have at least one for `RECORDED_CLOUD` |
+
+---
+
+## 10. Change Lifecycle State Machine
 
 Typed lifecycle and transitions defining the safe progression of an enterprise change.
 

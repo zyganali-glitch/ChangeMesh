@@ -17,7 +17,16 @@
 - `BLOCKED`: policy prevented execution; action remains `NOT_RUN`
 - `QUARANTINED`: excluded from decisions pending trust review
 
-**Invariant:** State cannot erase mode provenance. For example, a fixture success remains `FIXTURE PASS` and cannot be claimed as a live execution `PASS`.
+## Mode vs Evidence State
+
+Execution/Evidence Mode and Evidence State are orthogonal concepts. They must never be collapsed into one enum. Mode answers *where* and *under what side-effect boundary* an operation occurred, whereas Evidence State answers *what happened* to the named check or action.
+For example, `SIMULATED` is a state, not a mode. A simulated test run could be `SIMULATION + PASS` (the check passed in a simulated environment). `SIMULATED` as a state means the EvidenceRecord itself represents a simulated/substitute outcome rather than proof of real target action, and is not a synonym for `PASS`.
+
+**Invariant:** State cannot erase mode provenance. A fixture success remains `FIXTURE PASS` and cannot be claimed as a live execution `PASS`.
+
+**Mandatory Provenance:** Every evidence record must explicitly declare its `source` (a non-blank stable human/machine-readable reference) and its `collection_mode`.
+- `SIMULATED` state is only valid with a non-live controlled provenance (`FIXTURE` or `SIMULATION`). `LIVE_WRITE + SIMULATED` or `RECORDED_CLOUD + SIMULATED` will fail validation.
+- `RECORDED_CLOUD` mode evidence requires historical provenance: a `source_execution_identifier`, a `source_execution_timestamp`, and at least one immutable `ArtifactHash`. It does not imply current live execution.
 
 ## Authorities
 
@@ -47,3 +56,10 @@ Authority in ChangeMesh is strictly separated into four lanes:
 Fixture data is not customer data. Synthetic graph is not live DataHub. Local simulation is not managed Google proof. Model explanation is not test evidence. Deployment screenshot without revision/logs is weak evidence. Public claims must link current sanitized artifacts.
 
 *Note (ADR-0007): All managed service claims (Agent Runtime/Platform + Cloud Run for supporting services, Firestore as Operational State, Pub/Sub) must point to actual Google Cloud deployment evidence, not local simulators.*
+
+## P-05.03 Domain Contracts vs Runtime
+
+The `EvidenceRecord` domain contract and its supporting schemas (`EvidenceState`, `ExecutionEvidenceMode`, `Provenance`, `TraceReference`, `ArtifactHash`) are implemented as provider-neutral, strict Pydantic schemas.
+These schemas guarantee deterministic fact sovereignty: neither a model's judgment nor human approval can overwrite a deterministic execution fact (e.g., turning a `FAIL` or `BLOCKED` into a `PASS`).
+
+The runtime Evidence Ledger service (`src/evidence/evidence_record.py`) and adapters (such as Firestore persistence or Pub/Sub timelines) are explicitly deferred and **not yet implemented**. P-05.03 only defines the immutable evidence contracts.

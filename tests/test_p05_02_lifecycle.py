@@ -253,7 +253,6 @@ class TestP0502Lifecycle:
             assert export in contracts.__all__
             
         assert "DataClassification" not in contracts.__all__
-        assert "EvidenceState" not in contracts.__all__
 
     def test_lifecycle_020_no_provider_imports(self):
         """LIFECYCLE-020: Provider-specific imports absent from the new lifecycle domain module."""
