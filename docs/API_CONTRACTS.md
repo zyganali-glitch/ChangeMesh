@@ -184,6 +184,8 @@ The following are explicitly deferred to later P-05 micro-tasks:
 
 The following provider-neutral contracts define how evidence facts are recorded without manufacturing execution proof or leaking provider dependencies.
 
+**Immutability guarantee:** All P-05.03 evidence models use `ConfigDict(extra="forbid", frozen=True)`. Once constructed and validated, evidence facts cannot be mutated in-place. Post-construction field assignment raises `ValidationError`. This enforces deterministic fact sovereignty: a validated `FAIL` cannot become `PASS`, a `SIMULATION` mode cannot become `LIVE_WRITE`, and `RECORDED_CLOUD` provenance cannot lose its historical proof.
+
 ### `ExecutionEvidenceMode` (Enum)
 Canonical collection mode for execution evidence.
 - `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`
@@ -229,7 +231,7 @@ Canonical provider-neutral evidence fact schema.
 | `state` | `EvidenceState` | Yes | Valid enum value |
 | `provenance` | `Provenance` | Yes | Nested validation; `SIMULATED` state demands `FIXTURE` or `SIMULATION` mode |
 | `trace` | `Optional[TraceReference]`| No | Nested validation |
-| `artifacts` | `list[ArtifactHash]` | No | Must have at least one for `RECORDED_CLOUD` |
+| `artifacts` | `tuple[ArtifactHash, ...]` | No | Immutable tuple; must have at least one for `RECORDED_CLOUD`; list input accepted at construction and converted to tuple |
 
 ---
 

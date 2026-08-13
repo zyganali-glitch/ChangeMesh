@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -28,7 +28,7 @@ class EvidenceState(str, Enum):
 
 class ArtifactHash(BaseModel):
     """Provider-neutral ArtifactHash contract."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: str
     algorithm: str
@@ -44,7 +44,7 @@ class ArtifactHash(BaseModel):
 
 class TraceReference(BaseModel):
     """Provider-neutral TraceReference contract."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     trace_id: str
     span_id: Optional[str] = None
@@ -59,7 +59,7 @@ class TraceReference(BaseModel):
 
 class Provenance(BaseModel):
     """Provenance contract describing origin and mode."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: str
     source: str
@@ -78,7 +78,7 @@ class Provenance(BaseModel):
 
 class EvidenceRecord(BaseModel):
     """Canonical provider-neutral evidence fact schema."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: str
     evidence_id: str
@@ -87,7 +87,7 @@ class EvidenceRecord(BaseModel):
     state: EvidenceState
     provenance: Provenance
     trace: Optional[TraceReference] = None
-    artifacts: List[ArtifactHash] = []
+    artifacts: Tuple[ArtifactHash, ...] = ()
 
     @field_validator("schema_version", "evidence_id", "change_request_id", "subject")
     @classmethod
