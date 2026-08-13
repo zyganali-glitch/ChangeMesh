@@ -123,21 +123,20 @@ def can_transition(current: ChangeState, target: ChangeState, *, retry_origin: O
         
     # Retry resume logic
     if current == ChangeState.RETRY_SCHEDULED:
-        # Terminal exits from RETRY_SCHEDULED are allowed unconditionally
-        if target in RETRY_TERMINAL_EXITS:
-            return True
-        
-        # All other exits require explicit retry context
+        # 1. retry_origin must be a ChangeState
         if not isinstance(retry_origin, ChangeState):
             return False
             
-        # The retry origin must be a state that actually supports scheduling a retry
+        # 2. retry_origin must be a valid retriable origin
         if retry_origin not in RETRY_RESUME_TARGETS:
             return False
             
-        # The target must be an allowed resume target for the given origin
-        if target not in RETRY_RESUME_TARGETS[retry_origin]:
-            return False
+        # 3. If target is a terminal exit, allow it after origin validation
+        if target in RETRY_TERMINAL_EXITS:
+            return True
+            
+        # 4. Otherwise target must be the exact bounded resume target for that origin
+        return target in RETRY_RESUME_TARGETS[retry_origin]
 
     return True
 
@@ -152,7 +151,7 @@ def require_transition(current: ChangeState, target: ChangeState, *, retry_origi
         raise IllegalTransitionError(f"Invalid target state type: {type(target)}")
         
     if not can_transition(current, target, retry_origin=retry_origin):
-        if current == ChangeState.RETRY_SCHEDULED and retry_origin is not None:
+        if current == ChangeState.RETRY_SCHEDULED and isinstance(retry_origin, ChangeState):
             raise IllegalTransitionError(
                 f"Illegal transition from {current.value} to {target.value} with retry_origin={retry_origin.value}"
             )

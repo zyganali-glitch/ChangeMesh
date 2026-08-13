@@ -209,7 +209,7 @@ Typed lifecycle and transitions defining the safe progression of an enterprise c
 | `is_terminal` | `(state: ChangeState) -> bool` | Identifies if a state has no outgoing edges. |
 
 ### Lifecycle Security Invariants
-- **Bounded Retry**: `RETRY_SCHEDULED` is a visible recovery state, not an escalation path. Transitions out of retry must explicitly provide the `retry_origin` context. Resumption is strictly bounded to the exact state that originated the retry (e.g. `DISCOVERING` retry resumes at `DISCOVERING`). Bypassing intermediate stages via retry is structurally impossible.
+- **Bounded Retry**: `RETRY_SCHEDULED` is a visible recovery state, not an escalation path. Transitions out of retry must explicitly provide the `retry_origin` context. Resumption is strictly bounded to the exact state that originated the retry (e.g. `DISCOVERING` retry resumes at `DISCOVERING`). Bypassing intermediate stages via retry is structurally impossible. All exits from `RETRY_SCHEDULED`, including terminal exits, require a valid retriable origin.
 - **`AWAITING_AUTHORITY`**: Represents an explicit organizational-policy `HUMAN_AUTHORITY` slot, not a universal approval gate. `LIVE_WRITE` does not automatically mean `AWAITING_AUTHORITY`. Gemini uncertainty cannot manufacture human authority.
 - **`AUTHORIZED`**: Does not represent blanket permission for irreversible mutation. It signifies "Policy-authorized for the next bounded execution step within the current authority envelope."
 - **Immutability**: `ALLOWED_TRANSITIONS` and retry context mapping use `MappingProxyType` to prevent runtime mutation. Terminal states cannot be resurrected or retry.

@@ -88,19 +88,50 @@ class TestP0502Lifecycle:
                 assert not can_transition(state, ChangeState.RETRY_SCHEDULED)
 
     def test_lifecycle_008_retry_targets_bounded(self):
-        """LIFECYCLE-008: Retry resume targets are strictly bounded by origin."""
-        # Exhaustively test all origin contexts
-        for origin in ChangeState:
+        """LIFECYCLE-008: Exhaustive valid retry-origin matrix."""
+        # For every valid retriable origin x every ChangeState target
+        for origin in RETRY_RESUME_TARGETS:
             for target in ChangeState:
-                if origin not in RETRY_RESUME_TARGETS:
-                    # If it's not a valid origin, no target (except terminal exits) should be reachable from retry
-                    if target not in [ChangeState.CANCELLED, ChangeState.FAILED]:
-                        assert not can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
+                expected = target in RETRY_RESUME_TARGETS[origin] or target in [ChangeState.CANCELLED, ChangeState.FAILED]
+                
+                assert can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin) == expected
+                
+                if expected:
+                    require_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
                 else:
-                    if target in RETRY_RESUME_TARGETS[origin] or target in [ChangeState.CANCELLED, ChangeState.FAILED]:
-                        assert can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
-                    else:
-                        assert not can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
+                    with pytest.raises(IllegalTransitionError):
+                        require_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
+
+    def test_lifecycle_008b_retry_without_origin(self):
+        """LIFECYCLE-008b: RETRY_SCHEDULED with no origin."""
+        # For every ChangeState target, without origin it must fail closed
+        for target in ChangeState:
+            assert not can_transition(ChangeState.RETRY_SCHEDULED, target)
+            with pytest.raises(IllegalTransitionError):
+                require_transition(ChangeState.RETRY_SCHEDULED, target)
+                
+    def test_lifecycle_008c_terminal_non_retriable_origins(self):
+        """LIFECYCLE-008c: Terminal/non-retriable origin matrix."""
+        # For every origin NOT in RETRY_RESUME_TARGETS x every ChangeState target
+        for origin in ChangeState:
+            if origin in RETRY_RESUME_TARGETS:
+                continue
+                
+            for target in ChangeState:
+                assert not can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
+                with pytest.raises(IllegalTransitionError):
+                    require_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
+                    
+    def test_lifecycle_008d_wrong_primitive_contexts(self):
+        """LIFECYCLE-008d: Wrong primitive contexts must fail closed cleanly."""
+        targets_to_test = [ChangeState.EXECUTING, ChangeState.CANCELLED, ChangeState.FAILED]
+        invalid_origins = ["INVALID", None, 123]
+        
+        for invalid_origin in invalid_origins:
+            for target in targets_to_test:
+                assert not can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=invalid_origin) # type: ignore
+                with pytest.raises(IllegalTransitionError):
+                    require_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=invalid_origin) # type: ignore
 
     def test_lifecycle_009_compensation_explicit(self):
         """LIFECYCLE-009: Compensation entry is explicit."""
@@ -171,16 +202,15 @@ class TestP0502Lifecycle:
         """LIFECYCLE-017: Exhaustive transition table validation for ordinary transitions."""
         for current in ChangeState:
             for target in ChangeState:
-                is_allowed = target in ALLOWED_TRANSITIONS.get(current, frozenset())
-                
-                # Exclude RETRY_SCHEDULED resume transitions from ordinary tests as they require origin
-                if current == ChangeState.RETRY_SCHEDULED and target not in [ChangeState.CANCELLED, ChangeState.FAILED]:
-                    # Without origin, normal transition into retry resume should fail
-                    assert not can_transition(current, target)
+                # RETRY_SCHEDULED resume behavior is tested in 008 suite
+                if current == ChangeState.RETRY_SCHEDULED:
                     continue
+                    
+                is_allowed = target in ALLOWED_TRANSITIONS.get(current, frozenset())
                     
                 if is_allowed:
                     assert can_transition(current, target)
+                    require_transition(current, target)
                 else:
                     assert not can_transition(current, target)
                     with pytest.raises(IllegalTransitionError):
