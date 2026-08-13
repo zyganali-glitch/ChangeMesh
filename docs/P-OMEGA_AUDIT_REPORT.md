@@ -1,90 +1,43 @@
-# P-Ω Whole-Repository Integrity Audit — P-05.05
+# P-Ω Whole-Repository Integrity Audit — P-05.06 (P-05 Phase Closure)
 
-> **Produced by:** P-05.05 closure
+> **Produced by:** P-05.06 closure
 > **Date:** 2026-08-13
-> **Baseline:** `19b41a6a42932b312f9db70649dc6648ff750b24`
+> **Baseline:** 2a07a5031e983600b60af746a1e5ab9a45008f91
 
-## 1. EventEnvelope exists and is versioned
+## 1. P-05.06 Conventions Exist
 
-- **PASS** — `domain/contracts/event_envelope.py` defines `EventEnvelope` with `schema_version: str` field, validated non-blank.
-- `ConfigDict(extra="forbid", frozen=True)` applied.
+- **PASS** — domain/contracts/conventions.py defines HashAlgorithm, canonical serialization, redaction, and timestamp functions.
 
-## 2. All required Master Plan fields exist
+## 2. All required Master Plan conventions met
 
-- **PASS** — Fields: `schema_version`, `event_id`, `change_id`, `causation_id` (Optional), `correlation_id`, `producer_revision`, `timestamp`, `idempotency_key`.
-- Exact match to Master Plan P-05.05 specification.
+- **PASS** — Naming styles (PascalCase for models, snake_case for fields), exact schema_version spelling, non-leakage of cloud/runtime concepts.
 
-## 3. Deterministic duplicate classification
+## 3. P-05.06 ArtifactHash Validation
 
-- **PASS** — `classify_event_delivery` applies Rules A-C in explicit deterministic order.
-- Rule A (exact replay → DUPLICATE), Rule B (same ID different content → CONFLICT), Rule C (idempotency collision → CONFLICT).
-- Tests: `test_a_unseen_root_accept`, `test_b_exact_replay_duplicate`, `test_c_same_id_changed_producer_conflict`, `test_d_same_id_changed_timestamp_conflict`, `test_e_same_id_changed_idempotency_key_conflict`, `test_f_same_change_idem_different_event_conflict`, `test_g_same_idem_key_different_change_not_duplicate`.
+- **PASS** — ArtifactHash now strictly validates canonical SHA-256 (64 hex characters) and uses the HashAlgorithm enum. P-05.03 tests updated to use valid dummy digests.
 
-## 4. Deterministic out-of-order classification
+## 4. Provider-neutrality
 
-- **PASS** — Child with unseen cause → OUT_OF_ORDER. Child with seen cause → ACCEPT.
-- Tests: `test_a_child_cause_unseen_out_of_order`, `test_b_child_cause_seen_accept`.
+- **PASS** — AST scan rejects cloud vendor APIs, Pub/Sub, Firestore, ADK, and runtime SDK layers from all contract files, including docstrings.
 
-## 5. Identity conflicts fail closed
+## 5. Credentials absent
 
-- **PASS** — Same event_id with different immutable content → CONFLICT. Same (change_id, idempotency_key) with different event_id → CONFLICT. Causal child change_id mismatch → CONFLICT. Causal child correlation_id mismatch → CONFLICT.
-- No silent merge, latest-wins, rewrite, or auto-correction.
+- **PASS** — Tests assert absence of credential fields (	oken, secret, etc.).
 
-## 6. Timestamp not used as sole causal authority
+## 6. API docs exactly match code
 
-- **PASS** — Tests: `test_e_timestamp_not_causal_authority`, `test_timestamp_equal_to_cause_accepted`, `test_timestamp_reversed_ordering_accepted`.
-- Classifier uses causation_id-based causal graph, not timestamp comparison.
+- **PASS** — docs/API_CONTRACTS.md updated to reflect HashAlgorithm usage and regex constraint for digest in ArtifactHash.
 
-## 7. Classifier pure / no mutation
+## 7. Master Plan / HANDOFF parity
 
-- **PASS** — Tests: `test_conflict_does_not_mutate_existing`, `test_conflict_does_not_mutate_incoming`.
-- Function reads only, returns disposition. No state writes, no database access, no side effects.
+- **PASS** — Master Plan: P-05 = DONE, P-05.06 = DONE. HANDOFF: Next Exact Task = P-06.01 — Choose language/runtime versions and repository structure from feasibility evidence.
+- Poetry/P-06 not prematurely started.
 
-## 8. Provider-neutrality
+## 8. Full-suite result
 
-- **PASS** — AST scan rejects: google, pubsub, firestore, vertexai, github, opentelemetry, pytest.
-- Tests: `test_no_forbidden_imports`, `test_no_fixture_or_test_imports`.
-- Only imports: datetime, enum, typing, pydantic.
-
-## 9. Credentials absent
-
-- **PASS** — Tests: `test_no_credential_fields`, `test_no_credential_substrings_in_field_names`.
-- No token, secret, credential, api_key, private_key, service_account, session, client fields.
-
-## 10. P-05.04 exports/tests preserved
-
-- **PASS** — `test_prior_exports_preserved` verifies all 24 P-05.01–P-05.04 exports remain in `__all__`.
-- P-05.04 test count: 175 passed (was 176; removed 1 obsolete forward-looking test that asserted EventEnvelope module does not exist).
-- P-05.04 forward-looking tests updated to P-05.06 non-leakage boundary.
-
-## 11. P-05.06 not prematurely implemented
-
-- **PASS** — Tests: `test_no_hash_algorithm_field`, `test_no_serialization_format_field`, `test_no_redaction_field`, `test_source_module_no_hash_implementation`.
-- No hashlib, sha256, sha512, canonical JSON, wire format, redaction policy in event_envelope.py.
-
-## 12. API docs exactly match code
-
-- **PASS** — `docs/API_CONTRACTS.md` Section 12 documents exact EventEnvelope fields, types, requiredness, root vs child causation, correlation invariant, idempotency scope, duplicate/out-of-order/conflict classification rules, timestamp-is-metadata boundary, and purity guarantee.
-
-## 13. Architecture distinguishes contract vs runtime
-
-- **PASS** — `docs/ARCHITECTURE.md` header states P-05.05 EventEnvelope contract IMPLEMENTED. Pub/Sub Event Backbone (P-09), PubSub Timeline runtime, and Firestore dedup persistence remain PLANNED.
-
-## 14. Environment makes no false Pub/Sub runtime claim
-
-- **PASS** — `AGENT_ENVIRONMENT_AND_API.md` adds Event Envelope Contract Boundary section explicitly stating: P-05.05 does NOT prove Pub/Sub runtime implementation; P-09 owns actual publish/consume behavior.
-- Pub/Sub VERIFIED status unchanged (reflects API access verification, not runtime implementation).
-
-## 15. Master Plan / HANDOFF parity
-
-- **PASS** — Master Plan: P-05.05 = DONE. HANDOFF: P-05.05 in completed list, next task = P-05.06.
-- **PASS** — Stale Master Plan evidence count for P-05.04 discovered and corrected to 175 (was incorrectly reading 176). Parity restored.
-
-## 16. Full-suite result
-
-- **376 passed, 3 errors** — known unrelated GCP fixture errors only.
-- P-05.05: 82 passed
-- Combined P-05: 376 passed
+- **563 passed, 3 errors** — known unrelated GCP fixture errors only.
+- P-05.06: 187 passed
+- Combined P-05: 563 passed
 - No new failures or errors.
 
 ## Test totals
@@ -96,17 +49,18 @@
 | P-05.03 | 54 | 0 | PASS |
 | P-05.04 | 175 | 0 | PASS |
 | P-05.05 | 82 | 0 | PASS |
-| Combined P-05 | 376 | 0 | PASS |
-| Full suite | 376 | 3 | FAIL — known unrelated GCP fixture errors only |
+| P-05.06 | 187 | 0 | PASS |
+| Combined P-05 | 563 | 0 | PASS |
+| Full suite | 563 | 3 | FAIL — known unrelated GCP fixture errors only |
 
 ## Known unrelated errors
 
 | Test | Error | Root cause |
 |---|---|---|
-| `test_firestore_access` | fixture 'project' not found | Missing conftest fixture |
-| `test_pubsub_access` | fixture 'project' not found | Missing conftest fixture |
-| `test_cloud_run_access` | fixture 'project' not found | Missing conftest fixture |
+| \	est_firestore_access\ | fixture 'project' not found | Missing conftest fixture |
+| \	est_pubsub_access\ | fixture 'project' not found | Missing conftest fixture |
+| \	est_cloud_run_access\ | fixture 'project' not found | Missing conftest fixture |
 
 ## P-Ω verdict
 
-**PASS** — All 16 integrity checks pass. P-05.05 is closed.
+**PASS** — All integrity checks pass. P-05 phase is completely closed.
