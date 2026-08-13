@@ -151,7 +151,7 @@ def test_recorded_cloud_requirements():
         source_execution_timestamp=datetime.now(timezone.utc)
     )
     
-    hash_obj = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+    hash_obj = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     
     # Valid
     EvidenceRecord(
@@ -192,14 +192,14 @@ def test_recorded_cloud_requirements():
 
 def test_artifact_hash():
     """Test ArtifactHash schema."""
-    h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+    h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     assert h.algorithm == "sha256"
     
     with pytest.raises(ValidationError):
-        ArtifactHash(schema_version="1.0", algorithm=" ", digest="abc")
+        ArtifactHash(schema_version="1.0", algorithm=" ", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         
     with pytest.raises(ValidationError):
-        ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc", extra_field="bad")
+        ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", extra_field="bad")
 
 
 def test_trace_reference():
@@ -412,17 +412,17 @@ class TestArtifactHashImmutability:
     """Post-construction mutation of ArtifactHash fields must be rejected."""
 
     def test_digest_frozen(self):
-        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         with pytest.raises(ValidationError):
             h.digest = "different-digest"
 
     def test_algorithm_frozen(self):
-        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         with pytest.raises(ValidationError):
             h.algorithm = "md5"
 
     def test_schema_version_frozen(self):
-        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         with pytest.raises(ValidationError):
             h.schema_version = "2.0"
 
@@ -445,7 +445,7 @@ class TestArtifactCollectionImmutability:
     """The artifacts tuple must not expose mutable list API."""
 
     def test_artifacts_is_tuple(self):
-        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         record = _make_record(artifacts=[h])
         assert isinstance(record.artifacts, tuple)
 
@@ -463,7 +463,7 @@ class TestArtifactCollectionImmutability:
 
     def test_list_input_converts_to_tuple(self):
         """Pydantic must accept list input and convert to immutable tuple."""
-        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         record = _make_record(artifacts=[h])
         assert type(record.artifacts) is tuple
         assert len(record.artifacts) == 1
@@ -528,7 +528,7 @@ class TestRecordedCloudPostConstructionSafety:
                 source_execution_timestamp=datetime.now(timezone.utc),
             ),
             artifacts=[
-                ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+                ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             ],
         )
 
@@ -636,11 +636,11 @@ class TestConstructionTimeValidation:
 
     def test_blank_artifact_hash_schema_version(self):
         with pytest.raises(ValidationError, match="must not be blank"):
-            ArtifactHash(schema_version="  ", algorithm="sha256", digest="abc")
+            ArtifactHash(schema_version="  ", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     def test_blank_artifact_hash_algorithm(self):
-        with pytest.raises(ValidationError, match="must not be blank"):
-            ArtifactHash(schema_version="1.0", algorithm="  ", digest="abc")
+        with pytest.raises(ValidationError):
+            ArtifactHash(schema_version="1.0", algorithm="  ", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     def test_blank_artifact_hash_digest(self):
         with pytest.raises(ValidationError, match="must not be blank"):
@@ -669,7 +669,7 @@ class TestConstructionTimeValidation:
                 provenance=prov,
                 artifacts=[
                     ArtifactHash(
-                        schema_version="1.0", algorithm="sha256", digest="abc"
+                        schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                     )
                 ],
             )
@@ -696,7 +696,7 @@ class TestConstructionTimeValidation:
                 ),
                 artifacts=[
                     ArtifactHash(
-                        schema_version="1.0", algorithm="sha256", digest="abc"
+                        schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                     )
                 ],
             )

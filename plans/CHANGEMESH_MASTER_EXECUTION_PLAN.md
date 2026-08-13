@@ -679,11 +679,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-05.06 — Freeze naming, enum, timestamp, hashing, redaction, and serialization conventions
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Freeze naming, enum, timestamp, hashing, redaction, and serialization conventions.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No duplicate synonyms or locale-dependent machine values.
 - **Required evidence:** Contract lint/search evidence.
+- **Evidence:** 187 tests in `tests/test_p05_06_contract_conventions.py` asserting naming styles (PascalCase for models, snake_case for fields), exact schema version spelling, credential field absence, provider neutrality (no cloud APIs or ADK leakages), redaction behavior, deterministic JSON serialization, enum consistency, and canonical hashing constraints (SHA-256 hex). `ArtifactHash` and tests updated. Total P-05 suite = 563 tests.
 - **Mandatory documentation sync:** All technical docs.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

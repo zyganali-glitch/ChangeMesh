@@ -197,11 +197,12 @@ Canonical evidence state describing the result of a check or action.
 
 ### `ArtifactHash`
 Provider-neutral ArtifactHash contract.
+
 | Field | Type | Required | Validation |
 |---|---|---|---|
 | `schema_version` | `str` | Yes | Must not be blank |
-| `algorithm` | `str` | Yes | Must not be blank |
-| `digest` | `str` | Yes | Must not be blank |
+| `algorithm` | `HashAlgorithm` | Yes | Must be canonical enum (`sha256`) |
+| `digest` | `str` | Yes | 64 lowercase hex characters (SHA-256 pattern) |
 
 ### `TraceReference`
 Provider-neutral TraceReference contract for correlating an evidence record with an execution trace.

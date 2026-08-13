@@ -2,7 +2,8 @@
 
 This package exposes the P-05.01 foundational schemas, the P-05.02
 lifecycle contract, P-05.03 evidence contracts, P-05.04 core
-innovation contracts, and P-05.05 event envelope contract.
+innovation contracts, P-05.05 event envelope contract, and P-05.06
+frozen machine conventions.
 Provider-specific layers (ADK, Firestore, Pub/Sub, GitHub, UI) depend
 inward on these contracts.  These contracts never depend outward on
 providers.
@@ -43,6 +44,20 @@ from .event_envelope import (
     classify_event_delivery,
 )
 
+from .conventions import (
+    HashAlgorithm,
+    is_valid_sha256_digest,
+    sha256_hex,
+    normalize_utc_datetime,
+    format_utc_timestamp,
+    parse_utc_timestamp,
+    REDACTION_SENTINEL,
+    SECRET_KEY_PATTERNS,
+    redact_mapping,
+    canonical_json_bytes,
+    canonical_model_sha256,
+)
+
 __all__ = [
     # P-05.01 — Foundational contracts
     "DataClassLevel",
@@ -79,4 +94,17 @@ __all__ = [
     "EventEnvelope",
     "EventDeliveryDisposition",
     "classify_event_delivery",
+    # P-05.06 — Machine conventions
+    "HashAlgorithm",
+    "is_valid_sha256_digest",
+    "sha256_hex",
+    "normalize_utc_datetime",
+    "format_utc_timestamp",
+    "parse_utc_timestamp",
+    "REDACTION_SENTINEL",
+    "SECRET_KEY_PATTERNS",
+    "redact_mapping",
+    "canonical_json_bytes",
+    "canonical_model_sha256",
 ]
+

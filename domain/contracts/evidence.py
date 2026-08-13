@@ -26,19 +26,39 @@ class EvidenceState(str, Enum):
     QUARANTINED = "QUARANTINED"
 
 
+from domain.contracts.conventions import HashAlgorithm, is_valid_sha256_digest
+
+
 class ArtifactHash(BaseModel):
-    """Provider-neutral ArtifactHash contract."""
+    """Provider-neutral ArtifactHash contract.
+
+    Uses the canonical ``HashAlgorithm`` enum (P-05.06) and validates
+    digest format: exactly 64 lowercase hexadecimal characters for
+    SHA-256.
+    """
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: str
-    algorithm: str
+    algorithm: HashAlgorithm
     digest: str
 
-    @field_validator("schema_version", "algorithm", "digest")
+    @field_validator("schema_version")
     @classmethod
-    def _must_not_be_blank(cls, v: str, info) -> str:
+    def _schema_version_not_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
+        return v
+
+    @field_validator("digest")
+    @classmethod
+    def _validate_digest(cls, v: str, info) -> str:
+        if not v or not v.strip():
+            raise ValueError("digest must not be blank")
+        if not is_valid_sha256_digest(v):
+            raise ValueError(
+                f"digest must be exactly 64 lowercase hex characters, "
+                f"got {v!r}"
+            )
         return v
 
 
