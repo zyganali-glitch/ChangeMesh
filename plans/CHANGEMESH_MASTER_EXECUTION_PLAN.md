@@ -657,11 +657,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-05.04 — Define MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, and ApprovalCompressionCard
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, and ApprovalCompressionCard.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** All core innovations schema-first and versioned.
 - **Required evidence:** Contract tests.
+- **Evidence:** 145 tests in `tests/test_p05_04_core_innovation_contracts.py`. Schemas in `domain/contracts/memory.py`, `domain/contracts/capability.py`, `domain/contracts/rehearsal.py`, `domain/contracts/autonomy.py`. All six contracts versioned, immutable, provider-neutral, credential-free.
 - **Mandatory documentation sync:** Architecture, docs.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

@@ -16,11 +16,12 @@ P-04
 P-05.01
 P-05.02
 P-05.03
+P-05.04
 
 **Active Phase:**
 P-05
 
 **Next Exact Task:**
-P-05.04 — Define MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, and ApprovalCompressionCard
+P-05.05 — Define event envelope with event ID, change ID, causation, correlation, producer revision, timestamp, schema version, idempotency key
 
-P-05.03 completed with the deterministic EvidenceRecord and schemas defined in `domain/contracts/evidence.py` and `tests/test_p05_03_evidence_contracts.py`.
+P-05.04 completed with six core innovation contracts defined in `domain/contracts/memory.py`, `domain/contracts/capability.py`, `domain/contracts/rehearsal.py`, `domain/contracts/autonomy.py` and tested in `tests/test_p05_04_core_innovation_contracts.py` (145 tests). Contracts: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard. All schema-versioned, immutable, provider-neutral, credential-free.

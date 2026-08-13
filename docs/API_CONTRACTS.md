@@ -1,9 +1,9 @@
 # ChangeMesh Domain Contract API Reference
 
-> **Status:** `P-05.03 — IMPLEMENTED`
-> **Produced by:** P-05.03
+> **Status:** `P-05.04 — IMPLEMENTED`
+> **Produced by:** P-05.04
 > **Date:** 2026-08-13
-> **Implementation state:** The foundational domain contracts and evidence contracts defined below are implemented and tested. Additional contracts (CapabilityPassport, event envelope, etc.) remain `PENDING` in P-05.04–P-05.06.
+> **Implementation state:** The foundational domain contracts (P-05.01), evidence contracts (P-05.03), and core innovation contracts (P-05.04: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) defined below are implemented and tested. Event envelope (P-05.05) and naming conventions (P-05.06) remain `PENDING`.
 
 ## 1. Overview
 
@@ -168,15 +168,14 @@ Describes a tool's interface and capability boundary.
 
 ---
 
-## 8. Contracts NOT in P-05.01
+## 8. Remaining Deferred Contracts
 
 The following are explicitly deferred to later P-05 micro-tasks:
 
-| Contract | Owner Phase |
-|---|---|
-| MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard | P-05.04 |
-| Event envelope (event ID, change ID, causation, correlation) | P-05.05 |
-| Naming, enum, timestamp, hashing, redaction, serialization conventions | P-05.06 |
+| Contract | Owner Phase | Status |
+|---|---|---|
+| Event envelope (event ID, change ID, causation, correlation) | P-05.05 | `PENDING` |
+| Naming, enum, timestamp, hashing, redaction, serialization conventions | P-05.06 | `PENDING` |
 
 ---
 
@@ -274,3 +273,126 @@ Typed lifecycle and transitions defining the safe progression of an enterprise c
 - **`AUTHORIZED`**: Does not represent blanket permission for irreversible mutation. It signifies "Policy-authorized for the next bounded execution step within the current authority envelope."
 - **Immutability**: `ALLOWED_TRANSITIONS` and retry context mapping use `MappingProxyType` to prevent runtime mutation. Terminal states cannot be resurrected or retry.
 - **Compensation Boundary**: `COMPENSATING` is reachable only from `EXECUTING` or `VERIFYING`. Its exits are strictly bounded to `RETRY_SCHEDULED` (originating from `COMPENSATING`), `FAILED`, `CANCELLED`, or `BLOCKED`.
+
+---
+
+## 11. Core Innovation Contracts (P-05.04)
+
+Six schema-only contracts defining the core innovation surface. All use `ConfigDict(extra="forbid", frozen=True)` for immutability. Provider-neutral (no `google.*`, `opentelemetry.*` imports). Runtime services (Memory Trust Layer, ShadowLab, Agent Registry, Approval Compression runtime) are deferred to P-11–P-14.
+
+### `MemoryRecord`
+
+Typed, versioned memory fact with explicit trust metadata. **Memory is not truth** — `trust_level` describes reliability, not authority.
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `memory_id` | `str` | Yes | Must not be blank |
+| `change_request_id` | `str` | Yes | Must not be blank |
+| `content` | `str` | Yes | Must not be blank |
+| `memory_type` | `MemoryType` enum | Yes | `DECISION`, `OBSERVATION`, `CONSTRAINT`, `LESSON`, `CONTEXT` |
+| `source` | `str` | Yes | Must not be blank |
+| `trust_level` | `TrustLevel` enum | Yes | `VERIFIED`, `ASSERTED`, `INFERRED`, `UNKNOWN` |
+| `scope` | `MemoryScope` enum | Yes | `CHANGE_LOCAL`, `AGENT_LOCAL`, `ORGANIZATION`, `GLOBAL` |
+| `valid_from` | `datetime` | Yes | — |
+| `valid_until` | `Optional[datetime]` | No | Must be ≥ `valid_from` if present |
+| `tags` | `tuple[str, ...]` | No | Immutable |
+
+**Authority invariant:** `trust_level == VERIFIED` does not grant authority. A `VERIFIED` memory can be overridden by policy. Memory trust does not substitute for human authority slots.
+
+### `CapabilityPassport`
+
+Versioned, immutable proof-of-capability envelope. **Valid passport is not authorization** — it proves capability, not permission.
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `passport_id` | `str` | Yes | Must not be blank |
+| `agent_id` | `str` | Yes | Must not be blank |
+| `capabilities` | `tuple[str, ...]` | Yes | At least one; all non-blank |
+| `evidence_refs` | `tuple[str, ...]` | Yes | At least one; all non-blank |
+| `issued_at` | `datetime` | Yes | — |
+| `expires_at` | `Optional[datetime]` | No | Must be > `issued_at` if present |
+| `issuer` | `str` | Yes | Must not be blank |
+| `scope` | `str` | Yes | Must not be blank |
+
+### `RehearsalScenario`
+
+Defines a single rehearsal scenario for ShadowLab dry-runs. Includes optional fault injection.
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `scenario_id` | `str` | Yes | Must not be blank |
+| `change_request_id` | `str` | Yes | Must not be blank |
+| `description` | `str` | Yes | Must not be blank |
+| `target_states` | `tuple[str, ...]` | Yes | At least one; all non-blank |
+| `success_criteria_refs` | `tuple[str, ...]` | Yes | At least one; all non-blank |
+| `fault_injections` | `tuple[FaultInjectionSpec, ...]` | No | Nested validation |
+| `timeout_seconds` | `int` | Yes | > 0 |
+| `created_at` | `datetime` | Yes | — |
+
+### `RehearsalResult`
+
+Records the outcome of a rehearsal run. **PASS does not authorize live execution.**
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `result_id` | `str` | Yes | Must not be blank |
+| `scenario_id` | `str` | Yes | Must not be blank |
+| `change_request_id` | `str` | Yes | Must not be blank |
+| `outcome` | `RehearsalOutcome` enum | Yes | `PASS`, `FAIL`, `ERROR`, `TIMEOUT` |
+| `evidence_refs` | `tuple[str, ...]` | No | Immutable |
+| `started_at` | `datetime` | Yes | — |
+| `completed_at` | `datetime` | Yes | Must be ≥ `started_at` |
+| `observations` | `tuple[str, ...]` | No | Immutable |
+
+### `AutonomyClass` (Enum)
+
+Classification of how much human involvement is needed:
+- `AUTO_EXECUTE` — No human needed
+- `AUTO_EXECUTE_AND_NOTIFY` — Execute then inform
+- `REHEARSE_THEN_EXECUTE` — Dry run first
+- `HUMAN_AUTHORITY_REQUIRED` — Must get human sign-off before execution
+- `BLOCKED` — Cannot proceed
+
+### `AutonomyDecision`
+
+Records why a particular autonomy class was assigned.
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `decision_id` | `str` | Yes | Must not be blank |
+| `change_request_id` | `str` | Yes | Must not be blank |
+| `autonomy_class` | `AutonomyClass` | Yes | Valid enum value |
+| `rationale` | `str` | Yes | Must not be blank |
+| `policy_refs` | `tuple[str, ...]` | Yes | At least one; all non-blank |
+| `decided_at` | `datetime` | Yes | — |
+| `authority_slot_ref` | `Optional[str]` | No | Required for `HUMAN_AUTHORITY_REQUIRED`; must not be blank if present |
+
+**Authority invariants:**
+- `LIVE_WRITE != HUMAN_AUTHORITY_REQUIRED` — write scope does not automatically trigger a human authority slot.
+- Gemini uncertainty is not an autonomy class — model confidence cannot manufacture `HUMAN_AUTHORITY_REQUIRED`.
+- `BLOCKED != HUMAN_AUTHORITY_REQUIRED` — blocked changes do not become review requests.
+
+### `ApprovalCompressionCard`
+
+Pre-built decision packet for human authority slots. **Card existence is NOT approval.** The card reduces time-to-decision, it does not contain or record the human decision.
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `card_id` | `str` | Yes | Must not be blank |
+| `change_request_id` | `str` | Yes | Must match `autonomy_decision.change_request_id` |
+| `autonomy_decision` | `AutonomyDecision` | Yes | Must have `autonomy_class == HUMAN_AUTHORITY_REQUIRED` |
+| `authority_slot_ref` | `str` | Yes | Must match `autonomy_decision.authority_slot_ref` |
+| `decision_question` | `str` | Yes | Must not be blank |
+| `decision_options` | `tuple[str, ...]` | Yes | At least 2 unique non-blank options |
+| `evidence_summary` | `str` | Yes | Must not be blank |
+| `risk_summary` | `str` | Yes | Must not be blank |
+| `action_scope` | `str` | Yes | Must not be blank |
+| `created_at` | `datetime` | Yes | — |
+
+**Forbidden fields:** No `approved`, `is_approved`, `human_decision`, `human_response`, `approval_result`, or `auto_approved` field exists. The card is a decision *input*, not a decision *record*.

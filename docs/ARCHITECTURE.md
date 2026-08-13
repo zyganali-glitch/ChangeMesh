@@ -1,9 +1,9 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04 DONE; P-05.01, P-05.02, P-05.03 IMPLEMENTED`
-> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, P-05.01, P-05.02, and P-05.03
+> **Status:** `P-04 DONE; P-05.01, P-05.02, P-05.03, P-05.04 IMPLEMENTED`
+> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, P-05.01, P-05.02, P-05.03, and P-05.04
 > **Date:** 2026-08-13
-> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented (P-05.01). The lifecycle state machine is implemented (P-05.02). Evidence contracts are implemented (P-05.03) while the runtime Evidence Ledger service remains `PLANNED`. Remaining domain contracts, agents, cloud services, and UI remain `PLANNED`.
+> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented (P-05.01). The lifecycle state machine is implemented (P-05.02). Evidence contracts are implemented (P-05.03). Core innovation contracts (MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) are implemented as schema-only (P-05.04). Runtime services — Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger — remain `PLANNED`. Remaining domain contracts (event envelope), agents, cloud services, and UI remain `PLANNED`.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 
@@ -217,7 +217,7 @@ These invariants are binding for all subsequent implementation:
 
 The `domain/contracts/` boundary contains (P-05, partially implemented):
 - Domain types: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass (P-05.01 — **IMPLEMENTED**)
-- Additional contracts: EvidenceRecord, lifecycle state machine, CapabilityPassport, event envelope (P-05.02–P-05.06 — PENDING)
+- Additional contracts: EvidenceRecord, lifecycle state machine (P-05.02 — **IMPLEMENTED**), CapabilityPassport, MemoryRecord, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard (P-05.04 — **IMPLEMENTED** schema-only), event envelope (P-05.05 — PENDING), naming conventions (P-05.06 — PENDING)
 - Versioned contract schemas
 - Enums and state labels
 - Port interfaces (abstract boundaries that adapters implement)
@@ -398,7 +398,8 @@ The following architecture decisions are explicitly deferred to their designated
 | Autonomy and friction review | P-04.05 | `DONE` (see `docs/AUTONOMY_REVIEW.md`) |
 | Foundational domain schemas (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) | P-05.01 | `DONE` (see `docs/API_CONTRACTS.md`) |
 | Lifecycle state machine | P-05.02 | `DONE` (see `domain/contracts/change_lifecycle.py`) |
-| Remaining contracts, conventions | P-05.03–P-05.06 | `PENDING` |
+| Core innovation contracts (MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) | P-05.04 | `DONE` (schema only; runtime in P-11–P-14) |
+| Event envelope, naming/enum conventions | P-05.05–P-05.06 | `PENDING` |
 | Implementation stack and dependency freeze (Python/Node version, package manager) | P-06 | `PENDING` |
 | ADK agent skeleton implementation | P-07 | `PENDING` |
 | Gemini integration and structured reasoning boundary | P-08 | `PENDING` |

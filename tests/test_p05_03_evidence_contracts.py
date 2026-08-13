@@ -264,9 +264,8 @@ def test_public_export():
     assert "TraceReference" in exports
     assert "ArtifactHash" in exports
     
-    # Check non-leakage
-    assert "MemoryRecord" not in exports
-    assert "CapabilityPassport" not in exports
+    # Check non-leakage (P-05.05+ concepts should not be present yet)
+    assert "EventEnvelope" not in exports
 
 
 def test_provider_neutrality():
