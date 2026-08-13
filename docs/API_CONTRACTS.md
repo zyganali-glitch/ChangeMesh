@@ -1,9 +1,9 @@
 # ChangeMesh Domain Contract API Reference
 
-> **Status:** `P-05.04 — IMPLEMENTED`
-> **Produced by:** P-05.04
+> **Status:** `P-05.05 — IMPLEMENTED`
+> **Produced by:** P-05.05
 > **Date:** 2026-08-13
-> **Implementation state:** The foundational domain contracts (P-05.01), evidence contracts (P-05.03), and core innovation contracts (P-05.04: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) defined below are implemented and tested. Event envelope (P-05.05) and naming conventions (P-05.06) remain `PENDING`.
+> **Implementation state:** The foundational domain contracts (P-05.01), evidence contracts (P-05.03), core innovation contracts (P-05.04), and event envelope contract (P-05.05: EventEnvelope, EventDeliveryDisposition, classify_event_delivery) defined below are implemented and tested. Naming conventions (P-05.06) remain `PENDING`.
 
 ## 1. Overview
 
@@ -30,7 +30,10 @@ from domain.contracts import (
     ExecutionEvidenceMode,
     Provenance,
     TraceReference,
-    ArtifactHash
+    ArtifactHash,
+    EventEnvelope,
+    EventDeliveryDisposition,
+    classify_event_delivery,
 )
 ```
 
@@ -174,7 +177,6 @@ The following are explicitly deferred to later P-05 micro-tasks:
 
 | Contract | Owner Phase | Status |
 |---|---|---|
-| Event envelope (event ID, change ID, causation, correlation) | P-05.05 | `PENDING` |
 | Naming, enum, timestamp, hashing, redaction, serialization conventions | P-05.06 | `PENDING` |
 
 ---
@@ -429,3 +431,102 @@ Pre-built decision packet for human authority slots. **Card existence is NOT app
 | `created_at` | `datetime` | Yes | — |
 
 **Forbidden fields:** No `approved`, `is_approved`, `human_decision`, `human_response`, `approval_result`, or `auto_approved` field exists. The card is a decision *input*, not a decision *record*.
+
+---
+
+## 12. Event Envelope Contract (P-05.05)
+
+Provider-neutral event identity and causal metadata envelope. All fields use `ConfigDict(extra="forbid", frozen=True)` for immutability.
+
+### `EventDeliveryDisposition` (Enum)
+
+Deterministic delivery classification for a provider-neutral event.
+
+| Value | Semantics |
+|---|---|
+| `ACCEPT` | Event is new and causally consistent — admit it |
+| `DUPLICATE` | Exact replay of an already-observed event |
+| `OUT_OF_ORDER` | Causal predecessor has not yet been observed |
+| `CONFLICT` | Structurally contradictory event identity, idempotency, or causal metadata |
+
+**Excluded vocabulary:** `ACK`, `NACK`, `DEAD_LETTER`, `RETRYING`, `PUBLISHED`, `CONSUMED` — these belong to P-09 runtime transport.
+
+**`OUT_OF_ORDER` is not `FAIL`:** It means the causal predecessor required to deterministically admit this event has not yet been observed. P-09/P-20 decide retry/recovery behavior.
+
+**`CONFLICT` fails closed:** No silent merge, latest-wins, rewrite, or auto-correction.
+
+### `EventEnvelope`
+
+Canonical provider-neutral event envelope carrying event identity, change identity, causal chain metadata, correlation identity, producer provenance, and idempotency key.
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `schema_version` | `str` | Yes | Must not be blank |
+| `event_id` | `str` | Yes | Must not be blank |
+| `change_id` | `str` | Yes | Must not be blank |
+| `causation_id` | `Optional[str]` | No | None for root events; must not be blank if present; must not equal `event_id` (self-causation rejected) |
+| `correlation_id` | `str` | Yes | Must not be blank |
+| `producer_revision` | `str` | Yes | Must not be blank |
+| `timestamp` | `datetime` | Yes | Typed datetime; wall-clock timestamp is metadata, NOT causal authority |
+| `idempotency_key` | `str` | Yes | Must not be blank |
+
+**Identity fields:**
+- `event_id` — identity of one logical domain event
+- `idempotency_key` — identity of the logical operation/publication effect whose duplicate execution must be prevented
+- These are conceptually distinct and must not be collapsed or derived from each other
+
+**Causation semantics:**
+- Root event: `causation_id = None`
+- Child event: `causation_id` points to the observed parent event
+- Self-causation (`event_id == causation_id`) is rejected
+- A causal child must share `change_id` and `correlation_id` with its observed cause
+
+**Correlation semantics:**
+- `correlation_id` is mandatory and identifies the logical distributed correlation chain
+- A root may establish its own stable correlation identity
+- A causal child must preserve its observed parent's correlation identity
+
+**Producer revision:** Provenance/identity context for auditability. NOT runtime agent authorization, capability passport validity, or human approval.
+
+**Timestamp boundary:** `timestamp` is typed `datetime` metadata. P-05.06 owns canonical serialized format, locale, precision, hashing, and JSON representation. Wall-clock timestamp is NOT causal authority — distributed clocks can skew.
+
+**Credential boundary:** No field may carry tokens, secrets, API keys, private keys, service account material, sessions, or clients.
+
+**Immutability:** Once validated, the envelope is frozen and cannot be mutated in place.
+
+**Extra fields:** Rejected (`extra="forbid"`).
+
+### `classify_event_delivery`
+
+Pure, deterministic delivery classifier.
+
+```python
+def classify_event_delivery(
+    incoming: EventEnvelope,
+    seen_events: Mapping[str, EventEnvelope],
+    seen_idempotency: Mapping[tuple[str, str], str],
+) -> EventDeliveryDisposition
+```
+
+**Parameters:**
+- `incoming` — the event envelope to classify
+- `seen_events` — mapping of `event_id → EventEnvelope` for already-observed events
+- `seen_idempotency` — mapping of `(change_id, idempotency_key) → event_id` for already-observed idempotency scopes
+
+**Deterministic rules applied in order:**
+
+| Rule | Condition | Result |
+|---|---|---|
+| A — Exact replay | `event_id` exists and stored envelope equals incoming | `DUPLICATE` |
+| B — Same ID, different content | `event_id` exists but any immutable field differs | `CONFLICT` |
+| C — Idempotency collision | Same `(change_id, idempotency_key)` but different `event_id` | `CONFLICT` |
+| D — Root event | `causation_id` is None, no collision | `ACCEPT` |
+| D — Cause unseen | `causation_id` set but cause not in `seen_events` | `OUT_OF_ORDER` |
+| E — Causal consistency | `change_id` or `correlation_id` differs from observed cause | `CONFLICT` |
+| Pass | All checks pass | `ACCEPT` |
+
+**Idempotency scope:** `(change_id, idempotency_key)`. Same textual `idempotency_key` across different `change_id` values are independent identities.
+
+**Purity guarantee:** Does not write state, read databases, call Pub/Sub, acknowledge messages, sleep, retry, create dead-letter records, or mutate its inputs.
+
+**Pub/Sub runtime:** P-09 owns topic/subscription topology, publisher adapters, consumer adapters, delivery, acknowledgements, retries, dead-letter, and infrastructure config. `classify_event_delivery` provides the domain classification semantics that P-09 will consume.

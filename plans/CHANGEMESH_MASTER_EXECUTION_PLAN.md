@@ -668,11 +668,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-05.05 — Define event envelope with event ID, change ID, causation, correlation, producer revision, timestamp, schema version, idempotency key
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define event envelope with event ID, change ID, causation, correlation, producer revision, timestamp, schema version, idempotency key.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Duplicate/out-of-order handling deterministic.
 - **Required evidence:** Event-contract tests.
+- **Evidence:** 82 tests in `tests/test_p05_05_event_envelope.py`. EventEnvelope (immutable, provider-neutral, credential-free) in `domain/contracts/event_envelope.py`. EventDeliveryDisposition enum (ACCEPT, DUPLICATE, OUT_OF_ORDER, CONFLICT). classify_event_delivery pure classifier with deterministic duplicate/out-of-order/conflict/causal-consistency rules. Timestamp is metadata, not causal authority. Self-causation rejected. Identity vs idempotency identity distinct. Idempotency scope: (change_id, idempotency_key). Provider-neutrality AST-verified. Credential-surface absence verified. P-05.06 non-leakage verified.
 - **Mandatory documentation sync:** Architecture, environment.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

@@ -1,10 +1,11 @@
 """ChangeMesh domain contracts — provider-neutral core contract layer.
 
 This package exposes the P-05.01 foundational schemas, the P-05.02
-lifecycle contract, P-05.03 evidence contracts, and P-05.04 core
-innovation contracts.  Provider-specific layers (ADK, Firestore,
-Pub/Sub, GitHub, UI) depend inward on these contracts.  These
-contracts never depend outward on providers.
+lifecycle contract, P-05.03 evidence contracts, P-05.04 core
+innovation contracts, and P-05.05 event envelope contract.
+Provider-specific layers (ADK, Firestore, Pub/Sub, GitHub, UI) depend
+inward on these contracts.  These contracts never depend outward on
+providers.
 """
 
 from .change_request import ChangeRequest
@@ -35,6 +36,12 @@ from .memory import MemoryRecord, MemoryTrustStatus
 from .capability import CapabilityPassport
 from .rehearsal import RehearsalScenario, RehearsalResult, FaultInjectionSpec
 from .autonomy import AutonomyClass, AutonomyDecision, ApprovalCompressionCard
+
+from .event_envelope import (
+    EventEnvelope,
+    EventDeliveryDisposition,
+    classify_event_delivery,
+)
 
 __all__ = [
     # P-05.01 — Foundational contracts
@@ -68,4 +75,8 @@ __all__ = [
     "AutonomyClass",
     "AutonomyDecision",
     "ApprovalCompressionCard",
+    # P-05.05 — Event envelope
+    "EventEnvelope",
+    "EventDeliveryDisposition",
+    "classify_event_delivery",
 ]

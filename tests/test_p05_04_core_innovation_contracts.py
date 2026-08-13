@@ -1357,32 +1357,26 @@ class TestPublicExports:
 
 
 # ===========================================================================
-# SECTION 10: P-05.05 NON-LEAKAGE
+# SECTION 10: P-05.06 NON-LEAKAGE
 # ===========================================================================
 
 
-class TestP0505NonLeakage:
-    """P-05.04 must not implement P-05.05 event-envelope concepts."""
+class TestP0506NonLeakage:
+    """P-05.04 must not implement P-05.06 naming/serialization concepts."""
 
-    def test_no_event_envelope_in_exports(self):
+    def test_no_serialization_conventions_in_exports(self):
         exports = set(domain.contracts.__all__)
         forbidden = {
-            "EventEnvelope",
-            "causation_id",
-            "correlation_id",
-            "idempotency_key",
-            "producer_revision",
+            "canonical_hash",
+            "canonical_json",
+            "timestamp_wire_format",
+            "redaction_policy",
+            "naming_convention",
         }
         for name in forbidden:
             assert name not in exports, (
-                f"P-05.05 concept '{name}' leaked into P-05.04 exports"
+                f"P-05.06 concept '{name}' leaked into exports"
             )
-
-    def test_no_event_envelope_module(self):
-        """No event_envelope module exists in domain/contracts/."""
-        contracts_dir = pathlib.Path(domain.contracts.__file__).parent
-        assert not (contracts_dir / "event_envelope.py").exists()
-        assert not (contracts_dir / "event.py").exists()
 
     @pytest.mark.parametrize("module_name", _P0504_MODULES)
     def test_no_event_envelope_fields(self, module_name):

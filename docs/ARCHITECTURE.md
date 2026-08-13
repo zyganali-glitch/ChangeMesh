@@ -1,9 +1,9 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04 DONE; P-05.01, P-05.02, P-05.03, P-05.04 IMPLEMENTED`
-> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, P-05.01, P-05.02, P-05.03, and P-05.04
+> **Status:** `P-04 DONE; P-05.01, P-05.02, P-05.03, P-05.04, P-05.05 IMPLEMENTED`
+> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, P-05.01, P-05.02, P-05.03, P-05.04, and P-05.05
 > **Date:** 2026-08-13
-> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented (P-05.01). The lifecycle state machine is implemented (P-05.02). Evidence contracts are implemented (P-05.03). Core innovation contracts (MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) are implemented as schema-only (P-05.04). Runtime services — Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger — remain `PLANNED`. Remaining domain contracts (event envelope), agents, cloud services, and UI remain `PLANNED`.
+> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented (P-05.01). The lifecycle state machine is implemented (P-05.02). Evidence contracts are implemented (P-05.03). Core innovation contracts (MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) are implemented as schema-only (P-05.04). The provider-neutral event envelope contract (EventEnvelope, EventDeliveryDisposition, classify_event_delivery) is implemented (P-05.05). Runtime services — Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger — remain `PLANNED`. Pub/Sub Event Backbone (P-09), PubSub Timeline runtime, and Firestore dedup persistence remain `PLANNED`. Remaining domain conventions (P-05.06), agents, cloud services, and UI remain `PLANNED`.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 

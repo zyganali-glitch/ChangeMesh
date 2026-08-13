@@ -264,8 +264,9 @@ def test_public_export():
     assert "TraceReference" in exports
     assert "ArtifactHash" in exports
     
-    # Check non-leakage (P-05.05+ concepts should not be present yet)
-    assert "EventEnvelope" not in exports
+    # Check non-leakage (P-05.06 concepts should not be present yet)
+    assert "canonical_hash" not in exports
+    assert "timestamp_wire_format" not in exports
 
 
 def test_provider_neutrality():

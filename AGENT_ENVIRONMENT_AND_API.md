@@ -32,7 +32,7 @@ Record actual environment only; do not fill unknown values with guesses.
 - **Local:** Use Application Default Credentials (ADC) for local development.
 - **Cloud:** Target Workload Identity / Managed Identity. No service-account JSON key files should be used or distributed.
 - **Isolation:** Credentials (`GITHUB_TOKEN`, API Keys, etc.) exist only at external adapter boundaries.
-- **Inward Ban:** Credential material must **never** be propagated into model prompts, agent memory, evidence artifacts, Pub/Sub event payloads, or the public judge UI.
+- **Inward Ban:** Credential material must **never** be propagated into model prompts, agent memory, evidence artifacts, Pub/Sub event payloads, EventEnvelope fields, or the public judge UI.
 - **Logging:** Secret environment variables and credential material must never be logged unredacted.
 
 - Never commit credentials, service-account keys, OAuth tokens, cookies, or personal access tokens.
@@ -41,6 +41,14 @@ Record actual environment only; do not fill unknown values with guesses.
 - Every environment variable is documented with sensitivity, purpose, requirement, and safe example.
 - Every external API write defines timeout, retry, idempotency, and evidence behavior.
 - Costs and quotas are measured before final demo.
+
+### Event Envelope Contract Boundary (P-05.05)
+
+- **EventEnvelope** is a provider-neutral domain contract defined in `domain/contracts/event_envelope.py`. It carries event identity, change identity, causal chain, correlation, producer revision, and idempotency key.
+- **No credentials** are permitted in event metadata or payload boundary. Credential material must never enter an EventEnvelope.
+- **P-05.05 does NOT prove Pub/Sub runtime implementation.** The EventEnvelope is a domain schema consumed by future P-09 runtime.
+- **P-09 owns actual publish/consume behavior**, including topic/subscription topology, publisher/consumer adapters, delivery, acknowledgements, retries, dead-letter, and infrastructure config.
+- **classify_event_delivery** is a pure function consuming abstract already-seen snapshots. It does not own persistence (P-10).
 
 ## Environment-variable registry
 
@@ -60,7 +68,9 @@ Commands are added only after clean-checkout verification.
 |---|---|---|---|
 | Install | `pip install -r requirements.txt` | `VERIFIED` | 2026-08-08 |
 | Unit tests (Contracts) | `python -m pytest tests/test_p05_01_contracts.py` | `VERIFIED` | 2026-08-11 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (Missing `project` fixture in GCP tests) | 2026-08-11 |
+| Unit tests (P-05.05 Events) | `python -m pytest tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` | 2026-08-13 |
+| Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` | 2026-08-13 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (Missing `project` fixture in GCP tests) | 2026-08-13 |
 | Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |
 | Local web | `NOT_DEFINED` | `NOT_RUN` | - |
