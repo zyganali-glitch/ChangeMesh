@@ -1,9 +1,9 @@
 """ChangeMesh domain contracts — provider-neutral core contract layer.
 
-This package exposes the five public P-05.01 domain contracts.
-Provider-specific layers (ADK, Firestore, Pub/Sub, GitHub, UI) depend
-inward on these contracts.  These contracts never depend outward on
-providers.
+This package exposes the P-05.01 foundational schemas and the P-05.02
+lifecycle contract. Provider-specific layers (ADK, Firestore, Pub/Sub,
+GitHub, UI) depend inward on these contracts. These contracts never
+depend outward on providers.
 """
 
 from .change_request import ChangeRequest

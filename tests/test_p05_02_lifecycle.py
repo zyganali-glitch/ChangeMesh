@@ -4,6 +4,7 @@ from domain.contracts.change_lifecycle import (
     ChangeState,
     IllegalTransitionError,
     ALLOWED_TRANSITIONS,
+    RETRY_RESUME_TARGETS,
     can_transition,
     require_transition,
     is_terminal,
@@ -11,7 +12,7 @@ from domain.contracts.change_lifecycle import (
 )
 
 class TestP0502Lifecycle:
-    """State machine validation tests corresponding to LIFECYCLE-001 through LIFECYCLE-020."""
+    """State machine validation tests corresponding to LIFECYCLE-001 through LIFECYCLE-021."""
 
     def test_lifecycle_001_declared_states_are_valid(self):
         """LIFECYCLE-001: All declared states are valid enum members."""
@@ -52,7 +53,6 @@ class TestP0502Lifecycle:
 
     def test_lifecycle_004_backward_transitions_rejected(self):
         """LIFECYCLE-004: Backward transitions not explicitly declared are rejected."""
-        # E.g., Executing cannot simply go back to Discovering without RETRY_SCHEDULED or COMPENSATING
         assert not can_transition(ChangeState.EXECUTING, ChangeState.DISCOVERING)
         assert not can_transition(ChangeState.AUTHORIZED, ChangeState.QUALIFYING)
         assert not can_transition(ChangeState.VERIFYING, ChangeState.EXECUTING)
@@ -88,16 +88,19 @@ class TestP0502Lifecycle:
                 assert not can_transition(state, ChangeState.RETRY_SCHEDULED)
 
     def test_lifecycle_008_retry_targets_bounded(self):
-        """LIFECYCLE-008: Retry resume targets are bounded."""
-        retry_targets = ALLOWED_TRANSITIONS[ChangeState.RETRY_SCHEDULED]
-        
-        allowed_resumes = {
-            ChangeState.DISCOVERING, ChangeState.QUALIFYING, ChangeState.REHEARSING,
-            ChangeState.EXECUTING, ChangeState.VERIFYING, ChangeState.CERTIFYING,
-            ChangeState.CANCELLED, ChangeState.FAILED
-        }
-        
-        assert retry_targets == frozenset(allowed_resumes)
+        """LIFECYCLE-008: Retry resume targets are strictly bounded by origin."""
+        # Exhaustively test all origin contexts
+        for origin in ChangeState:
+            for target in ChangeState:
+                if origin not in RETRY_RESUME_TARGETS:
+                    # If it's not a valid origin, no target (except terminal exits) should be reachable from retry
+                    if target not in [ChangeState.CANCELLED, ChangeState.FAILED]:
+                        assert not can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
+                else:
+                    if target in RETRY_RESUME_TARGETS[origin] or target in [ChangeState.CANCELLED, ChangeState.FAILED]:
+                        assert can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
+                    else:
+                        assert not can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
 
     def test_lifecycle_009_compensation_explicit(self):
         """LIFECYCLE-009: Compensation entry is explicit."""
@@ -116,12 +119,17 @@ class TestP0502Lifecycle:
         })
         # Cannot jump to COMPLETE
         assert ChangeState.COMPLETE not in targets
+        
+        # If COMPENSATING retries, it can only resume to COMPENSATING
+        assert can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.COMPENSATING, retry_origin=ChangeState.COMPENSATING)
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin=ChangeState.COMPENSATING)
 
     def test_lifecycle_011_unknown_state_fails_closed(self):
         """LIFECYCLE-011: Unknown state/value fails closed."""
         assert not can_transition("RUNNING", ChangeState.COMPLETE) # type: ignore
         assert not can_transition(ChangeState.EXECUTING, "DONE") # type: ignore
         assert not can_transition(None, ChangeState.COMPLETE) # type: ignore
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin="INVALID") # type: ignore
         
         with pytest.raises(IllegalTransitionError):
             require_transition("RUNNING", ChangeState.COMPLETE) # type: ignore
@@ -150,49 +158,76 @@ class TestP0502Lifecycle:
         assert can_transition(ChangeState.AWAITING_AUTHORITY, ChangeState.CANCELLED)
 
     def test_lifecycle_015_live_write_does_not_imply_human_authority(self):
-        """
-        LIFECYCLE-015: LIVE_WRITE does not automatically imply AWAITING_AUTHORITY.
-        This is structurally proven by the fact that the transition from GROUNDED
-        directly to AUTHORIZED exists, allowing a system to bypass AWAITING_AUTHORITY
-        entirely when policy permits, regardless of execution mode.
-        """
+        """LIFECYCLE-015: LIVE_WRITE does not automatically imply AWAITING_AUTHORITY."""
         assert can_transition(ChangeState.GROUNDED, ChangeState.AUTHORIZED)
 
     def test_lifecycle_016_gemini_uncertainty_is_not_lifecycle_authority(self):
-        """
-        LIFECYCLE-016: Gemini uncertainty does not appear as a lifecycle transition authority.
-        The state machine has no 'UNCERTAIN' or 'ESCALATED_FOR_REVIEW' states.
-        """
+        """LIFECYCLE-016: Gemini uncertainty does not appear as a lifecycle transition authority."""
         for state in ChangeState:
             assert "UNCERTAIN" not in state.value
             assert "REVIEW" not in state.value
 
-    def test_lifecycle_017_transition_table_covers_all(self):
-        """LIFECYCLE-017: Transition table covers every ChangeState source exactly once."""
-        keys = set(ALLOWED_TRANSITIONS.keys())
-        all_states = set(ChangeState)
-        assert keys == all_states
+    def test_lifecycle_017_exhaustive_transition_table_validation(self):
+        """LIFECYCLE-017: Exhaustive transition table validation for ordinary transitions."""
+        for current in ChangeState:
+            for target in ChangeState:
+                is_allowed = target in ALLOWED_TRANSITIONS.get(current, frozenset())
+                
+                # Exclude RETRY_SCHEDULED resume transitions from ordinary tests as they require origin
+                if current == ChangeState.RETRY_SCHEDULED and target not in [ChangeState.CANCELLED, ChangeState.FAILED]:
+                    # Without origin, normal transition into retry resume should fail
+                    assert not can_transition(current, target)
+                    continue
+                    
+                if is_allowed:
+                    assert can_transition(current, target)
+                else:
+                    assert not can_transition(current, target)
+                    with pytest.raises(IllegalTransitionError):
+                        require_transition(current, target)
 
-    def test_lifecycle_018_every_target_is_valid(self):
-        """LIFECYCLE-018: Every transition-table target is a valid ChangeState."""
-        for source, targets in ALLOWED_TRANSITIONS.items():
-            assert isinstance(source, ChangeState)
-            for target in targets:
-                assert isinstance(target, ChangeState)
+    def test_lifecycle_018_retry_bypasses_are_impossible(self):
+        """LIFECYCLE-018: Explicit regression tests proving retry bypasses are impossible."""
+        
+        # DISCOVERING retry -> EXECUTING (bypasses QUALIFYING/REHEARSING/AUTHORITY)
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin=ChangeState.DISCOVERING)
+        
+        # QUALIFYING retry -> CERTIFYING
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.QUALIFYING)
+        
+        # REHEARSING retry -> EXECUTING
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin=ChangeState.REHEARSING)
+        
+        # EXECUTING retry -> CERTIFYING
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.EXECUTING)
+        
+        # VERIFYING retry -> CERTIFYING
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.VERIFYING)
+        
+        # Without origin context at all
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING)
 
     def test_lifecycle_019_public_exports_are_deliberate(self):
         """LIFECYCLE-019: Public lifecycle exports are deliberate."""
         import domain.contracts as contracts
-        # ChangeState must be exported
-        assert "ChangeState" in contracts.__all__
-        # EvidenceState must NOT be exported
-        assert "EvidenceState" not in contracts.__all__
         
+        expected_exports = {
+            "ChangeState", 
+            "IllegalTransitionError", 
+            "CHANGE_LIFECYCLE_VERSION", 
+            "can_transition", 
+            "require_transition", 
+            "is_terminal"
+        }
+        for export in expected_exports:
+            assert export in contracts.__all__
+            
+        assert "DataClassification" not in contracts.__all__
+        assert "EvidenceState" not in contracts.__all__
+
     def test_lifecycle_020_no_provider_imports(self):
         """LIFECYCLE-020: Provider-specific imports absent from the new lifecycle domain module."""
         import sys
-        
-        # Reload to capture imports strictly happening in the module
         import importlib
         import domain.contracts.change_lifecycle as change_lifecycle
         importlib.reload(change_lifecycle)
@@ -212,3 +247,11 @@ class TestP0502Lifecycle:
                 if node.module:
                     for f_mod in forbidden:
                         assert not node.module.startswith(f_mod)
+
+    def test_lifecycle_021_graph_mutation_rejected(self):
+        """LIFECYCLE-021: The transition graphs cannot be mutated at runtime."""
+        with pytest.raises(TypeError):
+            ALLOWED_TRANSITIONS[ChangeState.RECEIVED] = frozenset() # type: ignore
+            
+        with pytest.raises(TypeError):
+            RETRY_RESUME_TARGETS[ChangeState.DISCOVERING] = frozenset() # type: ignore

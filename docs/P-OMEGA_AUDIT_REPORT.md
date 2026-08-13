@@ -1,9 +1,9 @@
 ﻿# P-Ω Post-P05.02 Integrity Audit
 
-**Date:** 2026-08-11
+**Date:** 2026-08-13
 
 ## Overview
-This audit verifies whole-repository alignment after P-05.02 (Define change lifecycle state machine, allowed transitions, terminal states, retry/compensation branches) completion, before P-05.03 begins.
+This audit verifies whole-repository alignment after P-05.02 (Retry-Safety & Transition Integrity Repair) completion, before P-05.03 begins.
 
 ## 1. Plan ↔ HANDOFF Parity
 - **P-04 Status:** DONE ✅
@@ -24,8 +24,9 @@ This audit verifies whole-repository alignment after P-05.02 (Define change life
   - Executors cannot self-authorize.
 - **Fail-Closed Transitions:** Explicit transition table enforces strict state boundaries. Unknown states or missing edges raise IllegalTransitionError.
 - **Terminal Set:** COMPLETE, BLOCKED, FAILED, CANCELLED have 0 outgoing transitions.
-- **Retry Bounds:** Retry only explicitly enters and boundedly targets early-stage resumption. Terminal states cannot retry.
+- **Retry Bounds:** Retry only explicitly enters and boundedly targets early-stage resumption via explicit etry_origin context. Resuming to a later phase is strictly blocked.
 - **Compensation Bounds:** Reached from EXECUTING or VERIFYING. Returns to RETRY_SCHEDULED, or fails terminally.
+- **Graph Immutability:** ALLOWED_TRANSITIONS and RETRY_RESUME_TARGETS are strictly frozen via MappingProxyType to prevent runtime mutation.
 - **No P-05.03+ Implementation Leakage:** EvidenceRecord and tracing components are fully absent from the implementation space.
 
 ## 3. Architecture & Provider Independence
@@ -34,9 +35,10 @@ This audit verifies whole-repository alignment after P-05.02 (Define change life
 - **No Cloud/Dependency Mutation:** Environment lockfiles and test targets remain completely unmodified.
 
 ## 4. Test Verification
-- **P-05.01 Suite:** 41 tests PASS. Public surface evolution correctly allows P-05.02 exports while barring obsolete P-05.01 artifacts like DataClassification.
-- **P-05.02 Suite:** 20 tests PASS. Exhaustive graph validation, invariants checking, fail-closure, and public-export verification.
-- **Full-Suite Result:** FAIL. 61 passed, 3 errors. The 3 errors are exactly the known missing-project GCP setup errors in 	ests/test_gcp_access.py. No new regressions introduced.
+- **P-05.01 Suite:** 41 tests PASS. 
+- **P-05.02 Suite:** 21 tests PASS. Exhaustive graph validation, retry safety verification, invariants checking, graph immutability validation, and fail-closure logic.
+- **Combined P-05.01 + P-05.02 Suite:** 62 tests PASS.
+- **Full-Suite Result:** FAIL. 62 passed, 3 errors. The 3 errors are exactly the known missing-project GCP setup errors in 	ests/test_gcp_access.py. No new regressions introduced.
 
 ## Results
 **Status:** PASS

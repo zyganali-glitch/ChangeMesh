@@ -1,5 +1,6 @@
 from enum import Enum
-from typing import Mapping, FrozenSet
+from types import MappingProxyType
+from typing import Mapping, FrozenSet, Optional
 
 class ChangeState(str, Enum):
     """
@@ -40,7 +41,7 @@ class IllegalTransitionError(ValueError):
 
 # The definitive executable transition graph.
 # Every ChangeState appears exactly once as a key.
-ALLOWED_TRANSITIONS: Mapping[ChangeState, FrozenSet[ChangeState]] = {
+ALLOWED_TRANSITIONS: Mapping[ChangeState, FrozenSet[ChangeState]] = MappingProxyType({
     ChangeState.RECEIVED: frozenset({
         ChangeState.DISCOVERING, ChangeState.BLOCKED, ChangeState.CANCELLED, ChangeState.FAILED
     }),
@@ -74,7 +75,7 @@ ALLOWED_TRANSITIONS: Mapping[ChangeState, FrozenSet[ChangeState]] = {
     ChangeState.RETRY_SCHEDULED: frozenset({
         ChangeState.DISCOVERING, ChangeState.QUALIFYING, ChangeState.REHEARSING, 
         ChangeState.EXECUTING, ChangeState.VERIFYING, ChangeState.CERTIFYING, 
-        ChangeState.CANCELLED, ChangeState.FAILED
+        ChangeState.COMPENSATING, ChangeState.CANCELLED, ChangeState.FAILED
     }),
     ChangeState.COMPENSATING: frozenset({
         ChangeState.RETRY_SCHEDULED, ChangeState.FAILED, ChangeState.CANCELLED, ChangeState.BLOCKED
@@ -84,7 +85,24 @@ ALLOWED_TRANSITIONS: Mapping[ChangeState, FrozenSet[ChangeState]] = {
     ChangeState.COMPLETE: frozenset(),
     ChangeState.FAILED: frozenset(),
     ChangeState.CANCELLED: frozenset()
-}
+})
+
+# Defines which states are allowed to resume from a given retry origin.
+# Terminal exits from RETRY_SCHEDULED are handled independently of origin.
+RETRY_RESUME_TARGETS: Mapping[ChangeState, FrozenSet[ChangeState]] = MappingProxyType({
+    ChangeState.DISCOVERING: frozenset({ChangeState.DISCOVERING}),
+    ChangeState.QUALIFYING: frozenset({ChangeState.QUALIFYING}),
+    ChangeState.REHEARSING: frozenset({ChangeState.REHEARSING}),
+    ChangeState.EXECUTING: frozenset({ChangeState.EXECUTING}),
+    ChangeState.VERIFYING: frozenset({ChangeState.VERIFYING}),
+    ChangeState.CERTIFYING: frozenset({ChangeState.CERTIFYING}),
+    ChangeState.COMPENSATING: frozenset({ChangeState.COMPENSATING}),
+})
+
+# Terminal exits allowed explicitly from RETRY_SCHEDULED
+RETRY_TERMINAL_EXITS: FrozenSet[ChangeState] = frozenset({
+    ChangeState.CANCELLED, ChangeState.FAILED
+})
 
 def is_terminal(state: ChangeState) -> bool:
     """Returns True if the state has no outgoing transitions."""
@@ -92,15 +110,38 @@ def is_terminal(state: ChangeState) -> bool:
         raise ValueError(f"Unknown state: {state}")
     return len(ALLOWED_TRANSITIONS[state]) == 0
 
-def can_transition(current: ChangeState, target: ChangeState) -> bool:
+def can_transition(current: ChangeState, target: ChangeState, *, retry_origin: Optional[ChangeState] = None) -> bool:
     """Returns True if the transition from current to target is allowed."""
     if not isinstance(current, ChangeState):
         return False
     if not isinstance(target, ChangeState):
         return False
-    return target in ALLOWED_TRANSITIONS[current]
+    
+    # Check general transition legality
+    if target not in ALLOWED_TRANSITIONS[current]:
+        return False
+        
+    # Retry resume logic
+    if current == ChangeState.RETRY_SCHEDULED:
+        # Terminal exits from RETRY_SCHEDULED are allowed unconditionally
+        if target in RETRY_TERMINAL_EXITS:
+            return True
+        
+        # All other exits require explicit retry context
+        if not isinstance(retry_origin, ChangeState):
+            return False
+            
+        # The retry origin must be a state that actually supports scheduling a retry
+        if retry_origin not in RETRY_RESUME_TARGETS:
+            return False
+            
+        # The target must be an allowed resume target for the given origin
+        if target not in RETRY_RESUME_TARGETS[retry_origin]:
+            return False
 
-def require_transition(current: ChangeState, target: ChangeState) -> None:
+    return True
+
+def require_transition(current: ChangeState, target: ChangeState, *, retry_origin: Optional[ChangeState] = None) -> None:
     """
     Asserts that the transition from current to target is allowed.
     Raises IllegalTransitionError if it is not.
@@ -110,7 +151,11 @@ def require_transition(current: ChangeState, target: ChangeState) -> None:
     if not isinstance(target, ChangeState):
         raise IllegalTransitionError(f"Invalid target state type: {type(target)}")
         
-    if not can_transition(current, target):
+    if not can_transition(current, target, retry_origin=retry_origin):
+        if current == ChangeState.RETRY_SCHEDULED and retry_origin is not None:
+            raise IllegalTransitionError(
+                f"Illegal transition from {current.value} to {target.value} with retry_origin={retry_origin.value}"
+            )
         raise IllegalTransitionError(
             f"Illegal transition from {current.value} to {target.value}"
         )
