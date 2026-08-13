@@ -280,25 +280,34 @@ Typed lifecycle and transitions defining the safe progression of an enterprise c
 
 Six schema-only contracts defining the core innovation surface. All use `ConfigDict(extra="forbid", frozen=True)` for immutability. Provider-neutral (no `google.*`, `opentelemetry.*` imports). Runtime services (Memory Trust Layer, ShadowLab, Agent Registry, Approval Compression runtime) are deferred to P-11–P-14.
 
+### `MemoryTrustStatus` (Enum)
+
+Explicit trust status for a `MemoryRecord`.
+- `UNTRUSTED`
+- `TRUSTED`
+- `QUARANTINED`
+
 ### `MemoryRecord`
 
-Typed, versioned memory fact with explicit trust metadata. **Memory is not truth** — `trust_level` describes reliability, not authority.
+Typed, versioned memory fact with explicit trust metadata. **Memory is not truth** — it is not an authority source or action authorization.
 
 | Field | Type | Required | Validation |
 |---|---|---|---|
 | `schema_version` | `str` | Yes | Must not be blank |
 | `memory_id` | `str` | Yes | Must not be blank |
-| `change_request_id` | `str` | Yes | Must not be blank |
+| `scope` | `str` | Yes | Must not be blank |
 | `content` | `str` | Yes | Must not be blank |
-| `memory_type` | `MemoryType` enum | Yes | `DECISION`, `OBSERVATION`, `CONSTRAINT`, `LESSON`, `CONTEXT` |
 | `source` | `str` | Yes | Must not be blank |
-| `trust_level` | `TrustLevel` enum | Yes | `VERIFIED`, `ASSERTED`, `INFERRED`, `UNKNOWN` |
-| `scope` | `MemoryScope` enum | Yes | `CHANGE_LOCAL`, `AGENT_LOCAL`, `ORGANIZATION`, `GLOBAL` |
-| `valid_from` | `datetime` | Yes | — |
-| `valid_until` | `Optional[datetime]` | No | Must be ≥ `valid_from` if present |
-| `tags` | `tuple[str, ...]` | No | Immutable |
+| `capture_timestamp` | `datetime` | Yes | — |
+| `expiry_timestamp` | `datetime` | Yes | Must be > `capture_timestamp` |
+| `data_classification` | `DataClassLevel` | Yes | Valid enum value |
+| `trust_status` | `MemoryTrustStatus` | No | Defaults to `UNTRUSTED` |
+| `trust_evidence_ids` | `tuple[str, ...]` | No | Must have at least 1 non-blank ref if `TRUSTED`; no duplicates |
+| `contradiction_ids` | `tuple[str, ...]` | No | Elements must be non-blank; no duplicates |
+| `is_quarantined` | `bool` | No | Defaults to `False` |
+| `quarantine_reason` | `Optional[str]` | No | Required if `is_quarantined` is True |
 
-**Authority invariant:** `trust_level == VERIFIED` does not grant authority. A `VERIFIED` memory can be overridden by policy. Memory trust does not substitute for human authority slots.
+**Authority invariant:** `trust_status == TRUSTED` does not grant authority. A trusted memory can be overridden by policy. Memory trust does not substitute for human authority slots.
 
 ### `CapabilityPassport`
 
@@ -309,16 +318,32 @@ Versioned, immutable proof-of-capability envelope. **Valid passport is not autho
 | `schema_version` | `str` | Yes | Must not be blank |
 | `passport_id` | `str` | Yes | Must not be blank |
 | `agent_id` | `str` | Yes | Must not be blank |
-| `capabilities` | `tuple[str, ...]` | Yes | At least one; all non-blank |
-| `evidence_refs` | `tuple[str, ...]` | Yes | At least one; all non-blank |
-| `issued_at` | `datetime` | Yes | — |
-| `expires_at` | `Optional[datetime]` | No | Must be > `issued_at` if present |
+| `agent_revision` | `str` | Yes | Must not be blank |
+| `qualified_capabilities` | `tuple[str, ...]` | Yes | At least one; all non-blank; no duplicates |
+| `qualified_tool_ids` | `tuple[str, ...]` | No | All non-blank; no duplicates |
+| `permitted_data_classifications` | `tuple[DataClassLevel, ...]` | No | Valid enum values |
+| `qualification_evidence_ids` | `tuple[str, ...]` | Yes | At least one; all non-blank; no duplicates |
 | `issuer` | `str` | Yes | Must not be blank |
-| `scope` | `str` | Yes | Must not be blank |
+| `issued_at` | `datetime` | Yes | — |
+| `expires_at` | `datetime` | Yes | Must be > `issued_at` |
+| `is_revoked` | `bool` | No | Defaults to `False` |
+| `revoked_at` | `Optional[datetime]` | No | Must be ≥ `issued_at`; required if `is_revoked` is True |
+| `revocation_reason` | `Optional[str]` | No | Required if `is_revoked` is True |
+
+### `FaultInjectionSpec`
+
+Declarative fault-injection specification for rehearsal scenarios.
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `fault_id` | `str` | Yes | Must not be blank |
+| `fault_type` | `str` | Yes | Must not be blank |
+| `target` | `str` | Yes | Must not be blank |
+| `parameters` | `tuple[tuple[str, str], ...]` | No | Keys must not be blank |
 
 ### `RehearsalScenario`
 
-Defines a single rehearsal scenario for ShadowLab dry-runs. Includes optional fault injection.
+Defines a single rehearsal scenario for ShadowLab dry-runs. Data only, no executable callbacks.
 
 | Field | Type | Required | Validation |
 |---|---|---|---|
@@ -326,11 +351,12 @@ Defines a single rehearsal scenario for ShadowLab dry-runs. Includes optional fa
 | `scenario_id` | `str` | Yes | Must not be blank |
 | `change_request_id` | `str` | Yes | Must not be blank |
 | `description` | `str` | Yes | Must not be blank |
-| `target_states` | `tuple[str, ...]` | Yes | At least one; all non-blank |
-| `success_criteria_refs` | `tuple[str, ...]` | Yes | At least one; all non-blank |
+| `target_refs` | `tuple[str, ...]` | Yes | At least one; all non-blank; no duplicates |
+| `success_criterion_ids` | `tuple[str, ...]` | No | All non-blank; no duplicates |
+| `tool_double_ids` | `tuple[str, ...]` | No | All non-blank; no duplicates |
 | `fault_injections` | `tuple[FaultInjectionSpec, ...]` | No | Nested validation |
-| `timeout_seconds` | `int` | Yes | > 0 |
 | `created_at` | `datetime` | Yes | — |
+| `scenario_version` | `str` | Yes | Must not be blank |
 
 ### `RehearsalResult`
 
@@ -342,11 +368,12 @@ Records the outcome of a rehearsal run. **PASS does not authorize live execution
 | `result_id` | `str` | Yes | Must not be blank |
 | `scenario_id` | `str` | Yes | Must not be blank |
 | `change_request_id` | `str` | Yes | Must not be blank |
-| `outcome` | `RehearsalOutcome` enum | Yes | `PASS`, `FAIL`, `ERROR`, `TIMEOUT` |
-| `evidence_refs` | `tuple[str, ...]` | No | Immutable |
+| `state` | `EvidenceState` | Yes | Valid enum value |
+| `provenance` | `Provenance` | Yes | `collection_mode` must be `SIMULATION` |
 | `started_at` | `datetime` | Yes | — |
 | `completed_at` | `datetime` | Yes | Must be ≥ `started_at` |
-| `observations` | `tuple[str, ...]` | No | Immutable |
+| `evidence_record_ids` | `tuple[str, ...]` | No | Required for executed states (`PASS`, `FAIL`, `WARN`, `SIMULATED`); all non-blank; no duplicates |
+| `diagnostic_refs` | `tuple[str, ...]` | No | All non-blank; no duplicates |
 
 ### `AutonomyClass` (Enum)
 
@@ -366,11 +393,14 @@ Records why a particular autonomy class was assigned.
 | `schema_version` | `str` | Yes | Must not be blank |
 | `decision_id` | `str` | Yes | Must not be blank |
 | `change_request_id` | `str` | Yes | Must not be blank |
+| `action_class` | `str` | Yes | Must not be blank |
 | `autonomy_class` | `AutonomyClass` | Yes | Valid enum value |
-| `rationale` | `str` | Yes | Must not be blank |
-| `policy_refs` | `tuple[str, ...]` | Yes | At least one; all non-blank |
+| `policy_source` | `str` | Yes | Must not be blank |
+| `policy_revision` | `Optional[str]` | No | Must not be blank if present |
 | `decided_at` | `datetime` | Yes | — |
-| `authority_slot_ref` | `Optional[str]` | No | Required for `HUMAN_AUTHORITY_REQUIRED`; must not be blank if present |
+| `rationale` | `str` | Yes | Must not be blank |
+| `authority_slot_ref` | `Optional[str]` | No | Required for `HUMAN_AUTHORITY_REQUIRED`; strictly forbidden for all other classes |
+| `required_rehearsal_refs` | `tuple[str, ...]` | No | Required for `REHEARSE_THEN_EXECUTE`; at least one; all non-blank; no duplicates |
 
 **Authority invariants:**
 - `LIVE_WRITE != HUMAN_AUTHORITY_REQUIRED` — write scope does not automatically trigger a human authority slot.
@@ -390,9 +420,12 @@ Pre-built decision packet for human authority slots. **Card existence is NOT app
 | `authority_slot_ref` | `str` | Yes | Must match `autonomy_decision.authority_slot_ref` |
 | `decision_question` | `str` | Yes | Must not be blank |
 | `decision_options` | `tuple[str, ...]` | Yes | At least 2 unique non-blank options |
-| `evidence_summary` | `str` | Yes | Must not be blank |
-| `risk_summary` | `str` | Yes | Must not be blank |
+| `policy_reason` | `str` | Yes | Must not be blank |
 | `action_scope` | `str` | Yes | Must not be blank |
+| `completed_work_summary` | `str` | Yes | Must not be blank |
+| `rehearsed_work_summary` | `str` | Yes | Must not be blank |
+| `remaining_decision_summary` | `str` | Yes | Must not be blank |
+| `evidence_refs` | `tuple[str, ...]` | No | All non-blank; no duplicates |
 | `created_at` | `datetime` | Yes | — |
 
 **Forbidden fields:** No `approved`, `is_approved`, `human_decision`, `human_response`, `approval_result`, or `auto_approved` field exists. The card is a decision *input*, not a decision *record*.

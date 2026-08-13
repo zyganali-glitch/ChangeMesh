@@ -83,12 +83,24 @@ class MemoryRecord(BaseModel):
     quarantine_reason: Optional[str] = None
 
     @field_validator(
-        "schema_version", "memory_id", "scope", "source",
+        "schema_version", "memory_id", "scope", "content", "source",
     )
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
+        return v
+
+    @field_validator("trust_evidence_ids", "contradiction_ids")
+    @classmethod
+    def _validate_ref_tuples(cls, v: Tuple[str, ...], info) -> Tuple[str, ...]:
+        for ref in v:
+            if not ref or not ref.strip():
+                raise ValueError(f"{info.field_name} elements must not be blank")
+        
+        # Check duplicates
+        if len(set(v)) != len(v):
+            raise ValueError(f"{info.field_name} must not contain duplicate references")
         return v
 
     @field_validator("quarantine_reason")

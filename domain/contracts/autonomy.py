@@ -92,6 +92,16 @@ class AutonomyDecision(BaseModel):
             raise ValueError(f"{info.field_name} must not be blank")
         return v
 
+    @field_validator("required_rehearsal_refs")
+    @classmethod
+    def _validate_ref_tuples(cls, v: Tuple[str, ...], info) -> Tuple[str, ...]:
+        for ref in v:
+            if not ref or not ref.strip():
+                raise ValueError(f"{info.field_name} elements must not be blank")
+        if len(set(v)) != len(v):
+            raise ValueError(f"{info.field_name} must not contain duplicate references")
+        return v
+
     @field_validator("policy_revision", "authority_slot_ref")
     @classmethod
     def _optional_not_blank_if_set(
@@ -107,41 +117,27 @@ class AutonomyDecision(BaseModel):
     def _validate_autonomy_invariants(self):
         ac = self.autonomy_class
 
-        # AUTO_EXECUTE must not require human authority slot
-        if ac == AutonomyClass.AUTO_EXECUTE:
-            if self.authority_slot_ref is not None:
-                raise ValueError(
-                    "AUTO_EXECUTE must not have authority_slot_ref"
-                )
-
-        # AUTO_EXECUTE_AND_NOTIFY must not require human authority slot
-        elif ac == AutonomyClass.AUTO_EXECUTE_AND_NOTIFY:
-            if self.authority_slot_ref is not None:
-                raise ValueError(
-                    "AUTO_EXECUTE_AND_NOTIFY must not have "
-                    "authority_slot_ref"
-                )
-
-        # REHEARSE_THEN_EXECUTE must identify rehearsal boundary
-        elif ac == AutonomyClass.REHEARSE_THEN_EXECUTE:
-            if not self.required_rehearsal_refs:
-                raise ValueError(
-                    "REHEARSE_THEN_EXECUTE must have at least one "
-                    "required_rehearsal_ref"
-                )
-
         # HUMAN_AUTHORITY_REQUIRED must identify authority slot
-        elif ac == AutonomyClass.HUMAN_AUTHORITY_REQUIRED:
+        if ac == AutonomyClass.HUMAN_AUTHORITY_REQUIRED:
             if not self.authority_slot_ref:
                 raise ValueError(
                     "HUMAN_AUTHORITY_REQUIRED must have a non-blank "
                     "authority_slot_ref"
                 )
+        else:
+            # NO other class is allowed to have an authority_slot_ref
+            if self.authority_slot_ref is not None:
+                raise ValueError(
+                    f"{ac.value} must not have authority_slot_ref"
+                )
 
-        # BLOCKED remains blocked — no auto-conversion to review
-        # (No additional structural constraint needed; the class
-        #  simply remains BLOCKED with no implicit downstream
-        #  action.)
+        # REHEARSE_THEN_EXECUTE must identify rehearsal boundary
+        if ac == AutonomyClass.REHEARSE_THEN_EXECUTE:
+            if not self.required_rehearsal_refs:
+                raise ValueError(
+                    "REHEARSE_THEN_EXECUTE must have at least one "
+                    "required_rehearsal_ref"
+                )
 
         return self
 
@@ -198,12 +194,40 @@ class ApprovalCompressionCard(BaseModel):
     @field_validator(
         "schema_version", "card_id", "change_request_id",
         "authority_slot_ref", "decision_question", "policy_reason",
-        "action_scope",
+        "action_scope", "completed_work_summary", "rehearsed_work_summary",
+        "remaining_decision_summary",
     )
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
+        return v
+
+    @field_validator("decision_options")
+    @classmethod
+    def _validate_decision_options(cls, v: Tuple[str, ...]) -> Tuple[str, ...]:
+        normalized = []
+        for opt in v:
+            if not opt or not opt.strip():
+                raise ValueError("decision_options elements must not be blank")
+            normalized.append(opt.strip())
+        
+        if len(normalized) < 2:
+            raise ValueError("decision_options must have at least 2 options")
+        
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("decision_options must not contain duplicates")
+        
+        return tuple(normalized)
+
+    @field_validator("evidence_refs")
+    @classmethod
+    def _validate_evidence_refs(cls, v: Tuple[str, ...]) -> Tuple[str, ...]:
+        for ref in v:
+            if not ref or not ref.strip():
+                raise ValueError("evidence_refs elements must not be blank")
+        if len(set(v)) != len(v):
+            raise ValueError("evidence_refs must not contain duplicate references")
         return v
 
     @model_validator(mode="after")
@@ -239,16 +263,6 @@ class ApprovalCompressionCard(BaseModel):
                 "autonomy_decision.authority_slot_ref"
             )
 
-        # Decision options must have at least 2 choices
-        if len(self.decision_options) < 2:
-            raise ValueError(
-                "decision_options must have at least 2 options"
-            )
-
-        # No duplicate options
-        if len(set(self.decision_options)) != len(self.decision_options):
-            raise ValueError(
-                "decision_options must not contain duplicates"
-            )
+        # Decision options validation is now handled by field_validator
 
         return self

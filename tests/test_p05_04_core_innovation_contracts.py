@@ -231,6 +231,28 @@ class TestMemoryRecordValidation:
         with pytest.raises(ValidationError, match="must not be blank"):
             _make_memory(scope="")
 
+    def test_blank_content_rejects(self):
+        with pytest.raises(ValidationError, match="must not be blank"):
+            _make_memory(content="   ")
+
+    def test_blank_trust_evidence_id_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_memory(
+                trust_status=MemoryTrustStatus.TRUSTED,
+                trust_evidence_ids=("valid-id", "   "),
+            )
+
+    def test_duplicate_trust_evidence_id_rejects(self):
+        with pytest.raises(ValidationError, match="duplicate"):
+            _make_memory(
+                trust_status=MemoryTrustStatus.TRUSTED,
+                trust_evidence_ids=("id-1", "id-1"),
+            )
+
+    def test_blank_contradiction_id_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_memory(contradiction_ids=("   ",))
+
     def test_expiry_must_follow_capture(self):
         with pytest.raises(ValidationError, match="expiry_timestamp must be after"):
             _make_memory(
@@ -395,6 +417,30 @@ class TestCapabilityPassportValidation:
         ):
             _make_passport(qualification_evidence_ids=())
 
+    def test_blank_capability_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_passport(qualified_capabilities=("cap-1", "  "))
+
+    def test_duplicate_capability_rejects(self):
+        with pytest.raises(ValidationError, match="duplicate"):
+            _make_passport(qualified_capabilities=("cap-1", "cap-1"))
+
+    def test_blank_qualification_evidence_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_passport(qualification_evidence_ids=("ev-1", "   "))
+
+    def test_duplicate_qualification_evidence_rejects(self):
+        with pytest.raises(ValidationError, match="duplicate"):
+            _make_passport(qualification_evidence_ids=("ev-1", "ev-1"))
+
+    def test_blank_tool_id_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_passport(qualified_tool_ids=("   ",))
+
+    def test_duplicate_tool_id_rejects(self):
+        with pytest.raises(ValidationError, match="duplicate"):
+            _make_passport(qualified_tool_ids=("tool-1", "tool-1"))
+
     def test_expiry_ordering(self):
         with pytest.raises(
             ValidationError,
@@ -409,6 +455,18 @@ class TestCapabilityPassportValidation:
             match="revoked passport must have revoked_at",
         ):
             _make_passport(is_revoked=True, revocation_reason="test")
+
+    def test_revoked_at_before_issued_at_rejects(self):
+        with pytest.raises(
+            ValidationError,
+            match="revoked_at must not predate issued_at",
+        ):
+            _make_passport(
+                issued_at=_NOW,
+                is_revoked=True,
+                revoked_at=_NOW - timedelta(days=1),
+                revocation_reason="test",
+            )
 
     def test_revoked_without_reason_rejects(self):
         with pytest.raises(
@@ -512,6 +570,39 @@ class TestRehearsalScenarioValidation:
         with pytest.raises(ValidationError, match="must not be blank"):
             _make_scenario(scenario_id="  ")
 
+    def test_blank_description_rejects(self):
+        with pytest.raises(ValidationError, match="must not be blank"):
+            _make_scenario(description="   ")
+
+    def test_empty_target_refs_rejects(self):
+        with pytest.raises(ValidationError, match="target_refs must not be empty"):
+            _make_scenario(target_refs=())
+
+    def test_blank_target_ref_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_scenario(target_refs=("t1", "   "))
+
+    def test_duplicate_target_refs_rejects(self):
+        with pytest.raises(ValidationError, match="duplicate"):
+            _make_scenario(target_refs=("t1", "t1"))
+
+    def test_blank_success_criterion_ref_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_scenario(success_criterion_ids=("   ",))
+
+    def test_blank_tool_double_ref_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_scenario(tool_double_ids=("   ",))
+
+    def test_blank_fault_parameter_key_rejects(self):
+        with pytest.raises(ValidationError, match="parameters keys must not be blank"):
+            FaultInjectionSpec(
+                fault_id="f1",
+                fault_type="type1",
+                target="t1",
+                parameters=(("   ", "val"),)
+            )
+
     def test_no_executable_callbacks(self):
         """RehearsalScenario has no callable or function fields."""
         for field_name, field_info in RehearsalScenario.model_fields.items():
@@ -569,6 +660,18 @@ class TestRehearsalResultValidation:
                 started_at=_LATER,
                 completed_at=_NOW,
             )
+
+    def test_pass_with_blank_evidence_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_result(evidence_record_ids=("   ",))
+
+    def test_duplicate_evidence_refs_rejects(self):
+        with pytest.raises(ValidationError, match="duplicate"):
+            _make_result(evidence_record_ids=("ev1", "ev1"))
+
+    def test_blank_diagnostic_ref_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_result(diagnostic_refs=("   ",))
 
     def test_pass_without_evidence_rejected(self):
         with pytest.raises(
@@ -737,6 +840,35 @@ class TestAutonomyDecisionValidation:
             _make_autonomy_decision(
                 AutonomyClass.REHEARSE_THEN_EXECUTE,
                 required_rehearsal_refs=(),
+            )
+
+    def test_blocked_with_authority_slot_rejects(self):
+        with pytest.raises(ValidationError, match="BLOCKED must not have authority_slot_ref"):
+            _make_autonomy_decision(
+                AutonomyClass.BLOCKED,
+                authority_slot_ref="slot-1",
+            )
+
+    def test_rehearse_then_execute_with_authority_slot_rejects(self):
+        with pytest.raises(ValidationError, match="REHEARSE_THEN_EXECUTE must not have authority_slot_ref"):
+            _make_autonomy_decision(
+                AutonomyClass.REHEARSE_THEN_EXECUTE,
+                authority_slot_ref="slot-1",
+                required_rehearsal_refs=("reh-1",),
+            )
+
+    def test_rehearse_then_execute_blank_required_rehearsal_ref_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_autonomy_decision(
+                AutonomyClass.REHEARSE_THEN_EXECUTE,
+                required_rehearsal_refs=("   ",),
+            )
+
+    def test_duplicate_required_rehearsal_refs_rejects(self):
+        with pytest.raises(ValidationError, match="duplicate"):
+            _make_autonomy_decision(
+                AutonomyClass.REHEARSE_THEN_EXECUTE,
+                required_rehearsal_refs=("reh-1", "reh-1"),
             )
 
 
@@ -942,6 +1074,30 @@ class TestApprovalCompressionCardValidation:
             match="decision_options must not contain duplicates",
         ):
             _make_card(decision_options=("Approve", "Approve"))
+
+    def test_blank_decision_option_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_card(decision_options=("Approve", "   "))
+
+    def test_duplicate_options_with_whitespace_rejects(self):
+        with pytest.raises(ValidationError, match="duplicates"):
+            _make_card(decision_options=("Approve", " Approve "))
+
+    def test_blank_completed_work_summary_rejects(self):
+        with pytest.raises(ValidationError, match="must not be blank"):
+            _make_card(completed_work_summary="   ")
+
+    def test_blank_rehearsed_work_summary_rejects(self):
+        with pytest.raises(ValidationError, match="must not be blank"):
+            _make_card(rehearsed_work_summary="   ")
+
+    def test_blank_remaining_decision_summary_rejects(self):
+        with pytest.raises(ValidationError, match="must not be blank"):
+            _make_card(remaining_decision_summary="   ")
+
+    def test_blank_evidence_ref_rejects(self):
+        with pytest.raises(ValidationError, match="elements must not be blank"):
+            _make_card(evidence_refs=("   ",))
 
 
 class TestApprovalCardNoHumanResponse:

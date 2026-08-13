@@ -53,6 +53,14 @@ class FaultInjectionSpec(BaseModel):
             raise ValueError(f"{info.field_name} must not be blank")
         return v
 
+    @field_validator("parameters")
+    @classmethod
+    def _validate_parameters(cls, v: Tuple[Tuple[str, str], ...]) -> Tuple[Tuple[str, str], ...]:
+        for key, _ in v:
+            if not key or not key.strip():
+                raise ValueError("parameters keys must not be blank")
+        return v
+
 
 class RehearsalScenario(BaseModel):
     """Typed ShadowLab rehearsal scenario definition.
@@ -91,13 +99,31 @@ class RehearsalScenario(BaseModel):
 
     @field_validator(
         "schema_version", "scenario_id", "change_request_id",
-        "scenario_version",
+        "scenario_version", "description",
     )
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
         return v
+
+    @field_validator(
+        "target_refs", "success_criterion_ids", "tool_double_ids",
+    )
+    @classmethod
+    def _validate_ref_tuples(cls, v: Tuple[str, ...], info) -> Tuple[str, ...]:
+        for ref in v:
+            if not ref or not ref.strip():
+                raise ValueError(f"{info.field_name} elements must not be blank")
+        if len(set(v)) != len(v):
+            raise ValueError(f"{info.field_name} must not contain duplicate references")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_scenario_invariants(self):
+        if not self.target_refs:
+            raise ValueError("target_refs must not be empty")
+        return self
 
 
 class RehearsalResult(BaseModel):
@@ -147,6 +173,18 @@ class RehearsalResult(BaseModel):
     def _must_not_be_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
+        return v
+
+    @field_validator(
+        "evidence_record_ids", "diagnostic_refs",
+    )
+    @classmethod
+    def _validate_ref_tuples(cls, v: Tuple[str, ...], info) -> Tuple[str, ...]:
+        for ref in v:
+            if not ref or not ref.strip():
+                raise ValueError(f"{info.field_name} elements must not be blank")
+        if len(set(v)) != len(v):
+            raise ValueError(f"{info.field_name} must not contain duplicate references")
         return v
 
     @model_validator(mode="after")

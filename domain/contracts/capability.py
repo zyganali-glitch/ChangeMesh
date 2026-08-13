@@ -92,6 +92,20 @@ class CapabilityPassport(BaseModel):
             raise ValueError("revocation_reason must not be blank when set")
         return v
 
+    @field_validator(
+        "qualified_capabilities",
+        "qualified_tool_ids",
+        "qualification_evidence_ids",
+    )
+    @classmethod
+    def _validate_ref_tuples(cls, v: Tuple[str, ...], info) -> Tuple[str, ...]:
+        for ref in v:
+            if not ref or not ref.strip():
+                raise ValueError(f"{info.field_name} elements must not be blank")
+        if len(set(v)) != len(v):
+            raise ValueError(f"{info.field_name} must not contain duplicate references")
+        return v
+
     @model_validator(mode="after")
     def _validate_passport_invariants(self):
         # Qualified capabilities cannot be empty
@@ -115,6 +129,10 @@ class CapabilityPassport(BaseModel):
             if self.revoked_at is None:
                 raise ValueError(
                     "revoked passport must have revoked_at timestamp"
+                )
+            if self.revoked_at < self.issued_at:
+                raise ValueError(
+                    "revoked_at must not predate issued_at"
                 )
             if not self.revocation_reason:
                 raise ValueError(
