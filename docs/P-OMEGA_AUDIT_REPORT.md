@@ -1,8 +1,8 @@
 # P-Ω Whole-Repository Integrity Audit — P-06.05 Clean-Checkout Reproduction & P-06 Phase Closure
 
-> **Produced by:** P-06.05 Run first clean-checkout reproduction from separate directory (P-06 Final Evidence-Honesty & Phase Closure Refresh)  
+> **Produced by:** P-06.05 Run first clean-checkout reproduction from separate directory (P-06 Final Live-Doc PyYAML Parity Repair)  
 > **Date:** 2026-08-15  
-> **Repair Entry Remote SHA:** `198c67da736724b6f733993d2c6f398644a3d746`  
+> **Repair Entry Remote SHA:** `f6264631abd050610e8ac87360fc779037053ded`  
 > **Original Clean Clone Verified SHA:** `6a6e8455d8092e25458b6fad3edac49d76653041`  
 > **Canonical Remote URL:** `https://github.com/zyganali-glitch/ChangeMesh.git`  
 > **Canonical Branch:** `main`  
@@ -13,7 +13,7 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Repair entry SHA `198c67da736724b6f733993d2c6f398644a3d746` and reproduced baseline SHA `6a6e8455d8092e25458b6fad3edac49d76653041` verified against canonical remote. |
+| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Repair entry SHA `f6264631abd050610e8ac87360fc779037053ded` and reproduced baseline SHA `6a6e8455d8092e25458b6fad3edac49d76653041` verified against canonical remote. |
 | **B** | Separate-Directory Clean Clone & Cache Honesty | **PASS** | Clean clone performed into sanitized OS temp directory (`C:\Users\MEHMET\AppData\Local\Temp\...`). No repo-local `.venv`, no `.env`, no copied/untracked repository state, and no repo-local generated state inherited from canonical workspace. External package-manager download cache state was not relied upon as project state and cold-cache/offline reproducibility is NOT claimed. |
 | **C** | Clone SHA Provenance | **PASS** | In clean clone: `git rev-parse HEAD` == `6a6e8455d8092e25458b6fad3edac49d76653041`. Initial working tree clean. |
 | **D** | Python 3.13.5 & uv 0.11.28 Proof | **PASS** | `uv --version` reported `0.11.28`; `uv run python --version` reported `Python 3.13.5` from active interpreter. |
@@ -29,7 +29,7 @@
 | **N** | Zero Live Cloud Mutations Executed | **PASS** | Zero Google Cloud mutation or network side-effect executed. Default integration guard strictly prevented cloud access. |
 | **O** | Clean Clone Working Tree Integrity | **PASS** | After all command executions, `git status --short` in the clean clone reported 0 modified tracked files and 0 untracked files. Working tree remained clean. |
 | **P** | Master Plan Task-Contract Preservation | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` P-06.05 task block preserves all original binding fields (`Required action`, `Forbidden shortcuts`, `Acceptance criteria`, `Required evidence: Clean-checkout log.`, `Mandatory documentation sync`, `Closure`) while updating `Status: DONE` and appending truthful `Evidence`. |
-| **Q** | Master Plan & HANDOFF Parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized: Phase P-06 is `DONE`, P-06.05 is `DONE`, P-07 is `PENDING`, next task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`. |
+| **Q** | Master Plan & HANDOFF Parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized: Phase P-06 is `DONE`, P-06.05 is `DONE`, P-07 is `PENDING`, next task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`. Master Plan P-06.05 Evidence, `docs/HANDOFF.md`, and `docs/P-06.05_CLEAN_CHECKOUT_LOG.md` are in full parity regarding dedicated dev tools absence (`ruff`, `mypy`, `pytest`) and runtime presence of PyYAML. |
 | **R** | Bilingual Public Document Parity & Prerequisite Honesty | **PASS** | `README.md` and `README.tr.md` synchronized: Phase P-06 marked `DONE`, Git prerequisite stated truthfully as `Git` without unproven version floors, tested Git version (`git version 2.52.0.windows.1`) labeled as tested environment evidence, and baseline command results published in English and Turkish. |
 | **S** | Submission Manifest Sync | **PASS** | `docs/SUBMISSION_MANIFEST.md` updated: `Clean-checkout reproduction: VERIFIED (docs/P-06.05_CLEAN_CHECKOUT_LOG.md)`. All future items remain honest (`NOT_CREATED`, `NOT_FINAL`, `NOT_RUN`). |
 | **T** | Command Registry Sync | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated to reflect `CLEAN_CHECKOUT_VERIFIED` for reproduced commands and install paths. |
