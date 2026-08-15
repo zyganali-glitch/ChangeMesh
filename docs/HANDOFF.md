@@ -21,11 +21,12 @@ P-05.05
 P-05.06
 P-05
 P-06.01
+P-06.02
 
 **Active Phase:**
 P-06
 
 **Next Exact Task:**
-P-06.02 — Create reproducible dependency manifests and lockfiles
+P-06.03 — Create safe local configuration templates and secret handling
 
-P-06.01 completed with ADR-0015, pinning Python 3.13.5 via `.python-version`, determining Node NOT_REQUIRED, and freezing the repository structure to the canonical planned package map in `docs/ARCHITECTURE.md` §3 with strict current physical, frozen target, and future planned-only distinction. Total 590 domain contract tests passing. P-06.02 remains PENDING.
+P-06.02 completed with ADR-0016, establishing PEP 621 / PEP 735 `pyproject.toml` as canonical source-of-truth manifest, `uv.lock` as deterministic lockfile (78 packages with SHA-256 hashes), and `requirements.txt` as generated compatibility lockfile export. Clean isolated virtual environment installation verified with exit code 0 and `uv pip check` reporting 0 conflicts. Total 590 domain contract tests passing. Next eligible task is P-06.03.

@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-06.01 Closure Repair
+# P-Ω Whole-Repository Integrity Audit — P-06.02 Closure
 
-> **Produced by:** P-06.01 Language/Runtime Pinning and Repository Structure Freeze (Closure Repair)
+> **Produced by:** P-06.02 Dependency Manifests and Lockfiles Closure
 > **Date:** 2026-08-15
-> **Baseline Remote SHA:** `d3c85eb9ea7f5a66f06b7375b740aa588b3062d4`
+> **Baseline Remote SHA:** `06be3edc69aa3faeeda335b290423c17331066fc`
 
 ---
 
@@ -10,22 +10,23 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Python runtime version pinned | **PASS** | `.python-version` pinned to exact version `3.13.5`. |
-| **B** | Node.js runtime evaluated | **PASS** | Evaluated and determined `NOT_REQUIRED` in ADR-0015, `AGENT_ENVIRONMENT_AND_API.md`, and `docs/ARCHITECTURE.md`. Zero Node tooling added. |
-| **C** | ADR-0015 created and synchronized | **PASS** | `docs/DECISION_LOG.md` contains complete ADR-0015 with context, compatibility evidence, alternatives, and frozen target structure matching architecture map. |
-| **D** | Environment memory synchronized | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated: stack `Python 3.13.5 + Vanilla JS/HTML/CSS`, Python `3.13.5`, Node `NOT_REQUIRED`. |
-| **E** | README synchronized | **PASS** | `README.md` updated with P-06.01 implementation status. |
-| **F** | Architecture package map parity | **PASS** | `docs/ARCHITECTURE.md` §3 canonical package map updated with `api/`, `integrations/gcp/`, and browser-native `web/`. |
-| **G** | Architecture memory parity | **PASS** | `AGENT_ARCHITECTURE_AND_PATTERNS.md` §4 synchronized with `api/`, `integrations/gcp/`, `integrations/github/`, `integrations/metadata/`, and browser-native `web/`. |
-| **H** | No P-07+ implementation leakage | **PASS** | No empty directory scaffolding or placeholder stub modules created for `src/`, `integrations/gcp/`, `api/`, `web/`, etc. |
-| **I** | P-06.02 boundary preserved | **PASS** | `requirements.txt` untouched; no lockfiles, Poetry, or uv configs created. P-06.02 remains `PENDING`. |
-| **J** | Domain contracts provider neutrality | **PASS** | `domain/contracts/` unmodified; AST provider-neutrality test suite passes with 0 provider imports. |
-| **K** | No secrets or credentials introduced | **PASS** | Scanned diffs and environment registry; zero secrets or tokens committed. |
-| **L** | Master Plan phase registry & detailed parity | **PASS** | Phase registry line 122 is `P-06 IN_PROGRESS`; detailed P-06 status is `IN_PROGRESS`; P-06.01 is `DONE`; P-06.02 is `PENDING`. |
-| **M** | HANDOFF exact next-task parity | **PASS** | `docs/HANDOFF.md` points verbatim to `P-06.02 — Create reproducible dependency manifests and lockfiles`. Active phase is `P-06`. |
-| **N** | Memory and lessons synchronized | **PASS** | `AGENT_MEMORY_AND_LESSONS.md` contains `LESSON-20260815-01` on avoiding dual-runtime complexity. |
-| **O** | Combined P-05 regression suite | **PASS** | 590 passed across all 6 contract test files. |
-| **P** | Full repository suite status honestly recorded | **PASS** | Honesty check PASS. Actual full suite execution produces `FAIL` (590 passed, 3 errors: `test_gcp_access.py` missing fixture 'project'). Full suite status is honestly reported as `FAIL`. |
+| **A** | Baseline SHA & remote tracking | **PASS** | `06be3edc69aa3faeeda335b290423c17331066fc` verified at entry; clean working tree. |
+| **B** | Python runtime version preserved | **PASS** | `.python-version` pinned to `3.13.5`; `pyproject.toml` requires `>=3.13,<3.14`. |
+| **C** | Node.js runtime evaluated & absent | **PASS** | Node remains `NOT_REQUIRED`. Zero npm/Node tooling or package.json files exist. |
+| **D** | Canonical dependency manifest (Source of Truth) | **PASS** | `pyproject.toml` (PEP 621 / PEP 735) created as sole canonical editable manifest declaring direct runtime and dev/test dependencies. |
+| **E** | Deterministic lock artifact | **PASS** | `uv.lock` generated via `uv 0.11.28`, freezing 78 packages with exact versions, URLs, and SHA-256 hashes. |
+| **F** | Compatibility lock export | **PASS** | `requirements.txt` migrated to generated compatibility lockfile export with exact pins, SHA-256 hashes, and clear auto-generation header. |
+| **G** | Dependency inventory & classification | **PASS** | DIRECT_RUNTIME (8), DIRECT_DEV_TEST (2), UNNECESSARY (1: `google-cloud-aiplatform` legacy SDK removed), TRANSITIVE (69). |
+| **H** | Fresh isolated venv clean install | **PASS** | Isolated Python 3.13.5 venv installed from lock via `uv pip install --require-hashes -r requirements.txt` with exit code 0. |
+| **I** | Dependency consistency check | **PASS** | `uv pip check` on isolated environment reports `Checked 77 packages in 14ms. All installed packages are compatible` (0 conflicts). |
+| **J** | Reproducibility verification | **PASS** | Second fresh isolated venv installed from lock; package lists match 100% byte-for-byte across both environments. |
+| **K** | Domain contracts provider neutrality | **PASS** | `domain/contracts/` unmodified; AST provider-neutrality test suite passes with 0 provider imports. |
+| **L** | No secrets or credentials introduced | **PASS** | Manifests and lockfiles audited; zero secrets, tokens, or private index URLs. |
+| **M** | Future-phase non-leakage | **PASS** | P-06.03 (no `.env`), P-06.04 (no broad command framework), P-06.05 (no separate-dir checkout), P-07 (no agent skeleton) strictly preserved as PENDING. |
+| **N** | Documentation & ADR synchronization | **PASS** | ADR-0016 in `docs/DECISION_LOG.md`, `AGENT_ENVIRONMENT_AND_API.md` updated with lock commands and boundary. |
+| **O** | Combined P-05 regression suite | **PASS** | 590 passed across all 6 contract test files in isolated venv. |
+| **P** | Full repository suite status honestly recorded | **PASS** | Full suite execution produces `FAIL` (590 passed, 3 errors: known `test_gcp_access.py` missing fixture 'project'). Honestly reported as `FAIL`. |
+| **Q** | Master Plan & HANDOFF exact parity | **PASS** | Phase registry `P-06 IN_PROGRESS`; P-06.01 `DONE`; P-06.02 `DONE`; P-06.03 `PENDING`; HANDOFF points verbatim to `P-06.03 — Create safe local configuration templates and secret handling`. |
 
 ---
 
@@ -54,4 +55,4 @@
 
 ## 3. P-Ω Final Verdict
 
-**PASS** — All 16 whole-repository integrity audit checks pass. P-06.01 runtime version pinning (`Python 3.13.5`), Node `NOT_REQUIRED` declaration, repository structure freeze, and architecture parity across `docs/ARCHITECTURE.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, and `docs/DECISION_LOG.md` (ADR-0015) are in 100% agreement. Full repository test status is honestly recorded as `FAIL` due to known baseline GCP fixture errors. Next eligible task is `P-06.02`.
+**PASS** — All 17 whole-repository integrity audit checks pass. P-06.02 establishes canonical PEP 621 / PEP 735 `pyproject.toml`, deterministic `uv.lock` (78 packages with SHA-256 integrity hashes), and generated compatibility `requirements.txt`. Clean isolated virtual environment installation succeeds deterministically with 0 conflicts. Domain contract neutrality is 100% preserved. Full repository test status is honestly recorded as `FAIL` due to known baseline GCP fixture errors. Next eligible task is `P-06.03 — Create safe local configuration templates and secret handling`.

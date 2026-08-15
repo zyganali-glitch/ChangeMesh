@@ -203,3 +203,36 @@
 - Boundary with P-06.02: P-06.01 solely selects and pins the language/runtime versions and repository structure. P-06.02 owns creating reproducible dependency manifests and lockfiles. `requirements.txt` is not modified and no lockfiles are generated.
 - Boundary with P-07: P-06.01 introduces no agent implementation, skeleton code, or runtime services.
 
+## ADR-0016 — Canonical Dependency Manifest (PEP 621 pyproject.toml) and Deterministic Lockfile (uv.lock) Strategy
+- Date: 2026-08-15
+- Status: Accepted
+- Context: Micro-task P-06.02 requires establishing reproducible dependency manifests and lockfiles for Python 3.13.5. Historically, loose unpinned dependencies existed in `requirements.txt` without explicit dev/test dependency separation, without transitive dependency pinning, and without cryptographic integrity hashes.
+- Decision:
+    1. **Single Source of Truth Manifest:** Standard PEP 621 / PEP 735 `pyproject.toml` is the sole canonical editable manifest for all direct dependencies.
+        - `[project.dependencies]`: Direct runtime dependencies (`google-adk>=2.6.0`, `google-genai>=0.1.0`, `pydantic>=2.0.0`, `google-cloud-firestore>=2.15.0`, `google-cloud-pubsub>=2.20.0`, `google-cloud-run>=0.10.0`, `google-cloud-logging>=3.10.0`, `google-cloud-trace>=1.15.0`).
+        - `[dependency-groups].dev`: Direct dev/test dependencies (`pytest>=8.0.0`, `pyyaml>=6.0.0`).
+        - `requires-python = ">=3.13,<3.14"` (matching `.python-version` 3.13.5).
+    2. **Deterministic Lockfile Artifact:** `uv.lock` (generated via `uv lock` with `uv 0.11.28`) is the canonical cross-platform lock artifact freezing the exact resolved dependency graph (77 installed packages + root project) with exact versions, repository URLs, and SHA-256 integrity hashes.
+    3. **Compatibility Lock Export:** `requirements.txt` is redefined strictly as a generated compatibility lockfile export (via `uv export --frozen --all-groups -o requirements.txt`), containing exact versions and SHA-256 hashes for standard `pip` environments, Cloud Run buildpacks, and Docker containers without `uv`. It is read-only and carries an explicit auto-generation header warning.
+    4. **Dependency Inventory Classification:**
+        - `DIRECT_RUNTIME`: `pydantic`, `google-adk`, `google-genai`, `google-cloud-firestore`, `google-cloud-pubsub`, `google-cloud-run`, `google-cloud-logging`, `google-cloud-trace`.
+        - `DIRECT_DEV_TEST`: `pytest`, `pyyaml`.
+        - `UNNECESSARY / REMOVED`: `google-cloud-aiplatform` (legacy `vertexai` client superseded by `google-genai` for Gemini 3.5+; removing it avoids bloated resolution while `google-genai` provides direct Gemini SDK runtime).
+        - `TRANSITIVE`: All other 69 resolved dependencies (e.g. `fastapi`, `starlette`, `httpx`, `opentelemetry-api`, `opentelemetry-sdk`, `grpcio`, `protobuf`, `proto-plus`, `anyio`, etc.).
+    5. **Tooling Version Pinning:** `uv` 0.11.28 is recorded as the dependency resolver/generator.
+- Alternatives Considered:
+    - *Poetry / Pipenv:* Rejected. Introduces unnecessary runtime framework overhead and slower resolution without adding value over standard PEP 621.
+    - *pip-tools (requirements.in + requirements.txt):* Rejected. `uv.lock` provides faster resolution, multi-platform universal wheel resolution, and standard PEP 621 / PEP 735 metadata in `pyproject.toml`.
+    - *Raw unpinned requirements.txt:* Rejected. Non-deterministic and violates reproducibility requirements.
+- Consequences:
+    - Eliminates hidden development dependencies.
+    - Clean installs in fresh isolated virtual environments succeed deterministically with `uv pip install --require-hashes -r requirements.txt` or `uv sync --frozen`.
+    - Preserves domain contract provider neutrality with zero domain-level dependency changes.
+- Evidence:
+    - Deterministic resolution of 78 packages (77 external + 1 project root) in `uv.lock`.
+    - Clean isolated venv install verified with exit code 0 (`uv pip check` reports 0 conflicts).
+    - Second isolated venv install verified 100% byte-for-byte identical package list.
+    - 590 domain contract unit tests passing in isolated environment.
+- Boundary with P-06.03: P-06.02 establishes dependency manifests and lockfiles only. No `.env`, secret templates, or config files are created.
+- Boundary with P-06.04: P-06.02 does not create a general command runner or CI framework.
+- Boundary with P-06.05: P-06.02 validates fresh isolated virtual environment installation; P-06.05 later validates full separate-directory clean Git checkout reproduction.

@@ -704,12 +704,13 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-06.02 — Create reproducible dependency manifests and lockfiles
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create reproducible dependency manifests and lockfiles.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Clean install deterministic; no unnecessary framework.
 - **Required evidence:** Install output and dependency audit.
-- **Mandatory documentation sync:** Environment/API.
+- **Evidence:** ADR-0016 in `docs/DECISION_LOG.md`, PEP 621 / PEP 735 canonical manifest `pyproject.toml` (declaring direct runtime `google-adk>=2.6.0`, `google-genai>=0.1.0`, `pydantic>=2.0.0`, `google-cloud-firestore>=2.15.0`, `google-cloud-pubsub>=2.20.0`, `google-cloud-run>=0.10.0`, `google-cloud-logging>=3.10.0`, `google-cloud-trace>=1.15.0` and direct dev/test `pytest>=8.0.0`, `pyyaml>=6.0.0`), `uv.lock` (canonical deterministic lockfile freezing 78 packages with SHA-256 integrity hashes via `uv 0.11.28`), and `requirements.txt` (redefined strictly as generated compatibility lock export with exact pins and hashes). Fresh isolated Python 3.13.5 virtual environment installation verified with exit code 0 and `uv pip check` reporting 0 conflicts. Second isolated virtual environment verified with 100% byte-for-byte identical package list. All 590 domain contract tests passing in isolated environment. `AGENT_ENVIRONMENT_AND_API.md` synchronized.
+- **Mandatory documentation sync:** Environment/API (`AGENT_ENVIRONMENT_AND_API.md`), Decision Log (`docs/DECISION_LOG.md`), Master Plan (`plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`), Handoff (`docs/HANDOFF.md`), P-Ω Audit Report (`docs/P-OMEGA_AUDIT_REPORT.md`).
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-06.03 — Create safe local configuration templates and secret handling

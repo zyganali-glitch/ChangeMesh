@@ -1,0 +1,22 @@
+[project]
+name = "changemesh"
+version = "0.1.0"
+description = "ChangeMesh — The Enterprise Change Rehearsal and Execution Fleet"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "google-adk>=2.6.0",
+    "google-genai>=0.1.0",
+    "pydantic>=2.0.0",
+    "google-cloud-firestore>=2.15.0",
+    "google-cloud-pubsub>=2.20.0",
+    "google-cloud-run>=0.10.0",
+    "google-cloud-logging>=3.10.0",
+    "google-cloud-trace>=1.15.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pyyaml>=6.0.0",
+]

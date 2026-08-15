@@ -53,7 +53,13 @@ Record actual environment only; do not fill unknown values with guesses.
 ### Machine Conventions Contract Boundary (P-05.06)
 
 - **Machine conventions** (`domain/contracts/conventions.py`) define canonical hashing (`HashAlgorithm.SHA256`, 64-character lowercase hex regex `^[0-9a-f]{64}$`), UTC timestamp normalization and naive rejection (`UtcDateTime`), deterministic canonical JSON serialization (`canonical_json_bytes`), and structural secret redaction (`redact_mapping`, `REDACTION_SENTINEL = "[REDACTED]"`).
-- **P-05.06 does NOT implement runtime cryptography or cloud KMS.** It defines domain-level machine serialization, validation, and normalization rules.
+### Dependency and Lockfile Architecture Boundary (P-06.02 / ADR-0016)
+
+- **Canonical Manifest (Source of Truth):** `pyproject.toml` (PEP 621 / PEP 735). Direct runtime dependencies (`google-adk>=2.6.0`, `google-genai>=0.1.0`, `pydantic>=2.0.0`, `google-cloud-firestore>=2.15.0`, `google-cloud-pubsub>=2.20.0`, `google-cloud-run>=0.10.0`, `google-cloud-logging>=3.10.0`, `google-cloud-trace>=1.15.0`) and direct dev/test dependencies (`pytest>=8.0.0`, `pyyaml>=6.0.0`).
+- **Deterministic Lock Artifact:** `uv.lock` (generated via `uv lock` with `uv 0.11.28`). Freezes the exact resolved dependency graph (77 installed packages + root project) with repository URLs and SHA-256 integrity hashes.
+- **Compatibility Lockfile Export:** `requirements.txt` is strictly a generated compatibility lock export with exact pins and SHA-256 hashes for standard `pip` environments, Cloud Run buildpacks, and Docker containers without `uv`.
+- **Regeneration Command:** `uv lock ; uv export --frozen --all-groups -o requirements.txt`
+- **Installation from Lock:** `uv sync --frozen` (or `uv pip install --require-hashes -r requirements.txt` / `pip install --require-hashes -r requirements.txt`).
 
 ## Environment-variable registry
 
@@ -71,7 +77,11 @@ Commands are added only after clean-checkout verification.
 
 | Purpose | Command | Status | Last verified |
 |---|---|---|---|
-| Install | `pip install -r requirements.txt` | `VERIFIED` | 2026-08-08 |
+| Install (uv locked) | `uv sync --frozen` | `VERIFIED` | 2026-08-15 |
+| Install (pip hash-locked) | `pip install --require-hashes -r requirements.txt` | `VERIFIED` | 2026-08-15 |
+| Lock generation | `uv lock` | `VERIFIED` | 2026-08-15 |
+| Lock export | `uv export --frozen --all-groups -o requirements.txt` | `VERIFIED` | 2026-08-15 |
+| Dependency check | `uv pip check` | `VERIFIED` | 2026-08-15 |
 | Unit tests (Contracts) | `python -m pytest tests/test_p05_01_contracts.py` | `VERIFIED` | 2026-08-11 |
 | Unit tests (P-05.05 Events) | `python -m pytest tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` (82 passed) | 2026-08-13 |
 | Unit tests (P-05.06 Conventions) | `python -m pytest tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (214 passed) | 2026-08-15 |
