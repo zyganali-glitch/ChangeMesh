@@ -183,7 +183,7 @@ The P-04.01 component dependency architecture is documented in [`docs/ARCHITECTU
 - Adapter replaceability contract
 
 > [!IMPORTANT]
-> This is a **planned component architecture**, not a final implemented architecture. Domain schemas are defined in P-05. Implementation stack is frozen in P-06. Runtime implementation begins in P-07+. All components remain `PLANNED`.
+> This is a **component dependency architecture**. Domain schemas and machine conventions are implemented and frozen in P-05. Implementation stack and dependency freeze are complete in P-06. The Change Orchestrator ADK skeleton (P-07.01) is `IMPLEMENTED` with typed intake, distinct change ID generation, `ChangeState.RECEIVED` initial state, and zero external writes. Specialized agent fleet definitions (P-07.02), deterministic routing/delegation (P-07.03), and Gemini structured reasoning (P-08) remain `PENDING`. All other runtime, cloud adapter, and UI components remain `PLANNED` for their respective phases.
 
 ## Google-native implementation policy
 

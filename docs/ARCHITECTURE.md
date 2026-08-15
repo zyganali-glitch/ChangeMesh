@@ -3,7 +3,7 @@
 > **Status:** `P-04 DONE; P-05 DONE (P-05.01, P-05.02, P-05.03, P-05.04, P-05.05, P-05.06 IMPLEMENTED); P-06 DONE; P-07.01 IMPLEMENTED (Change Orchestrator ADK Skeleton)`
 > **Produced by:** P-04.01–P-04.05, P-05.01–P-05.06, P-06.01–P-06.05, P-07.01
 > **Date:** 2026-08-15
-> **Implementation state:** Architecture design is complete (P-04). All domain contracts and machine conventions (P-05.01 foundational schemas, P-05.02 lifecycle state machine, P-05.03 evidence contracts, P-05.04 core innovation schemas, P-05.05 event envelope contract, and P-05.06 machine conventions) are implemented and verified. P-06 language/runtime/dependency freeze is complete. Change Orchestrator ADK skeleton (P-07.01) is implemented in `src/agents/change_orchestrator.py` with typed ChangeRequest intake, distinct change_id generation, initial state ChangeState.RECEIVED, and zero external writes. Routing/delegation (P-07.03), specialized agent fleet (P-07.02), saga/recovery (P-20), Gemini structured reasoning (P-08), Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), and Evidence Ledger remain `PLANNED`. Pub/Sub Event Backbone (P-09), PubSub Timeline runtime, and Firestore dedup persistence remain `PLANNED`. API Entrypoint (`api/`), Google Cloud adapters (`integrations/gcp/`), and Web Dashboard (`web/`) remain `PLANNED`. Runtime agents, cloud services, and UI remain `PLANNED`.
+> **Implementation state:** Architecture design is complete (P-04). All domain contracts and machine conventions (P-05.01 foundational schemas, P-05.02 lifecycle state machine, P-05.03 evidence contracts, P-05.04 core innovation schemas, P-05.05 event envelope contract, and P-05.06 machine conventions) are implemented and verified. P-06 language/runtime/dependency freeze is complete. Change Orchestrator ADK skeleton (P-07.01) is implemented in `src/agents/change_orchestrator.py` with typed ChangeRequest intake, distinct change_id generation, initial state ChangeState.RECEIVED, and zero external writes. Specialized agent fleet definitions (P-07.02), deterministic routing/delegation (P-07.03), sequential fallback/concurrency (P-07.04), agent revision metadata (P-07.05), Gemini structured reasoning (P-08), Pub/Sub Event Backbone (P-09), Firestore dedup persistence & saga (P-10/P-20), Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger, API Entrypoint (`api/`), Google Cloud adapters (`integrations/gcp/`), and Web Dashboard (`web/`) remain `PLANNED`.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 
@@ -135,7 +135,7 @@ graph TB
 
 ## 3. Canonical Planned Package Map
 
-Domain contracts (`domain/contracts/`) are `IMPLEMENTED` and verified (P-05). All application, runtime agent, orchestrator, provider adapter, API entrypoint, and UI target packages listed below remain `PLANNED` for implementation in P-07+ phases.
+Domain contracts (`domain/contracts/`) are `IMPLEMENTED` and verified (P-05). Change Orchestrator ADK intake skeleton (`src/agents/change_orchestrator.py`) is `IMPLEMENTED` under P-07.01. All remaining specialized agent, routing, persistence, provider adapter, API entrypoint, and UI target packages listed below remain `PLANNED` for implementation in their respective owning phases.
 
 | Logical Module | Planned Target Path | Responsibility | Dependency Direction | Allowed Dependencies | Forbidden Dependencies | Provider Status |
 |---|---|---|---|---|---|---|
@@ -450,12 +450,16 @@ See the full review in [`AUTONOMY_REVIEW.md`](AUTONOMY_REVIEW.md).
 
 | Claim | Honest State |
 |---|---|
-| Components implemented | NO — all are `PLANNED` |
-| Domain schemas frozen | NO — deferred to P-05 |
-| Implementation stack chosen | NO — deferred to P-06 |
-| Agents running | NO — deferred to P-07+ |
-| Google Cloud deployed | NO — deferred to P-28 |
-| Product runnable | NO — `NOT_RUN` |
+| Domain contracts & conventions | YES — implemented and frozen in P-05 (P-05.01–P-05.06) |
+| Runtime & dependency freeze | YES — implemented and frozen in P-06 (P-06.01–P-06.05) |
+| Change Orchestrator ADK skeleton | YES — implemented in P-07.01 (`src/agents/change_orchestrator.py`, zero external writes) |
+| Specialized agent fleet | NO — deferred to P-07.02 (`PENDING`) |
+| Deterministic routing/delegation | NO — deferred to P-07.03 (`PENDING`) |
+| Gemini structured reasoning | NO — deferred to P-08 (`PENDING`) |
+| Pub/Sub event backbone | NO — deferred to P-09 (`PENDING`) |
+| Firestore saga persistence | NO — deferred to P-10 (`PENDING`) |
+| Google Cloud deployed | NO — deferred to P-28 (`PENDING`) |
+| Full product runnable | NO — `NOT_RUN` |
 
 Per ADR-0006, all architecture must strictly align with the `docs/CATEGORY_MAPPING.md` which maps the "Fortified Enterprise Fleet" category requirements to concrete modules.
 
