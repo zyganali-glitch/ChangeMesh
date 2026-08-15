@@ -6,28 +6,29 @@ missing, blank, or ambiguous escape-hatch revisions with fail-closed semantics.
 
 Test Sections:
 1. AgentRevisionProvenance Domain Contract Tests
-2. Provenance and EvidenceRecord Agent Revision Integration Tests
-3. EventEnvelope Producer Identity and Revision Provenance Tests
+2. Provenance and EvidenceRecord Agent Revision Integration Tests (Root Cause 1 & 2)
+3. EventEnvelope Producer Identity and Revision Provenance Tests (Root Cause 1 & 2)
 4. Event Delivery Duplicate vs Conflict on Revision Change Tests
-5. Canonical Agent Fleet Revision Provenance Propagation Tests
-6. Multi-Agent Branch Coordinator Revision Tracing Tests
-7. Immutability, Serialization Round-Trip, and Non-Escape Tests
-8. Provider Neutrality, Zero Credentials, and Zero Network Tests
+5. Trace Contract Fail-Closed Semantics Tests (Root Cause 3)
+6. Canonical Agent Fleet Revision Provenance Propagation Tests
+7. Multi-Agent Branch Coordinator Revision Tracing Tests
+8. Contract Preservation, Causation, and Evidence Invariant Tests
+9. Immutability, Serialization Round-Trip, and Non-Escape Tests
+10. Provider Neutrality, Zero Credentials, and Zero Network Tests
 """
 
 from __future__ import annotations
 
 import ast
-import json
 import pathlib
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
 
 import domain.contracts
-from domain.contracts.agent_descriptor import AgentDescriptor, AgentRevisionProvenance
+from domain.contracts.agent_descriptor import AgentRevisionProvenance
+from domain.contracts.conventions import HashAlgorithm
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.event_envelope import (
     EventDeliveryDisposition,
@@ -36,13 +37,12 @@ from domain.contracts.event_envelope import (
 )
 from domain.contracts.evidence import (
     ArtifactHash,
+    EvidenceProducerKind,
     EvidenceRecord,
     EvidenceState,
     ExecutionEvidenceMode,
     Provenance,
-    TraceReference,
 )
-from domain.contracts.conventions import HashAlgorithm, UtcDateTime
 from src.agents.coordinator import (
     BranchCoordinator,
     BranchExecutionTrace,
@@ -53,28 +53,22 @@ from src.agents.coordinator import (
     CoordinationResult,
     ExecutionStrategy,
 )
-from src.agents.definition import CANONICAL_TOOL_DESCRIPTORS, AgentDefinition
+from src.agents.definition import AgentDefinition
 from src.agents.registry import (
-    CANONICAL_SPECIALIST_AGENT_IDS,
-    CANONICAL_SPECIALIST_ROLES,
     get_canonical_agent_definition,
     list_canonical_agent_definitions,
 )
 from src.agents.router import (
     DeterministicRouter,
     RoutingOutcome,
+    RoutingRejectionReason,
     RoutingRequest,
-    RoutingResult,
     RoutingTraceRecord,
 )
 from src.agents.schemas import (
-    EvidenceAuditorInput,
     ImpactScoutInput,
-    MigrationEngineerInput,
     PolicyGuardianInput,
-    ReleaseStewardInput,
 )
-
 
 # ===========================================================================
 # 1. AgentRevisionProvenance Domain Contract Tests
@@ -167,20 +161,29 @@ class TestAgentRevisionProvenanceContract:
         with pytest.raises(ValidationError, match="cannot be an ambiguous escape hatch"):
             AgentRevisionProvenance(agent_id=escape_hatch, agent_revision="1.0.0")
 
-    def test_immutability_and_extra_forbid(self):
-        """AgentRevisionProvenance is frozen and forbids extra fields."""
+    def test_blank_role_when_provided_fails(self):
+        """If role is provided, it cannot be blank or whitespace."""
         prov = AgentRevisionProvenance(agent_id="agent-migration-engineer", agent_revision="1.0.0")
-        with pytest.raises(ValidationError):
-            prov.agent_revision = "2.0.0"  # type: ignore[misc]
-        with pytest.raises(ValidationError):
+        assert prov.role is None
+
+        with pytest.raises(ValidationError, match="role must not be blank"):
             AgentRevisionProvenance(
                 agent_id="agent-migration-engineer",
                 agent_revision="1.0.0",
-                extra_field="invalid",  # type: ignore[call-arg]
+                role="   ",
             )
 
-    def test_round_trip_json_serialization(self):
-        """AgentRevisionProvenance serializes and deserializes with 100% fidelity."""
+    def test_extra_fields_forbidden(self):
+        """Extra fields are rejected on frozen AgentRevisionProvenance."""
+        with pytest.raises(ValidationError, match="extra"):
+            AgentRevisionProvenance(
+                agent_id="agent-evidence-auditor",
+                agent_revision="1.0.0",
+                extra_field="unauthorized",  # type: ignore[call-arg]
+            )
+
+    def test_json_round_trip(self):
+        """AgentRevisionProvenance serializes and deserializes accurately."""
         prov = AgentRevisionProvenance(
             agent_id="agent-evidence-auditor",
             agent_revision="1.0.0",
@@ -218,6 +221,69 @@ class TestProvenanceAgentRevisionIntegration:
         assert prov.agent_role is None
         assert prov.agent_provenance is None
         assert prov.get_agent_provenance() is None
+        assert prov.is_agent_produced is False
+        assert prov.producer_kind == EvidenceProducerKind.FIXTURE
+
+    def test_explicit_non_agent_evidence_valid(self):
+        """Legitimate explicitly non-agent evidence remains valid."""
+        for kind in (
+            EvidenceProducerKind.FIXTURE,
+            EvidenceProducerKind.NON_AGENT,
+            EvidenceProducerKind.SIMULATION,
+            EvidenceProducerKind.RECORDED_CLOUD,
+        ):
+            prov = Provenance(
+                schema_version="1.0.0",
+                source="test-framework",
+                collection_mode=ExecutionEvidenceMode.FIXTURE,
+                collection_timestamp=self._now(),
+                producer_kind=kind,
+            )
+            assert prov.producer_kind == kind
+            assert prov.is_agent_produced is False
+            assert prov.get_agent_provenance() is None
+
+    def test_non_agent_evidence_with_agent_fields_fails(self):
+        """Non-agent evidence cannot specify agent_id, agent_revision, or agent_provenance."""
+        now = self._now()
+        with pytest.raises(ValidationError, match="Non-agent evidence .* cannot specify"):
+            Provenance(
+                schema_version="1.0.0",
+                source="fixture-runner",
+                collection_mode=ExecutionEvidenceMode.FIXTURE,
+                collection_timestamp=now,
+                producer_kind=EvidenceProducerKind.FIXTURE,
+                agent_id="agent-impact-scout",
+                agent_revision="1.0.0",
+            )
+
+        with pytest.raises(ValidationError, match="Non-agent evidence .* cannot specify"):
+            Provenance(
+                schema_version="1.0.0",
+                source="fixture-runner",
+                collection_mode=ExecutionEvidenceMode.FIXTURE,
+                collection_timestamp=now,
+                producer_kind=EvidenceProducerKind.NON_AGENT,
+                agent_provenance=AgentRevisionProvenance(
+                    agent_id="agent-impact-scout",
+                    agent_revision="1.0.0",
+                ),
+            )
+
+    def test_agent_produced_evidence_with_missing_agent_provenance_fails(self):
+        """Agent-produced evidence (producer_kind=AGENT) with missing provenance fails closed."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError,
+            match="Agent-produced evidence .* requires exact agent_id and agent_revision",
+        ):
+            Provenance(
+                schema_version="1.0.0",
+                source="agent:impact-scout",
+                collection_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                collection_timestamp=now,
+                producer_kind=EvidenceProducerKind.AGENT,
+            )
 
     def test_agent_provenance_via_direct_fields(self):
         """Provenance constructed with agent_id, agent_revision, and agent_role."""
@@ -231,6 +297,8 @@ class TestProvenanceAgentRevisionIntegration:
             agent_revision="1.0.0",
             agent_role="impact_scout",
         )
+        assert prov.producer_kind == EvidenceProducerKind.AGENT
+        assert prov.is_agent_produced is True
         assert prov.agent_id == "agent-impact-scout"
         assert prov.agent_revision == "1.0.0"
         assert prov.agent_role == "impact_scout"
@@ -255,17 +323,122 @@ class TestProvenanceAgentRevisionIntegration:
             collection_timestamp=now,
             agent_provenance=agent_prov,
         )
+        assert prov.producer_kind == EvidenceProducerKind.AGENT
+        assert prov.is_agent_produced is True
         assert prov.agent_id == "agent-policy-guardian"
         assert prov.agent_revision == "1.0.0"
         assert prov.agent_role == "policy_guardian"
         assert prov.agent_provenance == agent_prov
         assert prov.get_agent_provenance() == agent_prov
 
+    def test_provenance_flattened_nested_agent_id_mismatch_fails(self):
+        """Contradictory agent_id between flattened and nested provenance is rejected."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError, match="agent_id .* does not match agent_provenance.agent_id"
+        ):
+            Provenance(
+                schema_version="1.0.0",
+                source="agent:impact-scout",
+                collection_mode=ExecutionEvidenceMode.SIMULATION,
+                collection_timestamp=now,
+                agent_id="agent-impact-scout",
+                agent_revision="1.0.0",
+                agent_provenance=AgentRevisionProvenance(
+                    agent_id="agent-policy-guardian",
+                    agent_revision="1.0.0",
+                ),
+            )
+
+    def test_provenance_flattened_nested_agent_revision_mismatch_fails(self):
+        """Contradictory agent_revision between flattened and nested provenance is rejected."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError,
+            match="agent_revision .* does not match agent_provenance.agent_revision",
+        ):
+            Provenance(
+                schema_version="1.0.0",
+                source="agent:impact-scout",
+                collection_mode=ExecutionEvidenceMode.SIMULATION,
+                collection_timestamp=now,
+                agent_id="agent-impact-scout",
+                agent_revision="1.0.0",
+                agent_provenance=AgentRevisionProvenance(
+                    agent_id="agent-impact-scout",
+                    agent_revision="2.0.0",
+                ),
+            )
+
+    def test_provenance_flattened_nested_role_mismatch_fails(self):
+        """Contradictory role between flattened and nested provenance is rejected."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError, match="agent_role .* does not match agent_provenance.role"
+        ):
+            Provenance(
+                schema_version="1.0.0",
+                source="agent:impact-scout",
+                collection_mode=ExecutionEvidenceMode.SIMULATION,
+                collection_timestamp=now,
+                agent_id="agent-impact-scout",
+                agent_revision="1.0.0",
+                agent_role="impact_scout",
+                agent_provenance=AgentRevisionProvenance(
+                    agent_id="agent-impact-scout",
+                    agent_revision="1.0.0",
+                    role="policy_guardian",
+                ),
+            )
+
+    def test_provenance_matching_flattened_nested_round_trip(self):
+        """Matching flattened and nested provenance succeeds and round-trips without ambiguity."""
+        now = self._now()
+        prov = Provenance(
+            schema_version="1.0.0",
+            source="agent:impact-scout",
+            collection_mode=ExecutionEvidenceMode.SIMULATION,
+            collection_timestamp=now,
+            agent_id="agent-impact-scout",
+            agent_revision="1.0.0",
+            agent_role="impact_scout",
+            agent_provenance=AgentRevisionProvenance(
+                agent_id="agent-impact-scout",
+                agent_revision="1.0.0",
+                role="impact_scout",
+            ),
+        )
+        assert prov.agent_id == "agent-impact-scout"
+        assert prov.agent_revision == "1.0.0"
+        assert prov.agent_role == "impact_scout"
+        assert prov.get_agent_provenance().agent_id == "agent-impact-scout"
+
+        dumped = prov.model_dump_json()
+        loaded = Provenance.model_validate_json(dumped)
+        assert loaded == prov
+
+    def test_provenance_get_agent_provenance_unambiguous_single_truth(self):
+        """get_agent_provenance() always yields the exact single source of truth."""
+        now = self._now()
+        prov = Provenance(
+            schema_version="1.0.0",
+            source="agent:release-steward",
+            collection_mode=ExecutionEvidenceMode.LIVE_WRITE,
+            collection_timestamp=now,
+            agent_id="agent-release-steward",
+            agent_revision="1.0.0",
+            agent_role="release_steward",
+        )
+        ap = prov.get_agent_provenance()
+        assert ap is not None
+        assert ap.agent_id == prov.agent_id
+        assert ap.agent_revision == prov.agent_revision
+        assert ap.role == prov.agent_role
+
     def test_incomplete_agent_provenance_fails_closed(self):
         """Supplying agent_id without agent_revision (or vice-versa) must fail closed."""
         now = self._now()
-        # agent_id provided without agent_revision
-        with pytest.raises(ValidationError, match="Agent revision provenance requires both"):
+        with pytest.raises(ValidationError):
             Provenance(
                 schema_version="1.0.0",
                 source="agent:impact-scout",
@@ -275,8 +448,7 @@ class TestProvenanceAgentRevisionIntegration:
                 agent_revision=None,
             )
 
-        # agent_revision provided without agent_id
-        with pytest.raises(ValidationError, match="Agent revision provenance requires both"):
+        with pytest.raises(ValidationError):
             Provenance(
                 schema_version="1.0.0",
                 source="agent:impact-scout",
@@ -353,7 +525,7 @@ class TestProvenanceAgentRevisionIntegration:
         assert record.state == EvidenceState.PASS
 
     def test_evidence_record_round_trip_json_serialization(self):
-        """EvidenceRecord with agent revision metadata preserves exact facts across JSON serialization."""
+        """EvidenceRecord with agent revision preserves exact facts across JSON round trip."""
         now = self._now()
         prov = Provenance(
             schema_version="1.0.0",
@@ -428,6 +600,7 @@ class TestEventEnvelopeProducerProvenance:
             change_id="cr-001",
             correlation_id="corr-001",
             agent_provenance=ap,
+            producer_id=ap.agent_id,
             producer_revision=ap.agent_revision,
             timestamp=now,
             idempotency_key="idem-002",
@@ -436,6 +609,148 @@ class TestEventEnvelopeProducerProvenance:
         assert env.producer_revision == "1.0.0"
         assert env.producer_role == "impact_scout"
         assert env.get_agent_provenance() == ap
+
+    def test_agent_event_missing_producer_id_fails(self):
+        """Agent-produced event with revision but missing producer identity fails."""
+        now = self._now()
+        with pytest.raises(ValidationError):
+            EventEnvelope(
+                schema_version="1.0.0",
+                event_id="evt-missing-id",
+                change_id="cr-001",
+                correlation_id="corr-001",
+                producer_revision="1.0.0",
+                timestamp=now,
+                idempotency_key="idem-missing-id",
+            )
+
+    def test_agent_event_missing_producer_revision_fails(self):
+        """Agent-produced event with producer identity but missing revision fails."""
+        now = self._now()
+        with pytest.raises(ValidationError):
+            EventEnvelope(
+                schema_version="1.0.0",
+                event_id="evt-missing-rev",
+                change_id="cr-001",
+                correlation_id="corr-001",
+                producer_id="agent-impact-scout",
+                timestamp=now,
+                idempotency_key="idem-missing-rev",
+            )
+
+    def test_event_envelope_flattened_nested_producer_id_mismatch_fails(self):
+        """Contradictory producer_id between flattened and nested provenance is rejected."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError, match="producer_id .* does not match agent_provenance.agent_id"
+        ):
+            EventEnvelope(
+                schema_version="1.0.0",
+                event_id="evt-mismatch-id",
+                change_id="cr-001",
+                correlation_id="corr-001",
+                producer_id="agent-impact-scout",
+                producer_revision="1.0.0",
+                agent_provenance=AgentRevisionProvenance(
+                    agent_id="agent-policy-guardian",
+                    agent_revision="1.0.0",
+                ),
+                timestamp=now,
+                idempotency_key="idem-mismatch-id",
+            )
+
+    def test_event_envelope_flattened_nested_producer_revision_mismatch_fails(self):
+        """Contradictory producer_revision between flattened and nested provenance is rejected."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError,
+            match="producer_revision .* does not match agent_provenance.agent_revision",
+        ):
+            EventEnvelope(
+                schema_version="1.0.0",
+                event_id="evt-mismatch-rev",
+                change_id="cr-001",
+                correlation_id="corr-001",
+                producer_id="agent-impact-scout",
+                producer_revision="1.0.0",
+                agent_provenance=AgentRevisionProvenance(
+                    agent_id="agent-impact-scout",
+                    agent_revision="2.0.0",
+                ),
+                timestamp=now,
+                idempotency_key="idem-mismatch-rev",
+            )
+
+    def test_event_envelope_flattened_nested_role_mismatch_fails(self):
+        """Contradictory role between flattened and nested provenance is rejected."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError, match="producer_role .* does not match agent_provenance.role"
+        ):
+            EventEnvelope(
+                schema_version="1.0.0",
+                event_id="evt-mismatch-role",
+                change_id="cr-001",
+                correlation_id="corr-001",
+                producer_id="agent-impact-scout",
+                producer_revision="1.0.0",
+                producer_role="impact_scout",
+                agent_provenance=AgentRevisionProvenance(
+                    agent_id="agent-impact-scout",
+                    agent_revision="1.0.0",
+                    role="policy_guardian",
+                ),
+                timestamp=now,
+                idempotency_key="idem-mismatch-role",
+            )
+
+    def test_event_envelope_matching_flattened_nested_round_trip(self):
+        """Matching flattened and nested provenance on EventEnvelope succeeds and round-trips."""
+        now = self._now()
+        env = EventEnvelope(
+            schema_version="1.0.0",
+            event_id="evt-match",
+            change_id="cr-001",
+            correlation_id="corr-001",
+            producer_id="agent-impact-scout",
+            producer_revision="1.0.0",
+            producer_role="impact_scout",
+            agent_provenance=AgentRevisionProvenance(
+                agent_id="agent-impact-scout",
+                agent_revision="1.0.0",
+                role="impact_scout",
+            ),
+            timestamp=now,
+            idempotency_key="idem-match",
+        )
+        assert env.producer_id == "agent-impact-scout"
+        assert env.producer_revision == "1.0.0"
+        assert env.producer_role == "impact_scout"
+        assert env.get_agent_provenance().agent_id == "agent-impact-scout"
+
+        dumped = env.model_dump_json()
+        loaded = EventEnvelope.model_validate_json(dumped)
+        assert loaded == env
+
+    def test_event_envelope_get_agent_provenance_unambiguous_single_truth(self):
+        """get_agent_provenance() on EventEnvelope always returns matching single truth."""
+        now = self._now()
+        env = EventEnvelope(
+            schema_version="1.0.0",
+            event_id="evt-single-truth",
+            change_id="cr-001",
+            correlation_id="corr-001",
+            producer_id="agent-release-steward",
+            producer_revision="1.0.0",
+            producer_role="release_steward",
+            timestamp=now,
+            idempotency_key="idem-single-truth",
+        )
+        ap = env.get_agent_provenance()
+        assert ap is not None
+        assert ap.agent_id == env.producer_id
+        assert ap.agent_revision == env.producer_revision
+        assert ap.role == env.producer_role
 
     @pytest.mark.parametrize(
         "escape_hatch",
@@ -450,6 +765,7 @@ class TestEventEnvelopeProducerProvenance:
                 event_id="evt-003",
                 change_id="cr-001",
                 correlation_id="corr-001",
+                producer_id="agent-impact-scout",
                 producer_revision=escape_hatch,
                 timestamp=now,
                 idempotency_key="idem-003",
@@ -472,6 +788,34 @@ class TestEventEnvelopeProducerProvenance:
                 producer_revision="1.0.0",
                 timestamp=now,
                 idempotency_key="idem-004",
+            )
+
+    @pytest.mark.parametrize("blank_val", ["", "   ", "\t"])
+    def test_event_envelope_blank_producer_id_or_revision_fails(self, blank_val: str):
+        """Blank producer_id or producer_revision on EventEnvelope must fail validation."""
+        now = self._now()
+        with pytest.raises(ValidationError, match="must not be blank"):
+            EventEnvelope(
+                schema_version="1.0.0",
+                event_id="evt-blank-id",
+                change_id="cr-001",
+                correlation_id="corr-001",
+                producer_id=blank_val,
+                producer_revision="1.0.0",
+                timestamp=now,
+                idempotency_key="idem-blank-id",
+            )
+
+        with pytest.raises(ValidationError, match="must not be blank"):
+            EventEnvelope(
+                schema_version="1.0.0",
+                event_id="evt-blank-rev",
+                change_id="cr-001",
+                correlation_id="corr-001",
+                producer_id="agent-impact-scout",
+                producer_revision=blank_val,
+                timestamp=now,
+                idempotency_key="idem-blank-rev",
             )
 
     def test_event_envelope_round_trip_json_serialization(self):
@@ -591,7 +935,175 @@ class TestEventDeliveryProvenanceSemantics:
 
 
 # ===========================================================================
-# 5. Canonical Agent Fleet Revision Provenance Propagation Tests
+# 5. Trace Contract Fail-Closed Semantics Tests (Root Cause 3)
+# ===========================================================================
+
+
+class TestTraceContractFailClosedSemantics:
+    """Validate that trace contracts fail closed when revision provenance is incomplete."""
+
+    def _now(self) -> datetime:
+        return datetime.now(timezone.utc)
+
+    def test_routing_trace_routed_missing_selected_revision_fails(self):
+        """RoutingTraceRecord(outcome=ROUTED, ...) with missing selected revision fails."""
+        with pytest.raises(
+            ValidationError, match="requires both selected_agent_id and selected_agent_revision"
+        ):
+            RoutingTraceRecord(
+                trace_id="tr-001",
+                change_id="cr-001",
+                outcome=RoutingOutcome.ROUTED,
+                required_capabilities=["repository_blast_radius_analysis"],
+                payload_type="ImpactScoutInput",
+                selected_agent_id="agent-impact-scout",
+                selected_role="impact_scout",
+                selected_agent_revision=None,
+                capability_match_passed=True,
+                contract_match_passed=True,
+            )
+
+    def test_routing_trace_routed_missing_selected_agent_id_fails(self):
+        """RoutingTraceRecord(outcome=ROUTED, ...) with missing selected agent ID fails."""
+        with pytest.raises(
+            ValidationError, match="requires both selected_agent_id and selected_agent_revision"
+        ):
+            RoutingTraceRecord(
+                trace_id="tr-002",
+                change_id="cr-001",
+                outcome=RoutingOutcome.ROUTED,
+                required_capabilities=["repository_blast_radius_analysis"],
+                payload_type="ImpactScoutInput",
+                selected_agent_id=None,
+                selected_role="impact_scout",
+                selected_agent_revision="1.0.0",
+                capability_match_passed=True,
+                contract_match_passed=True,
+            )
+
+    def test_routing_trace_rejected_with_no_agent_revision_valid(self):
+        """Rejected routing with NO selected agent / revision remains valid."""
+        trace = RoutingTraceRecord(
+            trace_id="tr-003",
+            change_id="cr-001",
+            outcome=RoutingOutcome.REJECTED,
+            required_capabilities=["unknown_capability"],
+            payload_type="ImpactScoutInput",
+            selected_agent_id=None,
+            selected_role=None,
+            selected_agent_revision=None,
+            capability_match_passed=False,
+            contract_match_passed=False,
+            rejection_reason=RoutingRejectionReason.UNKNOWN_CAPABILITY,
+        )
+        assert trace.outcome == RoutingOutcome.REJECTED
+        assert trace.selected_agent_id is None
+        assert trace.selected_agent_revision is None
+        assert trace.get_selected_revision_provenance() is None
+
+    @pytest.mark.parametrize(
+        "escape_hatch",
+        ["unknown", "latest", "current", "null", "none", "*", "undefined"],
+    )
+    def test_routing_trace_escape_hatch_revision_fails(self, escape_hatch: str):
+        """RoutingTraceRecord rejects escape hatch selected_agent_revision."""
+        with pytest.raises(ValidationError, match="cannot be an ambiguous escape hatch"):
+            RoutingTraceRecord(
+                trace_id="tr-004",
+                change_id="cr-001",
+                outcome=RoutingOutcome.ROUTED,
+                required_capabilities=["repository_blast_radius_analysis"],
+                payload_type="ImpactScoutInput",
+                selected_agent_id="agent-impact-scout",
+                selected_role="impact_scout",
+                selected_agent_revision=escape_hatch,
+                capability_match_passed=True,
+                contract_match_passed=True,
+            )
+
+    def test_branch_trace_routed_missing_revision_fails(self):
+        """BranchExecutionTrace with routing_outcome=ROUTED missing revision fails."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError, match="requires both selected_agent_id and selected_agent_revision"
+        ):
+            BranchExecutionTrace(
+                trace_id="tr-b-001",
+                branch_id="br-001",
+                change_id="cr-001",
+                strategy_used=ExecutionStrategy.SEQUENTIAL,
+                routing_outcome=RoutingOutcome.ROUTED,
+                selected_agent_id="agent-impact-scout",
+                selected_role="impact_scout",
+                selected_agent_revision=None,
+                status=BranchStatus.SUCCESS,
+                started_at=now,
+                completed_at=now,
+            )
+
+    def test_branch_trace_routed_missing_agent_id_fails(self):
+        """BranchExecutionTrace with routing_outcome=ROUTED missing agent_id fails."""
+        now = self._now()
+        with pytest.raises(
+            ValidationError, match="requires both selected_agent_id and selected_agent_revision"
+        ):
+            BranchExecutionTrace(
+                trace_id="tr-b-002",
+                branch_id="br-001",
+                change_id="cr-001",
+                strategy_used=ExecutionStrategy.SEQUENTIAL,
+                routing_outcome=RoutingOutcome.ROUTED,
+                selected_agent_id=None,
+                selected_role="impact_scout",
+                selected_agent_revision="1.0.0",
+                status=BranchStatus.SUCCESS,
+                started_at=now,
+                completed_at=now,
+            )
+
+    def test_branch_trace_success_with_rejected_routing_fails(self):
+        """BranchExecutionTrace with status=SUCCESS cannot have routing_outcome=REJECTED."""
+        now = self._now()
+        with pytest.raises(ValidationError, match="status=SUCCESS requires routing_outcome=ROUTED"):
+            BranchExecutionTrace(
+                trace_id="tr-b-003",
+                branch_id="br-001",
+                change_id="cr-001",
+                strategy_used=ExecutionStrategy.SEQUENTIAL,
+                routing_outcome=RoutingOutcome.REJECTED,
+                selected_agent_id="agent-impact-scout",
+                selected_role="impact_scout",
+                selected_agent_revision="1.0.0",
+                status=BranchStatus.SUCCESS,
+                started_at=now,
+                completed_at=now,
+            )
+
+    def test_branch_trace_rejected_without_agent_valid(self):
+        """BranchExecutionTrace for rejected routing with no specialist remains valid."""
+        now = self._now()
+        trace = BranchExecutionTrace(
+            trace_id="tr-b-004",
+            branch_id="br-001",
+            change_id="cr-001",
+            strategy_used=ExecutionStrategy.SEQUENTIAL,
+            routing_outcome=RoutingOutcome.REJECTED,
+            selected_agent_id=None,
+            selected_role=None,
+            selected_agent_revision=None,
+            status=BranchStatus.REJECTED,
+            error_message="No matching specialist",
+            started_at=now,
+            completed_at=now,
+        )
+        assert trace.status == BranchStatus.REJECTED
+        assert trace.selected_agent_id is None
+        assert trace.selected_agent_revision is None
+        assert trace.get_selected_revision_provenance() is None
+
+
+# ===========================================================================
+# 6. Canonical Agent Fleet Revision Provenance Propagation Tests
 # ===========================================================================
 
 
@@ -685,7 +1197,7 @@ class TestCanonicalAgentFleetProvenance:
 
 
 # ===========================================================================
-# 6. Multi-Agent Branch Coordinator Revision Tracing Tests
+# 7. Multi-Agent Branch Coordinator Revision Tracing Tests
 # ===========================================================================
 
 
@@ -832,7 +1344,123 @@ class TestBranchCoordinatorRevisionTracing:
 
 
 # ===========================================================================
-# 7. Immutability, Serialization Round-Trip, and Non-Escape Tests
+# 8. Contract Preservation, Causation, and Evidence Invariant Tests
+# ===========================================================================
+
+
+class TestContractPreservationAndSemantics:
+    """Validate causation, correlation, idempotency, evidence modes, and states."""
+
+    def _now(self) -> datetime:
+        return datetime.now(timezone.utc)
+
+    def test_causation_correlation_idempotency_preserved(self):
+        """Root, child, duplicate, out-of-order, and conflict causal invariants hold."""
+        now = self._now()
+        root = EventEnvelope(
+            schema_version="1.0.0",
+            event_id="evt-root",
+            change_id="chg-001",
+            correlation_id="corr-001",
+            producer_id="agent-change-orchestrator",
+            producer_revision="1.0.0",
+            timestamp=now,
+            idempotency_key="idem-root",
+        )
+        child = EventEnvelope(
+            schema_version="1.0.0",
+            event_id="evt-child",
+            change_id="chg-001",
+            causation_id="evt-root",
+            correlation_id="corr-001",
+            producer_id="agent-impact-scout",
+            producer_revision="1.0.0",
+            timestamp=now + timedelta(seconds=1),
+            idempotency_key="idem-child",
+        )
+
+        seen: dict[str, EventEnvelope] = {}
+        seen_idem: dict[tuple[str, str], str] = {}
+
+        # 1. Root accepted
+        assert classify_event_delivery(root, seen, seen_idem) == EventDeliveryDisposition.ACCEPT
+        seen[root.event_id] = root
+        seen_idem[(root.change_id, root.idempotency_key)] = root.event_id
+
+        # 2. Child accepted
+        assert classify_event_delivery(child, seen, seen_idem) == EventDeliveryDisposition.ACCEPT
+        seen[child.event_id] = child
+        seen_idem[(child.change_id, child.idempotency_key)] = child.event_id
+
+        # 3. Exact replay is DUPLICATE
+        assert classify_event_delivery(root, seen, seen_idem) == EventDeliveryDisposition.DUPLICATE
+
+        # 4. Out of order child (missing cause)
+        orphan_child = EventEnvelope(
+            schema_version="1.0.0",
+            event_id="evt-orphan",
+            change_id="chg-001",
+            causation_id="evt-nonexistent",
+            correlation_id="corr-001",
+            producer_id="agent-impact-scout",
+            producer_revision="1.0.0",
+            timestamp=now,
+            idempotency_key="idem-orphan",
+        )
+        assert (
+            classify_event_delivery(orphan_child, seen, seen_idem)
+            == EventDeliveryDisposition.OUT_OF_ORDER
+        )
+
+    def test_evidence_modes_and_states_preserved(self):
+        """Evidence modes and states remain orthogonal and strictly validated."""
+        now = self._now()
+        # FIXTURE + PASS
+        prov_fix = Provenance(
+            schema_version="1.0.0",
+            source="fixture-runner",
+            collection_mode=ExecutionEvidenceMode.FIXTURE,
+            collection_timestamp=now,
+        )
+        rec_fix = EvidenceRecord(
+            schema_version="1.0.0",
+            evidence_id="ev-fix",
+            change_request_id="cr-001",
+            subject="test_fixture",
+            state=EvidenceState.PASS,
+            provenance=prov_fix,
+        )
+        assert rec_fix.state == EvidenceState.PASS
+
+        # RECORDED_CLOUD requires source_execution_identifier,
+        # source_execution_timestamp, and artifact
+        prov_cloud = Provenance(
+            schema_version="1.0.0",
+            source="gcp-cloud-run",
+            collection_mode=ExecutionEvidenceMode.RECORDED_CLOUD,
+            collection_timestamp=now,
+            source_execution_identifier="exec-12345",
+            source_execution_timestamp=now,
+        )
+        art = ArtifactHash(
+            schema_version="1.0.0",
+            algorithm=HashAlgorithm.SHA256,
+            digest="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        )
+        rec_cloud = EvidenceRecord(
+            schema_version="1.0.0",
+            evidence_id="ev-cloud",
+            change_request_id="cr-001",
+            subject="cloud_verification",
+            state=EvidenceState.PASS,
+            provenance=prov_cloud,
+            artifacts=(art,),
+        )
+        assert rec_cloud.provenance.collection_mode == ExecutionEvidenceMode.RECORDED_CLOUD
+
+
+# ===========================================================================
+# 9. Immutability, Serialization Round-Trip, and Non-Escape Tests
 # ===========================================================================
 
 
@@ -882,7 +1510,7 @@ class TestImmutabilityAndRoundTrip:
 
 
 # ===========================================================================
-# 8. Provider Neutrality, Zero Credentials, and Zero Network Tests
+# 10. Provider Neutrality, Zero Credentials, and Zero Network Tests
 # ===========================================================================
 
 

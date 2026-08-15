@@ -42,7 +42,7 @@ from typing import Any, Awaitable, Callable, Sequence
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from domain.contracts.agent_descriptor import AgentRevisionProvenance
 from domain.contracts.autonomy import AutonomyClass, AutonomyDecision
@@ -186,6 +186,70 @@ class BranchExecutionTrace(BaseModel):
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
         return v.strip()
+
+    @field_validator("selected_agent_id", "selected_agent_revision")
+    @classmethod
+    def _validate_selected_id_and_revision(cls, v: str | None, info) -> str | None:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError(f"{info.field_name} must not be blank when provided")
+            cleaned = v.strip()
+            if cleaned.lower() in (
+                "unknown",
+                "latest",
+                "current",
+                "null",
+                "none",
+                "*",
+                "undefined",
+            ):
+                raise ValueError(f"{info.field_name} cannot be an ambiguous escape hatch: {v!r}")
+            return cleaned
+        return None
+
+    @field_validator("selected_role")
+    @classmethod
+    def _validate_selected_role(cls, v: str | None) -> str | None:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError("selected_role must not be blank when provided")
+            return v.strip()
+        return None
+
+    @model_validator(mode="after")
+    def _validate_branch_trace_invariants(self):
+        # 1. Mutual completeness of selected agent ID and revision
+        has_id = self.selected_agent_id is not None
+        has_rev = self.selected_agent_revision is not None
+        if has_id != has_rev:
+            raise ValueError(
+                "BranchExecutionTrace requires both selected_agent_id and selected_agent_revision "
+                f"when either is provided; got selected_agent_id={self.selected_agent_id!r}, "
+                f"selected_agent_revision={self.selected_agent_revision!r}"
+            )
+
+        # 2. When routing_outcome is ROUTED, selected_agent_id and selected_agent_revision
+        # are mandatory
+        if self.routing_outcome == RoutingOutcome.ROUTED:
+            if not has_id or not has_rev:
+                raise ValueError(
+                    "BranchExecutionTrace with routing_outcome=ROUTED requires both "
+                    "selected_agent_id and selected_agent_revision"
+                )
+
+        # 3. When status is SUCCESS, routing_outcome must be ROUTED with complete
+        # specialist metadata
+        if self.status == BranchStatus.SUCCESS:
+            if self.routing_outcome != RoutingOutcome.ROUTED:
+                raise ValueError(
+                    "BranchExecutionTrace with status=SUCCESS requires routing_outcome=ROUTED"
+                )
+            if not has_id or not has_rev:
+                raise ValueError(
+                    "BranchExecutionTrace with status=SUCCESS requires "
+                    "selected_agent_id and selected_agent_revision"
+                )
+        return self
 
     def get_selected_revision_provenance(self) -> AgentRevisionProvenance | None:
         """Return structured AgentRevisionProvenance for the branch specialist, if selected."""

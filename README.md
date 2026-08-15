@@ -10,15 +10,15 @@
 > **Implementation-in-progress competition build.**
 > This repository currently contains the project charter, architecture constraints, governance system, execution plan, frozen dependency foundation, and initial Google ADK agent fleet implementation.
 >
-> - **Architecture baseline (P-04):** `IMPLEMENTED` (`DONE`)
-> - **Domain contracts & machine conventions (P-05.01–P-05.06):** `IMPLEMENTED` (`DONE`)
-> - **Runtime & repository structure freeze (P-06.01):** `IMPLEMENTED` (`DONE` — Python `3.13.5` pinned via `.python-version`, Node `NOT_REQUIRED`)
-> - **Reproducible dependency manifests & lockfiles (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` version enforcement, `uv.lock`, runtime `requirements.txt`, dev/test `requirements-dev.txt`)
-> - **Safe local configuration & secret handling (P-06.03):** `IMPLEMENTED` (`DONE` — `.env.example` template with zero secret defaults, ADC-first local auth, comprehensive `.gitignore` credential/artifact protection, 14 config-safety tests)
-> - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py` defined for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown with strict execution safety boundaries)
-> - **Phase P-06 Local Dev & Dependency Freeze:** `IMPLEMENTED` (`DONE` — P-06.01–P-06.05 complete; clean-checkout reproduction verified from separate directory in [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
-> - **Phase P-07 Google ADK Agent Skeleton & Fleet:** `IN_PROGRESS` (P-07.01 Change Orchestrator ADK skeleton `IMPLEMENTED` with typed ChangeRequest intake, distinct change_id generation, ChangeState.RECEIVED initial state, and zero external writes; P-07.02 six specialized ADK agent definitions and bounded tool/instruction contracts `IMPLEMENTED`; P-07.03 deterministic local routing/delegation `IMPLEMENTED`; P-07.04 sequential fallback and controlled parallel branches `IMPLEMENTED`; P-07.05 `PENDING`)
-> - **Runtime product & agent fleet implementation:** In progress in Phase P-07 (`IN_PROGRESS`). Change Orchestrator skeleton (P-07.01), specialized agent fleet definitions (P-07.02), deterministic local routing/delegation (P-07.03), and multi-agent branch coordination with sequential fallback (P-07.04) are `IMPLEMENTED`. Agent revision metadata (P-07.05) and Gemini structured reasoning (P-08) remain `PENDING`. Cloud deployment, persistence, and P-12 Agent Registry / Capability Passport runtime remain `PLANNED` / not implemented.
+> - **Architecture foundation (P-04):** `IMPLEMENTED` (`DONE`)
+> - **Domain contracts & machine rules (P-05.01–P-05.06):** `IMPLEMENTED` (`DONE`)
+> - **Runtime version and repository layout (P-06.01):** `IMPLEMENTED` (`DONE` — Python `3.13.5` pinned via `.python-version`, Node evaluated as `NOT_REQUIRED`)
+> - **Reproducible dependency manifests and lockfiles (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` version enforcement, `uv.lock`, runtime `requirements.txt`, dev/test `requirements-dev.txt`)
+> - **Safe local configuration template and secret handling (P-06.03):** `IMPLEMENTED` (`DONE` — zero secret default `.env.example` template, ADC-first auth policy, comprehensive `.gitignore` protection, 14 config-safety tests)
+> - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, strict fail-closed safety guards for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown)
+> - **P-06 Local Environment and Dependency Freeze Phase:** `IMPLEMENTED` (`DONE` — P-06.01 through P-06.05 complete; clean checkout reproduction verified via [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
+> - **P-07 Google ADK Agent Skeleton and Fleet Phase:** `IMPLEMENTED` (`DONE` — P-07.01 Change Orchestrator ADK skeleton, P-07.02 six specialized ADK agent definitions with bounded tool/instruction contracts, P-07.03 deterministic local routing/delegation, P-07.04 multi-agent branch coordination & sequential fallback, and P-07.05 exact agent revision metadata provenance across domain contracts and execution traces)
+> - **Runtime product and agent fleet implementation:** Phase P-07 complete (`DONE`). Phase P-08 Gemini integration and structured reasoning boundary is next (`PENDING`). Cloud deployment, persistence, and P-12 Agent Registry / Capability Passport runtime are `PLANNED`.
 >
 > Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
 
@@ -279,7 +279,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
    ```bash
    uv run python scripts/cmd.py unit
    ```
-   *(Executes all 788 unit/contract tests across P-05 domain contracts, P-06.03 config safety, P-06.04 command contracts, P-07.01 Change Orchestrator ADK skeleton, P-07.02 specialized agent fleet definitions, P-07.03 deterministic routing/delegation, and P-07.04 multi-agent concurrency/fallback with exit code 0).*
+   *(Executes all 910 unit/contract tests across P-05 domain contracts, P-06.03 config safety, P-06.04 command contracts, P-07.01 Change Orchestrator ADK skeleton, P-07.02 specialized agent fleet definitions, P-07.03 deterministic routing/delegation, P-07.04 multi-agent concurrency/fallback, and P-07.05 agent revision metadata provenance with exit code 0).*
 
 ### Configuration & Authentication Boundary
 
@@ -292,10 +292,10 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 
 | Command | Action | Check Semantics | Baseline Result |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (788 passed) |
-| `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `FAIL` (historical format debt) |
-| `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `FAIL` (historical lint debt) |
-| `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests`) | `FAIL` (historical type debt in `test_gcp_access.py`) |
+| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (910 passed) |
+| `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `PASS` (0 format issues) |
+| `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `PASS` (0 lint issues) |
+| `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests src`) | `PASS` (0 type issues) |
 | `uv run python scripts/cmd.py integration` | Integration tests | Fails closed by default; zero cloud calls | `FAIL_CLOSED` (requires `--live-write-danger`) |
 | `uv run python scripts/cmd.py e2e\|demo\|deploy\|teardown` | Deferred actions | Fail closed; print `NOT_RUN` | `NOT_RUN` (owning phases pending) |
 

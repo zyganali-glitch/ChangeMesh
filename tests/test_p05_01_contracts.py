@@ -174,17 +174,19 @@ class TestCONTRACT008:
     This is the canonical P-04 bug prevention test (D-003).
     """
 
-    PASSPORT_FIELDS = frozenset({
-        "qualification_status",
-        "passport_valid",
-        "signature_valid",
-        "trust_level",
-        "authorized",
-        "policy_approval",
-        "capability_passport",
-        "passport_expiry",
-        "qualification_evidence",
-    })
+    PASSPORT_FIELDS = frozenset(
+        {
+            "qualification_status",
+            "passport_valid",
+            "signature_valid",
+            "trust_level",
+            "authorized",
+            "policy_approval",
+            "capability_passport",
+            "passport_expiry",
+            "qualification_evidence",
+        }
+    )
 
     def test_no_passport_fields(self):
         actual_fields = set(AgentDescriptor.model_fields.keys())
@@ -217,18 +219,20 @@ class TestCONTRACT009:
 class TestCONTRACT010:
     """ToolDescriptor has no provider-specific credential or client fields."""
 
-    FORBIDDEN_FIELDS = frozenset({
-        "api_token",
-        "api_key",
-        "credentials",
-        "client",
-        "sdk_client",
-        "session",
-        "github_token",
-        "firestore_client",
-        "callback",
-        "executable",
-    })
+    FORBIDDEN_FIELDS = frozenset(
+        {
+            "api_token",
+            "api_key",
+            "credentials",
+            "client",
+            "sdk_client",
+            "session",
+            "github_token",
+            "firestore_client",
+            "callback",
+            "executable",
+        }
+    )
 
     def test_no_provider_fields(self):
         actual_fields = set(ToolDescriptor.model_fields.keys())
@@ -464,26 +468,32 @@ class TestCONTRACT018:
                     "required_evidence_types": [],
                 },
             ),
-            (AgentDescriptor, {
-                "schema_version": "1.0.0",
-                "agent_id": "a",
-                "agent_revision": "r",
-                "role": "r",
-                "description": "d",
-                "declared_capabilities": [],
-                "permitted_data_classifications": [],
-                "permitted_tool_ids": [],
-            }),
-            (ToolDescriptor, {
-                "schema_version": "1.0.0",
-                "tool_id": "t",
-                "tool_revision": "r",
-                "name": "n",
-                "description": "d",
-                "declared_actions": [],
-                "is_read_only": True,
-                "permitted_data_classifications": [],
-            }),
+            (
+                AgentDescriptor,
+                {
+                    "schema_version": "1.0.0",
+                    "agent_id": "a",
+                    "agent_revision": "r",
+                    "role": "r",
+                    "description": "d",
+                    "declared_capabilities": [],
+                    "permitted_data_classifications": [],
+                    "permitted_tool_ids": [],
+                },
+            ),
+            (
+                ToolDescriptor,
+                {
+                    "schema_version": "1.0.0",
+                    "tool_id": "t",
+                    "tool_revision": "r",
+                    "name": "n",
+                    "description": "d",
+                    "declared_actions": [],
+                    "is_read_only": True,
+                    "permitted_data_classifications": [],
+                },
+            ),
         ],
         ids=["DataClass", "SuccessCriterion", "AgentDescriptor", "ToolDescriptor"],
     )
@@ -534,10 +544,10 @@ class TestCONTRACT019:
                 requested_by="test",
                 requested_at="2026-08-11T10:00:00Z",
             )
-            
+
         with pytest.raises(ValidationError):
             DataClass(schema_version="  ", classification=DataClassLevel.PUBLIC)
-            
+
         with pytest.raises(ValidationError):
             DataClass(schema_version="", classification=DataClassLevel.PUBLIC)
 
@@ -553,7 +563,7 @@ class TestCONTRACT019:
                 permitted_data_classifications=[],
                 permitted_tool_ids=[],
             )
-            
+
     def test_blank_tool_revision_rejected(self):
         with pytest.raises(ValidationError):
             ToolDescriptor(
@@ -588,12 +598,13 @@ class TestCONTRACT019:
 # CONTRACT-020 — Public Surface Area Test
 # ===========================================================================
 
+
 class TestCONTRACT020:
     """The public contracts exactly match the 5 required schemas plus 1 enum."""
-    
+
     def test_required_schemas_exist(self):
         import domain.contracts as contracts
-        
+
         # Ensure the 5 + 1 P-05.01 elements are exported
         required_p05_01_surface = {
             "ChangeRequest",
@@ -601,13 +612,14 @@ class TestCONTRACT020:
             "AgentDescriptor",
             "ToolDescriptor",
             "DataClass",
-            "DataClassLevel"
+            "DataClassLevel",
         }
         actual_surface = set(contracts.__all__)
-        
+
         assert required_p05_01_surface.issubset(actual_surface), (
-            f"Public surface area missing P-05.01 contracts. Expected at least {required_p05_01_surface}, got {actual_surface}"
+            f"Public surface area missing P-05.01 contracts. "
+            f"Expected at least {required_p05_01_surface}, got {actual_surface}"
         )
-        
+
         # Verify no old "DataClassification" exists in __all__
         assert "DataClassification" not in actual_surface

@@ -31,7 +31,7 @@ from enum import Enum
 from typing import Callable, Sequence, Type
 
 from google.adk.agents.base_agent import BaseAgent
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from domain.contracts.agent_descriptor import AgentRevisionProvenance
 from domain.contracts.conventions import UtcDateTime
@@ -135,6 +135,65 @@ class RoutingTraceRecord(BaseModel):
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
         return v.strip()
+
+    @field_validator("selected_agent_id", "selected_agent_revision")
+    @classmethod
+    def _validate_selected_id_and_revision(cls, v: str | None, info) -> str | None:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError(f"{info.field_name} must not be blank when provided")
+            cleaned = v.strip()
+            if cleaned.lower() in (
+                "unknown",
+                "latest",
+                "current",
+                "null",
+                "none",
+                "*",
+                "undefined",
+            ):
+                raise ValueError(f"{info.field_name} cannot be an ambiguous escape hatch: {v!r}")
+            return cleaned
+        return None
+
+    @field_validator("selected_role")
+    @classmethod
+    def _validate_selected_role(cls, v: str | None) -> str | None:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError("selected_role must not be blank when provided")
+            return v.strip()
+        return None
+
+    @model_validator(mode="after")
+    def _validate_routing_trace_invariants(self):
+        # 1. Mutual completeness of selected agent ID and revision
+        has_id = self.selected_agent_id is not None
+        has_rev = self.selected_agent_revision is not None
+        if has_id != has_rev:
+            raise ValueError(
+                "RoutingTraceRecord requires both selected_agent_id and selected_agent_revision "
+                f"when either is provided; got selected_agent_id={self.selected_agent_id!r}, "
+                f"selected_agent_revision={self.selected_agent_revision!r}"
+            )
+
+        # 2. When outcome is ROUTED, selected_agent_id and selected_agent_revision are mandatory
+        if self.outcome == RoutingOutcome.ROUTED:
+            if not has_id or not has_rev:
+                raise ValueError(
+                    "RoutingTraceRecord with outcome=ROUTED requires both selected_agent_id "
+                    "and selected_agent_revision"
+                )
+            if self.rejection_reason is not None:
+                raise ValueError(
+                    "RoutingTraceRecord with outcome=ROUTED cannot have a rejection_reason"
+                )
+            if not self.capability_match_passed or not self.contract_match_passed:
+                raise ValueError(
+                    "RoutingTraceRecord with outcome=ROUTED must have passed both "
+                    "capability and contract match"
+                )
+        return self
 
     def get_selected_revision_provenance(self) -> AgentRevisionProvenance | None:
         """Return structured AgentRevisionProvenance for the selected specialist, if routed."""
