@@ -15,11 +15,12 @@ skew; causation relationships and deterministic delivery state own
 causal ordering.
 """
 
-from datetime import datetime
 from enum import Enum
 from typing import Mapping, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from domain.contracts.conventions import UtcDateTime
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +78,7 @@ class EventEnvelope(BaseModel):
     causation_id: Optional[str] = None
     correlation_id: str
     producer_revision: str
-    timestamp: datetime
+    timestamp: UtcDateTime
     idempotency_key: str
 
     # -- field validators: mandatory non-blank strings -----------------------

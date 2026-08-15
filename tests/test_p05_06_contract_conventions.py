@@ -24,6 +24,7 @@ from domain.contracts import (
     sha256_hex,
     is_valid_sha256_digest,
     normalize_utc_datetime,
+    UtcDateTime,
     format_utc_timestamp,
     parse_utc_timestamp,
     REDACTION_SENTINEL,
@@ -34,12 +35,29 @@ from domain.contracts import (
 )
 from domain.contracts import (
     DataClassLevel,
+    DataClass,
+    SuccessCriterion,
+    ChangeRequest,
+    AgentDescriptor,
+    ToolDescriptor,
     ChangeState,
     ExecutionEvidenceMode,
     EvidenceState,
+    Provenance,
+    TraceReference,
+    EvidenceRecord,
+    MemoryRecord,
     MemoryTrustStatus,
+    CapabilityPassport,
+    RehearsalScenario,
+    RehearsalResult,
+    FaultInjectionSpec,
     AutonomyClass,
+    AutonomyDecision,
+    ApprovalCompressionCard,
+    EventEnvelope,
     EventDeliveryDisposition,
+    classify_event_delivery,
 )
 
 
@@ -317,6 +335,405 @@ class TestCrossTimezoneEquivalence:
 
         assert format_utc_timestamp(utc_dt) == format_utc_timestamp(est_dt)
         assert format_utc_timestamp(utc_dt) == format_utc_timestamp(jst_dt)
+
+
+class TestContractNaiveTimestampRejection:
+    """Every domain contract with machine timestamps rejects naive datetimes."""
+
+    _NAIVE_DT = datetime(2026, 8, 13, 20, 0, 0)
+    _AWARE_UTC = datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc)
+    _AWARE_FUTURE = datetime(2026, 8, 14, 20, 0, 0, tzinfo=timezone.utc)
+
+    def test_change_request_naive_requested_at(self):
+        sc = SuccessCriterion(
+            schema_version="1.0",
+            criterion_id="sc-1",
+            description="desc",
+            verification_method="deterministic",
+            required_evidence_types=["test_run"],
+        )
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            ChangeRequest(
+                schema_version="1.0",
+                request_id="req-1",
+                title="title",
+                description="desc",
+                target_systems=["sys-1"],
+                data_classification=DataClassLevel.INTERNAL,
+                success_criteria=[sc],
+                requested_by="user-1",
+                requested_at=self._NAIVE_DT,
+            )
+
+    def test_provenance_naive_collection_timestamp(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            Provenance(
+                schema_version="1.0",
+                source="src",
+                collection_mode=ExecutionEvidenceMode.FIXTURE,
+                collection_timestamp=self._NAIVE_DT,
+            )
+
+    def test_provenance_naive_source_execution_timestamp(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            Provenance(
+                schema_version="1.0",
+                source="src",
+                collection_mode=ExecutionEvidenceMode.FIXTURE,
+                collection_timestamp=self._AWARE_UTC,
+                source_execution_timestamp=self._NAIVE_DT,
+            )
+
+    def test_memory_record_naive_capture_timestamp(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            MemoryRecord(
+                schema_version="1.0",
+                memory_id="mem-1",
+                scope="change",
+                content="content",
+                source="src",
+                capture_timestamp=self._NAIVE_DT,
+                expiry_timestamp=self._AWARE_FUTURE,
+                data_classification=DataClassLevel.INTERNAL,
+            )
+
+    def test_memory_record_naive_expiry_timestamp(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            MemoryRecord(
+                schema_version="1.0",
+                memory_id="mem-1",
+                scope="change",
+                content="content",
+                source="src",
+                capture_timestamp=self._AWARE_UTC,
+                expiry_timestamp=self._NAIVE_DT,
+                data_classification=DataClassLevel.INTERNAL,
+            )
+
+    def test_capability_passport_naive_issued_at(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            CapabilityPassport(
+                schema_version="1.0",
+                passport_id="pass-1",
+                agent_id="agent-1",
+                agent_revision="rev-1",
+                qualified_capabilities=("cap-1",),
+                qualification_evidence_ids=("ev-1",),
+                issuer="issuer-1",
+                issued_at=self._NAIVE_DT,
+                expires_at=self._AWARE_FUTURE,
+            )
+
+    def test_capability_passport_naive_expires_at(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            CapabilityPassport(
+                schema_version="1.0",
+                passport_id="pass-1",
+                agent_id="agent-1",
+                agent_revision="rev-1",
+                qualified_capabilities=("cap-1",),
+                qualification_evidence_ids=("ev-1",),
+                issuer="issuer-1",
+                issued_at=self._AWARE_UTC,
+                expires_at=self._NAIVE_DT,
+            )
+
+    def test_capability_passport_naive_revoked_at(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            CapabilityPassport(
+                schema_version="1.0",
+                passport_id="pass-1",
+                agent_id="agent-1",
+                agent_revision="rev-1",
+                qualified_capabilities=("cap-1",),
+                qualification_evidence_ids=("ev-1",),
+                issuer="issuer-1",
+                issued_at=self._AWARE_UTC,
+                expires_at=self._AWARE_FUTURE,
+                is_revoked=True,
+                revoked_at=self._NAIVE_DT,
+                revocation_reason="compromised",
+            )
+
+    def test_rehearsal_scenario_naive_created_at(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            RehearsalScenario(
+                schema_version="1.0",
+                scenario_id="scen-1",
+                change_request_id="req-1",
+                description="desc",
+                target_refs=("target-1",),
+                created_at=self._NAIVE_DT,
+                scenario_version="1.0",
+            )
+
+    def test_rehearsal_result_naive_started_at(self):
+        prov = Provenance(
+            schema_version="1.0",
+            source="src",
+            collection_mode=ExecutionEvidenceMode.SIMULATION,
+            collection_timestamp=self._AWARE_UTC,
+        )
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            RehearsalResult(
+                schema_version="1.0",
+                result_id="res-1",
+                scenario_id="scen-1",
+                change_request_id="req-1",
+                state=EvidenceState.PASS,
+                provenance=prov,
+                started_at=self._NAIVE_DT,
+                completed_at=self._AWARE_FUTURE,
+                evidence_record_ids=("ev-1",),
+            )
+
+    def test_rehearsal_result_naive_completed_at(self):
+        prov = Provenance(
+            schema_version="1.0",
+            source="src",
+            collection_mode=ExecutionEvidenceMode.SIMULATION,
+            collection_timestamp=self._AWARE_UTC,
+        )
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            RehearsalResult(
+                schema_version="1.0",
+                result_id="res-1",
+                scenario_id="scen-1",
+                change_request_id="req-1",
+                state=EvidenceState.PASS,
+                provenance=prov,
+                started_at=self._AWARE_UTC,
+                completed_at=self._NAIVE_DT,
+                evidence_record_ids=("ev-1",),
+            )
+
+    def test_autonomy_decision_naive_decided_at(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            AutonomyDecision(
+                schema_version="1.0",
+                decision_id="dec-1",
+                change_request_id="req-1",
+                action_class="deploy",
+                autonomy_class=AutonomyClass.AUTO_EXECUTE,
+                policy_source="policy-1",
+                decided_at=self._NAIVE_DT,
+                rationale="safe action",
+            )
+
+    def test_approval_compression_card_naive_created_at(self):
+        decision = AutonomyDecision(
+            schema_version="1.0",
+            decision_id="dec-1",
+            change_request_id="req-1",
+            action_class="deploy",
+            autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
+            policy_source="policy-1",
+            decided_at=self._AWARE_UTC,
+            rationale="needs approval",
+            authority_slot_ref="slot-1",
+        )
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            ApprovalCompressionCard(
+                schema_version="1.0",
+                card_id="card-1",
+                change_request_id="req-1",
+                autonomy_decision=decision,
+                authority_slot_ref="slot-1",
+                decision_question="Approve?",
+                decision_options=("Yes", "No"),
+                policy_reason="Production write",
+                action_scope="deploy service",
+                completed_work_summary="tests pass",
+                rehearsed_work_summary="shadowlab pass",
+                remaining_decision_summary="authorize deployment",
+                created_at=self._NAIVE_DT,
+            )
+
+    def test_event_envelope_naive_timestamp(self):
+        with pytest.raises(ValidationError, match="Naive datetime rejected"):
+            EventEnvelope(
+                schema_version="1.0",
+                event_id="evt-1",
+                change_id="change-1",
+                correlation_id="corr-1",
+                producer_revision="rev-1",
+                timestamp=self._NAIVE_DT,
+                idempotency_key="idem-1",
+            )
+
+
+class TestContractCrossOffsetNormalization:
+    """All domain models normalize offset-aware datetimes to UTC in-memory."""
+
+    _OFFSET_DT = datetime(2026, 8, 13, 15, 0, 0, tzinfo=timezone(timedelta(hours=-5)))
+    _FUTURE_OFFSET = datetime(2026, 8, 14, 15, 0, 0, tzinfo=timezone(timedelta(hours=-5)))
+
+    def test_change_request_normalizes_to_utc(self):
+        sc = SuccessCriterion(
+            schema_version="1.0",
+            criterion_id="sc-1",
+            description="desc",
+            verification_method="deterministic",
+            required_evidence_types=["test_run"],
+        )
+        cr = ChangeRequest(
+            schema_version="1.0",
+            request_id="req-1",
+            title="title",
+            description="desc",
+            target_systems=["sys-1"],
+            data_classification=DataClassLevel.INTERNAL,
+            success_criteria=[sc],
+            requested_by="user-1",
+            requested_at=self._OFFSET_DT,
+        )
+        assert cr.requested_at.tzinfo == timezone.utc
+        assert cr.requested_at.hour == 20
+
+    def test_provenance_normalizes_to_utc(self):
+        prov = Provenance(
+            schema_version="1.0",
+            source="src",
+            collection_mode=ExecutionEvidenceMode.RECORDED_CLOUD,
+            collection_timestamp=self._OFFSET_DT,
+            source_execution_identifier="run-1",
+            source_execution_timestamp=self._FUTURE_OFFSET,
+        )
+        assert prov.collection_timestamp.tzinfo == timezone.utc
+        assert prov.collection_timestamp.hour == 20
+        assert prov.source_execution_timestamp.tzinfo == timezone.utc
+        assert prov.source_execution_timestamp.hour == 20
+
+    def test_memory_record_normalizes_to_utc(self):
+        mem = MemoryRecord(
+            schema_version="1.0",
+            memory_id="mem-1",
+            scope="change",
+            content="content",
+            source="src",
+            capture_timestamp=self._OFFSET_DT,
+            expiry_timestamp=self._FUTURE_OFFSET,
+            data_classification=DataClassLevel.INTERNAL,
+        )
+        assert mem.capture_timestamp.tzinfo == timezone.utc
+        assert mem.capture_timestamp.hour == 20
+        assert mem.expiry_timestamp.tzinfo == timezone.utc
+        assert mem.expiry_timestamp.hour == 20
+
+    def test_capability_passport_normalizes_to_utc(self):
+        passp = CapabilityPassport(
+            schema_version="1.0",
+            passport_id="pass-1",
+            agent_id="agent-1",
+            agent_revision="rev-1",
+            qualified_capabilities=("cap-1",),
+            qualification_evidence_ids=("ev-1",),
+            issuer="issuer-1",
+            issued_at=self._OFFSET_DT,
+            expires_at=self._FUTURE_OFFSET,
+            is_revoked=True,
+            revoked_at=self._OFFSET_DT,
+            revocation_reason="revoked",
+        )
+        assert passp.issued_at.tzinfo == timezone.utc
+        assert passp.issued_at.hour == 20
+        assert passp.expires_at.tzinfo == timezone.utc
+        assert passp.expires_at.hour == 20
+        assert passp.revoked_at.tzinfo == timezone.utc
+        assert passp.revoked_at.hour == 20
+
+    def test_rehearsal_scenario_normalizes_to_utc(self):
+        scen = RehearsalScenario(
+            schema_version="1.0",
+            scenario_id="scen-1",
+            change_request_id="req-1",
+            description="desc",
+            target_refs=("target-1",),
+            created_at=self._OFFSET_DT,
+            scenario_version="1.0",
+        )
+        assert scen.created_at.tzinfo == timezone.utc
+        assert scen.created_at.hour == 20
+
+    def test_rehearsal_result_normalizes_to_utc(self):
+        prov = Provenance(
+            schema_version="1.0",
+            source="src",
+            collection_mode=ExecutionEvidenceMode.SIMULATION,
+            collection_timestamp=self._OFFSET_DT,
+        )
+        res = RehearsalResult(
+            schema_version="1.0",
+            result_id="res-1",
+            scenario_id="scen-1",
+            change_request_id="req-1",
+            state=EvidenceState.PASS,
+            provenance=prov,
+            started_at=self._OFFSET_DT,
+            completed_at=self._FUTURE_OFFSET,
+            evidence_record_ids=("ev-1",),
+        )
+        assert res.started_at.tzinfo == timezone.utc
+        assert res.started_at.hour == 20
+        assert res.completed_at.tzinfo == timezone.utc
+        assert res.completed_at.hour == 20
+
+    def test_autonomy_decision_normalizes_to_utc(self):
+        dec = AutonomyDecision(
+            schema_version="1.0",
+            decision_id="dec-1",
+            change_request_id="req-1",
+            action_class="deploy",
+            autonomy_class=AutonomyClass.AUTO_EXECUTE,
+            policy_source="policy-1",
+            decided_at=self._OFFSET_DT,
+            rationale="safe",
+        )
+        assert dec.decided_at.tzinfo == timezone.utc
+        assert dec.decided_at.hour == 20
+
+    def test_approval_compression_card_normalizes_to_utc(self):
+        dec = AutonomyDecision(
+            schema_version="1.0",
+            decision_id="dec-1",
+            change_request_id="req-1",
+            action_class="deploy",
+            autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
+            policy_source="policy-1",
+            decided_at=self._OFFSET_DT,
+            rationale="needs approval",
+            authority_slot_ref="slot-1",
+        )
+        card = ApprovalCompressionCard(
+            schema_version="1.0",
+            card_id="card-1",
+            change_request_id="req-1",
+            autonomy_decision=dec,
+            authority_slot_ref="slot-1",
+            decision_question="Approve?",
+            decision_options=("Yes", "No"),
+            policy_reason="Production write",
+            action_scope="deploy service",
+            completed_work_summary="tests pass",
+            rehearsed_work_summary="shadowlab pass",
+            remaining_decision_summary="authorize deployment",
+            created_at=self._OFFSET_DT,
+        )
+        assert card.created_at.tzinfo == timezone.utc
+        assert card.created_at.hour == 20
+
+    def test_event_envelope_normalizes_to_utc(self):
+        env = EventEnvelope(
+            schema_version="1.0",
+            event_id="evt-1",
+            change_id="change-1",
+            correlation_id="corr-1",
+            producer_revision="rev-1",
+            timestamp=self._OFFSET_DT,
+            idempotency_key="idem-1",
+        )
+        assert env.timestamp.tzinfo == timezone.utc
+        assert env.timestamp.hour == 20
 
 
 # ===========================================================================
@@ -696,23 +1113,32 @@ class TestCredentialFieldAbsence:
 
 
 class TestProviderNeutrality:
-    """No provider imports in conventions or domain contracts."""
+    """No provider imports in conventions or domain contracts (AST-verified)."""
 
     _FORBIDDEN_IMPORTS = {
         "google", "vertexai", "pubsub", "firestore",
         "github", "opentelemetry",
     }
 
+    def _assert_node_clean(self, node: ast.AST, source_name: str):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                for forbidden in self._FORBIDDEN_IMPORTS:
+                    assert forbidden not in alias.name.lower(), (
+                        f"Direct provider import '{alias.name}' in {source_name}"
+                    )
+        elif isinstance(node, ast.ImportFrom):
+            module_name = node.module or ""
+            for forbidden in self._FORBIDDEN_IMPORTS:
+                assert forbidden not in module_name.lower(), (
+                    f"Provider import-from '{module_name}' in {source_name}"
+                )
+
     def test_conventions_module_clean(self):
         source = (_CONTRACTS_DIR / "conventions.py").read_text()
         tree = ast.parse(source)
         for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                if isinstance(node, ast.ImportFrom) and node.module:
-                    for forbidden in self._FORBIDDEN_IMPORTS:
-                        assert forbidden not in node.module, (
-                            f"Provider import '{node.module}' in conventions.py"
-                        )
+            self._assert_node_clean(node, "conventions.py")
 
     @pytest.mark.parametrize("module_name", _CONTRACT_MODULES)
     def test_contract_modules_clean(self, module_name):
@@ -720,12 +1146,23 @@ class TestProviderNeutrality:
         source = pathlib.Path(mod.__file__).read_text()
         tree = ast.parse(source)
         for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                if isinstance(node, ast.ImportFrom) and node.module:
-                    for forbidden in self._FORBIDDEN_IMPORTS:
-                        assert forbidden not in node.module, (
-                            f"Provider import '{node.module}' in {module_name}"
-                        )
+            self._assert_node_clean(node, module_name)
+
+    def test_lint_rejects_direct_import_ast(self):
+        """Proof that the AST lint catches direct `import google` form."""
+        fake_source = "import google\n"
+        tree = ast.parse(fake_source)
+        with pytest.raises(AssertionError, match="Direct provider import 'google'"):
+            for node in ast.walk(tree):
+                self._assert_node_clean(node, "fake_module")
+
+    def test_lint_rejects_import_from_ast(self):
+        """Proof that the AST lint catches `from google import cloud` form."""
+        fake_source = "from google.cloud import storage\n"
+        tree = ast.parse(fake_source)
+        with pytest.raises(AssertionError, match="Provider import-from 'google.cloud'"):
+            for node in ast.walk(tree):
+                self._assert_node_clean(node, "fake_module")
 
 
 # ===========================================================================
@@ -738,11 +1175,6 @@ class TestIdentityDistinctions:
 
     def test_distinct_id_fields_exist(self):
         """Multiple semantically different *_id fields coexist."""
-        from domain.contracts import ChangeRequest, EvidenceRecord, EventEnvelope
-        from domain.contracts import MemoryRecord, CapabilityPassport
-        from domain.contracts import RehearsalScenario, RehearsalResult
-        from domain.contracts import AutonomyDecision, ApprovalCompressionCard
-
         # request_id is the identity of a ChangeRequest
         assert "request_id" in ChangeRequest.model_fields
         # change_request_id is a reference to that request in other contracts
@@ -771,8 +1203,6 @@ class TestEventEnvelopeTimestampRegression:
 
     def test_timestamp_not_causal_authority(self):
         """Reversed timestamps do NOT alter causal result."""
-        from domain.contracts import EventEnvelope, classify_event_delivery, EventDeliveryDisposition
-
         cause = EventEnvelope(
             schema_version="1.0",
             event_id="cause-1",
@@ -803,8 +1233,6 @@ class TestEventEnvelopeTimestampRegression:
         assert result == EventDeliveryDisposition.ACCEPT
 
     def test_exact_replay_still_duplicate(self):
-        from domain.contracts import EventEnvelope, classify_event_delivery, EventDeliveryDisposition
-
         env = EventEnvelope(
             schema_version="1.0",
             event_id="evt-1",
@@ -817,6 +1245,61 @@ class TestEventEnvelopeTimestampRegression:
 
         result = classify_event_delivery(env, {"evt-1": env}, {})
         assert result == EventDeliveryDisposition.DUPLICATE
+
+    def test_equivalent_offset_timestamps_produce_duplicate_envelope(self):
+        """Two envelopes with same instant in different offsets normalize identically."""
+        env_utc = EventEnvelope(
+            schema_version="1.0",
+            event_id="evt-1",
+            change_id="change-1",
+            correlation_id="corr-1",
+            producer_revision="rev-1",
+            timestamp=datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc),
+            idempotency_key="idem-1",
+        )
+
+        env_offset = EventEnvelope(
+            schema_version="1.0",
+            event_id="evt-1",
+            change_id="change-1",
+            correlation_id="corr-1",
+            producer_revision="rev-1",
+            timestamp=datetime(2026, 8, 13, 15, 0, 0, tzinfo=timezone(timedelta(hours=-5))),
+            idempotency_key="idem-1",
+        )
+
+        # Equal model instances
+        assert env_utc == env_offset
+        assert env_utc.timestamp == env_offset.timestamp
+        assert env_offset.timestamp.tzinfo == timezone.utc
+
+        # Duplicate classification succeeds across offset forms
+        result = classify_event_delivery(env_offset, {"evt-1": env_utc}, {})
+        assert result == EventDeliveryDisposition.DUPLICATE
+
+    def test_equivalent_offset_timestamps_same_canonical_hash(self):
+        """Same instant in different offsets produces identical model hash."""
+        env_utc = EventEnvelope(
+            schema_version="1.0",
+            event_id="evt-1",
+            change_id="change-1",
+            correlation_id="corr-1",
+            producer_revision="rev-1",
+            timestamp=datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc),
+            idempotency_key="idem-1",
+        )
+
+        env_offset = EventEnvelope(
+            schema_version="1.0",
+            event_id="evt-1",
+            change_id="change-1",
+            correlation_id="corr-1",
+            producer_revision="rev-1",
+            timestamp=datetime(2026, 8, 13, 15, 0, 0, tzinfo=timezone(timedelta(hours=-5))),
+            idempotency_key="idem-1",
+        )
+
+        assert canonical_model_sha256(env_utc) == canonical_model_sha256(env_offset)
 
 
 # ===========================================================================
@@ -889,6 +1372,7 @@ class TestPublicExports:
         "is_valid_sha256_digest",
         "sha256_hex",
         "normalize_utc_datetime",
+        "UtcDateTime",
         "format_utc_timestamp",
         "parse_utc_timestamp",
         "REDACTION_SENTINEL",

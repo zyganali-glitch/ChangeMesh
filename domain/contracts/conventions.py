@@ -14,9 +14,9 @@ import json
 import re
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Mapping, Sequence, Union
+from typing import Annotated, Any, Mapping, Sequence, Union
 
-from pydantic import BaseModel
+from pydantic import AfterValidator, BaseModel
 
 
 # ===========================================================================
@@ -59,16 +59,24 @@ def normalize_utc_datetime(value: datetime) -> datetime:
 
     - Naive datetime → raises ``ValueError``.
     - Aware non-UTC → converted to UTC.
-    - Aware UTC → returned as-is.
+    - Aware UTC → returned with UTC tzinfo.
 
     Does not use system-local timezone.
     """
-    if value.tzinfo is None:
+    if not isinstance(value, datetime):
+        raise TypeError(f"Expected datetime, got {type(value).__name__}")
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
         raise ValueError(
             "Naive datetime rejected: all domain timestamps must be "
             "timezone-aware"
         )
     return value.astimezone(timezone.utc)
+
+
+UtcDateTime = Annotated[
+    datetime,
+    AfterValidator(normalize_utc_datetime),
+]
 
 
 # Canonical wire format: RFC 3339 / ISO-8601 UTC with fixed 6-digit

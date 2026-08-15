@@ -17,11 +17,11 @@ Credentials, tokens, API keys, and reusable secret material are
 forbidden in the passport contract surface.
 """
 
-from datetime import datetime
 from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from domain.contracts.conventions import UtcDateTime
 from domain.contracts.data_class import DataClassLevel
 
 
@@ -39,7 +39,7 @@ class CapabilityPassport(BaseModel):
         schema_version: Explicit contract version (e.g. ``"1.0.0"``).
         passport_id: Stable passport identity.
         agent_id: Identity reference to the agent (not embedded
-            mutable AgentDescriptor).
+        mutable AgentDescriptor).
         agent_revision: Specific revision of the qualified agent.
         qualified_capabilities: Set of capabilities the agent is
             qualified for.
@@ -67,10 +67,10 @@ class CapabilityPassport(BaseModel):
     permitted_data_classifications: Tuple[DataClassLevel, ...] = ()
     qualification_evidence_ids: Tuple[str, ...]
     issuer: str
-    issued_at: datetime
-    expires_at: datetime
+    issued_at: UtcDateTime
+    expires_at: UtcDateTime
     is_revoked: bool = False
-    revoked_at: Optional[datetime] = None
+    revoked_at: Optional[UtcDateTime] = None
     revocation_reason: Optional[str] = None
 
     @field_validator(

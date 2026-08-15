@@ -13,12 +13,12 @@ Credentials, tokens, API keys, and reusable secret material are
 forbidden in the memory contract surface.
 """
 
-from datetime import datetime
 from enum import Enum
 from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from domain.contracts.conventions import UtcDateTime
 from domain.contracts.data_class import DataClassLevel
 
 
@@ -73,8 +73,8 @@ class MemoryRecord(BaseModel):
     scope: str
     content: str
     source: str
-    capture_timestamp: datetime
-    expiry_timestamp: datetime
+    capture_timestamp: UtcDateTime
+    expiry_timestamp: UtcDateTime
     data_classification: DataClassLevel
     trust_status: MemoryTrustStatus = MemoryTrustStatus.UNTRUSTED
     trust_evidence_ids: Tuple[str, ...] = ()

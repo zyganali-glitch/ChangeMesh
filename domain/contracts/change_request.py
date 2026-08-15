@@ -1,9 +1,8 @@
 """ChangeMesh domain contracts — change request."""
 
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from domain.contracts.conventions import UtcDateTime
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.success_criterion import SuccessCriterion
 
@@ -39,7 +38,7 @@ class ChangeRequest(BaseModel):
     data_classification: DataClassLevel
     success_criteria: list[SuccessCriterion]
     requested_by: str
-    requested_at: datetime
+    requested_at: UtcDateTime
 
     @field_validator("request_id", "schema_version")
     @classmethod

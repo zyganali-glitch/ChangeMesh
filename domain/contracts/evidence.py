@@ -1,6 +1,5 @@
 """ChangeMesh domain contracts — evidence contracts."""
 
-from datetime import datetime
 from enum import Enum
 from typing import Optional, Tuple
 
@@ -26,7 +25,11 @@ class EvidenceState(str, Enum):
     QUARANTINED = "QUARANTINED"
 
 
-from domain.contracts.conventions import HashAlgorithm, is_valid_sha256_digest
+from domain.contracts.conventions import (
+    HashAlgorithm,
+    UtcDateTime,
+    is_valid_sha256_digest,
+)
 
 
 class ArtifactHash(BaseModel):
@@ -84,9 +87,9 @@ class Provenance(BaseModel):
     schema_version: str
     source: str
     collection_mode: ExecutionEvidenceMode
-    collection_timestamp: datetime
+    collection_timestamp: UtcDateTime
     source_execution_identifier: Optional[str] = None
-    source_execution_timestamp: Optional[datetime] = None
+    source_execution_timestamp: Optional[UtcDateTime] = None
 
     @field_validator("schema_version", "source", "source_execution_identifier")
     @classmethod

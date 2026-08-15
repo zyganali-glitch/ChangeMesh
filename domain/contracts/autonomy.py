@@ -18,11 +18,12 @@ Critical semantic separations:
 - BLOCKED != review requested
 """
 
-from datetime import datetime
 from enum import Enum
 from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from domain.contracts.conventions import UtcDateTime
 
 
 class AutonomyClass(str, Enum):
@@ -77,7 +78,7 @@ class AutonomyDecision(BaseModel):
     autonomy_class: AutonomyClass
     policy_source: str
     policy_revision: Optional[str] = None
-    decided_at: datetime
+    decided_at: UtcDateTime
     rationale: str
     authority_slot_ref: Optional[str] = None
     required_rehearsal_refs: Tuple[str, ...] = ()
@@ -189,7 +190,7 @@ class ApprovalCompressionCard(BaseModel):
     rehearsed_work_summary: str
     remaining_decision_summary: str
     evidence_refs: Tuple[str, ...] = ()
-    created_at: datetime
+    created_at: UtcDateTime
 
     @field_validator(
         "schema_version", "card_id", "change_request_id",

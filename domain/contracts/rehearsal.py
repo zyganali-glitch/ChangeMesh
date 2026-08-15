@@ -13,11 +13,11 @@ RehearsalResult reuses existing P-05.03 evidence vocabulary
 (EvidenceState, Provenance, ExecutionEvidenceMode).
 """
 
-from datetime import datetime
 from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from domain.contracts.conventions import UtcDateTime
 from domain.contracts.evidence import (
     EvidenceState,
     ExecutionEvidenceMode,
@@ -94,7 +94,7 @@ class RehearsalScenario(BaseModel):
     success_criterion_ids: Tuple[str, ...] = ()
     tool_double_ids: Tuple[str, ...] = ()
     fault_injections: Tuple[FaultInjectionSpec, ...] = ()
-    created_at: datetime
+    created_at: UtcDateTime
     scenario_version: str
 
     @field_validator(
@@ -160,8 +160,8 @@ class RehearsalResult(BaseModel):
     change_request_id: str
     state: EvidenceState
     provenance: Provenance
-    started_at: datetime
-    completed_at: datetime
+    started_at: UtcDateTime
+    completed_at: UtcDateTime
     evidence_record_ids: Tuple[str, ...] = ()
     diagnostic_refs: Tuple[str, ...] = ()
 
