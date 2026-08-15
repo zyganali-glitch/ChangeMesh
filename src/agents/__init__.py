@@ -5,6 +5,17 @@ for the canonical six-agent ChangeMesh fleet.
 """
 
 from src.agents.change_orchestrator import ChangeOrchestrator, ChangeRuntimeState
+from src.agents.coordinator import (
+    BranchCoordinator,
+    BranchExecutionTrace,
+    BranchPlan,
+    BranchResult,
+    BranchSpec,
+    BranchStatus,
+    CoordinationResult,
+    CoordinationTrace,
+    ExecutionStrategy,
+)
 from src.agents.definition import (
     CHANGE_ORCHESTRATOR_INSTRUCTION,
     EVIDENCE_AUDITOR_INSTRUCTION,
@@ -102,4 +113,14 @@ __all__ = [
     "EvidenceAuditorOutput",
     "ReleaseStewardInput",
     "ReleaseStewardOutput",
+    # Multi-Agent Branch Coordination (P-07.04)
+    "BranchCoordinator",
+    "BranchExecutionTrace",
+    "BranchPlan",
+    "BranchResult",
+    "BranchSpec",
+    "BranchStatus",
+    "CoordinationResult",
+    "CoordinationTrace",
+    "ExecutionStrategy",
 ]

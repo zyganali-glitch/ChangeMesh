@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, AsyncGenerator, Callable, ClassVar, Type
+from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, ClassVar, Type
 
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
@@ -40,6 +40,12 @@ from src.agents.definition import (
 )
 
 if TYPE_CHECKING:
+    from src.agents.coordinator import (
+        BranchCoordinator,
+        BranchPlan,
+        CoordinationResult,
+        ExecutionStrategy,
+    )
     from src.agents.router import DeterministicRouter, RoutingRequest, RoutingResult
 
 
@@ -229,6 +235,78 @@ class ChangeOrchestrator(BaseAgent):
     ) -> RoutingResult:
         """Alias for route_delegation."""
         return self.route_delegation(routing_request, router=router)
+
+    def is_parallel_safe(
+        self,
+        plan: BranchPlan,
+        *,
+        coordinator: BranchCoordinator | None = None,
+    ) -> tuple[bool, str | None]:
+        """Check whether a branch plan is safe for parallel execution.
+
+        P-07.04: Fail-closed deterministic conflict/safety evaluation.
+        """
+        from src.agents.coordinator import BranchCoordinator
+
+        active_coord = coordinator or BranchCoordinator()
+        return active_coord.is_parallel_safe(plan)
+
+    async def execute_branch_plan(
+        self,
+        plan: BranchPlan,
+        *,
+        coordinator: BranchCoordinator | None = None,
+        force_strategy: ExecutionStrategy | None = None,
+        branch_runner: Callable[..., Awaitable[BaseModel]] | None = None,
+    ) -> CoordinationResult:
+        """Execute a multi-agent branch plan with controlled parallel or sequential fallback.
+
+        P-07.04: Single-writer aggregation, zero shared mutable state, non-bypassable routing.
+        """
+        from src.agents.coordinator import BranchCoordinator
+
+        active_coord = coordinator or BranchCoordinator()
+        return await active_coord.execute_plan(
+            plan,
+            force_strategy=force_strategy,
+            branch_runner=branch_runner,
+        )
+
+    async def execute_parallel(
+        self,
+        plan: BranchPlan,
+        *,
+        coordinator: BranchCoordinator | None = None,
+        branch_runner: Callable[..., Awaitable[BaseModel]] | None = None,
+    ) -> CoordinationResult:
+        from src.agents.coordinator import BranchCoordinator, ExecutionStrategy
+
+        active_coord = coordinator or BranchCoordinator()
+        force_strat = (
+            ExecutionStrategy.PARALLEL if plan.strategy == ExecutionStrategy.SEQUENTIAL else None
+        )
+        return await active_coord.execute_plan(
+            plan,
+            force_strategy=force_strat,
+            branch_runner=branch_runner,
+        )
+
+    async def execute_sequential(
+        self,
+        plan: BranchPlan,
+        *,
+        coordinator: BranchCoordinator | None = None,
+        branch_runner: Callable[..., Awaitable[BaseModel]] | None = None,
+    ) -> CoordinationResult:
+        """Execute a branch plan with forced sequential fallback."""
+        from src.agents.coordinator import BranchCoordinator, ExecutionStrategy
+
+        active_coord = coordinator or BranchCoordinator()
+        return await active_coord.execute_plan(
+            plan,
+            force_strategy=ExecutionStrategy.SEQUENTIAL,
+            branch_runner=branch_runner,
+        )
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         """ADK core execution logic for the Change Orchestrator.

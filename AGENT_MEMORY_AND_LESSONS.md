@@ -92,5 +92,12 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Prevention rule: Verification commands must never mutate files. Distinguish command interface verification from underlying check results: a verification command works correctly when it faithfully reports repository debt without rewriting history or modifying frozen domain contracts.
 - Status: `ACTIVE`
 
-
-
+### LESSON-20260815-03 — Multi-Agent Concurrency and Sequential Fallback Determinism
+- Date/time: 2026-08-15
+- Active task: P-07.04
+- Symptom: Asserting canonical state equivalence between parallel execution and sequential fallback failed because synthetic default payloads used `datetime.now(timezone.utc)` generating different microseconds across runs.
+- Root cause: Volatile runtime timestamps inside business payloads break machine equivalence comparisons unless either the payload generator uses deterministic timestamps or the projection layer normalizes temporal metadata.
+- Incorrect approach: Allowing arbitrary dynamic timestamps in synthetic test fixture builders, or using wall-clock timing delays (`asyncio.sleep`) to synchronize concurrency tests.
+- Correct approach: Use deterministic synchronization (`asyncio.Event` / barriers) for overlap tests; use deterministic base timestamps in synthetic default builders; index `asyncio.gather` results strictly according to caller plan order rather than arrival order to maintain deterministic single-writer aggregation.
+- Prevention rule: Machine-testable equivalence between execution strategies requires strict separation of volatile observability metadata (trace IDs, execution durations) from canonical business outcome state.
+- Status: `ACTIVE`

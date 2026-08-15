@@ -21,7 +21,7 @@ Managed-service integrations remain conditional on real access and must be label
 
 ## 3. Agent architecture and target components
 
-- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): ADK intake skeleton implemented (P-07.01); deterministic routing/delegation implemented (P-07.03); saga coordination, recovery, fallback/concurrency PLANNED; durable workflow state is owned by Firestore Saga.
+- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): ADK intake skeleton implemented (P-07.01); deterministic routing/delegation implemented (P-07.03); multi-agent branch coordination, parallel execution, and sequential fallback implemented (P-07.04 via `src/agents/coordinator.py`); saga coordination, recovery PLANNED; durable workflow state is owned by Firestore Saga.
 - `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection, repository overlap, and parallel-change conflict detection (CS-BLAST-001, GL-CONFLICT-001 unified).
 - `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks (ZK-PRIV-001).
 - `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation and migration boundaries (CS-MIG-001).
@@ -42,9 +42,9 @@ Additional core targets:
 ## 4. Core modules
 
 - `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions)
-- `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches PENDING)
+- `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches IMPLEMENTED; P-07.05 agent revision metadata PENDING)
 - `api`: API entrypoint for HTTP/REST and webhook invocations (PLANNED)
-- `orchestration`: deterministic local routing/delegation IMPLEMENTED under P-07.03 via the current Change Orchestrator/router layer; sequential fallback and controlled parallel branches P-07.04 PENDING; durable saga transitions, Firestore persistence, Pub/Sub orchestration, and recovery remain PLANNED under their later owning phases
+- `orchestration`: deterministic local routing/delegation IMPLEMENTED under P-07.03; multi-agent branch coordination, parallel execution, single-writer aggregation, and sequential fallback IMPLEMENTED under P-07.04 via `src/agents/coordinator.py`; durable saga transitions, Firestore persistence, Pub/Sub orchestration, and recovery remain PLANNED under their later owning phases
 - `events`: Pub/Sub envelope, replay, dead-letter handling (PLANNED)
 - `state`: Firestore repositories and idempotency (PLANNED)
 - `memory`: trust typing, provenance, TTL, contradiction, quarantine (PLANNED)
