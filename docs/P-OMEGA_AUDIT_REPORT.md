@@ -1,9 +1,9 @@
 # P-Ω Whole-Repository Integrity Audit — P-06.05 Clean-Checkout Reproduction & P-06 Phase Closure
 
-> **Produced by:** P-06.05 Run first clean-checkout reproduction from separate directory (P-06 Local Development Environment and Dependency Freeze Phase Closure)  
+> **Produced by:** P-06.05 Run first clean-checkout reproduction from separate directory (P-06 Final Evidence-Honesty & Phase Closure Refresh)  
 > **Date:** 2026-08-15  
-> **Canonical Entry Remote SHA:** `6a6e8455d8092e25458b6fad3edac49d76653041`  
-> **Clean Clone Verified SHA:** `6a6e8455d8092e25458b6fad3edac49d76653041`  
+> **Repair Entry Remote SHA:** `198c67da736724b6f733993d2c6f398644a3d746`  
+> **Original Clean Clone Verified SHA:** `6a6e8455d8092e25458b6fad3edac49d76653041`  
 > **Canonical Remote URL:** `https://github.com/zyganali-glitch/ChangeMesh.git`  
 > **Canonical Branch:** `main`  
 
@@ -13,24 +13,24 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | `origin/main` verified at `6a6e8455d8092e25458b6fad3edac49d76653041` prior to task execution. |
-| **B** | Separate-Directory Clean Clone | **PASS** | Fresh clone performed into sanitized OS temp directory (`C:\Users\MEHMET\AppData\Local\Temp\changemesh-clean-ef29737c280046bea5e54cb967ad70fc\ChangeMesh`). No worktree, no local file copy, no inherited `.venv`/`.env`/caches. |
-| **C** | Clone SHA Provenance | **PASS** | In clean clone: `git rev-parse HEAD` == `6a6e8455d8092e25458b6fad3edac49d76653041` == `git rev-parse origin/main`. Initial working tree clean. |
+| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Repair entry SHA `198c67da736724b6f733993d2c6f398644a3d746` and reproduced baseline SHA `6a6e8455d8092e25458b6fad3edac49d76653041` verified against canonical remote. |
+| **B** | Separate-Directory Clean Clone & Cache Honesty | **PASS** | Clean clone performed into sanitized OS temp directory (`C:\Users\MEHMET\AppData\Local\Temp\...`). No repo-local `.venv`, no `.env`, no copied/untracked repository state, and no repo-local generated state inherited from canonical workspace. External package-manager download cache state was not relied upon as project state and cold-cache/offline reproducibility is NOT claimed. |
+| **C** | Clone SHA Provenance | **PASS** | In clean clone: `git rev-parse HEAD` == `6a6e8455d8092e25458b6fad3edac49d76653041`. Initial working tree clean. |
 | **D** | Python 3.13.5 & uv 0.11.28 Proof | **PASS** | `uv --version` reported `0.11.28`; `uv run python --version` reported `Python 3.13.5` from active interpreter. |
 | **E** | Dev/Test Frozen Install Reproduction | **PASS** | `uv sync --frozen` installed 79 packages deterministically in fresh `.venv` (exit code 0). `uv pip check` verified 0 incompatibilities (exit code 0). |
-| **F** | Runtime-Only Hash-Locked Install Reproduction | **PASS** | In isolated `.venv-runtime`, `uv pip install --require-hashes -r requirements.txt` installed 68 packages (exit code 0). `uv pip check` verified 0 incompatibilities. Import check verified dev tools (`ruff`, `mypy`, `pytest`, `pyyaml`) are completely absent. |
+| **F** | Explicit Runtime-Interpreter Dev-Tool Absence Proof | **PASS** | In isolated `.venv-runtime` installed via `requirements.txt` (68 packages, exit 0, 0 conflicts), explicit execution via `.\.venv-runtime\Scripts\python.exe -c "import importlib.util, sys; names=['ruff','mypy','pytest']; present=[n for n in names if importlib.util.find_spec(n) is not None]; print('PRESENT=' + (','.join(present) if present else 'NONE')); sys.exit(1 if present else 0)"` yielded `PRESENT=NONE` and exit code `0`. Pure dev tools (`ruff`, `mypy`, `pytest`) are strictly absent. (`pyyaml` is present as a direct runtime dependency of `google-adk>=2.6.0`). |
 | **G** | No Hidden State / Zero Secret Requirement | **PASS** | Clean clone initial state: `Test-Path .env` -> `False`. All 619 unit/contract tests, dependency installations, and command checks executed with zero secrets, zero `.env`, and zero service-account JSON keys. |
-| **H** | P-06.04 Command Contracts Suite | **PASS** | `uv run python -m pytest tests/test_p06_04_commands.py -v --tb=short` -> `15 passed` in 0.28s (exit code 0). |
-| **I** | P-06.03 Config Safety Suite | **PASS** | `uv run python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` -> `14 passed` in 0.81s (exit code 0). |
-| **J** | Combined P-05 Domain Contracts Suite | **PASS** | All 6 P-05 contract test files passed: `590 passed` in 1.98s (exit code 0). |
-| **K** | Canonical Unit Command | **PASS** | `uv run python scripts/cmd.py unit` -> `619 passed` in 4.02s (exit code 0; `--ignore=tests/test_gcp_access.py`). |
-| **L** | Full Repository Test Suite Honest Status | **PASS** | `uv run python -m pytest tests/` -> `619 passed, 3 errors` in 7.07s (exit code 1; STATUS = `FAIL`, faithfully reproducing expected baseline fixture errors in `tests/test_gcp_access.py`). |
+| **H** | P-06.04 Command Contracts Suite | **PASS** | `uv run python -m pytest tests/test_p06_04_commands.py -v --tb=short` -> `15 passed in 0.28s` (exit code 0). |
+| **I** | P-06.03 Config Safety Suite | **PASS** | `uv run python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` -> `14 passed in 0.81s` (exit code 0). |
+| **J** | Combined P-05 Domain Contracts Suite | **PASS** | All 6 P-05 contract test files passed: `590 passed in 1.98s` (exit code 0). |
+| **K** | Canonical Unit Command | **PASS** | `uv run python scripts/cmd.py unit` -> `619 passed in 4.02s` (exit code 0; `--ignore=tests/test_gcp_access.py`). |
+| **L** | Full Repository Test Suite Honest Status | **PASS** | `uv run python -m pytest tests/` -> `619 passed, 3 errors in 7.07s` (exit code 1; STATUS = `FAIL`, faithfully reproducing expected baseline fixture errors in `tests/test_gcp_access.py`). |
 | **M** | Canonical Commands & Guard Reproduction | **PASS** | Developer commands executed in clean clone: `format` (`FAIL` - historical format debt), `lint` (`FAIL` - 149 historical lint debt errors), `type-check` (`FAIL` - 2 type errors in `test_gcp_access.py`), `integration` (`FAIL_CLOSED` - exit 1, zero cloud mutation), `e2e`/`demo`/`deploy`/`teardown` (`NOT_RUN` - exit 1). All baseline semantics reproduced identically. |
 | **N** | Zero Live Cloud Mutations Executed | **PASS** | Zero Google Cloud mutation or network side-effect executed. Default integration guard strictly prevented cloud access. |
 | **O** | Clean Clone Working Tree Integrity | **PASS** | After all command executions, `git status --short` in the clean clone reported 0 modified tracked files and 0 untracked files. Working tree remained clean. |
 | **P** | Master Plan Task-Contract Preservation | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` P-06.05 task block preserves all original binding fields (`Required action`, `Forbidden shortcuts`, `Acceptance criteria`, `Required evidence: Clean-checkout log.`, `Mandatory documentation sync`, `Closure`) while updating `Status: DONE` and appending truthful `Evidence`. |
 | **Q** | Master Plan & HANDOFF Parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized: Phase P-06 is `DONE`, P-06.05 is `DONE`, P-07 is `PENDING`, next task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`. |
-| **R** | Bilingual Public Document Parity | **PASS** | `README.md` and `README.tr.md` synchronized: Phase P-06 marked `DONE`, clean-checkout prerequisites, quick start, configuration boundaries, and baseline command results published in English and Turkish. |
+| **R** | Bilingual Public Document Parity & Prerequisite Honesty | **PASS** | `README.md` and `README.tr.md` synchronized: Phase P-06 marked `DONE`, Git prerequisite stated truthfully as `Git` without unproven version floors, tested Git version (`git version 2.52.0.windows.1`) labeled as tested environment evidence, and baseline command results published in English and Turkish. |
 | **S** | Submission Manifest Sync | **PASS** | `docs/SUBMISSION_MANIFEST.md` updated: `Clean-checkout reproduction: VERIFIED (docs/P-06.05_CLEAN_CHECKOUT_LOG.md)`. All future items remain honest (`NOT_CREATED`, `NOT_FINAL`, `NOT_RUN`). |
 | **T** | Command Registry Sync | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated to reflect `CLEAN_CHECKOUT_VERIFIED` for reproduced commands and install paths. |
 | **U** | Historical Evidence Count Preservation | **PASS** | Historical P-06.03 (125 tracked files) and P-06.04 (128 tracked files) evidence counts preserved; current P-06.05 tracked-file count (129 files) freshly scoped and verified. |
@@ -87,5 +87,5 @@
 ## 5. P-Ω Final Verdict
 
 **PASS** — All 23 whole-repository integrity audit checks pass.
-Phase `P-06 — Local Development Environment and Dependency Freeze` is now complete (`DONE`).
-Clean-checkout reproducibility from a separate directory outside the canonical workspace has been executed with complete success and verified against the canonical remote repository `https://github.com/zyganali-glitch/ChangeMesh.git` (commit `6a6e8455d8092e25458b6fad3edac49d76653041`) with zero hidden local state. All 619 unit/contract tests pass. All developer command semantics and baseline failure states reproduced with 100% fidelity. Full live-document parity is synchronized across `README.md`, `README.tr.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, `docs/SUBMISSION_MANIFEST.md`, `AGENT_ENVIRONMENT_AND_API.md`, and `docs/P-06.05_CLEAN_CHECKOUT_LOG.md`. Historical evidence counts (125, 128) are preserved; current tracked-file count is 129. Next eligible task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`.
+Phase `P-06 — Local Development Environment and Dependency Freeze` is complete (`DONE`).
+Clean-checkout reproducibility from a separate directory outside the canonical workspace has been verified with explicit runtime-interpreter execution, tested Git version transparency, and precise cache language. All 619 unit/contract tests pass. All developer command semantics and baseline failure states reproduced with 100% fidelity. Full live-document parity is synchronized across `README.md`, `README.tr.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, `docs/SUBMISSION_MANIFEST.md`, `AGENT_ENVIRONMENT_AND_API.md`, and `docs/P-06.05_CLEAN_CHECKOUT_LOG.md`. Historical evidence counts (125, 128) are preserved; current tracked-file count is 129. Next eligible task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`.

@@ -27,9 +27,9 @@ Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yenid
 
 - **Python:** `3.13.5` (`uv` veya sistem CPython 3.13.5 ile yönetilir, `.python-version` içinde sabitlenmiştir)
 - **uv:** `0.11.28` (`pyproject.toml` `[tool.uv] required-version` içinde sabitlenmiştir)
-- **Git:** 2.40+
+- **Git**
 
-> **Test Edilen Ortam:** Windows 11 x86_64, PowerShell 7, CPython 3.13.5, uv 0.11.28.
+> **Test Edilen Ortam:** Windows 11 x86_64, PowerShell 7, CPython 3.13.5, uv 0.11.28, Git 2.52.0.
 
 ### Hızlı Başlangıç (Geliştirme / Test Ortamı)
 

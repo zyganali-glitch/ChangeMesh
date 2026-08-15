@@ -252,9 +252,9 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 
 - **Python:** `3.13.5` (managed via `uv` or system CPython 3.13.5, pinned in `.python-version`)
 - **uv:** `0.11.28` (pinned in `pyproject.toml` `[tool.uv] required-version`)
-- **Git:** 2.40+
+- **Git**
 
-> **Environment Tested:** Windows 11 x86_64, PowerShell 7, CPython 3.13.5, uv 0.11.28.
+> **Environment Tested:** Windows 11 x86_64, PowerShell 7, CPython 3.13.5, uv 0.11.28, Git 2.52.0.
 
 ### Quick Start (Dev / Test Environment)
 
