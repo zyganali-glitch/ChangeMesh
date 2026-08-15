@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-06.03 QA Repair (Dead-Code & Unused Import Removal)
+# P-Ω Whole-Repository Integrity Audit — P-06.03 Live-Doc Parity Repair
 
-> **Produced by:** P-06.03 Safe Local Configuration Templates and Secret Handling (Surgical QA Repair)
+> **Produced by:** P-06.03 Safe Local Configuration Templates and Secret Handling (Live-Doc Parity Repair)
 > **Date:** 2026-08-15
-> **Baseline Remote SHA:** `36527d71c8977d63362545b1f23a6716de5d8994`
+> **Baseline Remote SHA:** `23d24659f9b695eada4e7e349f35bc53bed9047c`
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Baseline SHA & remote tracking | **PASS** | `36527d71c8977d63362545b1f23a6716de5d8994` verified at entry; clean working tree. |
+| **A** | Baseline SHA & remote tracking | **PASS** | `23d24659f9b695eada4e7e349f35bc53bed9047c` verified at entry; clean working tree. |
 | **B** | Python runtime version preserved | **PASS** | `.python-version` pinned to `3.13.5`; `pyproject.toml` requires `>=3.13,<3.14`. |
 | **C** | Node.js runtime evaluated & absent | **PASS** | Node remains `NOT_REQUIRED`. Zero npm/Node tooling or package.json files exist. |
 | **D** | Canonical dependency manifest (Source of Truth) | **PASS** | `pyproject.toml` (PEP 621 / PEP 735) is sole canonical editable manifest declaring direct runtime (`google-adk`, `google-genai`, `pydantic`, `google-cloud-firestore`, `google-cloud-pubsub`) and direct dev/test (`pytest`, `pyyaml`, `google-auth`, `google-cloud-run`). |
@@ -26,12 +26,12 @@
 | **N** | Documentation & command registry parity | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated with P-06.03 configuration boundary, config-safety test entry (`VERIFIED`, 14 passed), and full suite status (`FAIL`, 604 passed, 3 errors). |
 | **O** | Combined P-05 regression suite | **PASS** | All 6 contract test files pass with 590 passed (`590 passed, 0 failed, 0 errors`). |
 | **P** | Full repository suite status honestly recorded | **PASS** | Full suite execution produces `FAIL` (604 passed, 3 errors: known `test_gcp_access.py` missing fixture 'project'). Honestly reported as `FAIL`. |
-| **Q** | Master Plan & HANDOFF exact parity | **PASS** | Master plan marks P-06.03 `DONE` with detailed evidence; P-06 remains `IN_PROGRESS`; P-06.04 remains `PENDING`; HANDOFF points verbatim to `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`. |
+| **Q** | Master Plan & HANDOFF exact parity | **PASS** | Master plan marks P-06.03 `DONE` with detailed evidence recording 125 tracked files; P-06 remains `IN_PROGRESS`; P-06.04 remains `PENDING`; HANDOFF records 125 tracked files and points verbatim to `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`. |
 | **R** | Bilingual Public Document Parity (README.md / README.tr.md) | **PASS** | `README.md` and `README.tr.md` synchronized to reflect P-06.03 `DONE`, `.env.example` verified template, and P-06.04/P-06.05 `PENDING`. |
 | **S** | Threat Model Implementation-State Parity | **PASS** | `docs/THREAT_MODEL.md` Section 14 updated to reflect P-06.03 `DONE` with 14 config-safety tests and 0-secret scan. |
 | **T** | Non-Goals and Red Lines Integrity | **PASS** | Zero runtime framework, secret manager client, or cloud credentials introduced into domain boundaries. |
-| **U** | Git working tree & rollback baseline integrity | **PASS** | Entry baseline SHA `36527d71c8977d63362545b1f23a6716de5d8994` verified; all edits strictly attributable to P-06.03 QA repair. |
-| **V** | Dead-code, unused-import & placeholder closure | **PASS** | `tests/test_p06_03_config_safety.py` audited by direct inspection; unused `Set` import removed; zero dead code, unused imports, or placeholders exist. |
+| **U** | Git working tree & rollback baseline integrity | **PASS** | Entry baseline SHA `23d24659f9b695eada4e7e349f35bc53bed9047c` verified; all edits strictly attributable to P-06.03 live-doc parity repair. |
+| **V** | Dead-code, unused-import & placeholder closure | **PASS** | Direct inspection verifies zero dead code, unused imports, or placeholders exist across tracked surfaces. |
 
 ---
 
@@ -61,4 +61,4 @@
 
 ## 3. P-Ω Final Verdict
 
-**PASS** — All 22 whole-repository integrity audit checks pass. P-06.03 establishes a safe root configuration template (`.env.example`) defining registered canonical environment variables with zero secret defaults (`GITHUB_TOKEN` empty), promotes Application Default Credentials (ADC) for local development while prohibiting long-lived service account key files, and fortifies `.gitignore` against credential and sensitive artifact leaks while preserving `.env.example` tracking. 14 automated config-safety tests pass, and repository-wide deterministic secret scanning over all 125 tracked files confirms 0 secrets. Dead-code and unused-import check is verified with 0 unused imports remaining in `tests/test_p06_03_config_safety.py`. Combined P-05 regression suite remains at 590 passed, and full repository test suite is honestly recorded as `FAIL` (604 passed, 3 errors) due to baseline GCP fixture errors. Documentation parity is 100% synchronized across all English and Turkish surfaces. Next eligible task is `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`.
+**PASS** — All 22 whole-repository integrity audit checks pass. P-06.03 establishes a safe root configuration template (`.env.example`) defining registered canonical environment variables with zero secret defaults (`GITHUB_TOKEN` empty), promotes Application Default Credentials (ADC) for local development while prohibiting long-lived service account key files, and fortifies `.gitignore` against credential and sensitive artifact leaks while preserving `.env.example` tracking. 14 automated config-safety tests pass, and repository-wide deterministic secret scanning over all 125 tracked files confirms 0 secrets. Dead-code and unused-import check is verified with 0 unused imports remaining across all test surfaces. Combined P-05 regression suite remains at 590 passed, and full repository test suite is honestly recorded as `FAIL` (604 passed, 3 errors) due to baseline GCP fixture errors. Full live-document parity is 100% synchronized across Master Plan (125 tracked files), HANDOFF (125 tracked files), and P-Ω Audit Report (125 tracked files) as well as all English and Turkish surfaces. Next eligible task is `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`.
