@@ -410,8 +410,8 @@ The following architecture decisions are explicitly deferred to their designated
 | Core innovation contracts (MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) | P-05.04 | `DONE` (schema only; runtime in P-11–P-14) |
 | Event envelope and deterministic delivery classifier | P-05.05 | `DONE` (see `domain/contracts/event_envelope.py`) |
 | Machine conventions (naming, enums, UtcDateTime, hashing, redaction, serialization) | P-05.06 | `DONE` (see `docs/CONTRACT_CONVENTIONS.md`) |
-| Implementation stack and dependency freeze (Python/Node version, package manager) | P-06 | `PENDING` |
-| ADK agent skeleton implementation | P-07 | `PENDING` |
+| Implementation stack and dependency freeze (Python/Node version, package manager) | P-06 | `DONE` |
+| ADK agent skeleton implementation | P-07 | `IN_PROGRESS` (P-07.01–P-07.03 DONE; P-07.04–P-07.05 PENDING) |
 | Gemini integration and structured reasoning boundary | P-08 | `PENDING` |
 
 ## 12. Autonomy and Friction Invariants (P-04.05)
