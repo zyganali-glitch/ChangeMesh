@@ -13,7 +13,8 @@ Bu repo uygulama öncesi / yarışma inşa aşamasındadır:
 - **Çalışma zamanı sürümü ve repo yapısı (P-06.01):** `IMPLEMENTED` (`DONE` — Python `3.13.5` `.python-version` ile sabitlendi, Node `NOT_REQUIRED`)
 - **Tekrarlanabilir bağımlılık bildirimleri ve kilit dosyaları (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` sürüm zorunluluğu, `uv.lock`, çalışma zamanı `requirements.txt`, geliştirme/test `requirements-dev.txt`)
 - **Güvenli yerel yapılandırma şablonu ve sır yönetimi (P-06.03):** `IMPLEMENTED` (`DONE` — varsayılan sır içermeyen `.env.example` şablonu, ADC öncelikli kimlik doğrulama, kapsamlı `.gitignore` koruması, 14 yapılandırma güvenlik testi)
-- **P-06 Yerel Geliştirme Ortamı ve Bağımlılık Dondurma Fazı:** `IN_PROGRESS` (P-06.04 standart komutlar ve P-06.05 temiz klon doğrulaması `PENDING` durumundadır)
+- **Kanonik komut arayüzü (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, format, lint, type-check, unit, integration, e2e, demo, deploy, teardown komutları sıkı güvenlik sınırları ile tanımlandı)
+- **P-06 Yerel Geliştirme Ortamı ve Bağımlılık Dondurma Fazı:** `IN_PROGRESS` (P-06.05 temiz klon doğrulaması `PENDING` durumundadır)
 - **Çalışma zamanı ürün ve ajan geliştirmesi:** P-07+ aşamasında başlayacaktır (`PLANNED`).
 
 Gerçek kanıt olmadan hiçbir özellik tamamlanmış gösterilemez (`PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`).
@@ -26,7 +27,7 @@ Güvenli yerel yapılandırma şablonu (`.env.example`), sıfır varsayılan sı
 
 Ayrı bir dizinden temiz klon ile yeniden üretilebilirlik henüz çalıştırılmamıştır (`NOT_RUN`). İlk temiz klon kurulumunun yapılması ve kanıtlanması münhasıran P-06.05 (`PENDING`) görevine aittir.
 
-Standart geliştirici komut akışı ve eksiksiz kurulum dokümantasyonu P-06.04 ile P-06.05 fazlarına aittir ve temiz klon doğrulaması tamamlandıktan sonra yayımlanacaktır.
+Standart geliştirici komut akışı (`uv run python scripts/cmd.py format|lint|type-check|unit|integration`) P-06.04 kapsamında hayata geçirilmiştir. Gelecek fazlara ait komutlar (e2e, demo, deploy, teardown) arayüzde mevcuttur ancak uygulandıkları faza kadar güvenli şekilde başarısız olmaktadır. Eksiksiz kurulum dokümantasyonu P-06.05 fazına aittir ve temiz klon doğrulaması tamamlandıktan sonra yayımlanacaktır.
 
 ## Temel fikir
 

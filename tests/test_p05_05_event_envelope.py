@@ -24,7 +24,7 @@ Covers:
 import ast
 import copy
 import pathlib
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -32,17 +32,16 @@ from pydantic import ValidationError
 import domain.contracts
 import domain.contracts.event_envelope
 from domain.contracts import (
-    EventEnvelope,
     EventDeliveryDisposition,
+    EventEnvelope,
     classify_event_delivery,
 )
-
 
 # ===========================================================================
 # HELPERS
 # ===========================================================================
 
-_NOW = datetime(2026, 8, 13, 12, 0, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 8, 13, 12, 0, 0, tzinfo=UTC)
 _LATER = _NOW + timedelta(hours=1)
 _EARLIER = _NOW - timedelta(hours=1)
 
@@ -157,16 +156,19 @@ class TestPositiveConstruction:
 class TestImmutability:
     """Post-construction mutation must fail for all fields."""
 
-    @pytest.mark.parametrize("field,value", [
-        ("schema_version", "2.0"),
-        ("event_id", "evt-999"),
-        ("change_id", "chg-999"),
-        ("causation_id", "evt-000"),
-        ("correlation_id", "corr-999"),
-        ("producer_revision", "agent-v9.9.9"),
-        ("timestamp", _LATER),
-        ("idempotency_key", "idem-999"),
-    ])
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("schema_version", "2.0"),
+            ("event_id", "evt-999"),
+            ("change_id", "chg-999"),
+            ("causation_id", "evt-000"),
+            ("correlation_id", "corr-999"),
+            ("producer_revision", "agent-v9.9.9"),
+            ("timestamp", _LATER),
+            ("idempotency_key", "idem-999"),
+        ],
+    )
     def test_mutation_rejected(self, field, value):
         env = _make_root()
         with pytest.raises(ValidationError):
@@ -202,14 +204,17 @@ class TestExtraFieldsRejected:
 class TestBlankFieldRejection:
     """Mandatory non-blank fields reject empty and whitespace-only strings."""
 
-    @pytest.mark.parametrize("field", [
-        "schema_version",
-        "event_id",
-        "change_id",
-        "correlation_id",
-        "producer_revision",
-        "idempotency_key",
-    ])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "schema_version",
+            "event_id",
+            "change_id",
+            "correlation_id",
+            "producer_revision",
+            "idempotency_key",
+        ],
+    )
     @pytest.mark.parametrize("bad_value", ["", " ", "\t", "  \t  "])
     def test_blank_mandatory_field(self, field, bad_value):
         with pytest.raises(ValidationError, match="must not be blank"):
@@ -260,8 +265,7 @@ class TestDeliveryDisposition:
 
     def test_no_transport_states(self):
         values = {e.value for e in EventDeliveryDisposition}
-        for forbidden in ("ACK", "NACK", "DEAD_LETTER", "RETRYING",
-                          "PUBLISHED", "CONSUMED"):
+        for forbidden in ("ACK", "NACK", "DEAD_LETTER", "RETRYING", "PUBLISHED", "CONSUMED"):
             assert forbidden not in values
 
 
@@ -529,9 +533,7 @@ class TestProviderNeutrality:
     """AST scan of event_envelope.py for forbidden provider imports."""
 
     def test_no_forbidden_imports(self):
-        source_path = pathlib.Path(
-            domain.contracts.event_envelope.__file__
-        )
+        source_path = pathlib.Path(domain.contracts.event_envelope.__file__)
         tree = ast.parse(source_path.read_text())
         forbidden_prefixes = (
             "google",
@@ -557,9 +559,7 @@ class TestProviderNeutrality:
                         )
 
     def test_no_fixture_or_test_imports(self):
-        source_path = pathlib.Path(
-            domain.contracts.event_envelope.__file__
-        )
+        source_path = pathlib.Path(domain.contracts.event_envelope.__file__)
         tree = ast.parse(source_path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -586,20 +586,31 @@ class TestCredentialSurface:
 
     def test_no_credential_fields(self):
         forbidden = {
-            "token", "secret", "credential", "api_key", "private_key",
-            "service_account", "session", "client", "password",
-            "access_token", "refresh_token",
+            "token",
+            "secret",
+            "credential",
+            "api_key",
+            "private_key",
+            "service_account",
+            "session",
+            "client",
+            "password",
+            "access_token",
+            "refresh_token",
         }
         field_names = set(EventEnvelope.model_fields.keys())
         for name in forbidden:
-            assert name not in field_names, (
-                f"Credential field '{name}' found in EventEnvelope"
-            )
+            assert name not in field_names, f"Credential field '{name}' found in EventEnvelope"
 
     def test_no_credential_substrings_in_field_names(self):
         credential_substrings = (
-            "token", "secret", "credential", "api_key", "private_key",
-            "service_account", "password",
+            "token",
+            "secret",
+            "credential",
+            "api_key",
+            "private_key",
+            "service_account",
+            "password",
         )
         for field_name in EventEnvelope.model_fields.keys():
             for sub in credential_substrings:
@@ -625,8 +636,7 @@ class TestP0506NonLeakage:
     def test_no_serialization_format_field(self):
         """No canonical JSON/byte format frozen."""
         fields = set(EventEnvelope.model_fields.keys())
-        for name in ("wire_format", "serialization_format",
-                      "canonical_json", "byte_format"):
+        for name in ("wire_format", "serialization_format", "canonical_json", "byte_format"):
             assert name not in fields
 
     def test_no_redaction_field(self):
@@ -637,9 +647,7 @@ class TestP0506NonLeakage:
 
     def test_source_module_no_hash_implementation(self):
         """event_envelope.py source does not contain hash algorithm code."""
-        source = pathlib.Path(
-            domain.contracts.event_envelope.__file__
-        ).read_text()
+        source = pathlib.Path(domain.contracts.event_envelope.__file__).read_text()
         # Exclude comments/docstrings by checking for actual code patterns
         for pattern in ("hashlib", "sha256", "sha512", "md5("):
             assert pattern not in source, (
@@ -667,19 +675,41 @@ class TestPublicExports:
     def test_prior_exports_preserved(self):
         """P-05.01 through P-05.04 exports are still present."""
         exports = set(domain.contracts.__all__)
-        p05_01 = {"DataClassLevel", "DataClass", "SuccessCriterion",
-                   "ChangeRequest", "AgentDescriptor", "ToolDescriptor"}
-        p05_02 = {"ChangeState", "IllegalTransitionError",
-                   "CHANGE_LIFECYCLE_VERSION", "can_transition",
-                   "require_transition", "is_terminal"}
-        p05_03 = {"EvidenceRecord", "EvidenceState",
-                   "ExecutionEvidenceMode", "Provenance",
-                   "TraceReference", "ArtifactHash"}
-        p05_04 = {"MemoryRecord", "MemoryTrustStatus",
-                   "CapabilityPassport", "RehearsalScenario",
-                   "RehearsalResult", "FaultInjectionSpec",
-                   "AutonomyClass", "AutonomyDecision",
-                   "ApprovalCompressionCard"}
+        p05_01 = {
+            "DataClassLevel",
+            "DataClass",
+            "SuccessCriterion",
+            "ChangeRequest",
+            "AgentDescriptor",
+            "ToolDescriptor",
+        }
+        p05_02 = {
+            "ChangeState",
+            "IllegalTransitionError",
+            "CHANGE_LIFECYCLE_VERSION",
+            "can_transition",
+            "require_transition",
+            "is_terminal",
+        }
+        p05_03 = {
+            "EvidenceRecord",
+            "EvidenceState",
+            "ExecutionEvidenceMode",
+            "Provenance",
+            "TraceReference",
+            "ArtifactHash",
+        }
+        p05_04 = {
+            "MemoryRecord",
+            "MemoryTrustStatus",
+            "CapabilityPassport",
+            "RehearsalScenario",
+            "RehearsalResult",
+            "FaultInjectionSpec",
+            "AutonomyClass",
+            "AutonomyDecision",
+            "ApprovalCompressionCard",
+        }
         for name in p05_01 | p05_02 | p05_03 | p05_04:
             assert name in exports, f"Prior export '{name}' missing"
 

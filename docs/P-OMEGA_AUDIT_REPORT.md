@@ -22,8 +22,9 @@
 | **J** | Config-safety automated tests | **PASS** | 14 automated unit tests in `tests/test_p06_03_config_safety.py` pass (`14 passed, 0 failed, 0 errors`). |
 | **K** | Repository-wide deterministic secret scan | **PASS** | Scanned all 125 tracked files across repository; 0 secrets, private keys, or credentials found (`PASS`). |
 | **L** | Domain contracts provider neutrality & isolation | **PASS** | `domain/contracts/` unmodified; zero credential fields, zero provider imports, and AST neutrality confirmed. |
-| **M** | Future-phase non-leakage | **PASS** | P-06.04 (standard commands), P-06.05 (separate-directory clean checkout reproduction), P-07 (agent skeleton), P-28 (deployment) strictly preserved as `PENDING`. |
-| **N** | Documentation & command registry parity | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated with P-06.03 configuration boundary, config-safety test entry (`VERIFIED`, 14 passed), and full suite status (`FAIL`, 604 passed, 3 errors). |
+| **M** | Future-phase non-leakage | **PASS** | P-06.04 (standard commands), P-06.05 (separate-directory clean checkout reproduction), P-07 (agent skeleton), P-28 (deployment) strictly preserved as `PENDING` (except P-06.04 which is now `DONE`). |
+| **N** | Documentation & command registry parity | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated with P-06.04 configuration boundary, config-safety test entry (`VERIFIED`), and full suite status (`FAIL`, 608 passed, 3 errors). |
+| **O** | P-06.04 Implementation | **PASS** | Canonical command interface `scripts/cmd.py` implemented. CI Plan documented. `ruff` and `mypy` integrated correctly without mass-formatting. |
 | **O** | Combined P-05 regression suite | **PASS** | All 6 contract test files pass with 590 passed (`590 passed, 0 failed, 0 errors`). |
 | **P** | Full repository suite status honestly recorded | **PASS** | Full suite execution produces `FAIL` (604 passed, 3 errors: known `test_gcp_access.py` missing fixture 'project'). Honestly reported as `FAIL`. |
 | **Q** | Master Plan & HANDOFF exact parity | **PASS** | Master plan marks P-06.03 `DONE` with detailed evidence recording 125 tracked files; P-06 remains `IN_PROGRESS`; P-06.04 remains `PENDING`; HANDOFF records 125 tracked files and points verbatim to `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`. |
@@ -47,7 +48,8 @@
 | P-05.06 | `tests/test_p05_06_contract_conventions.py` | 214 | 0 | **PASS** |
 | **Combined P-05** | *All 6 contract test files* | **590** | **0** | **PASS** |
 | P-06.03 | `tests/test_p06_03_config_safety.py` | 14 | 0 | **PASS** |
-| **Full Repository** | `tests/` | **604** | **3** | **FAIL** (Known unrelated GCP fixture errors only) |
+| P-06.04 | `tests/test_p06_04_commands.py` | 4 | 0 | **PASS** |
+| **Full Repository** | `tests/` | **608** | **3** | **FAIL** (Known unrelated GCP fixture errors only) |
 
 ### Known Unrelated Errors (GCP Access Fixture)
 

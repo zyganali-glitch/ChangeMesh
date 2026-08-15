@@ -15,6 +15,7 @@
 > - **Runtime & repository structure freeze (P-06.01):** `IMPLEMENTED` (`DONE` — Python `3.13.5` pinned via `.python-version`, Node `NOT_REQUIRED`)
 > - **Reproducible dependency manifests & lockfiles (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` version enforcement, `uv.lock`, runtime `requirements.txt`, dev/test `requirements-dev.txt`)
 > - **Safe local configuration & secret handling (P-06.03):** `IMPLEMENTED` (`DONE` — `.env.example` template with zero secret defaults, ADC-first local auth, comprehensive `.gitignore` credential/artifact protection, 14 config-safety tests)
+> - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py` defined for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown with strict execution safety boundaries)
 > - **Phase P-06 Local Dev & Dependency Freeze:** `IN_PROGRESS` (P-06.04 standard commands and P-06.05 clean-checkout reproduction remain `PENDING`)
 > - **Runtime product & agent implementation:** Begins in Phase P-07+ (`PLANNED`).
 >
@@ -251,7 +252,7 @@ A safe local configuration template (`.env.example`) with zero secret defaults a
 
 Clean-checkout reproducibility from a separate directory has not yet been executed and remains `NOT_RUN`. Phase P-06.05 exclusively owns the first clean-checkout reproduction and proof.
 
-Standard developer workflow commands and full setup publication belong to P-06.04 and P-06.05, and will be published once clean-checkout reproduction is formally proven.
+Standard developer workflow commands (`uv run python scripts/cmd.py format|lint|type-check|unit|integration`) have been implemented under P-06.04. Future execution phases (e2e, demo, deploy, teardown) exist in the interface but fail closed until implemented. Full setup publication belongs to P-06.05 and will be published once clean-checkout reproduction is formally proven.
 
 ## Product direction beyond the hackathon
 

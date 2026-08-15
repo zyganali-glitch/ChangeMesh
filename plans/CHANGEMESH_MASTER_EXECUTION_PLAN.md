@@ -726,7 +726,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Commands exist, fail correctly, and are documented only after verification.

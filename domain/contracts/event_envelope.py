@@ -15,17 +15,17 @@ skew; causation relationships and deterministic delivery state own
 causal ordering.
 """
 
+from collections.abc import Mapping
 from enum import Enum
-from typing import Mapping, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from domain.contracts.conventions import UtcDateTime
 
-
 # ---------------------------------------------------------------------------
 # EventDeliveryDisposition — small, bounded delivery classification
 # ---------------------------------------------------------------------------
+
 
 class EventDeliveryDisposition(str, Enum):
     """Deterministic delivery classification for a provider-neutral event.
@@ -39,6 +39,7 @@ class EventDeliveryDisposition(str, Enum):
     deterministically admit this event has not yet been observed.
     It is NOT automatically FAIL, BLOCKED, or DEAD_LETTER.
     """
+
     ACCEPT = "ACCEPT"
     DUPLICATE = "DUPLICATE"
     OUT_OF_ORDER = "OUT_OF_ORDER"
@@ -48,6 +49,7 @@ class EventDeliveryDisposition(str, Enum):
 # ---------------------------------------------------------------------------
 # EventEnvelope — immutable provider-neutral event identity/causal metadata
 # ---------------------------------------------------------------------------
+
 
 class EventEnvelope(BaseModel):
     """Canonical provider-neutral event envelope.
@@ -75,7 +77,7 @@ class EventEnvelope(BaseModel):
     schema_version: str
     event_id: str
     change_id: str
-    causation_id: Optional[str] = None
+    causation_id: str | None = None
     correlation_id: str
     producer_revision: str
     timestamp: UtcDateTime
@@ -99,9 +101,7 @@ class EventEnvelope(BaseModel):
 
     @field_validator("causation_id")
     @classmethod
-    def _causation_must_not_be_blank_if_present(
-        cls, v: Optional[str], info
-    ) -> Optional[str]:
+    def _causation_must_not_be_blank_if_present(cls, v: str | None, info) -> str | None:
         if v is not None and (not v or not v.strip()):
             raise ValueError("causation_id must not be blank")
         return v
@@ -112,9 +112,7 @@ class EventEnvelope(BaseModel):
     def _reject_self_causation(self):
         """An event cannot causally produce itself."""
         if self.causation_id is not None and self.event_id == self.causation_id:
-            raise ValueError(
-                "Self-causation rejected: event_id cannot equal causation_id"
-            )
+            raise ValueError("Self-causation rejected: event_id cannot equal causation_id")
         return self
 
 
@@ -122,10 +120,11 @@ class EventEnvelope(BaseModel):
 # classify_event_delivery — pure, deterministic delivery classifier
 # ---------------------------------------------------------------------------
 
+
 def classify_event_delivery(
     incoming: EventEnvelope,
     seen_events: Mapping[str, EventEnvelope],
-    seen_idempotency: Mapping[Tuple[str, str], str],
+    seen_idempotency: Mapping[tuple[str, str], str],
 ) -> EventDeliveryDisposition:
     """Classify an incoming event against already-observed state.
 

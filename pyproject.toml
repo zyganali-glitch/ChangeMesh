@@ -18,7 +18,27 @@ dev = [
     "pyyaml>=6.0.0",
     "google-auth>=2.0.0",
     "google-cloud-run>=0.10.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
 ]
 
 [tool.uv]
 required-version = "==0.11.28"
+
+[tool.ruff]
+# Avoid mass-formatting historical scratch/tools files.
+exclude = [
+    "scratch",
+    "tools",
+    "docs",
+    "test_gcp_access.py",
+    "test_runner.py",
+    "create_firestore_db.py",
+    "enable_apigateway.py",
+    "verify_agent_platform_apis.py",
+]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = []

@@ -1,11 +1,11 @@
+import logging
 import sys
 import uuid
-import logging
+
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
-from google.cloud import firestore
-from google.cloud import pubsub_v1
-from google.cloud import run_v2
+from google.cloud import firestore, run_v2
+from google.cloud import pubsub_v1  # type: ignore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ def test_firestore_access(project: str):
             sys.exit(1)
             
         data = doc.to_dict()
-        if data.get("test_id") != test_val:
+        if not data or data.get("test_id") != test_val:
             logger.error("Assertion Failed: Read-back values do not match.")
             sys.exit(1)
             
@@ -151,7 +151,7 @@ def run_tests():
         logger.info("All GCP access tests passed successfully.")
         sys.exit(0)
     except DefaultCredentialsError as e:
-        logger.error(f"FATAL: Application Default Credentials not found.")
+        logger.error("FATAL: Application Default Credentials not found.")
         logger.error(f"Cannot run real GCP access tests without authentication. Error: {e}")
         sys.exit(1)
     except Exception as e:

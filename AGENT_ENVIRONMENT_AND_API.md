@@ -108,9 +108,13 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 | Unit tests (P-05.06 Conventions) | `python -m pytest tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (214 passed) | 2026-08-15 |
 | Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (590 passed) | 2026-08-15 |
 | Unit tests (P-06.03 Config Safety) | `python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` | `VERIFIED` (14 passed) | 2026-08-15 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (604 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | 2026-08-15 |
-| Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
-| E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |
-| Local web | `NOT_DEFINED` | `NOT_RUN` | - |
-| Deploy | `NOT_DEFINED` | `NOT_RUN` | - |
-| Teardown | `NOT_DEFINED` | `NOT_RUN` | - |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (608 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | 2026-08-15 |
+| Format | `uv run python scripts/cmd.py format` | `VERIFIED` (Command exists, fails closed due to historical files) | 2026-08-15 |
+| Lint | `uv run python scripts/cmd.py lint` | `VERIFIED` (Command exists, fails closed due to historical files) | 2026-08-15 |
+| Type-check | `uv run python scripts/cmd.py type-check` | `VERIFIED` (Command exists, fails closed on P-05 stubs) | 2026-08-15 |
+| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` (Runs safely, excludes live-write tests) | 2026-08-15 |
+| Integration | `uv run python scripts/cmd.py integration` | `VERIFIED` (Fails closed without `--live-write-danger`) | 2026-08-15 |
+| E2E | `uv run python scripts/cmd.py e2e` | `NOT_RUN` (Owning phase P-24/P-25 pending) | 2026-08-15 |
+| Demo | `uv run python scripts/cmd.py demo` | `NOT_RUN` (Owning phase P-24 pending) | 2026-08-15 |
+| Deploy | `uv run python scripts/cmd.py deploy` | `NOT_RUN` (Owning phase P-28 pending) | 2026-08-15 |
+| Teardown | `uv run python scripts/cmd.py teardown` | `NOT_RUN` (Owning phase P-28 pending) | 2026-08-15 |

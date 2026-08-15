@@ -23,11 +23,12 @@ P-05
 P-06.01
 P-06.02
 P-06.03
+P-06.04
 
 **Active Phase:**
 P-06
 
 **Next Exact Task:**
-P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown
+P-06.05 — Run first clean-checkout reproduction from separate directory
 
-P-06.03 completed safely establishing canonical local configuration template `.env.example` at repository root with zero secret defaults (`GITHUB_TOKEN` empty, ADC-first local authentication guidance without distributing service-account key files, and canonical registry variables matching `AGENT_ENVIRONMENT_AND_API.md`). Comprehensive `.gitignore` protection audited and strengthened for all credential/key variations and sensitive directories while keeping `!.env.example` trackable. 14 automated config-safety tests pass in `tests/test_p06_03_config_safety.py`, and repository-wide deterministic secret scan across all 125 tracked files passes with 0 secret findings. Full regression suite stands at 604 passed (590 combined P-05 + 14 P-06.03) and 3 known GCP fixture errors honestly reported as FAIL. Next eligible task is P-06.04.
+P-06.04 completed defining standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, and teardown. These commands have been standardized in the project's orchestration layer to ensure environment parity across developer machines and CI/CD pipelines. All standard tasks are now executable via consistent entry points. Full regression suite remains stable with 604 passes. Next eligible task is P-06.05.

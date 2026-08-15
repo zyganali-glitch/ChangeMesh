@@ -17,37 +17,36 @@ Test categories:
 
 import ast
 import pathlib
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
 
-from domain.contracts.memory import MemoryRecord, MemoryTrustStatus
-from domain.contracts.capability import CapabilityPassport
-from domain.contracts.rehearsal import (
-    RehearsalScenario,
-    RehearsalResult,
-    FaultInjectionSpec,
-)
+import domain.contracts
 from domain.contracts.autonomy import (
+    ApprovalCompressionCard,
     AutonomyClass,
     AutonomyDecision,
-    ApprovalCompressionCard,
 )
+from domain.contracts.capability import CapabilityPassport
+from domain.contracts.data_class import DataClassLevel
 from domain.contracts.evidence import (
     EvidenceState,
     ExecutionEvidenceMode,
     Provenance,
 )
-from domain.contracts.data_class import DataClassLevel
-import domain.contracts
-
+from domain.contracts.memory import MemoryRecord, MemoryTrustStatus
+from domain.contracts.rehearsal import (
+    FaultInjectionSpec,
+    RehearsalResult,
+    RehearsalScenario,
+)
 
 # ---------------------------------------------------------------------------
 # HELPERS
 # ---------------------------------------------------------------------------
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 _LATER = _NOW + timedelta(hours=24)
 _MUCH_LATER = _NOW + timedelta(hours=48)
 
@@ -138,19 +137,13 @@ def _make_autonomy_decision(
         rationale="Low-risk read-only action",
     )
     if autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED:
-        defaults["authority_slot_ref"] = overrides.pop(
-            "authority_slot_ref", "slot-001"
-        )
-        defaults["rationale"] = overrides.pop(
-            "rationale", "Irreversible production change"
-        )
+        defaults["authority_slot_ref"] = overrides.pop("authority_slot_ref", "slot-001")
+        defaults["rationale"] = overrides.pop("rationale", "Irreversible production change")
     if autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE:
         defaults["required_rehearsal_refs"] = overrides.pop(
             "required_rehearsal_refs", ("scen-001",)
         )
-        defaults["rationale"] = overrides.pop(
-            "rationale", "Must rehearse before live execution"
-        )
+        defaults["rationale"] = overrides.pop("rationale", "Must rehearse before live execution")
     defaults.update(overrides)
     return AutonomyDecision(**defaults)
 
@@ -597,10 +590,7 @@ class TestRehearsalScenarioValidation:
     def test_blank_fault_parameter_key_rejects(self):
         with pytest.raises(ValidationError, match="parameters keys must not be blank"):
             FaultInjectionSpec(
-                fault_id="f1",
-                fault_type="type1",
-                target="t1",
-                parameters=(("   ", "val"),)
+                fault_id="f1", fault_type="type1", target="t1", parameters=(("   ", "val"),)
             )
 
     def test_no_executable_callbacks(self):
@@ -850,7 +840,9 @@ class TestAutonomyDecisionValidation:
             )
 
     def test_rehearse_then_execute_with_authority_slot_rejects(self):
-        with pytest.raises(ValidationError, match="REHEARSE_THEN_EXECUTE must not have authority_slot_ref"):
+        with pytest.raises(
+            ValidationError, match="REHEARSE_THEN_EXECUTE must not have authority_slot_ref"
+        ):
             _make_autonomy_decision(
                 AutonomyClass.REHEARSE_THEN_EXECUTE,
                 authority_slot_ref="slot-1",
@@ -899,12 +891,8 @@ class TestLiveWriteAutonomyRegression:
     def test_no_universal_live_write_gate(self):
         """Verify there is no validator that universally human-gates LIVE_WRITE."""
         # Both must succeed without error
-        _make_autonomy_decision(
-            AutonomyClass.AUTO_EXECUTE, action_class="LIVE_WRITE"
-        )
-        _make_autonomy_decision(
-            AutonomyClass.HUMAN_AUTHORITY_REQUIRED, action_class="LIVE_WRITE"
-        )
+        _make_autonomy_decision(AutonomyClass.AUTO_EXECUTE, action_class="LIVE_WRITE")
+        _make_autonomy_decision(AutonomyClass.HUMAN_AUTHORITY_REQUIRED, action_class="LIVE_WRITE")
 
 
 class TestGeminiNotAuthority:
@@ -915,8 +903,11 @@ class TestGeminiNotAuthority:
 
     def test_no_confidence_field(self):
         forbidden = {
-            "confidence", "model_confidence", "uncertainty",
-            "gemini_confidence", "model_uncertainty",
+            "confidence",
+            "model_confidence",
+            "uncertainty",
+            "gemini_confidence",
+            "model_uncertainty",
         }
         for field_name in AutonomyDecision.model_fields.keys():
             assert field_name not in forbidden
@@ -971,10 +962,7 @@ class TestApprovalCompressionCardPositive:
     def test_valid_card(self):
         card = _make_card()
         assert card.card_id == "card-001"
-        assert (
-            card.autonomy_decision.autonomy_class
-            == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
-        )
+        assert card.autonomy_decision.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
 
 
 class TestApprovalCompressionCardValidation:
@@ -1130,8 +1118,12 @@ class TestApprovalCardNoHumanResponse:
     def test_no_approval_field_in_model(self):
         """No field named 'approved', 'human_response', etc. exists."""
         forbidden = {
-            "approved", "is_approved", "human_decision",
-            "human_response", "approval_result", "auto_approved",
+            "approved",
+            "is_approved",
+            "human_decision",
+            "human_response",
+            "approval_result",
+            "auto_approved",
         }
         for field_name in ApprovalCompressionCard.model_fields.keys():
             assert field_name not in forbidden
@@ -1267,6 +1259,7 @@ class TestProviderNeutrality:
     @pytest.mark.parametrize("module_name", _P0504_MODULES)
     def test_no_forbidden_imports(self, module_name):
         import importlib
+
         mod = importlib.import_module(module_name)
         mod_path = pathlib.Path(mod.__file__)
         tree = ast.parse(mod_path.read_text())
@@ -1282,8 +1275,7 @@ class TestProviderNeutrality:
                 if node.module:
                     for prefix in _FORBIDDEN_PREFIXES:
                         assert not node.module.startswith(prefix), (
-                            f"{module_name} imports from forbidden "
-                            f"'{node.module}'"
+                            f"{module_name} imports from forbidden '{node.module}'"
                         )
 
 
@@ -1311,8 +1303,7 @@ class TestCredentialBoundary:
         for field_name in model_cls.model_fields.keys():
             for kw in _CREDENTIAL_KEYWORDS:
                 assert kw not in field_name.lower(), (
-                    f"{model_cls.__name__} has forbidden credential-like "
-                    f"field '{field_name}'"
+                    f"{model_cls.__name__} has forbidden credential-like field '{field_name}'"
                 )
 
 
@@ -1344,13 +1335,24 @@ class TestPublicExports:
         """Existing exports are not removed."""
         exports = set(domain.contracts.__all__)
         preserved = {
-            "DataClassLevel", "DataClass", "SuccessCriterion",
-            "ChangeRequest", "AgentDescriptor", "ToolDescriptor",
-            "ChangeState", "IllegalTransitionError",
+            "DataClassLevel",
+            "DataClass",
+            "SuccessCriterion",
+            "ChangeRequest",
+            "AgentDescriptor",
+            "ToolDescriptor",
+            "ChangeState",
+            "IllegalTransitionError",
             "CHANGE_LIFECYCLE_VERSION",
-            "can_transition", "require_transition", "is_terminal",
-            "EvidenceRecord", "EvidenceState", "ExecutionEvidenceMode",
-            "Provenance", "TraceReference", "ArtifactHash",
+            "can_transition",
+            "require_transition",
+            "is_terminal",
+            "EvidenceRecord",
+            "EvidenceState",
+            "ExecutionEvidenceMode",
+            "Provenance",
+            "TraceReference",
+            "ArtifactHash",
         }
         for name in preserved:
             assert name in exports, f"Missing preserved export: {name}"
@@ -1374,22 +1376,19 @@ class TestP0506NonLeakage:
             "naming_convention",
         }
         for name in forbidden:
-            assert name not in exports, (
-                f"P-05.06 concept '{name}' leaked into exports"
-            )
+            assert name not in exports, f"P-05.06 concept '{name}' leaked into exports"
 
     @pytest.mark.parametrize("module_name", _P0504_MODULES)
     def test_no_event_envelope_fields(self, module_name):
         """P-05.04 modules don't define event-envelope-specific fields."""
         import importlib
+
         mod = importlib.import_module(module_name)
         mod_path = pathlib.Path(mod.__file__)
         source = mod_path.read_text()
         # These are P-05.05 specific field names
         for concept in ("causation_id", "correlation_id", "idempotency_key"):
-            assert concept not in source, (
-                f"P-05.05 concept '{concept}' found in {module_name}"
-            )
+            assert concept not in source, f"P-05.05 concept '{concept}' found in {module_name}"
 
 
 # ===========================================================================
@@ -1400,32 +1399,38 @@ class TestP0506NonLeakage:
 class TestVersioning:
     """All six contracts require explicit non-blank schema_version."""
 
-    @pytest.mark.parametrize("factory,kwargs", [
-        (_make_memory, {}),
-        (_make_passport, {}),
-        (_make_scenario, {}),
-        (_make_result, {}),
-        (
-            _make_autonomy_decision,
-            {"autonomy_class": AutonomyClass.AUTO_EXECUTE},
-        ),
-        (_make_card, {}),
-    ])
+    @pytest.mark.parametrize(
+        "factory,kwargs",
+        [
+            (_make_memory, {}),
+            (_make_passport, {}),
+            (_make_scenario, {}),
+            (_make_result, {}),
+            (
+                _make_autonomy_decision,
+                {"autonomy_class": AutonomyClass.AUTO_EXECUTE},
+            ),
+            (_make_card, {}),
+        ],
+    )
     def test_version_required(self, factory, kwargs):
         with pytest.raises(ValidationError, match="must not be blank"):
             factory(schema_version="  ", **kwargs)
 
-    @pytest.mark.parametrize("factory,kwargs", [
-        (_make_memory, {}),
-        (_make_passport, {}),
-        (_make_scenario, {}),
-        (_make_result, {}),
-        (
-            _make_autonomy_decision,
-            {"autonomy_class": AutonomyClass.AUTO_EXECUTE},
-        ),
-        (_make_card, {}),
-    ])
+    @pytest.mark.parametrize(
+        "factory,kwargs",
+        [
+            (_make_memory, {}),
+            (_make_passport, {}),
+            (_make_scenario, {}),
+            (_make_result, {}),
+            (
+                _make_autonomy_decision,
+                {"autonomy_class": AutonomyClass.AUTO_EXECUTE},
+            ),
+            (_make_card, {}),
+        ],
+    )
     def test_version_present(self, factory, kwargs):
         obj = factory(**kwargs)
         assert obj.schema_version == "1.0"
