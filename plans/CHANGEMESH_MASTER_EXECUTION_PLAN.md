@@ -120,7 +120,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-04` | Architecture and Authority Map | `DONE` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `DONE` | `P-04` |
 | `P-06` | Local Development Environment and Dependency Freeze | `DONE` | `P-05` |
-| `P-07` | Google ADK Agent Skeleton | `IN_PROGRESS` | `P-06` |
+| `P-07` | Google ADK Agent Skeleton | `DONE` | `P-06` |
 | `P-08` | Gemini Integration and Structured Reasoning Boundary | `PENDING` | `P-07` |
 | `P-09` | Pub/Sub Event Backbone | `PENDING` | `P-08` |
 | `P-10` | Firestore State, Idempotency, and Saga Persistence | `PENDING` | `P-09` |

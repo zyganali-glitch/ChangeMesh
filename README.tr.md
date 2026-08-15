@@ -68,9 +68,9 @@ Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yenid
 | Komut | Eylem | Denetim Semantiği | Temel Hat Sonucu |
 |---|---|---|---|
 | `uv run python scripts/cmd.py unit` | Birim testleri çalıştır | Yerel deterministik test çalıştırma | `PASS` (910 geçti) |
-| `uv run python scripts/cmd.py format` | Format denetimi | Değişiklik yapmayan (`ruff format --check .`) | `PASS` (0 format sorunu) |
-| `uv run python scripts/cmd.py lint` | Lint denetimi | Değişiklik yapmayan (`ruff check .`, sıfır `--fix`) | `PASS` (0 lint sorunu) |
-| `uv run python scripts/cmd.py type-check` | Tip denetimi | Değişiklik yapmayan (`mypy domain tests src`) | `PASS` (0 tip sorunu) |
+| `uv run python scripts/cmd.py format` | Format denetimi | Değişiklik yapmayan (`ruff format --check .`) | `FAIL` (tarihsel format borcu) |
+| `uv run python scripts/cmd.py lint` | Lint denetimi | Değişiklik yapmayan (`ruff check .`, sıfır `--fix`) | `FAIL` (tarihsel lint borcu) |
+| `uv run python scripts/cmd.py type-check` | Tip denetimi | Değişiklik yapmayan (`mypy domain tests src`) | `FAIL` (`test_gcp_access.py` tarihsel tip borcu) |
 | `uv run python scripts/cmd.py integration` | Entegrasyon testleri | Varsayılan olarak kapalı başarısız; sıfır bulut çağrısı | `FAIL_CLOSED` (`--live-write-danger` gerektirir) |
 | `uv run python scripts/cmd.py e2e\|demo\|deploy\|teardown` | Ertelenmiş eylemler | Kapalı başarısız; `NOT_RUN` basar | `NOT_RUN` (sahip fazlar bekleniyor) |
 

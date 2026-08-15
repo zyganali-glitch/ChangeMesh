@@ -74,11 +74,8 @@ class CapabilityPassport(BaseModel):
     revocation_reason: Optional[str] = None
 
     @field_validator(
-        "schema_version",
-        "passport_id",
-        "agent_id",
-        "agent_revision",
-        "issuer",
+        "schema_version", "passport_id", "agent_id",
+        "agent_revision", "issuer",
     )
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
@@ -89,9 +86,7 @@ class CapabilityPassport(BaseModel):
     @field_validator("revocation_reason")
     @classmethod
     def _revocation_reason_not_blank_if_set(
-        cls,
-        v: Optional[str],
-        info,
+        cls, v: Optional[str], info,
     ) -> Optional[str]:
         if v is not None and (not v or not v.strip()):
             raise ValueError("revocation_reason must not be blank when set")
@@ -115,11 +110,15 @@ class CapabilityPassport(BaseModel):
     def _validate_passport_invariants(self):
         # Qualified capabilities cannot be empty
         if not self.qualified_capabilities:
-            raise ValueError("qualified_capabilities must not be empty")
+            raise ValueError(
+                "qualified_capabilities must not be empty"
+            )
 
         # Qualification evidence cannot be empty
         if not self.qualification_evidence_ids:
-            raise ValueError("qualification_evidence_ids must not be empty")
+            raise ValueError(
+                "qualification_evidence_ids must not be empty"
+            )
 
         # Expiry must follow issuance
         if self.expires_at <= self.issued_at:
@@ -128,17 +127,27 @@ class CapabilityPassport(BaseModel):
         # Revoked passport must have consistent metadata
         if self.is_revoked:
             if self.revoked_at is None:
-                raise ValueError("revoked passport must have revoked_at timestamp")
+                raise ValueError(
+                    "revoked passport must have revoked_at timestamp"
+                )
             if self.revoked_at < self.issued_at:
-                raise ValueError("revoked_at must not predate issued_at")
+                raise ValueError(
+                    "revoked_at must not predate issued_at"
+                )
             if not self.revocation_reason:
-                raise ValueError("revoked passport must have revocation_reason")
+                raise ValueError(
+                    "revoked passport must have revocation_reason"
+                )
 
         # Unrevoked passport must not masquerade as revoked
         if not self.is_revoked:
             if self.revoked_at is not None:
-                raise ValueError("unrevoked passport must not have revoked_at")
+                raise ValueError(
+                    "unrevoked passport must not have revoked_at"
+                )
             if self.revocation_reason is not None:
-                raise ValueError("unrevoked passport must not have revocation_reason")
+                raise ValueError(
+                    "unrevoked passport must not have revocation_reason"
+                )
 
         return self

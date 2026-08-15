@@ -29,6 +29,7 @@ from domain.contracts import (
     EvidenceRecord,
     EvidenceState,
     ExecutionEvidenceMode,
+    EvidenceProducerKind,
     Provenance,
     TraceReference,
     ArtifactHash,
@@ -205,6 +206,18 @@ The following provider-neutral contracts define how evidence facts are recorded 
 Canonical collection mode for execution evidence.
 - `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`
 
+### `EvidenceProducerKind` (Enum)
+Canonical classification for the entity or system producing evidence (P-07.05).
+- `AGENT` — Produced by an autonomous agent in the fleet (requires exact `agent_id` and `agent_revision`)
+- `NON_AGENT` — Produced by non-agent external processes or systems
+- `SYSTEM` — Produced by core ChangeMesh system infrastructure
+- `FIXTURE` — Sourced from static pre-recorded test fixtures
+- `SIMULATION` — Generated during ShadowLab rehearsal or dry-run execution
+- `RECORDED_CLOUD` — Captured from verifiable past cloud telemetry / audit logs
+
+**Orthogonality with Collection Mode:**
+Collection mode (`ExecutionEvidenceMode`: `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`) describes *how* evidence was gathered at execution time. Producer kind (`EvidenceProducerKind`) describes *who/what entity* authored the evidence. These two concepts are orthogonal and must never be collapsed.
+
 ### `EvidenceState` (Enum)
 Canonical evidence state describing the result of a check or action.
 - `PASS`, `WARN`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`
@@ -226,19 +239,31 @@ Provider-neutral TraceReference contract for correlating an evidence record with
 | `span_id` | `Optional[str]` | No | Must not be blank if present |
 
 ### `Provenance`
-Provenance contract describing origin, mode, historical context, and exact agent revision provenance (P-07.05).
+Provenance contract describing origin, collection mode, producer kind, historical context, and exact agent revision provenance (P-07.05).
+
 | Field | Type | Required | Validation |
 |---|---|---|---|
 | `schema_version` | `str` | Yes | Must not be blank |
 | `source` | `str` | Yes | Must not be blank |
 | `collection_mode` | `ExecutionEvidenceMode` | Yes | Valid enum value |
-| `collection_timestamp` | `datetime` | Yes | — |
+| `collection_timestamp` | `datetime` | Yes | Validated UTC datetime |
 | `source_execution_identifier` | `Optional[str]` | No | Must not be blank if present; required for `RECORDED_CLOUD` |
 | `source_execution_timestamp` | `Optional[datetime]`| No | Required for `RECORDED_CLOUD` |
-| `agent_id` | `Optional[str]` | No | Mutually required with `agent_revision`; escape hatches rejected |
-| `agent_revision` | `Optional[str]` | No | Mutually required with `agent_id`; escape hatches rejected |
-| `agent_role` | `Optional[str]` | No | Must not be blank if present |
-| `agent_provenance` | `Optional[AgentRevisionProvenance]` | No | Structured provenance model synced with agent fields |
+| `producer_kind` | `EvidenceProducerKind` | No | Defaults to `NON_AGENT` (or inferred from collection mode) |
+| `agent_id` | `Optional[str]` | No | Required if `producer_kind == AGENT`; forbidden if `producer_kind != AGENT`; escape hatches rejected |
+| `agent_revision` | `Optional[str]` | No | Required if `producer_kind == AGENT`; forbidden if `producer_kind != AGENT`; escape hatches rejected |
+| `agent_role` | `Optional[str]` | No | Optional; must not be blank if present; forbidden if `producer_kind != AGENT` |
+| `agent_provenance` | `Optional[AgentRevisionProvenance]` | No | Structured provenance model synced with agent fields; forbidden if `producer_kind != AGENT` |
+
+**Provenance Invariants & Agent/Non-Agent Boundary:**
+- **Agent Producer (`producer_kind == AGENT`):**
+  - Mandatory exact non-blank `agent_id` and `agent_revision`.
+  - Escape hatches (`unknown`, `latest`, `current`, `null`, `none`, `*`, `undefined`) are strictly rejected.
+  - `agent_provenance` is guaranteed/constructed as a structured `AgentRevisionProvenance`.
+  - Flat and nested representations must agree; contradictions fail closed (`ValidationError`).
+- **Non-Agent Producer (`producer_kind != AGENT`):**
+  - All agent fields (`agent_id`, `agent_revision`, `agent_role`, `agent_provenance`) MUST be `None`.
+  - Specifying any agent provenance field on non-agent evidence fails closed (`ValidationError`).
 
 ### `EvidenceRecord`
 Canonical provider-neutral evidence fact schema.
@@ -476,7 +501,7 @@ Deterministic delivery classification for a provider-neutral event.
 
 ### `EventEnvelope`
 
-Canonical provider-neutral event envelope carrying event identity, change identity, causal chain metadata, correlation identity, exact producer revision provenance (P-07.05), and idempotency key.
+Canonical provider-neutral event envelope carrying event identity, change identity, causal chain metadata, correlation identity, exact producer identity and revision provenance (P-07.05), and idempotency key.
 
 | Field | Type | Required | Validation |
 |---|---|---|---|
@@ -485,12 +510,12 @@ Canonical provider-neutral event envelope carrying event identity, change identi
 | `change_id` | `str` | Yes | Must not be blank |
 | `causation_id` | `Optional[str]` | No | None for root events; must not be blank if present; must not equal `event_id` (self-causation rejected) |
 | `correlation_id` | `str` | Yes | Must not be blank |
-| `producer_revision` | `str` | Yes | Must not be blank; escape hatches (`unknown`, `latest`, `current`, etc.) strictly rejected |
+| `producer_id` | `str` | Yes | Mandatory producer identity; escape hatches (`unknown`, `latest`, `current`, etc.) strictly rejected |
+| `producer_revision` | `str` | Yes | Mandatory producer semantic revision; escape hatches strictly rejected |
 | `timestamp` | `datetime` | Yes | Typed datetime; wall-clock timestamp is metadata, NOT causal authority |
 | `idempotency_key` | `str` | Yes | Must not be blank |
-| `producer_id` | `Optional[str]` | No | Must not be blank if present; escape hatches strictly rejected |
-| `producer_role` | `Optional[str]` | No | Must not be blank if present |
-| `agent_provenance` | `Optional[AgentRevisionProvenance]` | No | Structured agent provenance model synced with producer fields |
+| `producer_role` | `Optional[str]` | No | Optional; must not be blank if present |
+| `agent_provenance` | `Optional[AgentRevisionProvenance]` | No | Structured agent provenance model synced with producer fields; contradictions fail closed |
 
 **Identity fields:**
 - `event_id` — identity of one logical domain event

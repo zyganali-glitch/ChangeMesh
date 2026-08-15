@@ -293,9 +293,9 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 | Command | Action | Check Semantics | Baseline Result |
 |---|---|---|---|
 | `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (910 passed) |
-| `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `PASS` (0 format issues) |
-| `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `PASS` (0 lint issues) |
-| `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests src`) | `PASS` (0 type issues) |
+| `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `FAIL` (historical format debt) |
+| `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `FAIL` (historical lint debt) |
+| `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests src`) | `FAIL` (historical type debt in `test_gcp_access.py`) |
 | `uv run python scripts/cmd.py integration` | Integration tests | Fails closed by default; zero cloud calls | `FAIL_CLOSED` (requires `--live-write-danger`) |
 | `uv run python scripts/cmd.py e2e\|demo\|deploy\|teardown` | Deferred actions | Fail closed; print `NOT_RUN` | `NOT_RUN` (owning phases pending) |
 

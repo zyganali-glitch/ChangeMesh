@@ -83,11 +83,7 @@ class MemoryRecord(BaseModel):
     quarantine_reason: Optional[str] = None
 
     @field_validator(
-        "schema_version",
-        "memory_id",
-        "scope",
-        "content",
-        "source",
+        "schema_version", "memory_id", "scope", "content", "source",
     )
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
@@ -101,7 +97,7 @@ class MemoryRecord(BaseModel):
         for ref in v:
             if not ref or not ref.strip():
                 raise ValueError(f"{info.field_name} elements must not be blank")
-
+        
         # Check duplicates
         if len(set(v)) != len(v):
             raise ValueError(f"{info.field_name} must not contain duplicate references")
@@ -110,9 +106,7 @@ class MemoryRecord(BaseModel):
     @field_validator("quarantine_reason")
     @classmethod
     def _quarantine_reason_not_blank_if_set(
-        cls,
-        v: Optional[str],
-        info,
+        cls, v: Optional[str], info,
     ) -> Optional[str]:
         if v is not None and (not v or not v.strip()):
             raise ValueError("quarantine_reason must not be blank when set")
@@ -122,28 +116,43 @@ class MemoryRecord(BaseModel):
     def _validate_memory_invariants(self):
         # Expiry must logically follow capture time
         if self.expiry_timestamp <= self.capture_timestamp:
-            raise ValueError("expiry_timestamp must be after capture_timestamp")
+            raise ValueError(
+                "expiry_timestamp must be after capture_timestamp"
+            )
 
         # Quarantined memory cannot simultaneously be trusted
         if self.is_quarantined and self.trust_status == MemoryTrustStatus.TRUSTED:
-            raise ValueError("quarantined memory cannot simultaneously be TRUSTED")
+            raise ValueError(
+                "quarantined memory cannot simultaneously be TRUSTED"
+            )
 
         # QUARANTINED trust_status must align with is_quarantined flag
         if self.trust_status == MemoryTrustStatus.QUARANTINED and not self.is_quarantined:
-            raise ValueError("trust_status QUARANTINED requires is_quarantined=True")
+            raise ValueError(
+                "trust_status QUARANTINED requires is_quarantined=True"
+            )
 
         if self.is_quarantined and self.trust_status not in (
             MemoryTrustStatus.QUARANTINED,
             MemoryTrustStatus.UNTRUSTED,
         ):
-            raise ValueError("quarantined memory trust_status must be QUARANTINED or UNTRUSTED")
+            raise ValueError(
+                "quarantined memory trust_status must be QUARANTINED or UNTRUSTED"
+            )
 
         # Quarantined memory must have a quarantine reason
         if self.is_quarantined and not self.quarantine_reason:
-            raise ValueError("quarantined memory must have a quarantine_reason")
+            raise ValueError(
+                "quarantined memory must have a quarantine_reason"
+            )
 
         # Trusted memory must have deterministic trust basis
-        if self.trust_status == MemoryTrustStatus.TRUSTED and not self.trust_evidence_ids:
-            raise ValueError("TRUSTED memory must have at least one trust_evidence_id")
+        if (
+            self.trust_status == MemoryTrustStatus.TRUSTED
+            and not self.trust_evidence_ids
+        ):
+            raise ValueError(
+                "TRUSTED memory must have at least one trust_evidence_id"
+            )
 
         return self
