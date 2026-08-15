@@ -97,12 +97,14 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Credential Isolation**: Credentials exist only at adapters. Credential material must never propagate to model prompts, memory, evidence, or public UI.
 *   **Bounded Delegation**: Agents and subagents cannot delegate authority they do not possess.
 *   **Public UI is Low-Trust**: The public judge surface receives only sanitized data and holds no reusable external-write credentials.
+*   **No Authority Escalation**: Crossing a trust boundary never elevates authority (e.g., untrusted data cannot become policy).
+*   **Detailed Threat Model**: Lives in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
+
 ### 5.8 Multi-Agent Coordination and Runtime Isolation Invariants (P-07.04)
 
 *   **Non-Bypassable Sequential Fallback**: Every request for parallel execution (`plan.strategy == PARALLEL`, `force_strategy == PARALLEL`, or `ChangeOrchestrator.execute_parallel()`) must pass `BranchCoordinator.is_parallel_safe()`. If any safety invariant is violated (duplicate specialist targets, Release Steward concurrency), execution automatically falls back to `ExecutionStrategy.SEQUENTIAL` with `fallback_triggered=True` and a recorded deterministic fallback reason.
 *   **Deep Runtime Input Isolation**: Branch inputs (`BranchPlan.branches`, `BranchSpec.routing_request`, and payloads) are deep-copied on intake and dispatch (`isolated_spec = copy.deepcopy(spec)`). In-place mutations performed inside one branch runner cannot leak to concurrent branches or modify caller-owned input collections.
 *   **Single-Writer Aggregation**: Branch outputs are aggregated strictly by `BranchCoordinator` into deterministic plan order regardless of arrival order.
-*   **Detailed Threat Model**: Lives in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
 
 ## 6. State labels
 
