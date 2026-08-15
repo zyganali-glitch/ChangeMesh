@@ -81,7 +81,9 @@ Record actual environment only; do not fill unknown values with guesses.
 
 ## Command registry
 
-Commands are added only after clean-checkout verification.
+Commands may be recorded as `VERIFIED` after the owning micro-task executes them successfully under its required validation environment. `VERIFIED` does not imply clean-checkout reproducibility. P-06.05 exclusively owns first separate-directory clean-checkout reproduction; until P-06.05 closes, no command may be represented as `CLEAN_CHECKOUT_VERIFIED`.
+
+> **Note on P-06.02 verification:** P-06.02 dependency commands below were verified in fresh isolated Python 3.13.5 virtual environments on the canonical checkout. Separate-directory clean-checkout verification remains P-06.05 `PENDING`.
 
 | Purpose | Command | Status | Last verified |
 |---|---|---|---|
