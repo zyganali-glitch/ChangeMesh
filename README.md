@@ -17,7 +17,8 @@
 > - **Safe local configuration & secret handling (P-06.03):** `IMPLEMENTED` (`DONE` — `.env.example` template with zero secret defaults, ADC-first local auth, comprehensive `.gitignore` credential/artifact protection, 14 config-safety tests)
 > - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py` defined for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown with strict execution safety boundaries)
 > - **Phase P-06 Local Dev & Dependency Freeze:** `IMPLEMENTED` (`DONE` — P-06.01–P-06.05 complete; clean-checkout reproduction verified from separate directory in [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
-> - **Runtime product & agent implementation:** Begins in Phase P-07+ (`PLANNED`).
+> - **Phase P-07 Google ADK Agent Skeleton:** `IN_PROGRESS` (P-07.01 Change Orchestrator ADK skeleton `IMPLEMENTED` with typed ChangeRequest intake, distinct change_id generation, ChangeState.RECEIVED initial state, and zero external writes; P-07.02+ `PENDING`)
+> - **Runtime product & agent fleet implementation:** Begins in Phase P-07+ (`IN_PROGRESS`). Specialized agent fleet (P-07.02), deterministic routing (P-07.03), and Gemini structured reasoning (P-08) remain `PENDING`.
 >
 > Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
 
@@ -278,7 +279,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
    ```bash
    uv run python scripts/cmd.py unit
    ```
-   *(Executes all 619 unit/contract tests across P-05 domain contracts, P-06.03 config safety, and P-06.04 command contracts with exit code 0).*
+   *(Executes all 643 unit/contract tests across P-05 domain contracts, P-06.03 config safety, P-06.04 command contracts, and P-07.01 Change Orchestrator ADK skeleton with exit code 0).*
 
 ### Configuration & Authentication Boundary
 
@@ -291,7 +292,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 
 | Command | Action | Check Semantics | Baseline Result |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (619 passed) |
+| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (643 passed) |
 | `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `FAIL` (historical format debt) |
 | `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `FAIL` (historical lint debt) |
 | `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests`) | `FAIL` (historical type debt in `test_gcp_access.py`) |

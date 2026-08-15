@@ -1,9 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-06.05 Clean-Checkout Reproduction & P-06 Phase Closure
+# P-Ω Whole-Repository Integrity Audit — P-07.01 Change Orchestrator ADK Skeleton
 
-> **Produced by:** P-06.05 Run first clean-checkout reproduction from separate directory (P-06 Final Live-Doc PyYAML Parity Repair)  
+> **Produced by:** P-07.01 Implement Change Orchestrator ADK skeleton with no external writes  
 > **Date:** 2026-08-15  
-> **Repair Entry Remote SHA:** `f6264631abd050610e8ac87360fc779037053ded`  
-> **Original Clean Clone Verified SHA:** `6a6e8455d8092e25458b6fad3edac49d76653041`  
+> **Canonical Entry Remote SHA:** `30564a2c3d9b03e45dc58a1dd0660f771e9c1e77`  
 > **Canonical Remote URL:** `https://github.com/zyganali-glitch/ChangeMesh.git`  
 > **Canonical Branch:** `main`  
 
@@ -13,79 +12,67 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Repair entry SHA `f6264631abd050610e8ac87360fc779037053ded` and reproduced baseline SHA `6a6e8455d8092e25458b6fad3edac49d76653041` verified against canonical remote. |
-| **B** | Separate-Directory Clean Clone & Cache Honesty | **PASS** | Clean clone performed into sanitized OS temp directory (`C:\Users\MEHMET\AppData\Local\Temp\...`). No repo-local `.venv`, no `.env`, no copied/untracked repository state, and no repo-local generated state inherited from canonical workspace. External package-manager download cache state was not relied upon as project state and cold-cache/offline reproducibility is NOT claimed. |
-| **C** | Clone SHA Provenance | **PASS** | In clean clone: `git rev-parse HEAD` == `6a6e8455d8092e25458b6fad3edac49d76653041`. Initial working tree clean. |
-| **D** | Python 3.13.5 & uv 0.11.28 Proof | **PASS** | `uv --version` reported `0.11.28`; `uv run python --version` reported `Python 3.13.5` from active interpreter. |
-| **E** | Dev/Test Frozen Install Reproduction | **PASS** | `uv sync --frozen` installed 79 packages deterministically in fresh `.venv` (exit code 0). `uv pip check` verified 0 incompatibilities (exit code 0). |
-| **F** | Explicit Runtime-Interpreter Dev-Tool Absence Proof | **PASS** | In isolated `.venv-runtime` installed via `requirements.txt` (68 packages, exit 0, 0 conflicts), explicit execution via `.\.venv-runtime\Scripts\python.exe -c "import importlib.util, sys; names=['ruff','mypy','pytest']; present=[n for n in names if importlib.util.find_spec(n) is not None]; print('PRESENT=' + (','.join(present) if present else 'NONE')); sys.exit(1 if present else 0)"` yielded `PRESENT=NONE` and exit code `0`. Pure dev tools (`ruff`, `mypy`, `pytest`) are strictly absent. (`pyyaml` is present as a direct runtime dependency of `google-adk>=2.6.0`). |
-| **G** | No Hidden State / Zero Secret Requirement | **PASS** | Clean clone initial state: `Test-Path .env` -> `False`. All 619 unit/contract tests, dependency installations, and command checks executed with zero secrets, zero `.env`, and zero service-account JSON keys. |
-| **H** | P-06.04 Command Contracts Suite | **PASS** | `uv run python -m pytest tests/test_p06_04_commands.py -v --tb=short` -> `15 passed in 0.28s` (exit code 0). |
-| **I** | P-06.03 Config Safety Suite | **PASS** | `uv run python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` -> `14 passed in 0.81s` (exit code 0). |
-| **J** | Combined P-05 Domain Contracts Suite | **PASS** | All 6 P-05 contract test files passed: `590 passed in 1.98s` (exit code 0). |
-| **K** | Canonical Unit Command | **PASS** | `uv run python scripts/cmd.py unit` -> `619 passed in 4.02s` (exit code 0; `--ignore=tests/test_gcp_access.py`). |
-| **L** | Full Repository Test Suite Honest Status | **PASS** | `uv run python -m pytest tests/` -> `619 passed, 3 errors in 7.07s` (exit code 1; STATUS = `FAIL`, faithfully reproducing expected baseline fixture errors in `tests/test_gcp_access.py`). |
-| **M** | Canonical Commands & Guard Reproduction | **PASS** | Developer commands executed in clean clone: `format` (`FAIL` - historical format debt), `lint` (`FAIL` - 149 historical lint debt errors), `type-check` (`FAIL` - 2 type errors in `test_gcp_access.py`), `integration` (`FAIL_CLOSED` - exit 1, zero cloud mutation), `e2e`/`demo`/`deploy`/`teardown` (`NOT_RUN` - exit 1). All baseline semantics reproduced identically. |
-| **N** | Zero Live Cloud Mutations Executed | **PASS** | Zero Google Cloud mutation or network side-effect executed. Default integration guard strictly prevented cloud access. |
-| **O** | Clean Clone Working Tree Integrity | **PASS** | After all command executions, `git status --short` in the clean clone reported 0 modified tracked files and 0 untracked files. Working tree remained clean. |
-| **P** | Master Plan Task-Contract Preservation | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` P-06.05 task block preserves all original binding fields (`Required action`, `Forbidden shortcuts`, `Acceptance criteria`, `Required evidence: Clean-checkout log.`, `Mandatory documentation sync`, `Closure`) while updating `Status: DONE` and appending truthful `Evidence`. |
-| **Q** | Master Plan & HANDOFF Parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized: Phase P-06 is `DONE`, P-06.05 is `DONE`, P-07 is `PENDING`, next task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`. Master Plan P-06.05 Evidence, `docs/HANDOFF.md`, and `docs/P-06.05_CLEAN_CHECKOUT_LOG.md` are in full parity regarding dedicated dev tools absence (`ruff`, `mypy`, `pytest`) and runtime presence of PyYAML. |
-| **R** | Bilingual Public Document Parity & Prerequisite Honesty | **PASS** | `README.md` and `README.tr.md` synchronized: Phase P-06 marked `DONE`, Git prerequisite stated truthfully as `Git` without unproven version floors, tested Git version (`git version 2.52.0.windows.1`) labeled as tested environment evidence, and baseline command results published in English and Turkish. |
-| **S** | Submission Manifest Sync | **PASS** | `docs/SUBMISSION_MANIFEST.md` updated: `Clean-checkout reproduction: VERIFIED (docs/P-06.05_CLEAN_CHECKOUT_LOG.md)`. All future items remain honest (`NOT_CREATED`, `NOT_FINAL`, `NOT_RUN`). |
-| **T** | Command Registry Sync | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated to reflect `CLEAN_CHECKOUT_VERIFIED` for reproduced commands and install paths. |
-| **U** | Historical Evidence Count Preservation | **PASS** | Historical P-06.03 (125 tracked files) and P-06.04 (128 tracked files) evidence counts preserved; current P-06.05 tracked-file count (129 files) freshly scoped and verified. |
-| **V** | Non-Leakage of Future Phase Implementation | **PASS** | Phase P-07 is not started. Zero ADK agent code implemented. Zero cloud deployment attempted. |
-| **W** | Dead-Code, Unused-Import & Placeholder Audit | **PASS** | Repository contains zero TODO/FIXME markers, zero unused imports in newly added code, and zero dead code. |
+| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Entry SHA `30564a2c3d9b03e45dc58a1dd0660f771e9c1e77` verified via `git fetch origin` and `git rev-parse origin/main`. Working tree clean at task start. |
+| **B** | Changed-File Allowlist & Scope Strictness | **PASS** | Only legitimate P-07.01 files modified/created: `src/__init__.py`, `src/agents/__init__.py`, `src/agents/change_orchestrator.py`, `tests/test_p07_01_change_orchestrator.py`, and documentation sync (`docs/ARCHITECTURE.md`, `README.md`, `README.tr.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/P-OMEGA_AUDIT_REPORT.md`). |
+| **C** | Genuine Google ADK Integration | **PASS** | `ChangeOrchestrator` is a direct subclass of `google.adk.agents.base_agent.BaseAgent` (`isinstance(orch, BaseAgent)` is True, `issubclass(ChangeOrchestrator, BaseAgent)` is True). No fake/mock agent substitution. |
+| **D** | Provider-Neutral Domain Boundary Intact | **PASS** | `domain/contracts/` remains completely unmodified (0 diff). `ChangeRequest` domain contract imported and used directly without mutation. Provider-specific ADK code depends inward on domain contracts. |
+| **E** | Typed Intake Boundary & Fail-Closed Validation | **PASS** | `ChangeOrchestrator.initialize_change` receives `ChangeRequest` instance. Non-ChangeRequest inputs (dicts, strings, numbers, None, arbitrary objects) fail closed with `TypeError`. |
+| **F** | Distinct Identity Semantics (`request_id` vs `change_id`) | **PASS** | `change_id` is generated as a distinct, non-blank identifier (with injectable generator for deterministic testing). `request_id` is preserved and distinguishable. `change_id == request_id` fails closed with `ValueError`. |
+| **G** | Initial Lifecycle State Strictly `RECEIVED` | **PASS** | `ChangeRuntimeState.state` is initialized strictly to `ChangeState.RECEIVED`. No premature transitions to `DISCOVERING`, `QUALIFYING`, `REHEARSING`, etc. |
+| **H** | State Immutability & Reference Isolation | **PASS** | `ChangeRuntimeState` is frozen (`model_config = ConfigDict(frozen=True, extra="forbid")`). Separate initializations produce isolated state with zero shared mutable references. |
+| **I** | Zero External Writes & Zero Credential Requirement | **PASS** | Intake executes with zero Firestore writes, zero Pub/Sub publishes, zero Cloud Run calls, zero GitHub mutations, zero network requests, and zero credential dependencies. |
+| **J** | Zero Gemini / Vertex AI Invocation | **PASS** | Zero LLM or model client calls executed (`google.genai.Client` call count == 0). Model reasoning deferred to P-08. |
+| **K** | Specialized Fleet (P-07.02) & Routing (P-07.03) Non-Leakage | **PASS** | Zero specialized agent classes created (Impact Scout, Policy Guardian, Migration Engineer, Evidence Auditor, Release Steward deferred to P-07.02). Zero routing tables or delegation logic implemented (deferred to P-07.03). |
+| **L** | Dedicated P-07.01 Test Suite | **PASS** | `uv run pytest tests/test_p07_01_change_orchestrator.py -v` -> `24 passed in 2.02s` (exit code 0). |
+| **M** | Local ADK Runner Smoke Integration Boundary | **PASS** | `ChangeOrchestrator` executed in-process through real `google.adk.runners.Runner` with `InMemorySessionService`, generating `Event(author="change_orchestrator", turn_complete=True)` with zero cloud credentials or network calls. |
+| **N** | Canonical Unit Test Suite | **PASS** | `uv run python scripts/cmd.py unit` -> `643 passed in 5.53s` (exit code 0; increased from 619 to 643 passed tests). |
+| **O** | Full Repository Test Suite Honest Status | **PASS** | `uv run python -m pytest tests/` -> `643 passed, 3 errors in 6.06s` (exit code 1; STATUS = `FAIL`, honestly reporting known baseline `test_gcp_access.py` missing fixture). |
+| **P** | New-File Format, Lint, and Type Health | **PASS** | `uv run ruff format --check src tests/test_p07_01_change_orchestrator.py` -> 4 files formatted; `uv run ruff check src tests/test_p07_01_change_orchestrator.py` -> All checks passed; `uv run mypy src tests/test_p07_01_change_orchestrator.py` -> Success: 0 issues in 4 source files. |
+| **Q** | Dependency Manifest Integrity | **PASS** | `pyproject.toml`, `uv.lock`, `requirements.txt`, and `requirements-dev.txt` unmodified (0 diff). |
+| **R** | Master Plan Task-Contract Preservation | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` P-07.01 task preserves all original binding fields (`Required action`, `Forbidden shortcuts`, `Acceptance criteria`, `Required evidence: Unit/integration test.`, `Mandatory documentation sync`, `Closure`) while marking `Status: DONE` and recording truthful `Evidence`. Phase P-07 status updated to `IN_PROGRESS`. |
+| **S** | Master Plan & HANDOFF Parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized: P-07.01 is `DONE`, active phase is `P-07`, next exact task is `P-07.02 — Implement six specialized ADK agent definitions with bounded instructions/tool sets`. |
+| **T** | Bilingual Public Document Parity | **PASS** | `README.md` and `README.tr.md` synchronized bilingually: Phase P-07 marked `IN_PROGRESS`, P-07.01 marked `IMPLEMENTED`, P-07.02+ marked `PENDING`, unit test count updated to 643 passed. |
+| **U** | Architecture Document Honesty | **PASS** | `docs/ARCHITECTURE.md` updated: Change Orchestrator intake skeleton marked `IMPLEMENTED` (P-07.01); routing, saga, and recovery remain `PLANNED`. |
+| **V** | Historical Evidence & Tracked File Count | **PASS** | Historical P-06.03 (125 files), P-06.04 (128 files), and P-06.05 (129 files) counts preserved. Current tracked file count is 133 files (+4 new files: `src/__init__.py`, `src/agents/__init__.py`, `src/agents/change_orchestrator.py`, `tests/test_p07_01_change_orchestrator.py`). |
+| **W** | Dead-Code, Unused-Import & Placeholder Audit | **PASS** | Zero TODO/FIXME markers in new code, zero unused imports in new code, zero dead code. |
 
 ---
 
-## 2. Test Execution Summary (Clean-Checkout Baseline)
+## 2. Test Execution Summary
 
 | Suite | Scope / File | Passed | Errors / Fails | Status | Interface Status |
 |---|---|---:|---:|---|---|
-| P-05.01 | `tests/test_p05_01_contracts.py` | 41 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| P-05.02 | `tests/test_p05_02_lifecycle.py` | 24 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| P-05.03 | `tests/test_p05_03_evidence_contracts.py` | 54 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| P-05.04 | `tests/test_p05_04_core_innovation_contracts.py` | 175 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| P-05.05 | `tests/test_p05_05_event_envelope.py` | 82 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| P-05.06 | `tests/test_p05_06_contract_conventions.py` | 214 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| **Combined P-05** | *All 6 domain contract test files* | **590** | **0** | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| P-06.03 | `tests/test_p06_03_config_safety.py` | 14 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| P-06.04 | `tests/test_p06_04_commands.py` | 15 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| **Total Unit / Local** | `uv run python scripts/cmd.py unit` | **619** | **0** | **PASS** | CLEAN_CHECKOUT_VERIFIED |
-| **Full Repository** | `python -m pytest tests/` | **619** | **3** | **FAIL** (Known baseline GCP fixture errors) | CLEAN_CHECKOUT_VERIFIED |
+| P-05.01 | `tests/test_p05_01_contracts.py` | 41 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
+| P-05.02 | `tests/test_p05_02_lifecycle.py` | 24 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
+| P-05.03 | `tests/test_p05_03_evidence_contracts.py` | 54 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
+| P-05.04 | `tests/test_p05_04_core_innovation_contracts.py` | 175 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
+| P-05.05 | `tests/test_p05_05_event_envelope.py` | 82 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
+| P-05.06 | `tests/test_p05_06_contract_conventions.py` | 214 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
+| P-06.03 | `tests/test_p06_03_config_safety.py` | 14 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
+| P-06.04 | `tests/test_p06_04_commands.py` | 15 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
+| **P-07.01** | `tests/test_p07_01_change_orchestrator.py` | **24** | **0** | **PASS** | **DETERMINISTIC_VERIFIED** |
+| **Total Unit / Local** | `uv run python scripts/cmd.py unit` | **643** | **0** | **PASS** | **DETERMINISTIC_VERIFIED** |
+| **Full Repository** | `uv run python -m pytest tests/` | **643** | **3** | **FAIL** (Known baseline GCP fixture errors) | **DETERMINISTIC_VERIFIED** |
 
 ---
 
-## 3. Command Execution Summary (Clean-Checkout Baseline)
+## 3. Command Execution Summary
 
-| Command | Check Semantics | Side-Effect Behavior | Underlying Check Result | Interface Contract Status |
-|---|---|---|---|---|
-| `uv run python scripts/cmd.py format` | `ruff format --check .` | Strictly non-mutating (check-only) | `FAIL` (Reports unformatted historical files) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py lint` | `ruff check .` | Strictly non-mutating (zero `--fix`) | `FAIL` (Reports historical lint debt) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py type-check` | `mypy domain tests` | Non-mutating type validation | `FAIL` (Reports 2 errors in `tests/test_gcp_access.py`) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py unit` | `pytest tests/ --ignore=tests/test_gcp_access.py` | Local deterministic test execution | `PASS` (619 passed) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py integration` | Standalone script guard | Fails closed by default; zero cloud calls | `FAIL_CLOSED` (Exit 1) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py integration --live-write-danger` | `python tests/test_gcp_access.py` | Dispatches script directly | `NOT_RUN` (Zero live cloud execution in audit) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py e2e` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-24/P-25 pending) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py demo` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-24 pending) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py deploy` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-28 pending) | **CLEAN_CHECKOUT_VERIFIED** |
-| `uv run python scripts/cmd.py teardown` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-28 pending) | **CLEAN_CHECKOUT_VERIFIED** |
+| Command | Executed Scope | Exit Code | Result | Notes |
+|---|---|---:|---|---|
+| `uv run pytest tests/test_p07_01_change_orchestrator.py -v` | Dedicated P-07.01 test suite | 0 | `PASS` | 24 tests passed |
+| `uv run ruff format --check src tests/test_p07_01_change_orchestrator.py` | Format check on new files | 0 | `PASS` | 4 files verified formatted |
+| `uv run ruff check src tests/test_p07_01_change_orchestrator.py` | Lint check on new files | 0 | `PASS` | 0 errors |
+| `uv run mypy src tests/test_p07_01_change_orchestrator.py` | Type-check on new files | 0 | `PASS` | 0 issues across 4 source files |
+| `uv run python scripts/cmd.py unit` | Canonical unit command | 0 | `PASS` | 643 passed across 9 test files |
+| `uv run python -m pytest tests/` | Full repository test suite | 1 | `FAIL` | 643 passed, 3 errors (known baseline `test_gcp_access.py`) |
 
 ---
 
-## 4. Known Baseline Errors (Unrelated GCP Access Fixtures)
+## 4. Tracked File Inventory (133 Files)
 
-| Test | Error | Root Cause |
-|---|---|---|
-| `test_firestore_access` | fixture 'project' not found | Standalone script collected by pytest in `tests/test_gcp_access.py` |
-| `test_pubsub_access` | fixture 'project' not found | Standalone script collected by pytest in `tests/test_gcp_access.py` |
-| `test_cloud_run_access` | fixture 'project' not found | Standalone script collected by pytest in `tests/test_gcp_access.py` |
-
----
-
-## 5. P-Ω Final Verdict
-
-**PASS** — All 23 whole-repository integrity audit checks pass.
-Phase `P-06 — Local Development Environment and Dependency Freeze` is complete (`DONE`).
-Clean-checkout reproducibility from a separate directory outside the canonical workspace has been verified with explicit runtime-interpreter execution, tested Git version transparency, and precise cache language. All 619 unit/contract tests pass. All developer command semantics and baseline failure states reproduced with 100% fidelity. Full live-document parity is synchronized across `README.md`, `README.tr.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, `docs/SUBMISSION_MANIFEST.md`, `AGENT_ENVIRONMENT_AND_API.md`, and `docs/P-06.05_CLEAN_CHECKOUT_LOG.md`. Historical evidence counts (125, 128) are preserved; current tracked-file count is 129. Next eligible task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`.
+Tracked files increased from 129 to 133 (+4 files):
+1. `src/__init__.py`
+2. `src/agents/__init__.py`
+3. `src/agents/change_orchestrator.py`
+4. `tests/test_p07_01_change_orchestrator.py`

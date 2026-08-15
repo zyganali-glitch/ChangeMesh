@@ -15,7 +15,8 @@ Bu repo uygulama öncesi / yarışma inşa aşamasındadır:
 - **Güvenli yerel yapılandırma şablonu ve sır yönetimi (P-06.03):** `IMPLEMENTED` (`DONE` — varsayılan sır içermeyen `.env.example` şablonu, ADC öncelikli kimlik doğrulama, kapsamlı `.gitignore` koruması, 14 yapılandırma güvenlik testi)
 - **Kanonik komut arayüzü (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, format, lint, type-check, unit, integration, e2e, demo, deploy, teardown komutları sıkı güvenlik sınırları ile tanımlandı)
 - **P-06 Yerel Geliştirme Ortamı ve Bağımlılık Dondurma Fazı:** `IMPLEMENTED` (`DONE` — P-06.01–P-06.05 tamamlandı; ayrı dizinden temiz klon doğrulaması [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md) ile kanıtlandı)
-- **Çalışma zamanı ürün ve ajan geliştirmesi:** P-07+ aşamasında başlayacaktır (`PLANNED`).
+- **P-07 Google ADK Ajan İskeleti Fazı:** `IN_PROGRESS` (P-07.01 Değişiklik Orkestratörü ADK iskeleti `IMPLEMENTED` — tipli ChangeRequest alımı, bağımsız change_id üretimi, ChangeState.RECEIVED başlangıç durumu ve sıfır harici yazma ile tamamlandı; P-07.02+ `PENDING`)
+- **Çalışma zamanı ürün ve ajan filosu geliştirmesi:** P-07+ aşamasında başlamıştır (`IN_PROGRESS`). Uzmanlaşmış ajan filosu tanımları (P-07.02), deterministik yönlendirme (P-07.03) ve Gemini yapılandırılmış akıl yürütme (P-08) `PENDING` durumundadır.
 
 Gerçek kanıt olmadan hiçbir özellik tamamlanmış gösterilemez (`PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`).
 
@@ -53,7 +54,7 @@ Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yenid
    ```bash
    uv run python scripts/cmd.py unit
    ```
-   *(P-05 domain kontratları, P-06.03 yapılandırma güvenliği ve P-06.04 komut kontratlarını kapsayan 619 testin tamamını 0 çıkış koduyla çalıştırır).*
+   *(P-05 domain kontratları, P-06.03 yapılandırma güvenliği, P-06.04 komut kontratları ve P-07.01 Değişiklik Orkestratörü ADK iskeletini kapsayan 643 testin tamamını 0 çıkış koduyla çalıştırır).*
 
 ### Yapılandırma ve Kimlik Doğrulama Sınırı
 
@@ -66,7 +67,7 @@ Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yenid
 
 | Komut | Eylem | Denetim Semantiği | Temel Hat Sonucu |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Birim testleri çalıştır | Yerel deterministik test çalıştırma | `PASS` (619 geçti) |
+| `uv run python scripts/cmd.py unit` | Birim testleri çalıştır | Yerel deterministik test çalıştırma | `PASS` (643 geçti) |
 | `uv run python scripts/cmd.py format` | Format denetimi | Değişiklik yapmayan (`ruff format --check .`) | `FAIL` (tarihsel format borcu) |
 | `uv run python scripts/cmd.py lint` | Lint denetimi | Değişiklik yapmayan (`ruff check .`, sıfır `--fix`) | `FAIL` (tarihsel lint borcu) |
 | `uv run python scripts/cmd.py type-check` | Tip denetimi | Değişiklik yapmayan (`mypy domain tests`) | `FAIL` (`test_gcp_access.py` tarihsel tip borcu) |

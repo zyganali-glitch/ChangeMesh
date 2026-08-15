@@ -21,7 +21,7 @@ Managed-service integrations remain conditional on real access and must be label
 
 ## 3. Agent architecture and target components
 
-- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): owns ADK routing, saga coordination, and recovery; durable workflow state is owned by Firestore Saga.
+- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): ADK intake skeleton implemented (P-07.01); routing, saga coordination, and recovery PLANNED; durable workflow state is owned by Firestore Saga.
 - `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection, repository overlap, and parallel-change conflict detection (CS-BLAST-001, GL-CONFLICT-001 unified).
 - `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks (ZK-PRIV-001).
 - `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation and migration boundaries (CS-MIG-001).
@@ -42,6 +42,7 @@ Additional core targets:
 ## 4. Core modules
 
 - `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions)
+- `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; specialized agents P-07.02 PLANNED)
 - `api`: API entrypoint for HTTP/REST and webhook invocations (PLANNED)
 - `orchestration`: ADK composition, routing, saga transitions (PLANNED)
 - `events`: Pub/Sub envelope, replay, dead-letter handling (PLANNED)

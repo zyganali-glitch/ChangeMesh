@@ -120,7 +120,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-04` | Architecture and Authority Map | `DONE` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `DONE` | `P-04` |
 | `P-06` | Local Development Environment and Dependency Freeze | `DONE` | `P-05` |
-| `P-07` | Google ADK Agent Skeleton | `PENDING` | `P-06` |
+| `P-07` | Google ADK Agent Skeleton | `IN_PROGRESS` | `P-06` |
 | `P-08` | Gemini Integration and Structured Reasoning Boundary | `PENDING` | `P-07` |
 | `P-09` | Pub/Sub Event Backbone | `PENDING` | `P-08` |
 | `P-10` | Firestore State, Idempotency, and Saga Persistence | `PENDING` | `P-09` |
@@ -748,15 +748,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-07 — Google ADK Agent Skeleton
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement Change Orchestrator ADK skeleton with no external writes.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Receives typed ChangeRequest and creates change ID/state.
 - **Required evidence:** Unit/integration test.
+- **Evidence:** Implemented canonical Change Orchestrator ADK skeleton (`ChangeOrchestrator`, `ChangeRuntimeState`) in `src/agents/change_orchestrator.py` as a subclass of Google ADK `BaseAgent` (`google.adk.agents.base_agent.BaseAgent`). Intake boundary accepts typed `ChangeRequest` domain contract, fails closed with `TypeError` on untyped/invalid inputs, generates a distinct non-blank `change_id` (injectable/controllable for deterministic testing), initializes state strictly to `ChangeState.RECEIVED`, preserves `request_id` and contract immutability, and executes with zero external writes, zero cloud credentials, and zero model invocations. 24 dedicated unit and local ADK integration tests in `tests/test_p07_01_change_orchestrator.py` all passed (`24 passed`), including real `google.adk.runners.Runner` with `InMemorySessionService` in-process execution. Canonical unit command `uv run python scripts/cmd.py unit` passed with 643 tests (exit code 0). Clean new-file linting (`ruff check`), formatting (`ruff format --check`), and type checking (`mypy`) verified with 0 errors.
 - **Mandatory documentation sync:** Architecture, README status.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
