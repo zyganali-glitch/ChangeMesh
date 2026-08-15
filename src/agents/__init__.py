@@ -30,6 +30,14 @@ from src.agents.registry import (
     list_canonical_agent_definitions,
 )
 from src.agents.release_steward import ReleaseSteward
+from src.agents.router import (
+    DeterministicRouter,
+    RoutingOutcome,
+    RoutingRejectionReason,
+    RoutingRequest,
+    RoutingResult,
+    RoutingTraceRecord,
+)
 from src.agents.schemas import (
     EvidenceAuditorInput,
     EvidenceAuditorOutput,
@@ -72,6 +80,13 @@ __all__ = [
     "get_canonical_roles",
     "list_canonical_agent_classes",
     "list_canonical_agent_definitions",
+    # Deterministic Routing & Delegation (P-07.03)
+    "DeterministicRouter",
+    "RoutingRequest",
+    "RoutingResult",
+    "RoutingTraceRecord",
+    "RoutingOutcome",
+    "RoutingRejectionReason",
     # Specialized Input/Output Schemas
     "ImpactScoutInput",
     "ImpactScoutOutput",

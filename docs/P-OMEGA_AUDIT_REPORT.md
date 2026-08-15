@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-07.02 Authority-Contract Repair Closure
+# P-Ω Whole-Repository Integrity Audit — P-07.03 Deterministic Routing Closure
 
-> **Produced by:** P-07.02 Implement six specialized ADK agent definitions with bounded instructions/tool sets (Authority-Contract Repair)  
+> **Produced by:** P-07.03 Implement deterministic routing/delegation for initial workflow  
 > **Date:** 2026-08-15  
-> **Canonical Entry Remote SHA:** `990e9af07b4f77148ad98adb5cf6ee32a1520997`  
+> **Canonical Entry Remote SHA:** `c9d6f79c4c3b85b6e4425dca99a8cf43c2efb405`  
 > **Canonical Remote URL:** `https://github.com/zyganali-glitch/ChangeMesh.git`  
 > **Canonical Branch:** `main`  
 
@@ -12,26 +12,26 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Entry SHA `990e9af07b4f77148ad98adb5cf6ee32a1520997` verified via `git fetch origin` and `git rev-parse HEAD` & `origin/main`. Working tree clean at task start. |
-| **B** | Changed-File Repair Scope & Strictness | **PASS** | Only files required for the authority-contract repair and closure modified: `src/agents/schemas.py`, `src/agents/definition.py`, `src/agents/policy_guardian.py`, `tests/test_p07_02_agent_definitions.py`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md`. Zero domain contract mutations. |
-| **C** | Frozen Domain Contracts Untouched | **PASS** | `domain/contracts/` has 0 diff. `domain/contracts/autonomy.py` is imported and reused directly without duplication or mutation. |
-| **D** | Canonical AutonomyDecision Contract Reuse | **PASS** | `PolicyGuardianOutput` in `src/agents/schemas.py` carries typed `autonomy_decision: AutonomyDecision` instead of free-form `autonomy_class: str`. All domain-contract invariants are actively evaluated at the boundary. |
-| **E** | Exact Five AutonomyClass Vocabulary Preserved | **PASS** | `AutonomyClass` contains exactly: `AUTO_EXECUTE`, `AUTO_EXECUTE_AND_NOTIFY`, `REHEARSE_THEN_EXECUTE`, `HUMAN_AUTHORITY_REQUIRED`, `BLOCKED`. All five representable and verified in `test_all_five_canonical_autonomy_classes_representable_in_policy_guardian_output`. |
-| **F** | HUMAN_AUTHORITY_REQUIRED Authority-Slot Invariant | **PASS** | `HUMAN_AUTHORITY_REQUIRED` without `authority_slot_ref` is strictly rejected with `ValidationError` (`test_human_authority_required_without_slot_ref_rejected`). Blank string slot references also fail closed. Other classes carrying `authority_slot_ref` are rejected (`test_auto_execute_classes_with_authority_slot_ref_rejected`). |
-| **G** | REHEARSE_THEN_EXECUTE Rehearsal-Ref Invariant | **PASS** | `REHEARSE_THEN_EXECUTE` without `required_rehearsal_refs` is rejected with `ValidationError` (`test_rehearse_then_execute_rehearsal_ref_invariants`). |
-| **H** | Invalid Autonomy Synonyms Rejected | **PASS** | Non-canonical strings (`NEEDS_APPROVAL`, `MANUAL_REVIEW`, `UNSURE`, `AUTO`, `DENIED`, `PENDING`) cannot enter the boundary (`test_non_canonical_autonomy_synonyms_rejected`). |
-| **I** | Policy Authority-Source vs Evaluator/Enforcer Role | **PASS** | `ORGANIZATIONAL_POLICY` is the sole authority source; `PolicyGuardian` is evaluator/enforcer. `PolicyGuardian.declared_capabilities` reflects `autonomy_classification_evaluation`. `POLICY_GUARDIAN_INSTRUCTION` explicitly prohibits authoring policy or manufacturing human authority. |
-| **J** | LIVE_WRITE != HUMAN_AUTHORITY_REQUIRED | **PASS** | `POLICY_GUARDIAN_INSTRUCTION` explicitly notes `LIVE_WRITE` does not imply `HUMAN_AUTHORITY_REQUIRED`. Verified by test that `LIVE_WRITE` can be classified as `AUTO_EXECUTE` or `REHEARSE_THEN_EXECUTE` by policy (`test_live_write_does_not_imply_human_authority_required`). |
-| **K** | Model Uncertainty Cannot Create Human Authority | **PASS** | Preserved across `POLICY_GUARDIAN_INSTRUCTION`, `AutonomyDecision` schema, and `PolicyGuardian` definition. |
-| **L** | Exact Six Canonical Agents Total | **PASS** | Exactly 6 canonical agent classes in registry: `ChangeOrchestrator`, `ImpactScout`, `PolicyGuardian`, `MigrationEngineer`, `EvidenceAuditor`, `ReleaseSteward`. Zero 7th or invented agents. |
-| **M** | P-07.03 & P-08 Non-Leakage | **PASS** | Zero routing tables, zero dispatch algorithms, zero Gemini/Vertex AI invocations, zero cloud writes. |
-| **N** | Dedicated P-07.02 Test Suite | **PASS** | `uv run pytest tests/test_p07_02_agent_definitions.py -v` -> `59 passed in 2.36s` (exit code 0; increased from 49 to 59 passed). |
-| **O** | P-07.01 Regression Verification | **PASS** | `uv run pytest tests/test_p07_01_change_orchestrator.py -v` -> `24 passed in 2.03s` (exit code 0). |
-| **P** | Canonical Unit Test Suite | **PASS** | `uv run python scripts/cmd.py unit` -> `702 passed in 5.54s` (exit code 0; increased from 692 to 702 passed across 10 test files). |
-| **Q** | Full Repository Test Suite Honest Status | **PASS** | `uv run python -m pytest tests/` -> `702 passed, 3 errors in 6.17s` (exit code 1; STATUS = `FAIL`, honestly reporting known baseline `test_gcp_access.py` missing fixture). |
-| **R** | Format, Lint, and Static Type Health | **PASS** | `ruff format --check`, `ruff check`, and `mypy` all pass with 0 errors across changed source and test files. |
-| **S** | Master Plan Task-Contract Preservation | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` P-07.02 task preserves all original binding fields with `Status: DONE` and truthful `Evidence`. Phase P-07 status is `IN_PROGRESS`. |
-| **T** | Master Plan & HANDOFF Parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized: P-07.02 is `DONE`, active phase is `P-07`, next exact task is `P-07.03 — Implement deterministic routing/delegation for initial workflow`. |
+| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Entry SHA `c9d6f79c4c3b85b6e4425dca99a8cf43c2efb405` verified via `git fetch origin` and `git rev-parse HEAD` & `origin/main`. Working tree clean at task start. |
+| **B** | Changed-File Scope & Strictness | **PASS** | Only files required for P-07.03 routing and documentation sync modified/created: `src/agents/router.py`, `src/agents/change_orchestrator.py`, `src/agents/__init__.py`, `tests/test_p07_03_routing.py`, `docs/ARCHITECTURE.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, `docs/P-OMEGA_AUDIT_REPORT.md`. Zero domain contract mutations. |
+| **C** | Frozen Domain Contracts Untouched | **PASS** | `domain/contracts/` has 0 diff. Domain contracts remain provider-neutral. |
+| **D** | Deterministic Routing Engine Implemented | **PASS** | `DeterministicRouter`, `RoutingRequest`, `RoutingResult`, `RoutingTraceRecord`, `RoutingOutcome`, and `RoutingRejectionReason` implemented in `src/agents/router.py`. |
+| **E** | Exact Deterministic Capability Matching | **PASS** | Matching strictly checks `req_cap in specialist.declared_capabilities` using canonical `declared_capabilities` from P-07.02 `AgentDefinition`. No fuzzy matching, no substring matching, no regex, no synonym mapping, no LLM interpretation. |
+| **F** | Strict Input Contract Matching | **PASS** | Evaluates `isinstance(request.payload, selected_specialist.input_schema)`. Mismatched payloads rejected with `INPUT_CONTRACT_MISMATCH`. |
+| **G** | Specialist Target Rule & Self-Delegation Prohibited | **PASS** | Change Orchestrator coordinates routing and cannot delegate to itself (`SELF_DELEGATION_PROHIBITED`). Valid delegation targets are strictly the five specialized agents: `ImpactScout`, `PolicyGuardian`, `MigrationEngineer`, `EvidenceAuditor`, `ReleaseSteward`. |
+| **H** | Fail-Closed on Unknown / Blank / Fuzzy Capabilities | **PASS** | Blank capability strings rejected (`BLANK_CAPABILITY` / `ValidationError`). Unknown capabilities rejected (`UNKNOWN_CAPABILITY`). Fuzzy/substring/cased names rejected. |
+| **I** | Fail-Closed on Ambiguous Matches | **PASS** | If multiple specialists match capability requirements, router fails closed with `AMBIGUOUS_MATCH` instead of picking first or sorting. |
+| **J** | Routing != Authorization | **PASS** | Selecting an agent does not grant permissions, does not synthesize policy, does not override `AutonomyDecision`, does not create approvals. `LIVE_WRITE != HUMAN_AUTHORITY_REQUIRED` preserved. |
+| **K** | Non-Leakage of Future Phases | **PASS** | Zero fallback/concurrency logic (P-07.04 PENDING); zero global revision propagation (P-07.05 PENDING); zero Gemini/Vertex AI invocations (P-08 PENDING); zero Pub/Sub publishing (P-09 PENDING); zero Firestore mutation (P-10 PENDING); zero Capability Passport runtime fabrication (P-12 PENDING); zero external writes (P-15–P-19 PENDING). |
+| **L** | Deterministic Machine-Testable Routing Trace | **PASS** | `RoutingTraceRecord` captures complete routing facts (`trace_id`, `change_id`, `outcome`, `required_capabilities`, `payload_type`, `selected_agent_id`, `selected_role`, `selected_agent_revision`, `capability_match_passed`, `contract_match_passed`, `rejection_reason`, `evaluated_candidates`, `timestamp`). Sanitized and credential-free. |
+| **M** | In-Process Google ADK Runner Smoke Integration | **PASS** | Deterministically selected specialist executed via `google.adk.runners.Runner` + `InMemorySessionService` locally and in-process. |
+| **N** | Dedicated P-07.03 Test Suite | **PASS** | `uv run pytest tests/test_p07_03_routing.py -v` -> `50 passed in 2.38s` (exit code 0). |
+| **O** | P-07.02 Regression Verification | **PASS** | `uv run pytest tests/test_p07_02_agent_definitions.py -v` -> `59 passed in 5.57s` (exit code 0). |
+| **P** | P-07.01 Regression Verification | **PASS** | `uv run pytest tests/test_p07_01_change_orchestrator.py -v` -> `24 passed in 4.94s` (exit code 0). |
+| **Q** | Canonical Unit Test Suite | **PASS** | `uv run python scripts/cmd.py unit` -> `752 passed in 13.45s` (exit code 0; increased from 702 to 752 passed across 11 test files). |
+| **R** | Full Repository Test Suite Honest Status | **PASS** | `uv run python -m pytest tests/` -> `752 passed, 3 errors in 16.64s` (exit code 1; STATUS = `FAIL`, honestly reporting known baseline `test_gcp_access.py` missing fixture). |
+| **S** | Format, Lint, and Static Type Health | **PASS** | `ruff format --check`, `ruff check`, and `mypy` all pass with 0 errors across changed source and test files. |
+| **T** | Master Plan & HANDOFF Parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized: P-07.03 is `DONE`, active phase is `P-07`, next exact task is `P-07.04 — Implement sequential fallback and controlled parallel branches`. |
 
 ---
 
@@ -48,9 +48,10 @@
 | P-06.03 | `tests/test_p06_03_config_safety.py` | 14 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
 | P-06.04 | `tests/test_p06_04_commands.py` | 15 | 0 | **PASS** | DETERMINISTIC_VERIFIED |
 | P-07.01 | `tests/test_p07_01_change_orchestrator.py` | 24 | 0 | **PASS** | **DETERMINISTIC_VERIFIED** |
-| **P-07.02** | `tests/test_p07_02_agent_definitions.py` | **59** | **0** | **PASS** | **DETERMINISTIC_VERIFIED** |
-| **Total Unit / Local** | `uv run python scripts/cmd.py unit` | **702** | **0** | **PASS** | **DETERMINISTIC_VERIFIED** |
-| **Full Repository** | `uv run python -m pytest tests/` | **702** | **3** | **FAIL** (Known baseline GCP fixture errors) | **DETERMINISTIC_VERIFIED** |
+| P-07.02 | `tests/test_p07_02_agent_definitions.py` | 59 | 0 | **PASS** | **DETERMINISTIC_VERIFIED** |
+| **P-07.03** | `tests/test_p07_03_routing.py` | **50** | **0** | **PASS** | **DETERMINISTIC_VERIFIED** |
+| **Total Unit / Local** | `uv run python scripts/cmd.py unit` | **752** | **0** | **PASS** | **DETERMINISTIC_VERIFIED** |
+| **Full Repository** | `uv run python -m pytest tests/` | **752** | **3** | **FAIL** (Known baseline GCP fixture errors) | **DETERMINISTIC_VERIFIED** |
 
 ---
 
@@ -58,10 +59,11 @@
 
 | Command Line | Expected Outcome | Actual Outcome | Exit Code | Gate Verdict |
 |---|---|---|---:|---|
-| `uv run pytest tests/test_p07_02_agent_definitions.py -v` | 59 passed | 59 passed in 2.36s | 0 | **PASS** |
-| `uv run pytest tests/test_p07_01_change_orchestrator.py -v` | 24 passed | 24 passed in 2.03s | 0 | **PASS** |
-| `uv run python scripts/cmd.py unit` | 702 passed | 702 passed in 5.54s | 0 | **PASS** |
-| `uv run python -m pytest tests/` | 702 passed, 3 errors | 702 passed, 3 errors in 6.17s | 1 | **FAIL** (Known baseline) |
-| `uv run ruff format --check src/agents/schemas.py src/agents/definition.py src/agents/policy_guardian.py tests/test_p07_02_agent_definitions.py` | 4 files formatted | 4 files already formatted | 0 | **PASS** |
-| `uv run ruff check src/agents/schemas.py src/agents/definition.py src/agents/policy_guardian.py tests/test_p07_02_agent_definitions.py` | 0 lint errors | All checks passed! | 0 | **PASS** |
-| `uv run mypy src/agents/schemas.py src/agents/definition.py src/agents/policy_guardian.py tests/test_p07_02_agent_definitions.py` | 0 type errors | Success: no issues found in 4 source files | 0 | **PASS** |
+| `uv run pytest tests/test_p07_03_routing.py -v` | 50 passed | 50 passed in 2.38s | 0 | **PASS** |
+| `uv run pytest tests/test_p07_02_agent_definitions.py -v` | 59 passed | 59 passed in 5.57s | 0 | **PASS** |
+| `uv run pytest tests/test_p07_01_change_orchestrator.py -v` | 24 passed | 24 passed in 4.94s | 0 | **PASS** |
+| `uv run python scripts/cmd.py unit` | 752 passed | 752 passed in 13.45s | 0 | **PASS** |
+| `uv run python -m pytest tests/` | 752 passed, 3 errors | 752 passed, 3 errors in 16.64s | 1 | **FAIL** (Known baseline) |
+| `uv run ruff format --check src/agents/router.py src/agents/change_orchestrator.py src/agents/__init__.py tests/test_p07_03_routing.py` | 4 files formatted | 4 files already formatted | 0 | **PASS** |
+| `uv run ruff check src/agents/router.py src/agents/change_orchestrator.py src/agents/__init__.py tests/test_p07_03_routing.py` | 0 lint errors | All checks passed! | 0 | **PASS** |
+| `uv run mypy src/agents/router.py src/agents/change_orchestrator.py src/agents/__init__.py tests/test_p07_03_routing.py` | 0 type errors | Success: no issues found in 4 source files | 0 | **PASS** |

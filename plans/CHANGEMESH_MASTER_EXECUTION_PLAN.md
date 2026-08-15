@@ -774,11 +774,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-07.03 — Implement deterministic routing/delegation for initial workflow
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement deterministic routing/delegation for initial workflow.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Orchestrator delegates only when contract and capability requirements match.
 - **Required evidence:** Routing tests and trace.
+- **Evidence:** Implemented deterministic routing and delegation engine (`DeterministicRouter`, `RoutingRequest`, `RoutingResult`, `RoutingTraceRecord`, `RoutingOutcome`, `RoutingRejectionReason`) in `src/agents/router.py` and integrated into `ChangeOrchestrator` (`route_delegation`, `delegate`) in `src/agents/change_orchestrator.py`. Enforced exact deterministic capability matching against canonical declared capabilities (no fuzzy, substring, or synonym matching) and strict input schema contract matching against the selected specialist's `input_schema`. Enforced fail-closed behavior on: blank capability, unknown capability, no matching specialist, contract mismatch, self-delegation attempts by Change Orchestrator, and ambiguous multiple matching specialists. Generated immutable, credential-free, machine-testable `RoutingTraceRecord` for every routing evaluation. Verified that routing does not create authorization, does not synthesize policy, does not alter AutonomyDecision, and that selecting Release Steward does not grant write permissions. Verified zero Gemini/LLM invocations, zero external network calls, and zero external writes. 50 dedicated unit and ADK smoke tests in `tests/test_p07_03_routing.py` passed (`50 passed`), including in-process `google.adk.runners.Runner` + `InMemorySessionService` execution. P-07.02 (`59 passed`) and P-07.01 (`24 passed`) regression suites passed. Canonical unit suite `uv run python scripts/cmd.py unit` passed with 752 tests (0 failures). Formatting (`ruff format --check`), linting (`ruff check`), and static typing (`mypy`) verified with 0 errors across all changed source files.
 - **Mandatory documentation sync:** Architecture.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

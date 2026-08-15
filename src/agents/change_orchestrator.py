@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Callable, ClassVar, Type
+from typing import TYPE_CHECKING, AsyncGenerator, Callable, ClassVar, Type
 
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
@@ -38,6 +38,9 @@ from src.agents.definition import (
     CHANGE_ORCHESTRATOR_INSTRUCTION,
     AgentDefinition,
 )
+
+if TYPE_CHECKING:
+    from src.agents.router import DeterministicRouter, RoutingRequest, RoutingResult
 
 
 class ChangeRuntimeState(BaseModel):
@@ -187,6 +190,45 @@ class ChangeOrchestrator(BaseAgent):
     ) -> ChangeRuntimeState:
         """Alias for initialize_change."""
         return self.initialize_change(request, id_generator=id_generator)
+
+    def route_delegation(
+        self,
+        routing_request: RoutingRequest,
+        *,
+        router: DeterministicRouter | None = None,
+    ) -> RoutingResult:
+        """Route a delegation request deterministically to a specialized agent.
+
+        P-07.03: Orchestrator delegates only when capability and contract requirements match.
+
+        Args:
+            routing_request: Typed RoutingRequest with required capabilities and payload.
+            router: Optional DeterministicRouter instance (defaults to default canonical router).
+
+        Returns:
+            RoutingResult containing the outcome, selected agent/definition,
+            and deterministic trace.
+
+        Raises:
+            TypeError: If routing_request is not an instance of RoutingRequest.
+        """
+        from src.agents.router import DeterministicRouter, RoutingRequest
+
+        if not isinstance(routing_request, RoutingRequest):
+            raise TypeError(
+                f"Expected RoutingRequest instance, got {type(routing_request).__name__}"
+            )
+        active_router = router or DeterministicRouter()
+        return active_router.route(routing_request)
+
+    def delegate(
+        self,
+        routing_request: RoutingRequest,
+        *,
+        router: DeterministicRouter | None = None,
+    ) -> RoutingResult:
+        """Alias for route_delegation."""
+        return self.route_delegation(routing_request, router=router)
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         """ADK core execution logic for the Change Orchestrator.
