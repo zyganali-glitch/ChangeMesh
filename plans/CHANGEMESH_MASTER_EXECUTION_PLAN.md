@@ -763,11 +763,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-07.02 — Implement six specialized ADK agent definitions with bounded instructions/tool sets
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement six specialized ADK agent definitions with bounded instructions/tool sets.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Each exposes role, capability, forbidden actions, input/output schema, revision.
 - **Required evidence:** Agent-contract tests.
+- **Evidence:** Implemented exactly six canonical Google ADK `BaseAgent` definitions with bounded instructions and tool sets in `src/agents/`: `ChangeOrchestrator` (`src/agents/change_orchestrator.py`), `ImpactScout` (`src/agents/impact_scout.py`), `PolicyGuardian` (`src/agents/policy_guardian.py`), `MigrationEngineer` (`src/agents/migration_engineer.py`), `EvidenceAuditor` (`src/agents/evidence_auditor.py`), and `ReleaseSteward` (`src/agents/release_steward.py`). Implemented runtime `AgentDefinition` contract model, bounded system instructions, and 18 canonical tool descriptors in `src/agents/definition.py`. Implemented frozen input/output boundary schemas in `src/agents/schemas.py`. Implemented fleet registry and fail-closed lookups in `src/agents/registry.py`. Each agent exposes: `agent_id`, `role`, `agent_revision`, `description`, `declared_capabilities`, `forbidden_actions`, `input_schema`, `output_schema`, `instruction_contract`, `permitted_tool_ids`, and `permitted_data_classifications`. Conversion to frozen domain contract `AgentDescriptor` verified. 49 dedicated tests in `tests/test_p07_02_agent_definitions.py` passed (`49 passed`), including local ADK `Runner` + `InMemorySessionService` execution, zero external network/credentials verification, and 4-lane authority invariants. Canonical unit test command `uv run python scripts/cmd.py unit` passed with 692 tests (0 failures). Formatting (`ruff format --check`), linting (`ruff check`), and static typing (`mypy`) verified with 0 errors across all 11 source files.
 - **Mandatory documentation sync:** Architecture, judging map.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

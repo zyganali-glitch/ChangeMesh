@@ -15,8 +15,8 @@ Bu repo uygulama öncesi / yarışma inşa aşamasındadır:
 - **Güvenli yerel yapılandırma şablonu ve sır yönetimi (P-06.03):** `IMPLEMENTED` (`DONE` — varsayılan sır içermeyen `.env.example` şablonu, ADC öncelikli kimlik doğrulama, kapsamlı `.gitignore` koruması, 14 yapılandırma güvenlik testi)
 - **Kanonik komut arayüzü (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, format, lint, type-check, unit, integration, e2e, demo, deploy, teardown komutları sıkı güvenlik sınırları ile tanımlandı)
 - **P-06 Yerel Geliştirme Ortamı ve Bağımlılık Dondurma Fazı:** `IMPLEMENTED` (`DONE` — P-06.01–P-06.05 tamamlandı; ayrı dizinden temiz klon doğrulaması [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md) ile kanıtlandı)
-- **P-07 Google ADK Ajan İskeleti Fazı:** `IN_PROGRESS` (P-07.01 Değişiklik Orkestratörü ADK iskeleti `IMPLEMENTED` — tipli ChangeRequest alımı, bağımsız change_id üretimi, ChangeState.RECEIVED başlangıç durumu ve sıfır harici yazma ile tamamlandı; P-07.02+ `PENDING`)
-- **Çalışma zamanı ürün ve ajan filosu geliştirmesi:** P-07+ aşamasında başlamıştır (`IN_PROGRESS`). Uzmanlaşmış ajan filosu tanımları (P-07.02), deterministik yönlendirme (P-07.03) ve Gemini yapılandırılmış akıl yürütme (P-08) `PENDING` durumundadır.
+- **P-07 Google ADK Ajan İskeleti Fazı:** `IN_PROGRESS` (P-07.01 Değişiklik Orkestratörü ADK iskeleti ve P-07.02 altı uzmanlaşmış ADK ajan tanımı ile sınırlandırılmış araç/talimat kontratları `IMPLEMENTED`; P-07.03+ `PENDING`)
+- **Çalışma zamanı ürün ve ajan filosu geliştirmesi:** P-07+ aşamasında başlamıştır (`IN_PROGRESS`). Uzmanlaşmış ajan filosu tanımları (P-07.02) `IMPLEMENTED`; deterministik yönlendirme (P-07.03) ve Gemini yapılandırılmış akıl yürütme (P-08) `PENDING` durumundadır.
 
 Gerçek kanıt olmadan hiçbir özellik tamamlanmış gösterilemez (`PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`).
 
