@@ -14,20 +14,64 @@ Bu repo uygulama öncesi / yarışma inşa aşamasındadır:
 - **Tekrarlanabilir bağımlılık bildirimleri ve kilit dosyaları (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` sürüm zorunluluğu, `uv.lock`, çalışma zamanı `requirements.txt`, geliştirme/test `requirements-dev.txt`)
 - **Güvenli yerel yapılandırma şablonu ve sır yönetimi (P-06.03):** `IMPLEMENTED` (`DONE` — varsayılan sır içermeyen `.env.example` şablonu, ADC öncelikli kimlik doğrulama, kapsamlı `.gitignore` koruması, 14 yapılandırma güvenlik testi)
 - **Kanonik komut arayüzü (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, format, lint, type-check, unit, integration, e2e, demo, deploy, teardown komutları sıkı güvenlik sınırları ile tanımlandı)
-- **P-06 Yerel Geliştirme Ortamı ve Bağımlılık Dondurma Fazı:** `IN_PROGRESS` (P-06.05 temiz klon doğrulaması `PENDING` durumundadır)
+- **P-06 Yerel Geliştirme Ortamı ve Bağımlılık Dondurma Fazı:** `IMPLEMENTED` (`DONE` — P-06.01–P-06.05 tamamlandı; ayrı dizinden temiz klon doğrulaması [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md) ile kanıtlandı)
 - **Çalışma zamanı ürün ve ajan geliştirmesi:** P-07+ aşamasında başlayacaktır (`PLANNED`).
 
 Gerçek kanıt olmadan hiçbir özellik tamamlanmış gösterilemez (`PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`).
 
-## Kurulum ve Yeniden Üretilebilirlik
+## Kurulum ve Temiz Klon Doğrulaması
 
-P-06.02 kapsamında hem çalışma zamanı hem de geliştirme/test bağımlılık kurulumu, kanonik çalışma kopyasında taze ve izole Python 3.13.5 sanal ortamlarında başarıyla doğrulanmıştır (`VERIFIED`).
+Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yeniden üretilebilirlik P-06.05 kapsamında tam sadakatle doğrulanmıştır ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md)).
 
-Güvenli yerel yapılandırma şablonu (`.env.example`), sıfır varsayılan sır kuralı ve ADC öncelikli yerel kimlik doğrulama politikası ile P-06.03 kapsamında oluşturulmuş ve doğrulanmıştır (`VERIFIED`).
+### Önkoşullar
 
-Ayrı bir dizinden temiz klon ile yeniden üretilebilirlik henüz çalıştırılmamıştır (`NOT_RUN`). İlk temiz klon kurulumunun yapılması ve kanıtlanması münhasıran P-06.05 (`PENDING`) görevine aittir.
+- **Python:** `3.13.5` (`uv` veya sistem CPython 3.13.5 ile yönetilir, `.python-version` içinde sabitlenmiştir)
+- **uv:** `0.11.28` (`pyproject.toml` `[tool.uv] required-version` içinde sabitlenmiştir)
+- **Git:** 2.40+
 
-Standart geliştirici komut akışı (`uv run python scripts/cmd.py format|lint|type-check|unit|integration`) P-06.04 kapsamında hayata geçirilmiştir. Gelecek fazlara ait komutlar (e2e, demo, deploy, teardown) arayüzde mevcuttur ancak uygulandıkları faza kadar güvenli şekilde başarısız olmaktadır. Eksiksiz kurulum dokümantasyonu P-06.05 fazına aittir ve temiz klon doğrulaması tamamlandıktan sonra yayımlanacaktır.
+> **Test Edilen Ortam:** Windows 11 x86_64, PowerShell 7, CPython 3.13.5, uv 0.11.28.
+
+### Hızlı Başlangıç (Geliştirme / Test Ortamı)
+
+1. **Depoyu klonlayın:**
+   ```bash
+   git clone https://github.com/zyganali-glitch/ChangeMesh.git
+   cd ChangeMesh
+   ```
+
+2. **Bağımlılıkları senkronize edin (deterministik dondurulmuş kurulum):**
+   ```bash
+   uv sync --frozen
+   ```
+
+3. **Bağımlılık uyumluluğunu doğrulayın:**
+   ```bash
+   uv pip check
+   ```
+
+4. **Birim testleri çalıştırın:**
+   ```bash
+   uv run python scripts/cmd.py unit
+   ```
+   *(P-05 domain kontratları, P-06.03 yapılandırma güvenliği ve P-06.04 komut kontratlarını kapsayan 619 testin tamamını 0 çıkış koduyla çalıştırır).*
+
+### Yapılandırma ve Kimlik Doğrulama Sınırı
+
+- **`.env` gereksizdir:** Yerel birim testleri, şema doğrulamaları ve komut denetimleri `.env` veya bulut sırrı gerektirmez.
+- **Güvenli şablon:** `.env.example`, sıfır varsayılan sır içeren kanonik ortam değişkeni yapısını sunar.
+- **Google Cloud Kimlik Doğrulaması:** Application Default Credentials (`gcloud auth application-default login`), yalnızca ilerleyen fazlarda açıkça yetkilendirilmiş canlı Google Cloud işlemleri çalıştırılırken gereklidir.
+- **Servis Hesabı Anahtarları:** Servis hesabı JSON anahtar dosyaları yasaktır ve `.gitignore` tarafından yok sayılır.
+
+### Kanonik Komutlar ve Temel Hat Durum Tablosu
+
+| Komut | Eylem | Denetim Semantiği | Temel Hat Sonucu |
+|---|---|---|---|
+| `uv run python scripts/cmd.py unit` | Birim testleri çalıştır | Yerel deterministik test çalıştırma | `PASS` (619 geçti) |
+| `uv run python scripts/cmd.py format` | Format denetimi | Değişiklik yapmayan (`ruff format --check .`) | `FAIL` (tarihsel format borcu) |
+| `uv run python scripts/cmd.py lint` | Lint denetimi | Değişiklik yapmayan (`ruff check .`, sıfır `--fix`) | `FAIL` (tarihsel lint borcu) |
+| `uv run python scripts/cmd.py type-check` | Tip denetimi | Değişiklik yapmayan (`mypy domain tests`) | `FAIL` (`test_gcp_access.py` tarihsel tip borcu) |
+| `uv run python scripts/cmd.py integration` | Entegrasyon testleri | Varsayılan olarak kapalı başarısız; sıfır bulut çağrısı | `FAIL_CLOSED` (`--live-write-danger` gerektirir) |
+| `uv run python scripts/cmd.py e2e\|demo\|deploy\|teardown` | Ertelenmiş eylemler | Kapalı başarısız; `NOT_RUN` basar | `NOT_RUN` (sahip fazlar bekleniyor) |
 
 ## Temel fikir
 

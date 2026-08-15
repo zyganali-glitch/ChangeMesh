@@ -16,7 +16,7 @@
 > - **Reproducible dependency manifests & lockfiles (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` version enforcement, `uv.lock`, runtime `requirements.txt`, dev/test `requirements-dev.txt`)
 > - **Safe local configuration & secret handling (P-06.03):** `IMPLEMENTED` (`DONE` — `.env.example` template with zero secret defaults, ADC-first local auth, comprehensive `.gitignore` credential/artifact protection, 14 config-safety tests)
 > - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py` defined for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown with strict execution safety boundaries)
-> - **Phase P-06 Local Dev & Dependency Freeze:** `IN_PROGRESS` (P-06.05 clean-checkout reproduction remains `PENDING`)
+> - **Phase P-06 Local Dev & Dependency Freeze:** `IMPLEMENTED` (`DONE` — P-06.01–P-06.05 complete; clean-checkout reproduction verified from separate directory in [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
 > - **Runtime product & agent implementation:** Begins in Phase P-07+ (`PLANNED`).
 >
 > Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
@@ -244,15 +244,59 @@ The binding, living roadmap is:
 
 No implementation task is complete until the plan, architecture, memory, environment notes, README, handoff, and affected judge-facing documents are synchronized.
 
-## Setup
+## Setup and Clean-Checkout Reproduction
 
-Dependency installation for both runtime and dev/test dependency graphs has been verified in fresh isolated Python 3.13.5 virtual environments on the canonical checkout under P-06.02 (`VERIFIED`).
+Clean-checkout reproducibility from a separate directory outside the canonical workspace has been verified under P-06.05 ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md)).
 
-A safe local configuration template (`.env.example`) with zero secret defaults and ADC-first local authentication policy is established and verified under P-06.03 (`VERIFIED`).
+### Prerequisites
 
-Clean-checkout reproducibility from a separate directory has not yet been executed and remains `NOT_RUN`. Phase P-06.05 exclusively owns the first clean-checkout reproduction and proof.
+- **Python:** `3.13.5` (managed via `uv` or system CPython 3.13.5, pinned in `.python-version`)
+- **uv:** `0.11.28` (pinned in `pyproject.toml` `[tool.uv] required-version`)
+- **Git:** 2.40+
 
-Standard developer workflow commands (`uv run python scripts/cmd.py format|lint|type-check|unit|integration`) have been implemented under P-06.04. Future execution phases (e2e, demo, deploy, teardown) exist in the interface but fail closed until implemented. Full setup publication belongs to P-06.05 and will be published once clean-checkout reproduction is formally proven.
+> **Environment Tested:** Windows 11 x86_64, PowerShell 7, CPython 3.13.5, uv 0.11.28.
+
+### Quick Start (Dev / Test Environment)
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/zyganali-glitch/ChangeMesh.git
+   cd ChangeMesh
+   ```
+
+2. **Synchronize dependencies (deterministic frozen install):**
+   ```bash
+   uv sync --frozen
+   ```
+
+3. **Verify dependency consistency:**
+   ```bash
+   uv pip check
+   ```
+
+4. **Run unit tests:**
+   ```bash
+   uv run python scripts/cmd.py unit
+   ```
+   *(Executes all 619 unit/contract tests across P-05 domain contracts, P-06.03 config safety, and P-06.04 command contracts with exit code 0).*
+
+### Configuration & Authentication Boundary
+
+- **No `.env` required:** Local unit tests, schema validations, and command checks do not require `.env` or cloud credentials.
+- **Safe template:** `.env.example` provides the canonical environment structure with zero secret defaults.
+- **Google Cloud Auth:** Application Default Credentials (`gcloud auth application-default login`) are required only when running explicitly authorized live Google Cloud operations in later phases.
+- **Service-Account Keys:** Service-account JSON key files are prohibited and strictly ignored by `.gitignore`.
+
+### Canonical Commands & Baseline Verification Status
+
+| Command | Action | Check Semantics | Baseline Result |
+|---|---|---|---|
+| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (619 passed) |
+| `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `FAIL` (historical format debt) |
+| `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `FAIL` (historical lint debt) |
+| `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests`) | `FAIL` (historical type debt in `test_gcp_access.py`) |
+| `uv run python scripts/cmd.py integration` | Integration tests | Fails closed by default; zero cloud calls | `FAIL_CLOSED` (requires `--live-write-danger`) |
+| `uv run python scripts/cmd.py e2e\|demo\|deploy\|teardown` | Deferred actions | Fail closed; print `NOT_RUN` | `NOT_RUN` (owning phases pending) |
 
 ## Product direction beyond the hackathon
 

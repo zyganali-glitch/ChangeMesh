@@ -14,5 +14,5 @@ Status: `NOT_FROZEN`
 - Screenshot pack: `NOT_FINAL`
 - Build-period disclosure: `NOT_FINAL`
 - Evidence manifest: `NOT_FINAL`
-- Clean-checkout reproduction: `NOT_RUN`
+- Clean-checkout reproduction: `VERIFIED` ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
 - Final claim audit: `NOT_RUN`

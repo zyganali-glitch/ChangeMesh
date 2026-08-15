@@ -1,9 +1,11 @@
-# P-Ω Whole-Repository Integrity Audit — P-06.04 Canonical Command Interface
+# P-Ω Whole-Repository Integrity Audit — P-06.05 Clean-Checkout Reproduction & P-06 Phase Closure
 
-> **Produced by:** P-06.04 Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown (Final Master Plan Contract Restoration)  
+> **Produced by:** P-06.05 Run first clean-checkout reproduction from separate directory (P-06 Local Development Environment and Dependency Freeze Phase Closure)  
 > **Date:** 2026-08-15  
-> **Repair Entry Remote SHA:** `54958f583255e63980765348322a897d84eea1cc`  
-> **Trusted Pre-P-06.04 Baseline SHA:** `03ec56003998d2f7621d5806019d1c414c74ddec`  
+> **Canonical Entry Remote SHA:** `6a6e8455d8092e25458b6fad3edac49d76653041`  
+> **Clean Clone Verified SHA:** `6a6e8455d8092e25458b6fad3edac49d76653041`  
+> **Canonical Remote URL:** `https://github.com/zyganali-glitch/ChangeMesh.git`  
+> **Canonical Branch:** `main`  
 
 ---
 
@@ -11,64 +13,64 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Entry SHA & baseline tracking | **PASS** | Entry SHA `54958f583255e63980765348322a897d84eea1cc` and pre-P-06.04 baseline SHA `03ec56003998d2f7621d5806019d1c414c74ddec` verified. |
-| **B** | Master Plan task-contract preservation | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` P-06.04 task block preserves all original binding fields (`Required action`, `Forbidden shortcuts`, `Acceptance criteria`, `Required evidence: Command registry and CI plan.`, `Mandatory documentation sync`, `Closure`) while updating `Status: DONE` and appending truthful `Evidence`. |
-| **C** | Out-of-scope domain contracts restoration | **PASS** | All 10 domain contract files (`domain/contracts/__init__.py`, `autonomy.py`, `capability.py`, `change_lifecycle.py`, `conventions.py`, `data_class.py`, `event_envelope.py`, `evidence.py`, `memory.py`, `rehearsal.py`) preserved byte-for-byte to baseline `03ec56003998d2f7621d5806019d1c414c74ddec`. Zero mass-formatting churn. |
-| **D** | Out-of-scope historical tests restoration | **PASS** | Historical test files (`tests/test_p05_01_contracts.py` through `test_p05_06_contract_conventions.py`, `test_p06_03_config_safety.py`, `test_gcp_access.py`) preserved byte-for-byte to baseline `03ec56003998d2f7621d5806019d1c414c74ddec`. Zero modernizing churn. |
-| **E** | Canonical command interface dispatcher | **PASS** | `scripts/cmd.py` implemented exposing all 9 canonical commands (`format`, `lint`, `type-check`, `unit`, `integration`, `e2e`, `demo`, `deploy`, `teardown`) via `argparse` CLI and direct functional interfaces. |
-| **F** | Format command check-only non-mutating semantics | **PASS** | `format_cmd` executes `ruff format --check .` (never mutates source code, zero `--fix`). Returns non-zero truthfully when unformatted files exist. Interface `VERIFIED`, underlying check `FAIL`. |
-| **G** | Lint command non-mutating semantics | **PASS** | `lint_cmd` executes `ruff check .` (strictly non-mutating, zero `--fix`). Propagates exit code 1 truthfully on historical lint debt without artificial weakening. Interface `VERIFIED`, underlying check `FAIL`. |
-| **H** | Type-check command contract & propagation | **PASS** | `typecheck_cmd` executes `mypy domain tests` without blanket suppressions, propagating exit code truthfully (reports 2 errors in `tests/test_gcp_access.py`). Interface `VERIFIED`, underlying check `FAIL`. |
-| **I** | Unit command test execution & isolation | **PASS** | `unit_cmd` executes `pytest tests/ --ignore=tests/test_gcp_access.py` with exit code 0 (`619 passed`). Excludes real GCP mutations. Interface `VERIFIED`, underlying check `PASS`. |
-| **J** | Integration command default fail-closed guard | **PASS** | `integration_cmd` fails closed with exit code 1 by default, outputting an error message to stderr with zero cloud access and zero network side effects. Interface `VERIFIED`. |
-| **K** | Integration authorized script entry dispatch | **PASS** | `integration_cmd` with `--live-write-danger` dispatches `python tests/test_gcp_access.py` directly (avoiding broken pytest fixture collection). Verified via mock dispatch in dedicated tests without live cloud execution. |
-| **L** | Deferred future commands fail-closed | **PASS** | `e2e`, `demo`, `deploy`, `teardown` fail closed with exit code 1 and output `NOT_RUN` (owning phases P-24, P-25, P-28 pending). |
-| **M** | Dedicated P-06.04 automated command tests | **PASS** | 15 automated unit/contract tests in `tests/test_p06_04_commands.py` passing (`15 passed, 0 failed`). Zero secret and zero cloud requirement. |
-| **N** | P-06.03 config-safety regression suite | **PASS** | 14 automated tests in `tests/test_p06_03_config_safety.py` passing (`14 passed, 0 failed`). |
-| **O** | Combined P-05 domain contracts regression suite | **PASS** | All 6 P-05 contract test files pass with 590 passed (`590 passed, 0 failed`). |
-| **P** | Full repository test suite status honestly recorded | **PASS** | Full suite execution honestly recorded as `FAIL` (619 passed, 3 errors: known baseline missing `project` fixture in `test_gcp_access.py`). |
-| **Q** | CI execution plan contract | **PASS** | `docs/CI_PLAN.md` documented detailing execution order, failure behavior, safe vs guarded commands, and future phase ownership. |
-| **R** | Dependency manifest & lock parity | **PASS** | `pyproject.toml` tool configuration audited; `uv.lock` and `requirements-dev.txt` include direct dev tools `ruff` and `mypy`; `requirements.txt` strictly excludes dev tooling; `uv sync --frozen` and `uv pip check` succeed with 0 incompatibilities. |
-| **S** | Tracked-file count & historical evidence integrity | **PASS** | Historical P-06.03 evidence (125 tracked files) preserved in records; current P-06.04 tracked-file count (128 files: 125 + `docs/CI_PLAN.md`, `scripts/cmd.py`, `tests/test_p06_04_commands.py`) freshly computed and verified via `git ls-files`. |
-| **T** | Bilingual Public Document Parity (README.md / README.tr.md) | **PASS** | `README.md` and `README.tr.md` synchronized: P-06.04 is marked `DONE`, P-06 is `IN_PROGRESS`, only P-06.05 clean-checkout reproduction remains `PENDING`. |
-| **U** | Master Plan & HANDOFF exact parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized with P-06.04 evidence, 619 unit passes, full suite status, and exact next task pointer. |
-| **V** | P-06.05 clean-checkout non-leakage | **PASS** | P-06.05 is NOT started. No separate-directory clone executed. `CLEAN_CHECKOUT_VERIFIED` claim is not made. |
-| **W** | Dead-code, unused-import & placeholder closure | **PASS** | Newly authored P-06.04 code (`scripts/cmd.py`, `tests/test_p06_04_commands.py`) is 100% clean with zero unused imports, zero lint errors, and zero dead code. |
+| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | `origin/main` verified at `6a6e8455d8092e25458b6fad3edac49d76653041` prior to task execution. |
+| **B** | Separate-Directory Clean Clone | **PASS** | Fresh clone performed into sanitized OS temp directory (`C:\Users\MEHMET\AppData\Local\Temp\changemesh-clean-ef29737c280046bea5e54cb967ad70fc\ChangeMesh`). No worktree, no local file copy, no inherited `.venv`/`.env`/caches. |
+| **C** | Clone SHA Provenance | **PASS** | In clean clone: `git rev-parse HEAD` == `6a6e8455d8092e25458b6fad3edac49d76653041` == `git rev-parse origin/main`. Initial working tree clean. |
+| **D** | Python 3.13.5 & uv 0.11.28 Proof | **PASS** | `uv --version` reported `0.11.28`; `uv run python --version` reported `Python 3.13.5` from active interpreter. |
+| **E** | Dev/Test Frozen Install Reproduction | **PASS** | `uv sync --frozen` installed 79 packages deterministically in fresh `.venv` (exit code 0). `uv pip check` verified 0 incompatibilities (exit code 0). |
+| **F** | Runtime-Only Hash-Locked Install Reproduction | **PASS** | In isolated `.venv-runtime`, `uv pip install --require-hashes -r requirements.txt` installed 68 packages (exit code 0). `uv pip check` verified 0 incompatibilities. Import check verified dev tools (`ruff`, `mypy`, `pytest`, `pyyaml`) are completely absent. |
+| **G** | No Hidden State / Zero Secret Requirement | **PASS** | Clean clone initial state: `Test-Path .env` -> `False`. All 619 unit/contract tests, dependency installations, and command checks executed with zero secrets, zero `.env`, and zero service-account JSON keys. |
+| **H** | P-06.04 Command Contracts Suite | **PASS** | `uv run python -m pytest tests/test_p06_04_commands.py -v --tb=short` -> `15 passed` in 0.28s (exit code 0). |
+| **I** | P-06.03 Config Safety Suite | **PASS** | `uv run python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` -> `14 passed` in 0.81s (exit code 0). |
+| **J** | Combined P-05 Domain Contracts Suite | **PASS** | All 6 P-05 contract test files passed: `590 passed` in 1.98s (exit code 0). |
+| **K** | Canonical Unit Command | **PASS** | `uv run python scripts/cmd.py unit` -> `619 passed` in 4.02s (exit code 0; `--ignore=tests/test_gcp_access.py`). |
+| **L** | Full Repository Test Suite Honest Status | **PASS** | `uv run python -m pytest tests/` -> `619 passed, 3 errors` in 7.07s (exit code 1; STATUS = `FAIL`, faithfully reproducing expected baseline fixture errors in `tests/test_gcp_access.py`). |
+| **M** | Canonical Commands & Guard Reproduction | **PASS** | Developer commands executed in clean clone: `format` (`FAIL` - historical format debt), `lint` (`FAIL` - 149 historical lint debt errors), `type-check` (`FAIL` - 2 type errors in `test_gcp_access.py`), `integration` (`FAIL_CLOSED` - exit 1, zero cloud mutation), `e2e`/`demo`/`deploy`/`teardown` (`NOT_RUN` - exit 1). All baseline semantics reproduced identically. |
+| **N** | Zero Live Cloud Mutations Executed | **PASS** | Zero Google Cloud mutation or network side-effect executed. Default integration guard strictly prevented cloud access. |
+| **O** | Clean Clone Working Tree Integrity | **PASS** | After all command executions, `git status --short` in the clean clone reported 0 modified tracked files and 0 untracked files. Working tree remained clean. |
+| **P** | Master Plan Task-Contract Preservation | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` P-06.05 task block preserves all original binding fields (`Required action`, `Forbidden shortcuts`, `Acceptance criteria`, `Required evidence: Clean-checkout log.`, `Mandatory documentation sync`, `Closure`) while updating `Status: DONE` and appending truthful `Evidence`. |
+| **Q** | Master Plan & HANDOFF Parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized: Phase P-06 is `DONE`, P-06.05 is `DONE`, P-07 is `PENDING`, next task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`. |
+| **R** | Bilingual Public Document Parity | **PASS** | `README.md` and `README.tr.md` synchronized: Phase P-06 marked `DONE`, clean-checkout prerequisites, quick start, configuration boundaries, and baseline command results published in English and Turkish. |
+| **S** | Submission Manifest Sync | **PASS** | `docs/SUBMISSION_MANIFEST.md` updated: `Clean-checkout reproduction: VERIFIED (docs/P-06.05_CLEAN_CHECKOUT_LOG.md)`. All future items remain honest (`NOT_CREATED`, `NOT_FINAL`, `NOT_RUN`). |
+| **T** | Command Registry Sync | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated to reflect `CLEAN_CHECKOUT_VERIFIED` for reproduced commands and install paths. |
+| **U** | Historical Evidence Count Preservation | **PASS** | Historical P-06.03 (125 tracked files) and P-06.04 (128 tracked files) evidence counts preserved; current P-06.05 tracked-file count (129 files) freshly scoped and verified. |
+| **V** | Non-Leakage of Future Phase Implementation | **PASS** | Phase P-07 is not started. Zero ADK agent code implemented. Zero cloud deployment attempted. |
+| **W** | Dead-Code, Unused-Import & Placeholder Audit | **PASS** | Repository contains zero TODO/FIXME markers, zero unused imports in newly added code, and zero dead code. |
 
 ---
 
-## 2. Test Execution Summary
+## 2. Test Execution Summary (Clean-Checkout Baseline)
 
 | Suite | Scope / File | Passed | Errors / Fails | Status | Interface Status |
 |---|---|---:|---:|---|---|
-| P-05.01 | `tests/test_p05_01_contracts.py` | 41 | 0 | **PASS** | VERIFIED |
-| P-05.02 | `tests/test_p05_02_lifecycle.py` | 24 | 0 | **PASS** | VERIFIED |
-| P-05.03 | `tests/test_p05_03_evidence_contracts.py` | 54 | 0 | **PASS** | VERIFIED |
-| P-05.04 | `tests/test_p05_04_core_innovation_contracts.py` | 175 | 0 | **PASS** | VERIFIED |
-| P-05.05 | `tests/test_p05_05_event_envelope.py` | 82 | 0 | **PASS** | VERIFIED |
-| P-05.06 | `tests/test_p05_06_contract_conventions.py` | 214 | 0 | **PASS** | VERIFIED |
-| **Combined P-05** | *All 6 domain contract test files* | **590** | **0** | **PASS** | VERIFIED |
-| P-06.03 | `tests/test_p06_03_config_safety.py` | 14 | 0 | **PASS** | VERIFIED |
-| P-06.04 | `tests/test_p06_04_commands.py` | 15 | 0 | **PASS** | VERIFIED |
-| **Total Unit / Local** | `uv run python scripts/cmd.py unit` | **619** | **0** | **PASS** | VERIFIED |
-| **Full Repository** | `python -m pytest tests/` | **619** | **3** | **FAIL** (Known baseline GCP fixture errors) | VERIFIED |
+| P-05.01 | `tests/test_p05_01_contracts.py` | 41 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| P-05.02 | `tests/test_p05_02_lifecycle.py` | 24 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| P-05.03 | `tests/test_p05_03_evidence_contracts.py` | 54 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| P-05.04 | `tests/test_p05_04_core_innovation_contracts.py` | 175 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| P-05.05 | `tests/test_p05_05_event_envelope.py` | 82 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| P-05.06 | `tests/test_p05_06_contract_conventions.py` | 214 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| **Combined P-05** | *All 6 domain contract test files* | **590** | **0** | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| P-06.03 | `tests/test_p06_03_config_safety.py` | 14 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| P-06.04 | `tests/test_p06_04_commands.py` | 15 | 0 | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| **Total Unit / Local** | `uv run python scripts/cmd.py unit` | **619** | **0** | **PASS** | CLEAN_CHECKOUT_VERIFIED |
+| **Full Repository** | `python -m pytest tests/` | **619** | **3** | **FAIL** (Known baseline GCP fixture errors) | CLEAN_CHECKOUT_VERIFIED |
 
 ---
 
-## 3. Command Execution Summary
+## 3. Command Execution Summary (Clean-Checkout Baseline)
 
 | Command | Check Semantics | Side-Effect Behavior | Underlying Check Result | Interface Contract Status |
 |---|---|---|---|---|
-| `uv run python scripts/cmd.py format` | `ruff format --check .` | Strictly non-mutating (check-only) | `FAIL` (Reports unformatted historical files) | **VERIFIED** |
-| `uv run python scripts/cmd.py lint` | `ruff check .` | Strictly non-mutating (zero `--fix`) | `FAIL` (Reports historical lint debt) | **VERIFIED** |
-| `uv run python scripts/cmd.py type-check` | `mypy domain tests` | Non-mutating type validation | `FAIL` (Reports 2 errors in `tests/test_gcp_access.py`) | **VERIFIED** |
-| `uv run python scripts/cmd.py unit` | `pytest tests/ --ignore=tests/test_gcp_access.py` | Local deterministic test execution | `PASS` (619 passed) | **VERIFIED** |
-| `uv run python scripts/cmd.py integration` | Standalone script guard | Fails closed by default; zero cloud calls | `FAIL_CLOSED` (Exit 1) | **VERIFIED** |
-| `uv run python scripts/cmd.py integration --live-write-danger` | `python tests/test_gcp_access.py` | Dispatches script directly (mock-tested) | `NOT_RUN` (Not executed against live cloud in repair) | **VERIFIED** |
-| `uv run python scripts/cmd.py e2e` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-24/P-25 pending) | **VERIFIED** |
-| `uv run python scripts/cmd.py demo` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-24 pending) | **VERIFIED** |
-| `uv run python scripts/cmd.py deploy` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-28 pending) | **VERIFIED** |
-| `uv run python scripts/cmd.py teardown` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-28 pending) | **VERIFIED** |
+| `uv run python scripts/cmd.py format` | `ruff format --check .` | Strictly non-mutating (check-only) | `FAIL` (Reports unformatted historical files) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py lint` | `ruff check .` | Strictly non-mutating (zero `--fix`) | `FAIL` (Reports historical lint debt) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py type-check` | `mypy domain tests` | Non-mutating type validation | `FAIL` (Reports 2 errors in `tests/test_gcp_access.py`) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py unit` | `pytest tests/ --ignore=tests/test_gcp_access.py` | Local deterministic test execution | `PASS` (619 passed) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py integration` | Standalone script guard | Fails closed by default; zero cloud calls | `FAIL_CLOSED` (Exit 1) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py integration --live-write-danger` | `python tests/test_gcp_access.py` | Dispatches script directly | `NOT_RUN` (Zero live cloud execution in audit) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py e2e` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-24/P-25 pending) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py demo` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-24 pending) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py deploy` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-28 pending) | **CLEAN_CHECKOUT_VERIFIED** |
+| `uv run python scripts/cmd.py teardown` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-28 pending) | **CLEAN_CHECKOUT_VERIFIED** |
 
 ---
 
@@ -85,4 +87,5 @@
 ## 5. P-Ω Final Verdict
 
 **PASS** — All 23 whole-repository integrity audit checks pass.
-P-06.04 defines the canonical developer command interface in `scripts/cmd.py` with non-mutating verification semantics for `format` (`--check`) and `lint` (zero `--fix`), deterministic exit-code propagation, fail-closed integration safety with direct script dispatch upon explicit authorization, and safe fail-closed guards for deferred future commands. 15 automated command contract tests pass. Master Plan task contract strictly preserves all original binding fields (`Required evidence: Command registry and CI plan.`). Historical P-05 domain contracts (590 tests) and P-06.03 config-safety contracts (14 tests) are preserved without mass-formatting churn. Total unit test suite passes with 619 tests. Full repository test suite is honestly reported as `FAIL` (619 passed, 3 errors) due to known baseline fixture errors. Historical P-06.03 125 tracked-file evidence is distinguished from current 128 tracked files. Full live-document parity is synchronized across README (EN/TR), Master Plan, HANDOFF, CI Plan, and Environment Memory. P-06.05 has not been started. Next eligible task is `P-06.05 — Run first clean-checkout reproduction from separate directory`.
+Phase `P-06 — Local Development Environment and Dependency Freeze` is now complete (`DONE`).
+Clean-checkout reproducibility from a separate directory outside the canonical workspace has been executed with complete success and verified against the canonical remote repository `https://github.com/zyganali-glitch/ChangeMesh.git` (commit `6a6e8455d8092e25458b6fad3edac49d76653041`) with zero hidden local state. All 619 unit/contract tests pass. All developer command semantics and baseline failure states reproduced with 100% fidelity. Full live-document parity is synchronized across `README.md`, `README.tr.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, `docs/SUBMISSION_MANIFEST.md`, `AGENT_ENVIRONMENT_AND_API.md`, and `docs/P-06.05_CLEAN_CHECKOUT_LOG.md`. Historical evidence counts (125, 128) are preserved; current tracked-file count is 129. Next eligible task is `P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes`.
