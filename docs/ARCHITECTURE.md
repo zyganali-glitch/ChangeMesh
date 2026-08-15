@@ -1,9 +1,9 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04 DONE; P-05 DONE (P-05.01, P-05.02, P-05.03, P-05.04, P-05.05, P-05.06 IMPLEMENTED)`
-> **Produced by:** P-04.01–P-04.05, P-05.01–P-05.06
+> **Status:** `P-04 DONE; P-05 DONE (P-05.01, P-05.02, P-05.03, P-05.04, P-05.05, P-05.06 IMPLEMENTED); P-06.01 IMPLEMENTED (Language/Runtime Version Pinning & Repository Structure Freeze)`
+> **Produced by:** P-04.01–P-04.05, P-05.01–P-05.06, P-06.01
 > **Date:** 2026-08-15
-> **Implementation state:** Architecture design is complete (P-04). All domain contracts and machine conventions (P-05.01 foundational schemas, P-05.02 lifecycle state machine, P-05.03 evidence contracts, P-05.04 core innovation schemas, P-05.05 event envelope contract, and P-05.06 machine conventions) are implemented and verified. Runtime services — Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger — remain `PLANNED`. Pub/Sub Event Backbone (P-09), PubSub Timeline runtime, and Firestore dedup persistence remain `PLANNED`. Runtime agents, cloud services, and UI remain `PLANNED`.
+> **Implementation state:** Architecture design is complete (P-04). All domain contracts and machine conventions (P-05.01 foundational schemas, P-05.02 lifecycle state machine, P-05.03 evidence contracts, P-05.04 core innovation schemas, P-05.05 event envelope contract, and P-05.06 machine conventions) are implemented and verified. P-06.01 language/runtime version pinning (Python 3.13.5 via `.python-version`, Node `NOT_REQUIRED`) and repository structure freeze are complete. Runtime services — Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger — remain `PLANNED`. Pub/Sub Event Backbone (P-09), PubSub Timeline runtime, and Firestore dedup persistence remain `PLANNED`. API Entrypoint (`api/`), Google Cloud adapters (`integrations/gcp/`), and Web Dashboard (`web/`) remain `PLANNED`. Runtime agents, cloud services, and UI remain `PLANNED`.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 
@@ -70,7 +70,7 @@ graph TB
         direction LR
         GH_ADAPT["GitHub Adapter<br/>(integrations/github/)"]
         META_ADAPT["Metadata Graph Adapter<br/>(integrations/metadata/)"]
-        GCP_ADAPT["Google Cloud Services<br/>(Firestore, PubSub, Vertex AI)"]
+        GCP_ADAPT["Google Cloud Adapter<br/>(integrations/gcp/)<br/>(Firestore, PubSub, Vertex AI)"]
         EXT_TOOL["External Tool Boundary<br/>src/connectors/external_tool_boundary.py"]
     end
 
@@ -135,11 +135,12 @@ graph TB
 
 ## 3. Canonical Planned Package Map
 
-Every package listed below is `PLANNED`. No implementation exists yet.
+Domain contracts (`domain/contracts/`) are `IMPLEMENTED` and verified (P-05). All application, runtime agent, orchestrator, provider adapter, API entrypoint, and UI target packages listed below remain `PLANNED` for implementation in P-07+ phases.
 
 | Logical Module | Planned Target Path | Responsibility | Dependency Direction | Allowed Dependencies | Forbidden Dependencies | Provider Status |
 |---|---|---|---|---|---|---|
 | **Domain Contracts** | `domain/contracts/` | Versioned schemas, enums, ports/interfaces, domain types | Core (depended upon by all) | Standard library primitives, other domain contracts | Google SDK, ADK, Firestore, PubSub, GitHub, UI, fixtures | Provider-neutral |
+| **API Entrypoint** | `api/` | HTTP/REST and webhook entrypoint for orchestrator invocations | Inward (depends on domain contracts, orchestrator) | Domain contracts, Change Orchestrator | Direct provider SDK calls bypassing adapters, domain logic mutation | Provider-neutral entrypoint |
 | **Change Orchestrator** | `src/agents/change_orchestrator.py` | ADK routing, saga coordination, recovery, multi-agent orchestration | Inward (depends on domain contracts, saga) | Domain contracts, Firestore Saga, Approval Compression, PubSub Timeline | Direct Firestore/PubSub client calls bypassing ports | Provider-specific (ADK) |
 | **Firestore Saga** | `src/orchestrator/firestore_saga.py` | Durable workflow state persistence semantics | Inward (depends on domain contracts) | Domain contracts, Firestore adapter port | Direct Firestore SDK in core, UI, fixtures, GitHub SDK | Provider-neutral core + Firestore persistence adapter |
 | **Impact Scout** | `src/git/impact_scout.py` | Read-only blast-radius, repository overlap, parallel-change conflict detection (CS-BLAST-001 + GL-CONFLICT-001 unified) | Inward (depends on domain contracts) | Domain contracts, repository adapter port | Direct GitHub/GitLab SDK in core, UI | Provider-neutral core + repository adapter |
@@ -159,8 +160,9 @@ Every package listed below is `PLANNED`. No implementation exists yet.
 | **External Tool Boundary** | `src/connectors/external_tool_boundary.py` | Connector honesty — unavailable results remain explicit (GL-HONEST-001) | Inward (depends on domain contracts) | Domain contracts | Fabricated API responses | Provider-neutral |
 | **GitHub Adapter** | `integrations/github/` | Bounded GitHub adapter for repository operations | Outward (depends on domain contracts + GitHub SDK) | Domain contracts, GitHub SDK | Core domain types carrying GitHub-specific fields | Provider-specific |
 | **Metadata Graph Adapter** | `integrations/metadata/` | Synthetic graph and optional external metadata adapter | Outward (depends on domain contracts) | Domain contracts | Hard external coupling required for core function | Provider-specific |
+| **Google Cloud Adapter** | `integrations/gcp/` | Provider-specific Google Cloud adapter bindings (Firestore, Pub/Sub, Vertex AI / Gemini SDK) | Outward (depends on domain contracts + Google SDK) | Domain contracts, Google Cloud SDK, google-genai | Core domain types carrying Google-specific types | Provider-specific |
 | **Observability** | `observability/` | Trace correlation, redaction, OpenTelemetry integration | Outward (depends on domain contracts) | Domain contracts, OpenTelemetry SDK | Core domain types carrying telemetry-specific fields | Provider-specific |
-| **Web / Dashboard** | `web/` | Judge/operator dashboard | Outward (depends on domain contracts, Evidence Record) | Domain contracts, Evidence Record (read), application query interfaces | Durable workflow state, policy authority, evidence facts ownership | Provider-specific (UI framework) |
+| **Web / Dashboard** | `web/` | Browser-native HTML5/CSS3/JavaScript judge and operator dashboard (no Node runtime / bundler / build toolchain; Node NOT_REQUIRED per ADR-0015) | Outward (depends on domain contracts, Evidence Record) | Domain contracts, Evidence Record (read), application query interfaces | Durable workflow state, policy authority, evidence facts ownership, Node runtime/toolchain | Provider-specific (Browser-native UI) |
 | **Capability Module** | `capability/` | Passport generation, validation, expiry, revocation | Inward (depends on domain contracts) | Domain contracts | UI, fixtures | Provider-neutral |
 | **ShadowLab Scenarios** | `shadowlab/` | Scenario definitions, tool doubles, fault injection, results | Outward (depends on domain contracts) | Domain contracts | Production runtime import | Provider-neutral |
 | **Events Module** | `events/` | PubSub envelope, replay, dead-letter handling | Inward (depends on domain contracts) | Domain contracts, event port/adapter | Direct PubSub SDK in core | Provider-neutral core + event transport adapter |
@@ -172,11 +174,13 @@ Some logical architecture modules map to multiple physical files or directories.
 
 | Logical Module Name | Physical Canonical Target(s) | Reason |
 |---|---|---|
+| `api` | `api/` | API entrypoint for HTTP/REST and webhook invocations dispatching to Change Orchestrator. |
 | `orchestration` | `src/agents/change_orchestrator.py` (routing/coordination), `src/orchestrator/firestore_saga.py` (durable state) | Orchestration responsibility is split: ADK agent owns routing, Firestore Saga owns persistent state. Both serve the logical orchestration concept but have distinct canonical owners. |
 | `state` | `src/orchestrator/firestore_saga.py` | "State" as a logical module is implemented through the Firestore Saga. There is no separate `state/` package. |
 | `policy` | `src/agents/policy_guardian.py` (policy checks), `src/policy/shadowlab_auth.py` (destructive preflight) | Policy checking and destructive-target preflight are distinct responsibilities under the logical "policy" umbrella. |
 | `evidence` | `src/evidence/evidence_record.py`, `src/evidence/pubsub_timeline.py`, `src/evidence/change_passport.py` | Evidence is a logical area with three distinct canonical components. |
 | `integrations/github` and `git` | `src/git/impact_scout.py` (analysis), `integrations/github/` (adapter) | Impact Scout performs analysis logic; the GitHub adapter provides the provider-specific API binding. |
+| `integrations/gcp` | `integrations/gcp/` | Provider-specific Google Cloud adapter implementations for Firestore persistence, Pub/Sub transport, and Vertex AI / Gemini SDK calls. |
 
 ## 4. Explicit Dependency Matrix
 

@@ -42,18 +42,20 @@ Additional core targets:
 ## 4. Core modules
 
 - `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions)
-- `orchestration`: ADK composition, routing, saga transitions
-- `events`: Pub/Sub envelope, replay, dead-letter handling
-- `state`: Firestore repositories and idempotency
-- `memory`: trust typing, provenance, TTL, contradiction, quarantine
-- `capability`: passport generation, validation, expiry, revocation
-- `shadowlab`: scenario definitions, tool doubles, fault injection, results
-- `policy`: reversibility and autonomy classification
-- `integrations/github`: bounded GitHub adapter
-- `integrations/metadata`: synthetic graph and optional DataHub adapter
-- `evidence`: append-only evidence ledger and passport seal
-- `observability`: trace correlation and redaction
-- `web`: judge/operator dashboard
+- `api`: API entrypoint for HTTP/REST and webhook invocations (PLANNED)
+- `orchestration`: ADK composition, routing, saga transitions (PLANNED)
+- `events`: Pub/Sub envelope, replay, dead-letter handling (PLANNED)
+- `state`: Firestore repositories and idempotency (PLANNED)
+- `memory`: trust typing, provenance, TTL, contradiction, quarantine (PLANNED)
+- `capability`: passport generation, validation, expiry, revocation (PLANNED)
+- `shadowlab`: scenario definitions, tool doubles, fault injection, results (PLANNED)
+- `policy`: reversibility and autonomy classification (PLANNED)
+- `integrations/github`: bounded GitHub adapter (PLANNED)
+- `integrations/metadata`: synthetic graph and optional DataHub adapter (PLANNED)
+- `integrations/gcp`: Google Cloud provider adapters for Firestore, Pub/Sub, Vertex AI / Gemini SDK (PLANNED)
+- `evidence`: append-only evidence ledger and passport seal (PLANNED)
+- `observability`: trace correlation and redaction (PLANNED)
+- `web`: browser-native HTML5/CSS3/JavaScript judge/operator dashboard with Node NOT_REQUIRED per ADR-0015 (PLANNED)
 
 ## 5. Architectural patterns
 
