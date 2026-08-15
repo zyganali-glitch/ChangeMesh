@@ -50,6 +50,11 @@ Record actual environment only; do not fill unknown values with guesses.
 - **P-09 owns actual publish/consume behavior**, including topic/subscription topology, publisher/consumer adapters, delivery, acknowledgements, retries, dead-letter, and infrastructure config.
 - **classify_event_delivery** is a pure function consuming abstract already-seen snapshots. It does not own persistence (P-10).
 
+### Machine Conventions Contract Boundary (P-05.06)
+
+- **Machine conventions** (`domain/contracts/conventions.py`) define canonical hashing (`HashAlgorithm.SHA256`, 64-character lowercase hex regex `^[0-9a-f]{64}$`), UTC timestamp normalization and naive rejection (`UtcDateTime`), deterministic canonical JSON serialization (`canonical_json_bytes`), and structural secret redaction (`redact_mapping`, `REDACTION_SENTINEL = "[REDACTED]"`).
+- **P-05.06 does NOT implement runtime cryptography or cloud KMS.** It defines domain-level machine serialization, validation, and normalization rules.
+
 ## Environment-variable registry
 
 | Variable | Purpose | Required | Secret | Safe example | Owner phase |
@@ -68,9 +73,10 @@ Commands are added only after clean-checkout verification.
 |---|---|---|---|
 | Install | `pip install -r requirements.txt` | `VERIFIED` | 2026-08-08 |
 | Unit tests (Contracts) | `python -m pytest tests/test_p05_01_contracts.py` | `VERIFIED` | 2026-08-11 |
-| Unit tests (P-05.05 Events) | `python -m pytest tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` | 2026-08-13 |
-| Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` | 2026-08-13 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (Missing `project` fixture in GCP tests) | 2026-08-13 |
+| Unit tests (P-05.05 Events) | `python -m pytest tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` (82 passed) | 2026-08-13 |
+| Unit tests (P-05.06 Conventions) | `python -m pytest tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (214 passed) | 2026-08-15 |
+| Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (590 passed) | 2026-08-15 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (590 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | 2026-08-15 |
 | Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |
 | Local web | `NOT_DEFINED` | `NOT_RUN` | - |
