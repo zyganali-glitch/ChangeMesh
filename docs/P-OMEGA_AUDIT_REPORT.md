@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-06.03 Safe Local Configuration & Secret Handling
+# P-Ω Whole-Repository Integrity Audit — P-06.03 QA Repair (Dead-Code & Unused Import Removal)
 
-> **Produced by:** P-06.03 Safe Local Configuration Templates and Secret Handling
+> **Produced by:** P-06.03 Safe Local Configuration Templates and Secret Handling (Surgical QA Repair)
 > **Date:** 2026-08-15
-> **Baseline Remote SHA:** `cc6b31843fb50832d444036101f1f72f2d996396`
+> **Baseline Remote SHA:** `36527d71c8977d63362545b1f23a6716de5d8994`
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Baseline SHA & remote tracking | **PASS** | `cc6b31843fb50832d444036101f1f72f2d996396` verified at entry; clean working tree. |
+| **A** | Baseline SHA & remote tracking | **PASS** | `36527d71c8977d63362545b1f23a6716de5d8994` verified at entry; clean working tree. |
 | **B** | Python runtime version preserved | **PASS** | `.python-version` pinned to `3.13.5`; `pyproject.toml` requires `>=3.13,<3.14`. |
 | **C** | Node.js runtime evaluated & absent | **PASS** | Node remains `NOT_REQUIRED`. Zero npm/Node tooling or package.json files exist. |
 | **D** | Canonical dependency manifest (Source of Truth) | **PASS** | `pyproject.toml` (PEP 621 / PEP 735) is sole canonical editable manifest declaring direct runtime (`google-adk`, `google-genai`, `pydantic`, `google-cloud-firestore`, `google-cloud-pubsub`) and direct dev/test (`pytest`, `pyyaml`, `google-auth`, `google-cloud-run`). |
@@ -20,7 +20,7 @@
 | **H** | Local authentication & ADC policy | **PASS** | `.env.example` documents Application Default Credentials (`gcloud auth application-default login`); distribution or configuration of service-account JSON key files is explicitly prohibited. |
 | **I** | .gitignore credential & artifact protection | **PASS** | `.gitignore` audited and strengthened to ignore `.env`, `.env.*`, `*service-account*.json`, `*credentials*.json`, `application_default_credentials.json`, `*adc.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.pkcs12`, `api_key.txt`, `*.secret`, `*.token`, `tmp/`, `artifacts/private/`, `private/`, `secrets/` while tracking `!.env.example`. |
 | **J** | Config-safety automated tests | **PASS** | 14 automated unit tests in `tests/test_p06_03_config_safety.py` pass (`14 passed, 0 failed, 0 errors`). |
-| **K** | Repository-wide deterministic secret scan | **PASS** | Scanned all 123 tracked files across repository; 0 secrets, private keys, or credentials found (`PASS`). |
+| **K** | Repository-wide deterministic secret scan | **PASS** | Scanned all 125 tracked files across repository; 0 secrets, private keys, or credentials found (`PASS`). |
 | **L** | Domain contracts provider neutrality & isolation | **PASS** | `domain/contracts/` unmodified; zero credential fields, zero provider imports, and AST neutrality confirmed. |
 | **M** | Future-phase non-leakage | **PASS** | P-06.04 (standard commands), P-06.05 (separate-directory clean checkout reproduction), P-07 (agent skeleton), P-28 (deployment) strictly preserved as `PENDING`. |
 | **N** | Documentation & command registry parity | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated with P-06.03 configuration boundary, config-safety test entry (`VERIFIED`, 14 passed), and full suite status (`FAIL`, 604 passed, 3 errors). |
@@ -30,7 +30,8 @@
 | **R** | Bilingual Public Document Parity (README.md / README.tr.md) | **PASS** | `README.md` and `README.tr.md` synchronized to reflect P-06.03 `DONE`, `.env.example` verified template, and P-06.04/P-06.05 `PENDING`. |
 | **S** | Threat Model Implementation-State Parity | **PASS** | `docs/THREAT_MODEL.md` Section 14 updated to reflect P-06.03 `DONE` with 14 config-safety tests and 0-secret scan. |
 | **T** | Non-Goals and Red Lines Integrity | **PASS** | Zero runtime framework, secret manager client, or cloud credentials introduced into domain boundaries. |
-| **U** | Git working tree & rollback baseline integrity | **PASS** | Entry baseline SHA `cc6b31843fb50832d444036101f1f72f2d996396` verified; all edits strictly attributable to P-06.03. |
+| **U** | Git working tree & rollback baseline integrity | **PASS** | Entry baseline SHA `36527d71c8977d63362545b1f23a6716de5d8994` verified; all edits strictly attributable to P-06.03 QA repair. |
+| **V** | Dead-code, unused-import & placeholder closure | **PASS** | `tests/test_p06_03_config_safety.py` audited by direct inspection; unused `Set` import removed; zero dead code, unused imports, or placeholders exist. |
 
 ---
 
@@ -60,4 +61,4 @@
 
 ## 3. P-Ω Final Verdict
 
-**PASS** — All 21 whole-repository integrity audit checks pass. P-06.03 establishes a safe root configuration template (`.env.example`) defining registered canonical environment variables with zero secret defaults (`GITHUB_TOKEN` empty), promotes Application Default Credentials (ADC) for local development while prohibiting long-lived service account key files, and fortifies `.gitignore` against credential and sensitive artifact leaks while preserving `.env.example` tracking. 14 automated config-safety tests pass, and repository-wide deterministic secret scanning over all 123 tracked files confirms 0 secrets. Combined P-05 regression suite remains at 590 passed, and full repository test suite is honestly recorded as `FAIL` (604 passed, 3 errors) due to baseline GCP fixture errors. Documentation parity is 100% synchronized across all English and Turkish surfaces. Next eligible task is `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`.
+**PASS** — All 22 whole-repository integrity audit checks pass. P-06.03 establishes a safe root configuration template (`.env.example`) defining registered canonical environment variables with zero secret defaults (`GITHUB_TOKEN` empty), promotes Application Default Credentials (ADC) for local development while prohibiting long-lived service account key files, and fortifies `.gitignore` against credential and sensitive artifact leaks while preserving `.env.example` tracking. 14 automated config-safety tests pass, and repository-wide deterministic secret scanning over all 125 tracked files confirms 0 secrets. Dead-code and unused-import check is verified with 0 unused imports remaining in `tests/test_p06_03_config_safety.py`. Combined P-05 regression suite remains at 590 passed, and full repository test suite is honestly recorded as `FAIL` (604 passed, 3 errors) due to baseline GCP fixture errors. Documentation parity is 100% synchronized across all English and Turkish surfaces. Next eligible task is `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`.
