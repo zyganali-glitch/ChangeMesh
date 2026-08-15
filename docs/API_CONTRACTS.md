@@ -1,9 +1,9 @@
 # ChangeMesh Domain Contract API Reference
 
-> **Status:** `P-05.05 — IMPLEMENTED`
-> **Produced by:** P-05.05
-> **Date:** 2026-08-13
-> **Implementation state:** The foundational domain contracts (P-05.01), evidence contracts (P-05.03), core innovation contracts (P-05.04), and event envelope contract (P-05.05: EventEnvelope, EventDeliveryDisposition, classify_event_delivery) defined below are implemented and tested. Naming conventions (P-05.06) remain `PENDING`.
+> **Status:** `P-05.06 — IMPLEMENTED`
+> **Produced by:** P-05.06
+> **Date:** 2026-08-15
+> **Implementation state:** All domain contracts (P-05.01 foundational, P-05.02 lifecycle, P-05.03 evidence, P-05.04 core innovations, P-05.05 event envelope, and P-05.06 machine conventions) are fully implemented, enforced, and tested. Phase P-05 domain contracts are completely closed.
 
 ## 1. Overview
 
@@ -171,13 +171,18 @@ Describes a tool's interface and capability boundary.
 
 ---
 
-## 8. Remaining Deferred Contracts
+## 8. Domain Contract Phase Closure State
 
-The following are explicitly deferred to later P-05 micro-tasks:
+All Phase P-05 domain contracts and machine conventions are fully implemented and verified:
 
-| Contract | Owner Phase | Status |
+| Contract Group | Owner Phase | Status |
 |---|---|---|
-| Naming, enum, timestamp, hashing, redaction, serialization conventions | P-05.06 | `PENDING` |
+| Foundational schemas (`ChangeRequest`, `SuccessCriterion`, `AgentDescriptor`, `ToolDescriptor`, `DataClass`) | P-05.01 | `IMPLEMENTED` |
+| Change Lifecycle state machine (`ChangeState`, `can_transition`, `require_transition`, `is_terminal`) | P-05.02 | `IMPLEMENTED` |
+| Evidence & Provenance contracts (`EvidenceRecord`, `EvidenceState`, `ExecutionEvidenceMode`, `Provenance`, `ArtifactHash`, `TraceReference`) | P-05.03 | `IMPLEMENTED` |
+| Core Innovations (`MemoryRecord`, `CapabilityPassport`, `RehearsalScenario`, `RehearsalResult`, `AutonomyDecision`, `ApprovalCompressionCard`) | P-05.04 | `IMPLEMENTED` |
+| Event Envelope & Delivery Classifier (`EventEnvelope`, `EventDeliveryDisposition`, `classify_event_delivery`) | P-05.05 | `IMPLEMENTED` |
+| Machine Conventions (`HashAlgorithm`, `UtcDateTime`, `normalize_utc_datetime`, `canonical_json_bytes`, `redact_mapping`, naming/enum freeze) | P-05.06 | `IMPLEMENTED` |
 
 ---
 
@@ -531,3 +536,59 @@ def classify_event_delivery(
 **Purity guarantee:** Does not write state, read databases, call Pub/Sub, acknowledge messages, sleep, retry, create dead-letter records, or mutate its inputs.
 
 **Pub/Sub runtime:** P-09 owns topic/subscription topology, publisher adapters, consumer adapters, delivery, acknowledgements, retries, dead-letter, and infrastructure config. `classify_event_delivery` provides the domain classification semantics that P-09 will consume.
+ 
+---
+ 
+## 13. Machine Conventions (P-05.06)
+ 
+Authoritative, deterministic machine conventions frozen in `domain/contracts/conventions.py` and detailed in `docs/CONTRACT_CONVENTIONS.md`.
+ 
+### 13.1 HashAlgorithm & Artifact Hashing
+- **Canonical Algorithm:** SHA-256 only. Enum member `HashAlgorithm.SHA256 = "sha256"`.
+- **Digest Format:** Exactly 64 lowercase hexadecimal characters matching `^[0-9a-f]{64}$`.
+- **Helper Functions:**
+  - `is_valid_sha256_digest(digest: str) -> bool` — pure validation helper.
+  - `sha256_hex(data: bytes) -> str` — pure deterministic SHA-256 computation.
+  - `canonical_model_sha256(model: BaseModel) -> str` — computes SHA-256 of canonical JSON model representation.
+ 
+### 13.2 UtcDateTime & Timestamp Normalization
+- **Rule:** All machine timestamps in domain contracts are strictly timezone-aware and normalized to UTC in-memory.
+- **Type:** `UtcDateTime = Annotated[datetime, AfterValidator(normalize_utc_datetime)]`.
+- **Behavior:**
+  - Naive datetime inputs are rejected (`ValueError` / `ValidationError`).
+  - Aware non-UTC offsets (e.g. `15:00 -05:00`) normalize to equivalent UTC instant (`20:00 UTC`).
+  - Stored model attribute has `tzinfo == timezone.utc`.
+  - System-local timezone is never used.
+- **Wire Representation:** RFC 3339 / ISO-8601 UTC string: `YYYY-MM-DDTHH:MM:SS.ffffffZ` (fixed 6 microsecond digits with `Z` suffix).
+- **Helpers:**
+  - `normalize_utc_datetime(value: datetime) -> datetime`
+  - `format_utc_timestamp(value: datetime) -> str`
+  - `parse_utc_timestamp(value: str) -> datetime`
+- **Non-Causal Authority:** Timestamps on `EventEnvelope` and lifecycle records are metadata only; causal ordering is determined by deterministic causation chains (`causation_id`), not clock comparisons.
+ 
+### 13.3 Canonical JSON Serialization
+- **Standard:** Deterministic canonical JSON bytes via `canonical_json_bytes(value: Any) -> bytes`.
+- **Rules:**
+  - UTF-8 encoding.
+  - Lexicographically sorted dictionary keys (`sort_keys=True`).
+  - Compact separators without whitespace (`separators=(',', ':')`).
+  - Enum values serialize to their canonical machine string values.
+  - `datetime` serializes to canonical UTC wire format (`format_utc_timestamp`).
+  - `None` maps to JSON `null`.
+  - `float` `NaN` and `Infinity` are rejected (fail closed).
+  - Unsupported types (e.g. `bytes`, arbitrary objects) fail closed with `TypeError`.
+ 
+### 13.4 Structural Secret Redaction
+- **Sentinel:** `REDACTION_SENTINEL = "[REDACTED]"`.
+- **Function:** `redact_mapping(mapping: Mapping[str, Any]) -> dict[str, Any]`.
+- **Matching:** Case-insensitive structural matching of keys against `SECRET_KEY_PATTERNS` (`token`, `access_token`, `refresh_token`, `api_key`, `secret`, `password`, `private_key`, `credential`, `credentials`, `service_account`).
+- **Purity:** Does not mutate original mapping; returns new redacted structure recursively.
+- **Scope & Security Boundaries:**
+  - Structural field redaction is a defense-in-depth helper, not a substitute for data boundaries or universal DLP.
+  - Redaction does NOT authorize secret propagation or storage. ChangeMesh contracts strictly forbid credentials in domain payloads.
+  - Hashing a secret is not redaction.
+ 
+### 13.5 Runtime Boundary
+- Conventions in `domain/contracts/conventions.py` are purely domain-level and provider-neutral.
+- No Google Cloud SDKs, Pub/Sub, Firestore, ADK, or runtime transports are implemented by P-05.06.
+

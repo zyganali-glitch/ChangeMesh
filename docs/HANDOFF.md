@@ -1,4 +1,4 @@
-﻿# ChangeMesh Handoff State
+# ChangeMesh Handoff State
 
 **Completed:**
 P-00
@@ -25,6 +25,6 @@ P-05
 P-06
 
 **Next Exact Task:**
-P-06.01 - Stand up minimal Poetry environment and lock provider-neutral dependencies
+P-06.01 — Choose language/runtime versions and repository structure from feasibility evidence
 
-P-05.06 completed with canonical conventions for naming, enum, timestamp, hashing, redaction, and serialization. ArtifactHash and tests updated. Total 563 tests passing. All Phase P-05 micro-tasks are successfully closed.
+P-05.06 completed with canonical conventions for naming, enums, UtcDateTime timestamps, hashing, redaction, and canonical JSON serialization. All domain model timestamp fields enforce UtcDateTime. ArtifactHash and test suites updated. Total 590 domain tests passing. All Phase P-05 micro-tasks are successfully closed.

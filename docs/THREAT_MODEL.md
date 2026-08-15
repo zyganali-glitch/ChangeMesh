@@ -138,8 +138,9 @@ For every crossing, the payload must be purpose-bound. The system uses identifie
 - Gemini semantic evaluation (advisory) cannot overwrite Deterministic execution facts.
 - A public UI action cannot synthesize Human Authority.
 
-## 14. Explicitly Deferred Work
-- **P-04.04:** Defines fixture, simulation, recorded-cloud, and live-write modes/boundaries.
-- **P-04.05:** Autonomy vs. Friction review.
-- **P-05:** Concrete domain contracts, Pydantic schemas, TypeScript interfaces (e.g., `DataClass`, `TrustLevel`).
-- **P-06:** Implementation stack (Python version, auth SDK, secret manager).
+## 14. Implementation State & Redaction Boundary
+- **P-04:** Architecture trust boundaries and threat matrix complete (`DONE`).
+- **P-05:** Domain contract schemas and machine conventions complete (`DONE`).
+  - `domain/contracts/conventions.py` implements structural secret-field redaction (`redact_mapping`, `REDACTION_SENTINEL = "[REDACTED]"` per `docs/CONTRACT_CONVENTIONS.md`).
+  - **Honesty Boundary:** Machine convention redaction is **IMPLEMENTED**. Runtime DLP/Model Armor filtering, proxy interceptors, and automated log scrubbers remain **PLANNED** for runtime phases.
+- **P-06:** Implementation stack and dependency freeze (`PENDING`).

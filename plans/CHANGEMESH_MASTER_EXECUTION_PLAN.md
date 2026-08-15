@@ -623,7 +623,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-05 — Domain Contracts and State Machine
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-05.01 — Define versioned schemas for ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, and DataClass
 
@@ -684,8 +684,8 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No duplicate synonyms or locale-dependent machine values.
 - **Required evidence:** Contract lint/search evidence.
-- **Evidence:** 187 tests in `tests/test_p05_06_contract_conventions.py` asserting naming styles (PascalCase for models, snake_case for fields), exact schema version spelling, credential field absence, provider neutrality (no cloud APIs or ADK leakages), redaction behavior, deterministic JSON serialization, enum consistency, and canonical hashing constraints (SHA-256 hex). `ArtifactHash` and tests updated. Total P-05 suite = 563 tests.
-- **Mandatory documentation sync:** All technical docs.
+- **Evidence:** 214 tests in `tests/test_p05_06_contract_conventions.py` asserting naming styles (PascalCase for models, snake_case for fields), exact schema version spelling, credential field absence, provider neutrality (AST-verified for both `Import` and `ImportFrom`), `UtcDateTime` timezone-aware UTC normalization and naive rejection across all domain machine timestamps, redaction behavior, deterministic canonical JSON serialization, enum consistency, and canonical hashing constraints (SHA-256 hex). `ArtifactHash` and tests updated. Total P-05 suite = 590 tests passing.
+- **Mandatory documentation sync:** All technical docs (`docs/CONTRACT_CONVENTIONS.md`, `docs/API_CONTRACTS.md`, `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`, `docs/EVIDENCE_BOUNDARY.md`, `README.md`).
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-06 — Local Development Environment and Dependency Freeze

@@ -61,5 +61,6 @@ Fixture data is not customer data. Synthetic graph is not live DataHub. Local si
 
 The `EvidenceRecord` domain contract and its supporting schemas (`EvidenceState`, `ExecutionEvidenceMode`, `Provenance`, `TraceReference`, `ArtifactHash`) are implemented as provider-neutral, strict Pydantic schemas.
 These schemas guarantee deterministic fact sovereignty: neither a model's judgment nor human approval can overwrite a deterministic execution fact (e.g., turning a `FAIL` or `BLOCKED` into a `PASS`).
+All evidence timestamps and artifact hashes conform strictly to `docs/CONTRACT_CONVENTIONS.md` (UTC-aware `UtcDateTime`, SHA-256 64-char hex digests).
 
 The runtime Evidence Ledger service (`src/evidence/evidence_record.py`) and adapters (such as Firestore persistence or Pub/Sub timelines) are explicitly deferred and **not yet implemented**. P-05.03 only defines the immutable evidence contracts.

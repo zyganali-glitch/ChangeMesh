@@ -1,9 +1,9 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04 DONE; P-05.01, P-05.02, P-05.03, P-05.04, P-05.05 IMPLEMENTED`
-> **Produced by:** P-04.01, P-04.02, P-04.03, P-04.04, P-04.05, P-05.01, P-05.02, P-05.03, P-05.04, and P-05.05
-> **Date:** 2026-08-13
-> **Implementation state:** Architecture design is complete (P-04). Five foundational domain contracts (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) are implemented (P-05.01). The lifecycle state machine is implemented (P-05.02). Evidence contracts are implemented (P-05.03). Core innovation contracts (MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) are implemented as schema-only (P-05.04). The provider-neutral event envelope contract (EventEnvelope, EventDeliveryDisposition, classify_event_delivery) is implemented (P-05.05). Runtime services — Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger — remain `PLANNED`. Pub/Sub Event Backbone (P-09), PubSub Timeline runtime, and Firestore dedup persistence remain `PLANNED`. Remaining domain conventions (P-05.06), agents, cloud services, and UI remain `PLANNED`.
+> **Status:** `P-04 DONE; P-05 DONE (P-05.01, P-05.02, P-05.03, P-05.04, P-05.05, P-05.06 IMPLEMENTED)`
+> **Produced by:** P-04.01–P-04.05, P-05.01–P-05.06
+> **Date:** 2026-08-15
+> **Implementation state:** Architecture design is complete (P-04). All domain contracts and machine conventions (P-05.01 foundational schemas, P-05.02 lifecycle state machine, P-05.03 evidence contracts, P-05.04 core innovation schemas, P-05.05 event envelope contract, and P-05.06 machine conventions) are implemented and verified. Runtime services — Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger — remain `PLANNED`. Pub/Sub Event Backbone (P-09), PubSub Timeline runtime, and Firestore dedup persistence remain `PLANNED`. Runtime agents, cloud services, and UI remain `PLANNED`.
 
 This document defines the component boundaries, dependency directions, and canonical planned package map for ChangeMesh. It is the binding architecture contract for subsequent implementation phases.
 
@@ -215,9 +215,13 @@ These invariants are binding for all subsequent implementation:
 
 ### What is provider-neutral
 
-The `domain/contracts/` boundary contains (P-05, partially implemented):
+The `domain/contracts/` boundary contains (P-05 — **ALL IMPLEMENTED**):
 - Domain types: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass (P-05.01 — **IMPLEMENTED**)
-- Additional contracts: EvidenceRecord, lifecycle state machine (P-05.02 — **IMPLEMENTED**), CapabilityPassport, MemoryRecord, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard (P-05.04 — **IMPLEMENTED** schema-only), event envelope (P-05.05 — PENDING), naming conventions (P-05.06 — PENDING)
+- Change lifecycle state machine: ChangeState, can_transition, require_transition, is_terminal (P-05.02 — **IMPLEMENTED**)
+- Evidence contracts: EvidenceRecord, EvidenceState, ExecutionEvidenceMode, Provenance, ArtifactHash, TraceReference (P-05.03 — **IMPLEMENTED**)
+- Core innovation contracts: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard (P-05.04 — **IMPLEMENTED** schema-only)
+- Event envelope contract: EventEnvelope, EventDeliveryDisposition, classify_event_delivery (P-05.05 — **IMPLEMENTED**)
+- Machine conventions: HashAlgorithm, UtcDateTime, canonical JSON serialization, structural secret redaction, naming/enum conventions (P-05.06 — **IMPLEMENTED**, see `docs/CONTRACT_CONVENTIONS.md`)
 - Versioned contract schemas
 - Enums and state labels
 - Port interfaces (abstract boundaries that adapters implement)
@@ -398,8 +402,10 @@ The following architecture decisions are explicitly deferred to their designated
 | Autonomy and friction review | P-04.05 | `DONE` (see `docs/AUTONOMY_REVIEW.md`) |
 | Foundational domain schemas (ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass) | P-05.01 | `DONE` (see `docs/API_CONTRACTS.md`) |
 | Lifecycle state machine | P-05.02 | `DONE` (see `domain/contracts/change_lifecycle.py`) |
+| Evidence and provenance contracts | P-05.03 | `DONE` (see `domain/contracts/evidence.py`) |
 | Core innovation contracts (MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard) | P-05.04 | `DONE` (schema only; runtime in P-11–P-14) |
-| Event envelope, naming/enum conventions | P-05.05–P-05.06 | `PENDING` |
+| Event envelope and deterministic delivery classifier | P-05.05 | `DONE` (see `domain/contracts/event_envelope.py`) |
+| Machine conventions (naming, enums, UtcDateTime, hashing, redaction, serialization) | P-05.06 | `DONE` (see `docs/CONTRACT_CONVENTIONS.md`) |
 | Implementation stack and dependency freeze (Python/Node version, package manager) | P-06 | `PENDING` |
 | ADK agent skeleton implementation | P-07 | `PENDING` |
 | Gemini integration and structured reasoning boundary | P-08 | `PENDING` |
