@@ -6,7 +6,24 @@ ChangeMesh; kod, veri, güvenlik, uyumluluk ve operasyon sınırlarını aşan u
 
 ## Durum
 
-Bu repo başlangıç aşamasındadır. Şu anda ürün anayasası, mimari sınırlar, canlı yönetişim dosyaları ve ayrıntılı geliştirme planı hazırlanmıştır. Gerçek kanıt olmadan hiçbir özellik tamamlanmış gösterilemez.
+Bu repo uygulama öncesi / yarışma inşa aşamasındadır:
+
+- **Mimari temeli (P-04):** `IMPLEMENTED` (`DONE`)
+- **Domain kontratları ve makine kuralları (P-05.01–P-05.06):** `IMPLEMENTED` (`DONE`)
+- **Çalışma zamanı sürümü ve repo yapısı (P-06.01):** `IMPLEMENTED` (`DONE` — Python `3.13.5` `.python-version` ile sabitlendi, Node `NOT_REQUIRED`)
+- **Tekrarlanabilir bağımlılık bildirimleri ve kilit dosyaları (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` sürüm zorunluluğu, `uv.lock`, çalışma zamanı `requirements.txt`, geliştirme/test `requirements-dev.txt`)
+- **P-06 Yerel Geliştirme Ortamı ve Bağımlılık Dondurma Fazı:** `IN_PROGRESS` (P-06.03 yapılandırma şablonları, P-06.04 standart komutlar ve P-06.05 temiz klon doğrulaması `PENDING` durumundadır)
+- **Çalışma zamanı ürün ve ajan geliştirmesi:** P-07+ aşamasında başlayacaktır (`PLANNED`).
+
+Gerçek kanıt olmadan hiçbir özellik tamamlanmış gösterilemez (`PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`).
+
+## Kurulum ve Yeniden Üretilebilirlik
+
+P-06.02 kapsamında hem çalışma zamanı hem de geliştirme/test bağımlılık kurulumu, kanonik çalışma kopyasında taze ve izole Python 3.13.5 sanal ortamlarında başarıyla doğrulanmıştır (`VERIFIED`).
+
+Ayrı bir dizinden temiz klon ile yeniden üretilebilirlik henüz çalıştırılmamıştır (`NOT_RUN`). İlk temiz klon kurulumunun yapılması ve kanıtlanması münhasıran P-06.05 (`PENDING`) görevine aittir.
+
+Standart geliştirici komut akışı ve eksiksiz kurulum dokümantasyonu P-06.04 ile P-06.05 fazlarına aittir ve temiz klon doğrulaması tamamlandıktan sonra yayımlanacaktır.
 
 ## Temel fikir
 

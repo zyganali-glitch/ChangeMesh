@@ -8,7 +8,16 @@
 
 > [!IMPORTANT]
 > **Pre-implementation / competition build.**
-> This repository currently contains the project charter, architecture constraints, governance system, and execution plan. P-04 Architecture, Phase P-05 domain contracts and machine conventions (P-05.01–P-05.06), and P-06.01 runtime version pinning and repository structure freeze (Python 3.13.5 pinned via `.python-version`, Node `NOT_REQUIRED`) are `IMPLEMENTED`. Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
+> This repository currently contains the project charter, architecture constraints, governance system, execution plan, and frozen dependency foundation.
+>
+> - **Architecture baseline (P-04):** `IMPLEMENTED` (`DONE`)
+> - **Domain contracts & machine conventions (P-05.01–P-05.06):** `IMPLEMENTED` (`DONE`)
+> - **Runtime & repository structure freeze (P-06.01):** `IMPLEMENTED` (`DONE` — Python `3.13.5` pinned via `.python-version`, Node `NOT_REQUIRED`)
+> - **Reproducible dependency manifests & lockfiles (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` version enforcement, `uv.lock`, runtime `requirements.txt`, dev/test `requirements-dev.txt`)
+> - **Phase P-06 Local Dev & Dependency Freeze:** `IN_PROGRESS` (P-06.03 configuration templates, P-06.04 standard commands, and P-06.05 clean-checkout reproduction remain `PENDING`)
+> - **Runtime product & agent implementation:** Begins in Phase P-07+ (`PLANNED`).
+>
+> Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
 
 ## Competition target
 
@@ -235,9 +244,11 @@ No implementation task is complete until the plan, architecture, memory, environ
 
 ## Setup
 
-Setup commands are intentionally not published yet.
+Dependency installation for both runtime and dev/test dependency graphs has been verified in fresh isolated Python 3.13.5 virtual environments on the canonical checkout under P-06.02 (`VERIFIED`).
 
-They will be added only after the dependency, local environment, and deployment phases are implemented and reproduced on a clean checkout. Until then, any claim that the repository is runnable must remain `NOT_RUN`.
+Clean-checkout reproducibility from a separate directory has not yet been executed and remains `NOT_RUN`. Phase P-06.05 exclusively owns the first clean-checkout reproduction and proof.
+
+Standard developer workflow commands and full setup publication belong to P-06.04 and P-06.05, and will be published once clean-checkout reproduction is formally proven.
 
 ## Product direction beyond the hackathon
 

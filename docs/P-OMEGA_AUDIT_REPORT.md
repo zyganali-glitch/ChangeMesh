@@ -2,7 +2,7 @@
 
 > **Produced by:** P-06.02 Dependency Manifests and Lockfiles (Final Document-Parity Repair)
 > **Date:** 2026-08-15
-> **Baseline Remote SHA:** `1774a44b0956b3e8ebf8d455cb8ae5e0ca739a21`
+> **Baseline Remote SHA:** `0ea768e011fbda8a728b2e3fc6be76345291abc1`
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Baseline SHA & remote tracking | **PASS** | `1774a44b0956b3e8ebf8d455cb8ae5e0ca739a21` verified at entry; clean working tree. |
+| **A** | Baseline SHA & remote tracking | **PASS** | `0ea768e011fbda8a728b2e3fc6be76345291abc1` verified at entry; clean working tree. |
 | **B** | Python runtime version preserved | **PASS** | `.python-version` pinned to `3.13.5`; `pyproject.toml` requires `>=3.13,<3.14`. |
 | **C** | Node.js runtime evaluated & absent | **PASS** | Node remains `NOT_REQUIRED`. Zero npm/Node tooling or package.json files exist. |
 | **D** | Canonical dependency manifest (Source of Truth) | **PASS** | `pyproject.toml` (PEP 621 / PEP 735) is sole canonical editable manifest declaring direct runtime (`google-adk`, `google-genai`, `pydantic`, `google-cloud-firestore`, `google-cloud-pubsub`) and direct dev/test (`pytest`, `pyyaml`, `google-auth`, `google-cloud-run`). |
@@ -28,6 +28,7 @@
 | **P** | Combined P-05 regression suite | **PASS** | Carried forward from verified P-06.02 isolated execution: 590 passed across all 6 contract test files in isolated dev/test venv. |
 | **Q** | Full repository suite status honestly recorded | **PASS** | Carried forward from verified P-06.02 execution: Full suite execution produces `FAIL` (590 passed, 3 errors: known `test_gcp_access.py` missing fixture 'project'). Honestly reported as `FAIL`. |
 | **R** | Master Plan & HANDOFF exact parity | **PASS** | Phase registry `P-06 IN_PROGRESS`; P-06.01 `DONE`; P-06.02 `DONE`; P-06.03 `PENDING`; HANDOFF points verbatim to `P-06.03 — Create safe local configuration templates and secret handling`. |
+| **S** | Bilingual Public Document Parity (README.md / README.tr.md) | **PASS** | README.md and README.tr.md accurately reflect P-04 (DONE), P-05 (DONE), P-06.01 (DONE), P-06.02 (DONE), P-06 (IN_PROGRESS), and P-06.03+ (PENDING/PLANNED); isolated-environment dependency install is verified while separate-directory clean-checkout reproduction remains honestly NOT_RUN under P-06.05 ownership; no prerequisite dependency on P-28 deployment implied; JUDGING_MAP.md and SUBMISSION_MANIFEST.md reproducibility remain NOT_RUN; no P-06.04 command framework leaked. |
 
 ---
 
@@ -58,4 +59,4 @@
 
 ## 3. P-Ω Final Verdict
 
-**PASS** — All 18 whole-repository integrity audit checks pass. P-06.02 establishes canonical PEP 621 / PEP 735 `pyproject.toml` (cleanly separating direct runtime vs dev/test dependencies), `[tool.uv] required-version = "==0.11.28"` enforcement, deterministic `uv.lock` (74 packages with SHA-256 integrity hashes), runtime `requirements.txt` (68 packages, dev group excluded), and dev `requirements-dev.txt` (73 packages). Clean isolated virtual environment installations succeed deterministically for both runtime and dev/test with 0 conflicts, recorded as `VERIFIED` under staged isolated-execution semantics. Separate-directory clean-checkout reproduction is NOT claimed and remains P-06.05 `PENDING`. Domain contract neutrality is 100% preserved. Full repository test status is honestly recorded as `FAIL` due to known baseline GCP fixture errors (carried forward from verified P-06.02 execution). Next eligible task is `P-06.03 — Create safe local configuration templates and secret handling`.
+**PASS** — All 19 whole-repository integrity audit checks pass. P-06.02 establishes canonical PEP 621 / PEP 735 `pyproject.toml` (cleanly separating direct runtime vs dev/test dependencies), `[tool.uv] required-version = "==0.11.28"` enforcement, deterministic `uv.lock` (74 packages with SHA-256 integrity hashes), runtime `requirements.txt` (68 packages, dev group excluded), and dev `requirements-dev.txt` (73 packages). Clean isolated virtual environment installations succeed deterministically for both runtime and dev/test with 0 conflicts, recorded as `VERIFIED` under staged isolated-execution semantics. Separate-directory clean-checkout reproduction is NOT claimed and remains P-06.05 `PENDING`. Domain contract neutrality is 100% preserved. Full repository test status is honestly recorded as `FAIL` due to known baseline GCP fixture errors (carried forward from verified P-06.02 execution). Public bilingual documentation parity (README.md and README.tr.md) is 100% synchronized with exact status and setup truth. Next eligible task is `P-06.03 — Create safe local configuration templates and secret handling`.
