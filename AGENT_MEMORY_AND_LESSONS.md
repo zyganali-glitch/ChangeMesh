@@ -82,6 +82,9 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Root cause: Prematurely adopting a JS frontend framework (React/Next.js/Vite) before verifying if vanilla web assets are sufficient for the judge/operator dashboard.
 - Incorrect approach: Defaulting to Node.js / TypeScript / npm tooling for simple dashboard interfaces in a Python-first AI hackathon project.
 - Correct approach: Formally evaluate runtime necessity. Pin Python 3.13.5 as the single unified backend/agent runtime and declare Node `NOT_REQUIRED`, serving the dashboard as vanilla HTML/CSS/JS with zero build steps.
+- Prevention rule: Prefer unified single-runtime architectures unless external hard constraints require a second runtime.
+- Status: `ACTIVE`
+
 ### LESSON-20260815-02 — Developer verification commands must be non-mutating check-only gates, not auto-mutations
 - Date/time: 2026-08-15
 - Active task: P-06.04
@@ -100,4 +103,14 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Incorrect approach: Allowing arbitrary dynamic timestamps in synthetic test fixture builders, or using wall-clock timing delays (`asyncio.sleep`) to synchronize concurrency tests.
 - Correct approach: Use deterministic synchronization (`asyncio.Event` / barriers) for overlap tests; use deterministic base timestamps in synthetic default builders; index `asyncio.gather` results strictly according to caller plan order rather than arrival order to maintain deterministic single-writer aggregation.
 - Prevention rule: Machine-testable equivalence between execution strategies requires strict separation of volatile observability metadata (trace IDs, execution durations) from canonical business outcome state.
+- Status: `ACTIVE`
+
+### LESSON-20260815-04 — Pydantic frozen models provide shallow immutability; multi-agent isolation requires deep snapshotting and non-bypassable safety gates
+- Date/time: 2026-08-15
+- Active task: P-07.04 (QA Repair)
+- Symptom: Pydantic `ConfigDict(frozen=True)` prevents top-level attribute reassignments on models, but nested collections (e.g. `list[str]` in payloads or `required_capabilities` in `RoutingRequest`) remain mutable in Python. When multiple branch specs share or alias input objects, an in-place mutation inside one branch runner could leak across concurrent or sequential branches or mutate caller data. Additionally, an external `force_strategy=PARALLEL` parameter could potentially bypass `is_parallel_safe()` checks if not routed through the safety gate.
+- Root cause: Confusing shallow model immutability with deep object isolation, and allowing caller override parameters to bypass coordinator safety invariants.
+- Incorrect approach: Relying solely on `frozen=True` without deep copying nested collections, or allowing `force_strategy=PARALLEL` to skip safety evaluation.
+- Correct approach: (1) In `BranchCoordinator.execute_plan()`, evaluate `is_parallel_safe()` for all requests for parallel execution (`plan.strategy == PARALLEL`, `force_strategy == PARALLEL`, or `execute_parallel()`), automatically falling back to sequential execution with `fallback_triggered=True` if unsafe; (2) Store `BranchPlan.branches` as an immutable sequence with deep copy validators; (3) In `execute_branch()`, deep copy the branch spec (`isolated_spec = copy.deepcopy(spec)`) before dispatching to the router and runner.
+- Prevention rule: Multi-agent execution engines must guarantee complete deep runtime input isolation and non-bypassable safety gates. Never allow an override parameter or shallow wrapper to suppress safety fallback.
 - Status: `ACTIVE`

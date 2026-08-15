@@ -33,10 +33,11 @@ Responsibilities & Invariants:
 from __future__ import annotations
 
 import asyncio
+import copy
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Sequence
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -113,13 +114,14 @@ class BranchPlan(BaseModel):
     - All `branch_id` values within `branches` must be unique.
     - All `branches` must reference the exact same `change_id` as the plan.
     - Bounded and non-recursive (no nested plans).
+    - `branches` is stored as an immutable tuple of deeply isolated `BranchSpec`s.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
 
     plan_id: str
     change_id: str
-    branches: list[BranchSpec] = Field(min_length=1)
+    branches: Sequence[BranchSpec] = Field(min_length=1)
     strategy: ExecutionStrategy = ExecutionStrategy.PARALLEL
     description: str | None = None
 
@@ -130,14 +132,18 @@ class BranchPlan(BaseModel):
             raise ValueError(f"{info.field_name} must not be blank")
         return v.strip()
 
-    @field_validator("branches")
+    @field_validator("branches", mode="before")
     @classmethod
-    def _validate_branches(cls, v: list[BranchSpec], info) -> list[BranchSpec]:
+    def _validate_branches(cls, v: Any, info) -> tuple[BranchSpec, ...]:
         if not v:
             raise ValueError("BranchPlan must contain at least one branch")
 
+        branch_list: list[BranchSpec] = [
+            b if isinstance(b, BranchSpec) else BranchSpec.model_validate(b) for b in v
+        ]
+
         seen_branch_ids: set[str] = set()
-        for branch in v:
+        for branch in branch_list:
             if branch.branch_id in seen_branch_ids:
                 raise ValueError(f"Duplicate branch_id in plan: {branch.branch_id!r}")
             seen_branch_ids.add(branch.branch_id)
@@ -145,14 +151,14 @@ class BranchPlan(BaseModel):
         # Validate change_id alignment if change_id is present in values
         plan_change_id = info.data.get("change_id")
         if plan_change_id:
-            for branch in v:
+            for branch in branch_list:
                 if branch.routing_request.change_id != plan_change_id:
                     raise ValueError(
                         f"Branch {branch.branch_id!r} change_id "
                         f"({branch.routing_request.change_id!r}) "
                         f"does not match plan change_id ({plan_change_id!r})"
                     )
-        return list(v)
+        return tuple(copy.deepcopy(b) for b in branch_list)
 
 
 class BranchExecutionTrace(BaseModel):
@@ -254,8 +260,15 @@ class CoordinationResult(BaseModel):
     requested_strategy: ExecutionStrategy
     effective_strategy: ExecutionStrategy
     is_successful: bool
-    branch_results: list[BranchResult]
+    branch_results: Sequence[BranchResult] = Field(default_factory=tuple)
     trace: CoordinationTrace
+
+    @field_validator("branch_results", mode="before")
+    @classmethod
+    def _validate_branch_results(cls, v: Any) -> tuple[BranchResult, ...]:
+        if isinstance(v, (list, tuple)):
+            return tuple(v)
+        return (v,)
 
     @property
     def branch_count(self) -> int:
@@ -491,18 +504,20 @@ class BranchCoordinator:
         Returns:
             Immutable BranchResult capturing status, output, and execution trace.
         """
+        # Deep-isolate spec to guarantee runtime isolation from concurrent branches and caller
+        isolated_spec = copy.deepcopy(spec)
         started_at = self._now()
         trace_id = self._generate_id("trace-br")
 
         # 1. Non-bypassable qualification through DeterministicRouter
-        routing_res = self._router.route(spec.routing_request)
+        routing_res = self._router.route(isolated_spec.routing_request)
 
         if not routing_res.is_routed or routing_res.selected_agent_class is None:
             completed_at = self._now()
             trace = BranchExecutionTrace(
                 trace_id=trace_id,
-                branch_id=spec.branch_id,
-                change_id=spec.routing_request.change_id,
+                branch_id=isolated_spec.branch_id,
+                change_id=isolated_spec.routing_request.change_id,
                 strategy_used=strategy,
                 routing_outcome=routing_res.outcome,
                 selected_agent_id=routing_res.trace.selected_agent_id,
@@ -513,8 +528,8 @@ class BranchCoordinator:
                 completed_at=completed_at,
             )
             return BranchResult(
-                branch_id=spec.branch_id,
-                change_id=spec.routing_request.change_id,
+                branch_id=isolated_spec.branch_id,
+                change_id=isolated_spec.routing_request.change_id,
                 status=BranchStatus.REJECTED,
                 strategy_used=strategy,
                 routing_result=routing_res,
@@ -532,13 +547,13 @@ class BranchCoordinator:
 
         try:
             if branch_runner is not None:
-                output = await branch_runner(spec, routing_res)
+                output = await branch_runner(isolated_spec, routing_res)
             else:
                 # Default canonical execution: exercise real ADK BaseAgent in-process
                 agent_instance = selected_cls()
                 session_service = InMemorySessionService()
                 session = await session_service.create_session(
-                    session_id=f"session-{spec.branch_id}",
+                    session_id=f"session-{isolated_spec.branch_id}",
                     user_id="changemesh-orchestrator",
                     app_name="changemesh",
                 )
@@ -551,14 +566,16 @@ class BranchCoordinator:
                 async for _ in runner.run_async(
                     user_id="changemesh-orchestrator",
                     session_id=session.id,
-                    new_message=Content(parts=[Part(text=f"Execute branch {spec.branch_id}")]),
+                    new_message=Content(
+                        parts=[Part(text=f"Execute branch {isolated_spec.branch_id}")]
+                    ),
                 ):
                     pass
 
                 # Build typed synthetic output adhering to selected_def.output_schema
                 output = _build_default_output_for_specialist(
                     selected_def.agent_id,
-                    spec.routing_request.payload,
+                    isolated_spec.routing_request.payload,
                 )
 
         except Exception as exc:
@@ -569,8 +586,8 @@ class BranchCoordinator:
         completed_at = self._now()
         trace = BranchExecutionTrace(
             trace_id=trace_id,
-            branch_id=spec.branch_id,
-            change_id=spec.routing_request.change_id,
+            branch_id=isolated_spec.branch_id,
+            change_id=isolated_spec.routing_request.change_id,
             strategy_used=strategy,
             routing_outcome=routing_res.outcome,
             selected_agent_id=routing_res.trace.selected_agent_id,
@@ -582,8 +599,8 @@ class BranchCoordinator:
         )
 
         return BranchResult(
-            branch_id=spec.branch_id,
-            change_id=spec.routing_request.change_id,
+            branch_id=isolated_spec.branch_id,
+            change_id=isolated_spec.routing_request.change_id,
             status=status,
             strategy_used=strategy,
             routing_result=routing_res,
@@ -603,7 +620,8 @@ class BranchCoordinator:
 
         Args:
             plan: The typed BranchPlan containing branch specifications.
-            force_strategy: Optional strategy override (e.g. forced SEQUENTIAL fallback).
+            force_strategy: Optional strategy override (e.g. forced SEQUENTIAL fallback
+                or requested PARALLEL).
             branch_runner: Optional custom execution handler for branch tasks.
 
         Returns:
@@ -614,29 +632,37 @@ class BranchCoordinator:
 
         started_at = self._now()
         coordination_id = self._generate_id("coord")
-        requested_strategy = plan.strategy
+
+        # Snapshot branches to guarantee complete execution isolation from any caller mutation
+        isolated_branches: tuple[BranchSpec, ...] = tuple(copy.deepcopy(b) for b in plan.branches)
+
+        # Strategy resolution & non-bypassable safety check
+        # Any request/desire/override for PARALLEL must pass is_parallel_safe()
+        requested_strategy = force_strategy if force_strategy is not None else plan.strategy
         fallback_triggered = False
         fallback_reason: str | None = None
 
-        # Strategy resolution & safety check
-        if force_strategy is not None:
-            effective_strategy = force_strategy
-            if (
-                force_strategy == ExecutionStrategy.SEQUENTIAL
-                and requested_strategy == ExecutionStrategy.PARALLEL
-            ):
-                fallback_triggered = True
-                fallback_reason = "Forced sequential execution strategy requested by caller."
-        elif plan.strategy == ExecutionStrategy.PARALLEL:
+        if requested_strategy == ExecutionStrategy.PARALLEL:
             is_safe, reason = self.is_parallel_safe(plan)
             if not is_safe:
                 effective_strategy = ExecutionStrategy.SEQUENTIAL
                 fallback_triggered = True
-                fallback_reason = reason
+                fallback_reason = reason or "Parallel execution unsafe; falling back to sequential."
             else:
                 effective_strategy = ExecutionStrategy.PARALLEL
+                fallback_triggered = False
+                fallback_reason = None
         else:
             effective_strategy = ExecutionStrategy.SEQUENTIAL
+            if (
+                plan.strategy == ExecutionStrategy.PARALLEL
+                and force_strategy == ExecutionStrategy.SEQUENTIAL
+            ):
+                fallback_triggered = True
+                fallback_reason = "Forced sequential execution strategy requested by caller."
+            else:
+                fallback_triggered = False
+                fallback_reason = None
 
         # Execution phase
         branch_results_by_id: dict[str, BranchResult] = {}
@@ -645,14 +671,14 @@ class BranchCoordinator:
             # Controlled parallel execution with true overlap
             coros = [
                 self.execute_branch(b, ExecutionStrategy.PARALLEL, branch_runner)
-                for b in plan.branches
+                for b in isolated_branches
             ]
             raw_results = await asyncio.gather(*coros, return_exceptions=False)
             for res in raw_results:
                 branch_results_by_id[res.branch_id] = res
         else:
             # Deterministic sequential execution
-            for b in plan.branches:
+            for b in isolated_branches:
                 res = await self.execute_branch(b, ExecutionStrategy.SEQUENTIAL, branch_runner)
                 branch_results_by_id[res.branch_id] = res
 
@@ -662,7 +688,7 @@ class BranchCoordinator:
         failure_count = 0
         rejection_count = 0
 
-        for b in plan.branches:
+        for b in isolated_branches:
             res = branch_results_by_id[b.branch_id]
             ordered_results.append(res)
             if res.status == BranchStatus.SUCCESS:
@@ -672,7 +698,7 @@ class BranchCoordinator:
             elif res.status == BranchStatus.REJECTED:
                 rejection_count += 1
 
-        is_successful = success_count == len(plan.branches)
+        is_successful = success_count == len(isolated_branches)
         completed_at = self._now()
 
         trace = CoordinationTrace(
@@ -683,7 +709,7 @@ class BranchCoordinator:
             effective_strategy=effective_strategy,
             fallback_triggered=fallback_triggered,
             fallback_reason=fallback_reason,
-            total_branches=len(plan.branches),
+            total_branches=len(isolated_branches),
             success_count=success_count,
             failure_count=failure_count,
             rejection_count=rejection_count,
@@ -698,6 +724,6 @@ class BranchCoordinator:
             requested_strategy=requested_strategy,
             effective_strategy=effective_strategy,
             is_successful=is_successful,
-            branch_results=ordered_results,
+            branch_results=tuple(ordered_results),
             trace=trace,
         )

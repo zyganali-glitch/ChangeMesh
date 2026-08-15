@@ -38,6 +38,7 @@ from src.agents import (
     ImpactScoutInput,
     ImpactScoutOutput,
     MigrationEngineerInput,
+    MigrationEngineerOutput,
     PolicyGuardianInput,
     PolicyGuardianOutput,
     ReleaseStewardInput,
@@ -326,6 +327,298 @@ async def test_no_shared_mutable_state_across_branches() -> None:
 
     with pytest.raises(ValidationError):
         res1.status = BranchStatus.FAILED  # type: ignore[misc]
+
+
+@pytest.mark.anyio
+async def test_aliased_collection_cross_branch_parallel_isolation() -> None:
+    """Adversarial test proving complete runtime isolation with aliased input collections.
+
+    Even if the caller constructs multiple BranchSpecs sharing the SAME nested mutable list
+    across payloads, in-place mutations performed concurrently inside one branch runner
+    MUST NOT be visible to concurrent branches or the caller's original objects.
+    """
+    change_id = "chg-alias-par-001"
+    coord = BranchCoordinator()
+
+    # Shared mutable collections across distinct specialist inputs
+    shared_target_systems = ["repo-enterprise-db"]
+
+    impact_payload = ImpactScoutInput(
+        schema_version="1.0.0",
+        change_id=change_id,
+        target_systems=shared_target_systems,
+        repository_ref="main",
+        proposed_diff_ref="diff-001",
+        data_classification=DataClassLevel.INTERNAL,
+    )
+
+    policy_payload = PolicyGuardianInput(
+        schema_version="1.0.0",
+        change_id=change_id,
+        data_classification=DataClassLevel.INTERNAL,
+        target_systems=shared_target_systems,
+        requested_actions=["action.schema.migrate"],
+        actor_identity="operator@changemesh.internal",
+    )
+
+    branch_a_started = asyncio.Event()
+    branch_b_started = asyncio.Event()
+    branch_a_mutated = asyncio.Event()
+
+    observed_branch_b_target_systems: list[str] = []
+
+    async def adversarial_parallel_runner(
+        spec: BranchSpec, routing_res: RoutingResult
+    ) -> BaseModel:
+        if spec.branch_id == "br-scout-a":
+            branch_a_started.set()
+            # Wait for branch b to start concurrently
+            await branch_b_started.wait()
+            # In-place adversarial mutation of nested collection on spec
+            spec.routing_request.payload.target_systems.append("MUTATED_SYSTEM_CORRUPT")  # type: ignore[attr-defined]
+            branch_a_mutated.set()
+            return ImpactScoutOutput(
+                schema_version="1.0.0",
+                change_id=change_id,
+                affected_files=["f1"],
+                affected_systems=["db"],
+            )
+        elif spec.branch_id == "br-guardian-b":
+            branch_b_started.set()
+            # Wait for branch a to start and perform its in-place mutation
+            await branch_a_started.wait()
+            await branch_a_mutated.wait()
+            # Observe victim branch's isolated state
+            observed_branch_b_target_systems.extend(
+                spec.routing_request.payload.target_systems  # type: ignore[attr-defined]
+            )
+            return PolicyGuardianOutput(
+                schema_version="1.0.0",
+                change_id=change_id,
+                policy_verdict="COMPLIANT",
+                autonomy_decision=AutonomyDecision(
+                    schema_version="1.0.0",
+                    decision_id="d1",
+                    change_request_id=change_id,
+                    action_class="act",
+                    autonomy_class=AutonomyClass.AUTO_EXECUTE,
+                    policy_source="pol",
+                    rationale="r",
+                    decided_at=datetime(2026, 8, 15, 0, 0, 0, tzinfo=timezone.utc),
+                ),
+            )
+        raise ValueError(f"Unknown {spec.branch_id}")
+
+    # Safe parallel plan (2 distinct specialists) sharing aliased list
+    plan = BranchPlan(
+        plan_id="plan-aliased-par-iso",
+        change_id=change_id,
+        strategy=ExecutionStrategy.PARALLEL,
+        branches=[
+            BranchSpec(
+                branch_id="br-scout-a",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["repository_blast_radius_analysis"],
+                    payload=impact_payload,
+                ),
+            ),
+            BranchSpec(
+                branch_id="br-guardian-b",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["autonomy_classification_evaluation"],
+                    payload=policy_payload,
+                ),
+            ),
+        ],
+    )
+
+    result = await coord.execute_plan(plan, branch_runner=adversarial_parallel_runner)
+
+    assert result.is_successful is True
+    assert result.effective_strategy == ExecutionStrategy.PARALLEL
+
+    # 1. Victim branch B observed ONLY clean original collections
+    assert observed_branch_b_target_systems == ["repo-enterprise-db"]
+    assert "MUTATED_SYSTEM_CORRUPT" not in observed_branch_b_target_systems
+
+    # 2. Caller's original input objects remain completely unchanged
+    assert shared_target_systems == ["repo-enterprise-db"]
+    assert impact_payload.target_systems == ["repo-enterprise-db"]
+    assert policy_payload.target_systems == ["repo-enterprise-db"]
+
+
+@pytest.mark.anyio
+async def test_aliased_routing_request_and_payload_sequential_fallback_isolation() -> None:
+    """Adversarial test proving complete runtime isolation with identical RoutingRequests.
+
+    When duplicate specialist targets trigger sequential fallback, mutations performed by the
+    first executing branch must not leak into subsequent branch executions or caller objects.
+    """
+    change_id = "chg-alias-seq-001"
+    coord = BranchCoordinator()
+
+    shared_capabilities = ["migration_artifact_generation"]
+
+    shared_payload = MigrationEngineerInput(
+        schema_version="1.0.0",
+        change_id=change_id,
+        target_system="repo-enterprise-db",
+        source_schema_version="1.0.0",
+        target_schema_version="2.0.0",
+        migration_spec="ALTER TABLE users ADD COLUMN v1 INT;",
+    )
+
+    shared_routing_request = RoutingRequest(
+        change_id=change_id,
+        required_capabilities=shared_capabilities,
+        payload=shared_payload,
+    )
+
+    observed_branch_2_capabilities: list[str] = []
+
+    async def adversarial_sequential_runner(
+        spec: BranchSpec, routing_res: RoutingResult
+    ) -> BaseModel:
+        if spec.branch_id == "br-first-mutator":
+            # In-place mutation on first branch execution
+            spec.routing_request.required_capabilities.append("INJECTED_CAPABILITY_LEAK")
+            return MigrationEngineerOutput(
+                schema_version="1.0.0",
+                change_id=change_id,
+                artifact_id="art-1",
+                artifact_hash="hash-1",
+                migration_script_content="ALTER TABLE users ADD COLUMN v1 INT;",
+                rehearsal_instructions="run in shadowlab",
+                is_reversible=True,
+            )
+        elif spec.branch_id == "br-second-observer":
+            observed_branch_2_capabilities.extend(spec.routing_request.required_capabilities)
+            return MigrationEngineerOutput(
+                schema_version="1.0.0",
+                change_id=change_id,
+                artifact_id="art-2",
+                artifact_hash="hash-2",
+                migration_script_content="ALTER TABLE users ADD COLUMN v1 INT;",
+                rehearsal_instructions="run in shadowlab",
+                is_reversible=True,
+            )
+        raise ValueError(f"Unknown {spec.branch_id}")
+
+    plan = BranchPlan(
+        plan_id="plan-aliased-seq-iso",
+        change_id=change_id,
+        strategy=ExecutionStrategy.PARALLEL,  # Duplicate targets trigger fallback
+        branches=[
+            BranchSpec(branch_id="br-first-mutator", routing_request=shared_routing_request),
+            BranchSpec(branch_id="br-second-observer", routing_request=shared_routing_request),
+        ],
+    )
+
+    result = await coord.execute_plan(plan, branch_runner=adversarial_sequential_runner)
+
+    assert result.is_successful is True
+    assert result.effective_strategy == ExecutionStrategy.SEQUENTIAL
+    assert result.trace.fallback_triggered is True
+
+    # 1. Branch 2 observed ONLY clean original capabilities
+    assert observed_branch_2_capabilities == ["migration_artifact_generation"]
+    assert "INJECTED_CAPABILITY_LEAK" not in observed_branch_2_capabilities
+
+    # 2. Caller's original RoutingRequest remains completely unmodified
+    assert shared_capabilities == ["migration_artifact_generation"]
+    assert shared_routing_request.required_capabilities == ["migration_artifact_generation"]
+
+
+@pytest.mark.anyio
+async def test_caller_plan_collection_mutation_during_execution_cannot_corrupt_aggregation() -> (
+    None
+):
+    """Prove caller collection mutation during execution does not alter coordinator aggregation."""
+    change_id = "chg-caller-mutate-001"
+    coord = BranchCoordinator()
+
+    caller_branches = [
+        BranchSpec(
+            branch_id="br-first",
+            routing_request=RoutingRequest(
+                change_id=change_id,
+                required_capabilities=["repository_blast_radius_analysis"],
+                payload=_make_impact_scout_input(change_id),
+            ),
+        ),
+        BranchSpec(
+            branch_id="br-second",
+            routing_request=RoutingRequest(
+                change_id=change_id,
+                required_capabilities=["autonomy_classification_evaluation"],
+                payload=_make_policy_guardian_input(change_id),
+            ),
+        ),
+    ]
+
+    plan = BranchPlan(
+        plan_id="plan-caller-mut",
+        change_id=change_id,
+        strategy=ExecutionStrategy.PARALLEL,
+        branches=caller_branches,
+    )
+
+    execution_started = asyncio.Event()
+
+    async def mutator_runner(spec: BranchSpec, routing_res: RoutingResult) -> BaseModel:
+        execution_started.set()
+        if spec.branch_id == "br-first":
+            return ImpactScoutOutput(
+                schema_version="1.0.0",
+                change_id=change_id,
+                affected_files=["f1"],
+                affected_systems=["db"],
+            )
+        elif spec.branch_id == "br-second":
+            return PolicyGuardianOutput(
+                schema_version="1.0.0",
+                change_id=change_id,
+                policy_verdict="COMPLIANT",
+                autonomy_decision=AutonomyDecision(
+                    schema_version="1.0.0",
+                    decision_id="d1",
+                    change_request_id=change_id,
+                    action_class="act",
+                    autonomy_class=AutonomyClass.AUTO_EXECUTE,
+                    policy_source="pol",
+                    rationale="r",
+                    decided_at=datetime(2026, 8, 15, 0, 0, 0, tzinfo=timezone.utc),
+                ),
+            )
+        raise ValueError(f"Unknown {spec.branch_id}")
+
+    # Concurrently mutate the caller-side list while execution is in-flight
+    async def mutate_caller_list():
+        await execution_started.wait()
+        caller_branches.clear()
+        caller_branches.append(
+            BranchSpec(
+                branch_id="br-injected-corrupt",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["repository_blast_radius_analysis"],
+                    payload=_make_impact_scout_input(change_id),
+                ),
+            )
+        )
+
+    mutate_task = asyncio.create_task(mutate_caller_list())
+    result = await coord.execute_plan(plan, branch_runner=mutator_runner)
+    await mutate_task
+
+    # Coordinator result aggregated strictly the original 2 branches in exact original order
+    assert result.is_successful is True
+    assert result.branch_count == 2
+    assert result.branch_results[0].branch_id == "br-first"
+    assert result.branch_results[1].branch_id == "br-second"
+    assert result.get_branch_result("br-injected-corrupt") is None
 
 
 # ===========================================================================
@@ -813,6 +1106,165 @@ async def test_release_steward_concurrency_triggers_automatic_sequential_fallbac
     assert result.is_successful is True
     assert result.effective_strategy == ExecutionStrategy.SEQUENTIAL
     assert result.trace.fallback_triggered is True
+
+
+@pytest.mark.anyio
+async def test_duplicate_specialist_plan_direct_force_parallel_triggers_sequential_fallback() -> (
+    None
+):
+    """Prove force_strategy=PARALLEL on duplicate specialist plan triggers fallback."""
+    change_id = "chg-force-par-dup-001"
+    coord = BranchCoordinator()
+
+    plan = BranchPlan(
+        plan_id="plan-dup-specialist",
+        change_id=change_id,
+        strategy=ExecutionStrategy.SEQUENTIAL,  # Even if plan is marked SEQUENTIAL
+        branches=[
+            BranchSpec(
+                branch_id="br-mig-1",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["migration_artifact_generation"],
+                    payload=_make_migration_engineer_input(change_id),
+                ),
+            ),
+            BranchSpec(
+                branch_id="br-mig-2",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["migration_artifact_generation"],
+                    payload=_make_migration_engineer_input(change_id),
+                ),
+            ),
+        ],
+    )
+
+    # Directly force PARALLEL override
+    result = await coord.execute_plan(plan, force_strategy=ExecutionStrategy.PARALLEL)
+
+    assert result.is_successful is True
+    assert result.requested_strategy == ExecutionStrategy.PARALLEL
+    # MUST NOT execute in parallel; effective strategy MUST be SEQUENTIAL
+    assert result.effective_strategy == ExecutionStrategy.SEQUENTIAL
+    assert result.trace.fallback_triggered is True
+    assert "Conflict risk" in (result.trace.fallback_reason or "")
+
+
+@pytest.mark.anyio
+async def test_release_steward_concurrency_direct_force_parallel_triggers_sequential_fallback() -> (
+    None
+):
+    """Prove force_strategy=PARALLEL on Release Steward concurrency triggers fallback."""
+    change_id = "chg-force-par-rel-001"
+    coord = BranchCoordinator()
+
+    plan = BranchPlan(
+        plan_id="plan-rel-concurrency",
+        change_id=change_id,
+        strategy=ExecutionStrategy.SEQUENTIAL,
+        branches=[
+            BranchSpec(
+                branch_id="br-impact",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["repository_blast_radius_analysis"],
+                    payload=_make_impact_scout_input(change_id),
+                ),
+            ),
+            BranchSpec(
+                branch_id="br-release",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["release_bundle_packaging"],
+                    payload=_make_release_steward_input(change_id),
+                ),
+            ),
+        ],
+    )
+
+    # Directly force PARALLEL override
+    result = await coord.execute_plan(plan, force_strategy=ExecutionStrategy.PARALLEL)
+
+    assert result.is_successful is True
+    assert result.requested_strategy == ExecutionStrategy.PARALLEL
+    # MUST NOT execute in parallel; effective strategy MUST be SEQUENTIAL
+    assert result.effective_strategy == ExecutionStrategy.SEQUENTIAL
+    assert result.trace.fallback_triggered is True
+    assert "release steward" in (result.trace.fallback_reason or "").lower()
+
+
+@pytest.mark.anyio
+async def test_unsafe_plans_through_orchestrator_execute_parallel_trigger_sequential_fallback() -> (
+    None
+):
+    """Prove ChangeOrchestrator.execute_parallel() triggers fallback on unsafe plans."""
+    change_id = "chg-orch-par-unsafe-001"
+    orch = ChangeOrchestrator()
+
+    # 1. Duplicate specialist plan
+    dup_plan = BranchPlan(
+        plan_id="plan-dup-orch",
+        change_id=change_id,
+        strategy=ExecutionStrategy.PARALLEL,
+        branches=[
+            BranchSpec(
+                branch_id="br-mig-1",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["migration_artifact_generation"],
+                    payload=_make_migration_engineer_input(change_id),
+                ),
+            ),
+            BranchSpec(
+                branch_id="br-mig-2",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["migration_artifact_generation"],
+                    payload=_make_migration_engineer_input(change_id),
+                ),
+            ),
+        ],
+    )
+
+    dup_res = await orch.execute_parallel(dup_plan)
+    assert dup_res.is_successful is True
+    assert dup_res.requested_strategy == ExecutionStrategy.PARALLEL
+    assert dup_res.effective_strategy == ExecutionStrategy.SEQUENTIAL
+    assert dup_res.trace.fallback_triggered is True
+    assert "Conflict risk" in (dup_res.trace.fallback_reason or "")
+
+    # 2. Release Steward concurrency plan
+    rel_plan = BranchPlan(
+        plan_id="plan-rel-orch",
+        change_id=change_id,
+        strategy=ExecutionStrategy.PARALLEL,
+        branches=[
+            BranchSpec(
+                branch_id="br-impact",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["repository_blast_radius_analysis"],
+                    payload=_make_impact_scout_input(change_id),
+                ),
+            ),
+            BranchSpec(
+                branch_id="br-release",
+                routing_request=RoutingRequest(
+                    change_id=change_id,
+                    required_capabilities=["release_bundle_packaging"],
+                    payload=_make_release_steward_input(change_id),
+                ),
+            ),
+        ],
+    )
+
+    rel_res = await orch.execute_parallel(rel_plan)
+    assert rel_res.is_successful is True
+    assert rel_res.requested_strategy == ExecutionStrategy.PARALLEL
+    assert rel_res.effective_strategy == ExecutionStrategy.SEQUENTIAL
+    assert rel_res.trace.fallback_triggered is True
+    assert "release steward" in (rel_res.trace.fallback_reason or "").lower()
 
 
 # ===========================================================================

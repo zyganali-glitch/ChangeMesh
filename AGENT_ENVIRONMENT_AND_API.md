@@ -120,11 +120,11 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 | Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py tests/test_p05_06_contract_conventions.py -v --tb=short` | `CLEAN_CHECKOUT_VERIFIED` | `PASS` (590 passed) | Local non-mutating test | 2026-08-15 |
 | Unit tests (P-06.03 Config Safety) | `python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` | `CLEAN_CHECKOUT_VERIFIED` | `PASS` (14 passed) | Local non-mutating test | 2026-08-15 |
 | Unit tests (P-06.04 Commands) | `python -m pytest tests/test_p06_04_commands.py -v --tb=short` | `CLEAN_CHECKOUT_VERIFIED` | `PASS` (15 passed) | Local non-mutating test | 2026-08-15 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (782 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-15 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (788 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-15 |
 | Format | `uv run python scripts/cmd.py format` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports unformatted historical files) | Non-mutating (`ruff format --check .`) | 2026-08-15 |
 | Lint | `uv run python scripts/cmd.py lint` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports historical lint debt) | Non-mutating (`ruff check .`, no `--fix`) | 2026-08-15 |
 | Type-check | `uv run python scripts/cmd.py type-check` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports 2 errors in `test_gcp_access.py`) | Non-mutating (`mypy domain tests`) | 2026-08-15 |
-| Unit | `uv run python scripts/cmd.py unit` | `CLEAN_CHECKOUT_VERIFIED` | `PASS` (782 passed) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-15 |
+| Unit | `uv run python scripts/cmd.py unit` | `CLEAN_CHECKOUT_VERIFIED` | `PASS` (788 passed) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-15 |
 | Integration | `uv run python scripts/cmd.py integration` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL_CLOSED` (Exit 1, zero cloud access without `--live-write-danger`) | Guarded live writes (`tests/test_gcp_access.py`) | 2026-08-15 |
 | E2E | `uv run python scripts/cmd.py e2e` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24/P-25 pending) | Deferred workflow | 2026-08-15 |
 | Demo | `uv run python scripts/cmd.py demo` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24 pending) | Deferred demo | 2026-08-15 |

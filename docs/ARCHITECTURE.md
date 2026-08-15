@@ -455,7 +455,7 @@ See the full review in [`AUTONOMY_REVIEW.md`](AUTONOMY_REVIEW.md).
 | Change Orchestrator ADK skeleton | YES — implemented in P-07.01 (`src/agents/change_orchestrator.py`, zero external writes) |
 | Specialized agent fleet | YES — implemented in P-07.02 (`src/agents/` six ADK agent definitions, bounded instructions/tool sets, zero external writes) |
 | Deterministic routing/delegation | YES — implemented in P-07.03 (`src/agents/router.py`, deterministic capability and contract matching, zero external writes, zero model invocations) |
-| Sequential fallback & parallel branches | YES — implemented in P-07.04 (`src/agents/coordinator.py`, zero shared mutable state, single-writer aggregation, fail-closed fallback) |
+| Sequential fallback & parallel branches | YES — implemented in P-07.04 (`src/agents/coordinator.py`, deep runtime input isolation, single-writer aggregation, non-bypassable sequential fallback) |
 | Gemini structured reasoning | NO — deferred to P-08 (`PENDING`) |
 | Pub/Sub event backbone | NO — deferred to P-09 (`PENDING`) |
 | Firestore saga persistence | NO — deferred to P-10 (`PENDING`) |

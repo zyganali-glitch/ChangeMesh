@@ -279,15 +279,16 @@ class ChangeOrchestrator(BaseAgent):
         coordinator: BranchCoordinator | None = None,
         branch_runner: Callable[..., Awaitable[BaseModel]] | None = None,
     ) -> CoordinationResult:
+        """Execute a branch plan requesting parallel execution.
+
+        Enforces non-bypassable sequential fallback if the plan is unsafe.
+        """
         from src.agents.coordinator import BranchCoordinator, ExecutionStrategy
 
         active_coord = coordinator or BranchCoordinator()
-        force_strat = (
-            ExecutionStrategy.PARALLEL if plan.strategy == ExecutionStrategy.SEQUENTIAL else None
-        )
         return await active_coord.execute_plan(
             plan,
-            force_strategy=force_strat,
+            force_strategy=ExecutionStrategy.PARALLEL,
             branch_runner=branch_runner,
         )
 

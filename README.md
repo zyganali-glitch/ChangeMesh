@@ -279,7 +279,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
    ```bash
    uv run python scripts/cmd.py unit
    ```
-   *(Executes all 782 unit/contract tests across P-05 domain contracts, P-06.03 config safety, P-06.04 command contracts, P-07.01 Change Orchestrator ADK skeleton, P-07.02 specialized agent fleet definitions, P-07.03 deterministic routing/delegation, and P-07.04 multi-agent concurrency/fallback with exit code 0).*
+   *(Executes all 788 unit/contract tests across P-05 domain contracts, P-06.03 config safety, P-06.04 command contracts, P-07.01 Change Orchestrator ADK skeleton, P-07.02 specialized agent fleet definitions, P-07.03 deterministic routing/delegation, and P-07.04 multi-agent concurrency/fallback with exit code 0).*
 
 ### Configuration & Authentication Boundary
 
@@ -292,7 +292,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 
 | Command | Action | Check Semantics | Baseline Result |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (782 passed) |
+| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (788 passed) |
 | `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `FAIL` (historical format debt) |
 | `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `FAIL` (historical lint debt) |
 | `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests`) | `FAIL` (historical type debt in `test_gcp_access.py`) |
