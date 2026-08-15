@@ -146,4 +146,5 @@ For every crossing, the payload must be purpose-bound. The system uses identifie
 - **P-06:** Local development environment and dependency freeze is `IN_PROGRESS`.
   - P-06.01 runtime/language/repository-structure freeze is `DONE`.
   - P-06.02 reproducible dependency manifest/lockfile foundation is `DONE`.
-  - P-06.03 configuration/secret-template work, P-06.04 standard command workflow, and P-06.05 separate-directory clean-checkout reproduction remain `PENDING`.
+  - P-06.03 safe local configuration template (`.env.example` with zero secret defaults) and comprehensive credential/artifact ignore protection in `.gitignore` are `DONE` with 14 automated config-safety tests and 0-secret scan.
+  - P-06.04 standard command workflow and P-06.05 separate-directory clean-checkout reproduction remain `PENDING`.

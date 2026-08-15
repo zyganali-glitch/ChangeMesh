@@ -715,12 +715,13 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-06.03 — Create safe local configuration templates and secret handling
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create safe local configuration templates and secret handling.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No secret defaults; gitignore covers local credentials and sensitive generated artifacts.
 - **Required evidence:** Secret scan and config tests.
-- **Mandatory documentation sync:** Environment/API, threat model.
+- **Evidence:** Created safe root `.env.example` defining all 5 canonical environment variables (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GEMINI_MODEL`, `GITHUB_TOKEN`, `DEMO_REPO`) with zero secret defaults (`GITHUB_TOKEN=` empty), explicit Application Default Credentials (ADC) local auth policy (`gcloud auth application-default login`), and explicit prohibition of service-account JSON key files. `.gitignore` audited and strengthened to cover all credential file variations (`*service-account*.json`, `*service_account*.json`, `*credentials*.json`, `*credential*.json`, `application_default_credentials.json`, `*adc.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.pkcs12`, `api_key.txt`, `*.secret`, `*.token`), temporary/private directories (`tmp/`, `artifacts/private/`, `private/`, `secrets/`, `.secrets/`), and `.env` / `.env.*` variants while explicitly preserving tracked `!.env.example`. 14 automated config-safety tests in `tests/test_p06_03_config_safety.py` passing (`14 passed`). Deterministic repository-wide secret scan across all 123 tracked files executed with 0 secret findings (`PASS`). Combined P-05 regression suite verified at 590 passed (`590 passed`). Full repository suite executed and honestly reported as `FAIL` (604 passed, 3 errors: known baseline `test_gcp_access.py` missing fixture 'project'). Documentation synchronized across `AGENT_ENVIRONMENT_AND_API.md`, `docs/THREAT_MODEL.md`, `README.md`, `README.tr.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md`.
+- **Mandatory documentation sync:** Environment/API (`AGENT_ENVIRONMENT_AND_API.md`), Threat Model (`docs/THREAT_MODEL.md`), README (`README.md`, `README.tr.md`), Master Plan (`plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`), Handoff (`docs/HANDOFF.md`), P-Ω Audit Report (`docs/P-OMEGA_AUDIT_REPORT.md`).
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown

@@ -53,6 +53,7 @@ Record actual environment only; do not fill unknown values with guesses.
 ### Machine Conventions Contract Boundary (P-05.06)
 
 - **Machine conventions** (`domain/contracts/conventions.py`) define canonical hashing (`HashAlgorithm.SHA256`, 64-character lowercase hex regex `^[0-9a-f]{64}$`), UTC timestamp normalization and naive rejection (`UtcDateTime`), deterministic canonical JSON serialization (`canonical_json_bytes`), and structural secret redaction (`redact_mapping`, `REDACTION_SENTINEL = "[REDACTED]"`).
+
 ### Dependency and Lockfile Architecture Boundary (P-06.02 / ADR-0016)
 
 - **Canonical Manifest (Source of Truth):** `pyproject.toml` (PEP 621 / PEP 735).
@@ -68,6 +69,14 @@ Record actual environment only; do not fill unknown values with guesses.
 - **Installation from Lock:**
   - Runtime: `uv pip install --require-hashes -r requirements.txt` or `pip install --require-hashes -r requirements.txt`.
   - Dev/Test: `uv sync --frozen` or `uv pip install --require-hashes -r requirements-dev.txt` or `pip install --require-hashes -r requirements-dev.txt`.
+
+### Local Configuration & Secret-Handling Boundary (P-06.03)
+
+- **Canonical Configuration Template:** `.env.example` at repository root. It defines all registered environment variables with zero secret defaults.
+- **Secret-Value Policy:** Secret-bearing variables (`GITHUB_TOKEN`) must have empty values (`GITHUB_TOKEN=`) in the template. No dummy tokens, placeholders, or live credentials.
+- **ADC-First Local Policy:** Local development uses Google Cloud Application Default Credentials (ADC) via `gcloud auth application-default login`. Service-account JSON key files are prohibited and not distributed.
+- **Tracked vs Ignored Boundary:** `.gitignore` explicitly ignores real `.env`, `.env.*` (while preserving `!.env.example`), `*service-account*.json`, `*credentials*.json`, `application_default_credentials.json`, `*adc.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.pkcs12`, `api_key.txt`, `*.secret`, `*.token`, `tmp/`, `artifacts/private/`, `private/`, and `secrets/`.
+- **Evidence & Verification:** 14 automated tests in `tests/test_p06_03_config_safety.py` and 0-secret scan across all tracked repository files (`PASS`).
 
 ## Environment-variable registry
 
@@ -98,7 +107,8 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 | Unit tests (P-05.05 Events) | `python -m pytest tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` (82 passed) | 2026-08-13 |
 | Unit tests (P-05.06 Conventions) | `python -m pytest tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (214 passed) | 2026-08-15 |
 | Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (590 passed) | 2026-08-15 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (590 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | 2026-08-15 |
+| Unit tests (P-06.03 Config Safety) | `python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` | `VERIFIED` (14 passed) | 2026-08-15 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (604 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | 2026-08-15 |
 | Integration tests | `NOT_DEFINED` | `NOT_RUN` | - |
 | E2E demo | `NOT_DEFINED` | `NOT_RUN` | - |
 | Local web | `NOT_DEFINED` | `NOT_RUN` | - |

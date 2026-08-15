@@ -22,11 +22,12 @@ P-05.06
 P-05
 P-06.01
 P-06.02
+P-06.03
 
 **Active Phase:**
 P-06
 
 **Next Exact Task:**
-P-06.03 — Create safe local configuration templates and secret handling
+P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown
 
-P-06.02 completed with ADR-0016, establishing PEP 621 / PEP 735 `pyproject.toml` as canonical source-of-truth manifest (direct runtime + dev/test separated), `[tool.uv] required-version = "==0.11.28"` enforcement, `uv.lock` as deterministic lockfile (74 packages with SHA-256 hashes), runtime `requirements.txt` (68 packages, no dev tooling), and dev `requirements-dev.txt` (73 packages). Clean isolated virtual environment installations verified for both runtime and dev/test with exit code 0 and `uv pip check` reporting 0 conflicts. Total 590 domain contract tests passing in isolated dev environment. Next eligible task is P-06.03.
+P-06.03 completed safely establishing canonical local configuration template `.env.example` at repository root with zero secret defaults (`GITHUB_TOKEN` empty, ADC-first local authentication guidance without distributing service-account key files, and canonical registry variables matching `AGENT_ENVIRONMENT_AND_API.md`). Comprehensive `.gitignore` protection audited and strengthened for all credential/key variations and sensitive directories while keeping `!.env.example` trackable. 14 automated config-safety tests pass in `tests/test_p06_03_config_safety.py`, and repository-wide deterministic secret scan across all 123 tracked files passes with 0 secret findings. Full regression suite stands at 604 passed (590 combined P-05 + 14 P-06.03) and 3 known GCP fixture errors honestly reported as FAIL. Next eligible task is P-06.04.
