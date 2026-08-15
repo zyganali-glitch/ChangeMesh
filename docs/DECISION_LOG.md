@@ -171,3 +171,35 @@
     - Freeze all work while any authority decision is pending (Rejected: unnecessarily blocks safe independent saga edges).
 - Consequences: All subsequent implementation phases (P-05+) must comply with these autonomy invariants. Adding human approval where policy, rehearsal, and reversibility permit autonomous work violates IL-19 and this ADR.
 - Evidence: `docs/AUTONOMY_REVIEW.md`, `docs/ARCHITECTURE.md` §12
+
+## ADR-0015 — Language and Runtime Version Pinning and Repository Structure Freeze
+- Date: 2026-08-15
+- Status: Accepted
+- Context: Micro-task P-06.01 requires selecting exact language and runtime versions and freezing the repository structure based on feasibility evidence. Previously, `AGENT_ENVIRONMENT_AND_API.md` marked the implementation stack, Python version, and Node version as `NOT_DECIDED`.
+- Decision:
+    1. **Language and Runtime:** Python is selected as the sole product backend and agent runtime language, pinned to exact patch version `3.13.5`.
+    2. **Node Runtime Requirement:** Node.js is determined to be `NOT_REQUIRED`. The operator and judge dashboard in `web/` will use vanilla HTML5/CSS3/JavaScript without a Node runtime, bundler, or build toolchain, served directly via Python backend or static hosting. No `.nvmrc`, `package.json`, or npm toolchain is introduced.
+    3. **Version Marker File:** A minimal machine-readable version marker file `.python-version` containing `3.13.5` is created in the repository root for local tooling and Google Cloud Buildpack version detection.
+    4. **Repository Structure:** The repository structure is frozen strictly to the canonical planned package map in `docs/ARCHITECTURE.md` §3.
+        - *Current Physical Structure:* `domain/contracts/` (implemented provider-neutral schemas and conventions), `tests/` (unit and contract test suites), `docs/` (architecture, ADRs, policies), `plans/` (master roadmap), `fixtures/` (test data doubles), `.agents/` (Antigravity governance), and root governance documents.
+        - *Frozen Target Structure:* `src/agents/` (Google ADK agents), `src/git/` (Impact Scout), `src/evidence/` (Evidence ledger, timeline, passport), `src/orchestrator/` (Firestore saga state persistence), `src/auth/` (Approval compression), `src/policy/` (ShadowLab auth), `src/core/` (Gemini structured output deserialization), `src/audit/` (Claim audit), `src/memory/` (Memory trust layer), `src/connectors/` (Tool boundary), `integrations/` (GitHub, metadata, GCP adapters), `observability/` (OpenTelemetry/Cloud Logging), `web/` (vanilla dashboard UI), `shadowlab/` (rehearsal scenarios), `capability/` (passport generation/validation), `events/` (Pub/Sub event envelopes).
+        - *Future Planned-Only Structure:* No empty directories or placeholder files are created in P-06.01. Implementation of these modules belongs strictly to future phases (P-07 through P-24).
+- Alternatives Considered:
+    - *Python 3.10 / 3.11 / 3.12:* Rejected. Python 3.13 is fully supported across Google Cloud Run (`python313` runtime), Google ADK (2.6+), and Google GenAI SDK (`google-genai`). The local active environment is verified on Python 3.13.5 with 590 passing contract and convention tests.
+    - *Node.js / TypeScript frontend build framework (React, Next.js, Vite):* Rejected. A Node-based frontend introduces multi-runtime container bloat, npm dependency drift, and dual build steps in CI/CD and Cloud Run deployment. Vanilla JS/HTML/CSS meets all judge dashboard requirements cleanly.
+    - *Creating empty directory scaffolding for P-07+ in P-06.01:* Rejected. Creating placeholder modules violates the no-empty-scaffolding rule and creates deceptive impressions of progress.
+- Consequences:
+    - Resolves all `NOT_DECIDED` runtime fields in `AGENT_ENVIRONMENT_AND_API.md`.
+    - Establishes a deterministic Python 3.13.5 baseline for P-06.02 dependency manifests and lockfiles.
+    - Preserves provider neutrality of domain contracts and Google-native product architecture.
+- Evidence:
+    - Google ADK requires `Python >= 3.10` (PyPI package metadata and official docs, access date 2026-08-15).
+    - `google-genai` requires `Python >= 3.10` (PyPI package metadata and official docs, access date 2026-08-15).
+    - Google Cloud Run supports `Python 3.13` natively (`python313` runtime ID) and detects `.python-version` via Google Cloud Buildpacks (Google Cloud Run official docs, access date 2026-08-15).
+    - Local execution verified on Python 3.13.5 (`python -m pytest tests/` with 590 passing contract tests).
+- Relationship to ADK: Google ADK orchestrator and runtime agents (P-07+) will execute natively on Python 3.13.5.
+- Relationship to Cloud Run: Deployment containers will target Python 3.13 runtime via Cloud Run buildpack / container configurations.
+- Relationship to Existing Planned Architecture Map: 100% compliant with `docs/ARCHITECTURE.md` package map with zero architectural deviations.
+- Boundary with P-06.02: P-06.01 solely selects and pins the language/runtime versions and repository structure. P-06.02 owns creating reproducible dependency manifests and lockfiles. `requirements.txt` is not modified and no lockfiles are generated.
+- Boundary with P-07: P-06.01 introduces no agent implementation, skeleton code, or runtime services.
+

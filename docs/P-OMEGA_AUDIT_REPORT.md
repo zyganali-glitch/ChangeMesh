@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-05.06 (P-05 Final Closure Repair)
+# P-Ω Whole-Repository Integrity Audit — P-06.01 Closure
 
-> **Produced by:** P-05.06 Closure Repair & Parity Synchronization
+> **Produced by:** P-06.01 Language/Runtime Pinning and Repository Structure Freeze
 > **Date:** 2026-08-15
-> **Baseline Remote SHA:** `2945e25d7a3a3d73e7f07b8050736ef40304ba3a`
+> **Baseline Remote SHA:** `eaebfbf3a2f8c5af90d442fe8cac66176453eb2c`
 
 ---
 
@@ -10,32 +10,21 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Conventions module exists | **PASS** | `domain/contracts/conventions.py` implemented and exported in `__init__.py`. |
-| **B** | Naming convention lint passes | **PASS** | `TestNamingConventions` verifies PascalCase models, snake_case fields/functions, `schema_version` exact spelling across all modules. |
-| **C** | Frozen locale-neutral enum vocabularies | **PASS** | `TestEnumConventions` validates closed ASCII string enum sets across all domain models. |
-| **D** | Duplicate aliases within semantic enum rejected | **PASS** | `TestHashAlgorithm.test_rejects_aliases` verifies rejection of `SHA-256`, `sha-256`, `SHA256`. |
-| **E** | Cross-enum token independence allowed | **PASS** | `TestEnumIndependence` proves distinct enums (`EvidenceState.SIMULATED` vs `ExecutionEvidenceMode.SIMULATION`) remain independent. |
-| **F** | All domain timestamps covered by UtcDateTime | **PASS** | 14 machine timestamp fields across 9 models enforce `UtcDateTime = Annotated[datetime, AfterValidator(normalize_utc_datetime)]`. |
-| **G** | Naive contract timestamps rejected | **PASS** | `TestContractNaiveTimestampRejection` proves naive datetimes raise `ValidationError` across all 9 domain models and optional fields. |
-| **H** | Non-UTC timestamps normalize to UTC in-memory | **PASS** | `TestContractCrossOffsetNormalization` proves `-05:00` offset datetimes normalize to UTC instant with `tzinfo == timezone.utc`. |
-| **I** | Canonical wire timestamp is deterministic | **PASS** | `TestTimestampFormatting` verifies `YYYY-MM-DDTHH:MM:SS.ffffffZ` (6-digit microsecond precision + 'Z'). |
-| **J** | EventEnvelope timestamp is non-causal | **PASS** | `TestEventEnvelopeTimestampRegression` proves reversed timestamps do not alter causal ordering; identical instants across offsets normalize identically and classify as `DUPLICATE`. |
-| **K** | SHA-256 algorithm / digest convention enforced | **PASS** | `TestHashAlgorithm` & `TestDigestValidation` verify `sha256` token and 64 lowercase hex digest regex `^[0-9a-f]{64}$`. |
-| **L** | ArtifactHash remains immutable | **PASS** | `TestArtifactHashConvention` proves `frozen=True` and rejects extra fields. |
-| **M** | Canonical JSON deterministic | **PASS** | `TestCanonicalJsonBytes` proves sorted keys, compact separators, UTF-8, float bounds (NaN/Inf rejected), fail-closed on unsupported types. |
-| **N** | Redaction sentinel exact | **PASS** | `REDACTION_SENTINEL == "[REDACTED]"`. |
-| **O** | Nested redaction is non-mutating | **PASS** | `TestSecretKeyRedaction` proves recursive structural redaction creates new objects without mutating inputs. |
-| **P** | Redaction does not authorize secret propagation | **PASS** | `TestCredentialFieldAbsence` proves domain contracts contain zero credential/secret fields. |
-| **Q** | Provider-neutrality lint handles Import and ImportFrom | **PASS** | `TestProviderNeutrality` AST-lints both `ast.Import` and `ast.ImportFrom` and tests prove rejection of both synthetic AST node forms. |
-| **R** | P-05.01–P-05.05 regressions preserved | **PASS** | All 590 domain contract tests pass without failure or regression. |
-| **S** | API_CONTRACTS current-state parity | **PASS** | `docs/API_CONTRACTS.md` states `P-05.06 — IMPLEMENTED`, removes deferred table, and adds Section 13 for Machine Conventions. |
-| **T** | All technical docs audited | **PASS** | Audited and synchronized `docs/CONTRACT_CONVENTIONS.md`, `docs/API_CONTRACTS.md`, `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`, `docs/EVIDENCE_BOUNDARY.md`, `README.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`. |
-| **U** | Master Plan phase registry & detailed parity | **PASS** | Master Plan phase registry line 121 is `P-05 DONE`; detailed P-05 section line 626 is `DONE`; P-05.01–P-05.06 are all `DONE`. P-06 registry is `PENDING`, detailed P-06 status is `PENDING`, P-06.01 is `PENDING`. |
-| **V** | HANDOFF exact task parity | **PASS** | Master Plan and HANDOFF both state: `P-06.01 — Choose language/runtime versions and repository structure from feasibility evidence`. Active phase is `P-06`. |
-| **W** | Environment command registry parity | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` contains dedicated P-05.06 command (214 passed), 6-file combined P-05 command (590 passed), full suite command (FAIL: 590 passed, 3 errors), and verified date `2026-08-15`. |
-| **X** | No P-06 implementation leakage | **PASS** | No Poetry files, pyproject.toml, lockfiles, or environment scaffolding exist in the repository. P-06.01 was NOT started. |
-| **Y** | Exact current test counts | **PASS** | P-05.06: 214 passed; Combined P-05: 590 passed; Total: 590 passed, 3 errors. |
-| **Z** | Full-suite result honestly recorded | **PASS** | Recorded as `FAIL — known unrelated baseline GCP fixture errors only` (`test_gcp_access.py` missing fixture 'project'). |
+| **A** | Python runtime version pinned | **PASS** | `.python-version` created in repository root pinning exact version `3.13.5`. |
+| **B** | Node.js runtime evaluated | **PASS** | Evaluated and determined `NOT_REQUIRED` in ADR-0015 and `AGENT_ENVIRONMENT_AND_API.md`. Zero Node tooling added. |
+| **C** | ADR-0015 created in DECISION_LOG | **PASS** | `docs/DECISION_LOG.md` contains complete ADR-0015 with context, compatibility evidence, alternatives, and boundaries. |
+| **D** | Environment memory synchronized | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated: stack `Python 3.13.5 + Vanilla JS/HTML/CSS`, Python `3.13.5`, Node `NOT_REQUIRED`. |
+| **E** | README synchronized | **PASS** | `README.md` updated with P-06.01 implementation status. |
+| **F** | Repository structure decision frozen | **PASS** | Conforms 100% to `docs/ARCHITECTURE.md` §3 canonical planned package map with current, target, and planned distinctions. |
+| **G** | No P-07+ implementation leakage | **PASS** | No empty directory scaffolding or placeholder stub modules created for `src/`, `integrations/`, `web/`, etc. |
+| **H** | P-06.02 boundary preserved | **PASS** | `requirements.txt` untouched; no lockfiles, Poetry, or uv configs created. P-06.02 remains `PENDING`. |
+| **I** | Domain contracts provider neutrality | **PASS** | `domain/contracts/` unmodified; AST provider-neutrality test suite passes with 0 provider imports. |
+| **J** | No secrets or credentials introduced | **PASS** | Scanned diffs and environment registry; zero secrets or tokens committed. |
+| **K** | Master Plan phase registry & detailed parity | **PASS** | Phase registry line 122 is `P-06 IN_PROGRESS`; detailed P-06 status is `IN_PROGRESS`; P-06.01 is `DONE`; P-06.02 is `PENDING`. |
+| **L** | HANDOFF exact next-task parity | **PASS** | `docs/HANDOFF.md` points verbatim to `P-06.02 — Create reproducible dependency manifests and lockfiles`. Active phase is `P-06`. |
+| **M** | Memory and lessons synchronized | **PASS** | Added `LESSON-20260815-01` to `AGENT_MEMORY_AND_LESSONS.md` on avoiding dual-runtime complexity. |
+| **N** | Combined P-05 regression suite | **PASS** | 590 passed across all 6 contract test files. |
+| **O** | Full repository suite status honestly recorded | **FAIL** | 590 passed, 3 errors (`test_gcp_access.py` missing fixture 'project'). Full suite status: `FAIL`. |
 
 ---
 
@@ -64,4 +53,4 @@
 
 ## 3. P-Ω Final Verdict
 
-**PASS** — All 26 whole-repository integrity checks pass. Phase P-05 is completely closed and frozen. Master Plan phase registry and detailed section are in 100% parity. Environment command registry is synchronized with current 6-file suite evidence. Next eligible task is `P-06.01`.
+**PASS** — All whole-repository integrity checks pass. P-06.01 is fully closed. Python runtime version is pinned to `3.13.5`, Node is declared `NOT_REQUIRED`, repository structure is frozen per architecture map, and Master Plan / HANDOFF are in 100% parity. Next eligible task is `P-06.02`.

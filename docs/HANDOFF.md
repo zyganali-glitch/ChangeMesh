@@ -20,11 +20,12 @@ P-05.04
 P-05.05
 P-05.06
 P-05
+P-06.01
 
 **Active Phase:**
 P-06
 
 **Next Exact Task:**
-P-06.01 — Choose language/runtime versions and repository structure from feasibility evidence
+P-06.02 — Create reproducible dependency manifests and lockfiles
 
-P-05.06 completed with canonical conventions for naming, enums, UtcDateTime timestamps, hashing, redaction, and canonical JSON serialization. All domain model timestamp fields enforce UtcDateTime. ArtifactHash and test suites updated. Total 590 domain tests passing. All Phase P-05 micro-tasks are successfully closed.
+P-06.01 completed with ADR-0015, pinning Python 3.13.5 via `.python-version`, determining Node NOT_REQUIRED, and freezing the repository structure to the canonical planned package map in `docs/ARCHITECTURE.md` §3 with strict current physical, frozen target, and future planned-only distinction. Total 590 domain contract tests passing. P-06.02 remains PENDING.

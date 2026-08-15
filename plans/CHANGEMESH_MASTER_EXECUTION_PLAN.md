@@ -119,7 +119,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-03` | Product Thesis, User, and Outcome Contract | `DONE` | `P-02` |
 | `P-04` | Architecture and Authority Map | `DONE` | `P-03` |
 | `P-05` | Domain Contracts and State Machine | `DONE` | `P-04` |
-| `P-06` | Local Development Environment and Dependency Freeze | `PENDING` | `P-05` |
+| `P-06` | Local Development Environment and Dependency Freeze | `IN_PROGRESS` | `P-05` |
 | `P-07` | Google ADK Agent Skeleton | `PENDING` | `P-06` |
 | `P-08` | Gemini Integration and Structured Reasoning Boundary | `PENDING` | `P-07` |
 | `P-09` | Pub/Sub Event Backbone | `PENDING` | `P-08` |
@@ -690,16 +690,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-06 — Local Development Environment and Dependency Freeze
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-06.01 — Choose language/runtime versions and repository structure from feasibility evidence
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Choose language/runtime versions and repository structure from feasibility evidence.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Decision supports ADK/Cloud Run; exact versions pinned.
-- **Required evidence:** ADR and version files.
-- **Mandatory documentation sync:** Environment/API, README.
+- **Required evidence:** ADR-0015 in `docs/DECISION_LOG.md`, `.python-version` (pinned to `3.13.5`), Node evaluated and marked `NOT_REQUIRED`, repository structure frozen to `docs/ARCHITECTURE.md` canonical package map with strict distinction between current physical structure, frozen target structure, and future planned-only components.
+- **Mandatory documentation sync:** Environment/API (`AGENT_ENVIRONMENT_AND_API.md`), README (`README.md`), Decision Log (`docs/DECISION_LOG.md`).
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-06.02 — Create reproducible dependency manifests and lockfiles

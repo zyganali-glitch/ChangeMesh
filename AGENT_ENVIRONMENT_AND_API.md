@@ -4,9 +4,9 @@ Record actual environment only; do not fill unknown values with guesses.
 
 ## Current status
 
-- Local implementation stack: `NOT_DECIDED`
-- Python version: `NOT_DECIDED`
-- Node version: `NOT_DECIDED`
+- Local implementation stack: `Python 3.13.5` (backend/agents) + `Vanilla JS/HTML/CSS` (web dashboard, no build step)
+- Python version: `3.13.5` (pinned in `.python-version`)
+- Node version: `NOT_REQUIRED` (No Node runtime or build step; dashboard is vanilla static assets served via Python/Cloud Run)
 - Google Cloud project: `project-af5e1c99-3bc4-424f-b53`
 - Region: `global` (for Vertex AI Gemini), `europe-west3` (for cloud resources)
 - Vertex AI access: `ENABLED` (Provisioned via UI)

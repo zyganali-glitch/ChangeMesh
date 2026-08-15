@@ -75,3 +75,14 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Prevention rule: When writing negative tests for Pydantic models with `model_validator`, consider whether field-type validation might trigger first. Construct test data that reaches the intended validator.
 - Status: `ACTIVE`
 
+### LESSON-20260815-01 — Avoid dual-runtime (Python + Node) complexity when web dashboard can be vanilla static assets
+- Date/time: 2026-08-15
+- Active task: P-06.01
+- Symptom: Having a Node.js runtime/bundler in an ADK-centered Python project creates multi-runtime container bloat, dual-engine CI/CD pipelines, and npm dependency maintenance overhead.
+- Root cause: Prematurely adopting a JS frontend framework (React/Next.js/Vite) before verifying if vanilla web assets are sufficient for the judge/operator dashboard.
+- Incorrect approach: Defaulting to Node.js / TypeScript / npm tooling for simple dashboard interfaces in a Python-first AI hackathon project.
+- Correct approach: Formally evaluate runtime necessity. Pin Python 3.13.5 as the single unified backend/agent runtime and declare Node `NOT_REQUIRED`, serving the dashboard as vanilla HTML/CSS/JS with zero build steps.
+- Prevention rule: In Google-native ADK projects, default to single-runtime Python architecture unless rich client-side state genuinely demands a dedicated frontend framework.
+- Status: `ACTIVE`
+
+
