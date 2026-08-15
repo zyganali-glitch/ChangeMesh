@@ -1,38 +1,29 @@
 """Tests for P-05.03 evidence contracts."""
 
 import ast
-from datetime import UTC, datetime
-
+import json
+from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-import domain.contracts
 from domain.contracts.evidence import (
-    ArtifactHash,
     EvidenceRecord,
     EvidenceState,
     ExecutionEvidenceMode,
     Provenance,
     TraceReference,
+    ArtifactHash,
 )
+import domain.contracts
 
 
 def test_vocabulary():
     """Assert the exact EvidenceState and ExecutionEvidenceMode vocabularies."""
     assert set(s.value for s in EvidenceState) == {
-        "PASS",
-        "WARN",
-        "FAIL",
-        "NOT_RUN",
-        "SIMULATED",
-        "BLOCKED",
-        "QUARANTINED",
+        "PASS", "WARN", "FAIL", "NOT_RUN", "SIMULATED", "BLOCKED", "QUARANTINED"
     }
     assert set(m.value for m in ExecutionEvidenceMode) == {
-        "FIXTURE",
-        "SIMULATION",
-        "RECORDED_CLOUD",
-        "LIVE_WRITE",
+        "FIXTURE", "SIMULATION", "RECORDED_CLOUD", "LIVE_WRITE"
     }
 
     with pytest.raises(ValidationError):
@@ -46,8 +37,8 @@ def test_vocabulary():
                 schema_version="1.0",
                 source="src",
                 collection_mode=ExecutionEvidenceMode.FIXTURE,
-                collection_timestamp=datetime.now(UTC),
-            ),
+                collection_timestamp=datetime.now(timezone.utc)
+            )
         )
 
 
@@ -58,14 +49,14 @@ def test_mandatory_fields():
             schema_version="1.0",
             source="   ",
             collection_mode=ExecutionEvidenceMode.FIXTURE,
-            collection_timestamp=datetime.now(UTC),
+            collection_timestamp=datetime.now(timezone.utc)
         )
 
     with pytest.raises(ValidationError):
         Provenance(
             schema_version="1.0",
             source="src",
-            collection_timestamp=datetime.now(UTC),
+            collection_timestamp=datetime.now(timezone.utc)
             # missing collection_mode
         )
 
@@ -76,9 +67,9 @@ def test_mode_state_separation():
         schema_version="1.0",
         source="fixture-runner",
         collection_mode=ExecutionEvidenceMode.FIXTURE,
-        collection_timestamp=datetime.now(UTC),
+        collection_timestamp=datetime.now(timezone.utc)
     )
-
+    
     # FIXTURE + PASS
     record1 = EvidenceRecord(
         schema_version="1.0",
@@ -86,7 +77,7 @@ def test_mode_state_separation():
         change_request_id="c1",
         subject="test",
         state=EvidenceState.PASS,
-        provenance=provenance,
+        provenance=provenance
     )
     assert record1.state == EvidenceState.PASS
     assert record1.provenance.collection_mode == ExecutionEvidenceMode.FIXTURE
@@ -96,7 +87,7 @@ def test_mode_state_separation():
         schema_version="1.0",
         source="sim-runner",
         collection_mode=ExecutionEvidenceMode.SIMULATION,
-        collection_timestamp=datetime.now(UTC),
+        collection_timestamp=datetime.now(timezone.utc)
     )
     record2 = EvidenceRecord(
         schema_version="1.0",
@@ -104,7 +95,7 @@ def test_mode_state_separation():
         change_request_id="c1",
         subject="test",
         state=EvidenceState.PASS,
-        provenance=provenance2,
+        provenance=provenance2
     )
     assert record2.state == EvidenceState.PASS
     assert record2.provenance.collection_mode == ExecutionEvidenceMode.SIMULATION
@@ -128,14 +119,12 @@ def test_simulated_state_ambiguity():
             schema_version="1.0",
             source="sim",
             collection_mode=ExecutionEvidenceMode.SIMULATION,
-            collection_timestamp=datetime.now(UTC),
-        ),
+            collection_timestamp=datetime.now(timezone.utc)
+        )
     )
-
+    
     # LIVE_WRITE + SIMULATED (Invalid)
-    with pytest.raises(
-        ValidationError, match="SIMULATED state is only valid with FIXTURE or SIMULATION mode"
-    ):
+    with pytest.raises(ValidationError, match="SIMULATED state is only valid with FIXTURE or SIMULATION mode"):
         EvidenceRecord(
             schema_version="1.0",
             evidence_id="e1",
@@ -146,8 +135,8 @@ def test_simulated_state_ambiguity():
                 schema_version="1.0",
                 source="live",
                 collection_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                collection_timestamp=datetime.now(UTC),
-            ),
+                collection_timestamp=datetime.now(timezone.utc)
+            )
         )
 
 
@@ -157,17 +146,13 @@ def test_recorded_cloud_requirements():
         schema_version="1.0",
         source="cloud",
         collection_mode=ExecutionEvidenceMode.RECORDED_CLOUD,
-        collection_timestamp=datetime.now(UTC),
+        collection_timestamp=datetime.now(timezone.utc),
         source_execution_identifier="run-123",
-        source_execution_timestamp=datetime.now(UTC),
+        source_execution_timestamp=datetime.now(timezone.utc)
     )
-
-    hash_obj = ArtifactHash(
-        schema_version="1.0",
-        algorithm="sha256",
-        digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    )
-
+    
+    hash_obj = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    
     # Valid
     EvidenceRecord(
         schema_version="1.0",
@@ -176,14 +161,12 @@ def test_recorded_cloud_requirements():
         subject="test",
         state=EvidenceState.PASS,
         provenance=valid_prov,
-        artifacts=[hash_obj],
+        artifacts=[hash_obj]
     )
-
+    
     # Missing execution ID
     invalid_prov1 = valid_prov.model_copy(update={"source_execution_identifier": None})
-    with pytest.raises(
-        ValidationError, match="RECORDED_CLOUD evidence requires source_execution_identifier"
-    ):
+    with pytest.raises(ValidationError, match="RECORDED_CLOUD evidence requires source_execution_identifier"):
         EvidenceRecord(
             schema_version="1.0",
             evidence_id="e1",
@@ -191,13 +174,11 @@ def test_recorded_cloud_requirements():
             subject="test",
             state=EvidenceState.PASS,
             provenance=invalid_prov1,
-            artifacts=[hash_obj],
+            artifacts=[hash_obj]
         )
 
     # Missing artifacts
-    with pytest.raises(
-        ValidationError, match="RECORDED_CLOUD evidence requires at least one artifact hash"
-    ):
+    with pytest.raises(ValidationError, match="RECORDED_CLOUD evidence requires at least one artifact hash"):
         EvidenceRecord(
             schema_version="1.0",
             evidence_id="e1",
@@ -205,43 +186,30 @@ def test_recorded_cloud_requirements():
             subject="test",
             state=EvidenceState.PASS,
             provenance=valid_prov,
-            artifacts=[],
+            artifacts=[]
         )
 
 
 def test_artifact_hash():
     """Test ArtifactHash schema."""
-    h = ArtifactHash(
-        schema_version="1.0",
-        algorithm="sha256",
-        digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    )
+    h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     assert h.algorithm == "sha256"
-
+    
     with pytest.raises(ValidationError):
-        ArtifactHash(
-            schema_version="1.0",
-            algorithm=" ",
-            digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        )
-
+        ArtifactHash(schema_version="1.0", algorithm=" ", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        
     with pytest.raises(ValidationError):
-        ArtifactHash(
-            schema_version="1.0",
-            algorithm="sha256",
-            digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            extra_field="bad",
-        )
+        ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", extra_field="bad")
 
 
 def test_trace_reference():
     """Test TraceReference schema."""
     t = TraceReference(trace_id="t1", span_id="s1")
     assert t.trace_id == "t1"
-
+    
     with pytest.raises(ValidationError):
         TraceReference(trace_id="  ")
-
+        
     with pytest.raises(ValidationError):
         TraceReference(trace_id="t1", provider_data={"internal": "bad"})
 
@@ -259,9 +227,9 @@ def test_evidence_record_nested():
                 schema_version="1.0",
                 source="src",
                 collection_mode=ExecutionEvidenceMode.FIXTURE,
-                collection_timestamp=datetime.now(UTC),
+                collection_timestamp=datetime.now(timezone.utc)
             ),
-            unknown_field="bad",
+            unknown_field="bad"
         )
 
 
@@ -278,8 +246,8 @@ def test_authority_claim_honesty():
                 schema_version="1.0",
                 source="src",
                 collection_mode=ExecutionEvidenceMode.FIXTURE,
-                collection_timestamp=datetime.now(UTC),
-            ),
+                collection_timestamp=datetime.now(timezone.utc)
+            )
         )
         data = record.model_dump_json()
         loaded = EvidenceRecord.model_validate_json(data)
@@ -295,7 +263,7 @@ def test_public_export():
     assert "Provenance" in exports
     assert "TraceReference" in exports
     assert "ArtifactHash" in exports
-
+    
     # Check non-leakage (P-05.06 concepts should not be present yet)
     assert "canonical_hash" not in exports
     assert "timestamp_wire_format" not in exports
@@ -304,10 +272,9 @@ def test_public_export():
 def test_provider_neutrality():
     """AST check for provider imports in evidence.py."""
     import pathlib
-
     evidence_path = pathlib.Path(domain.contracts.evidence.__file__)
     tree = ast.parse(evidence_path.read_text())
-
+    
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for name in node.names:
@@ -340,7 +307,7 @@ def _make_fixture_provenance():
         schema_version="1.0",
         source="fixture-runner",
         collection_mode=ExecutionEvidenceMode.FIXTURE,
-        collection_timestamp=datetime.now(UTC),
+        collection_timestamp=datetime.now(timezone.utc),
     )
 
 
@@ -349,7 +316,7 @@ def _make_record(state=EvidenceState.FAIL, mode=ExecutionEvidenceMode.FIXTURE, *
         schema_version="1.0",
         source="src",
         collection_mode=mode,
-        collection_timestamp=datetime.now(UTC),
+        collection_timestamp=datetime.now(timezone.utc),
         **{k: v for k, v in kw.items() if k.startswith("source_execution")},
     )
     artifacts = kw.get("artifacts", ())
@@ -433,7 +400,7 @@ class TestProvenanceImmutability:
     def test_collection_timestamp_frozen(self):
         prov = _make_fixture_provenance()
         with pytest.raises(ValidationError):
-            prov.collection_timestamp = datetime.now(UTC)
+            prov.collection_timestamp = datetime.now(timezone.utc)
 
     def test_schema_version_frozen(self):
         prov = _make_fixture_provenance()
@@ -445,29 +412,17 @@ class TestArtifactHashImmutability:
     """Post-construction mutation of ArtifactHash fields must be rejected."""
 
     def test_digest_frozen(self):
-        h = ArtifactHash(
-            schema_version="1.0",
-            algorithm="sha256",
-            digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        )
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         with pytest.raises(ValidationError):
             h.digest = "different-digest"
 
     def test_algorithm_frozen(self):
-        h = ArtifactHash(
-            schema_version="1.0",
-            algorithm="sha256",
-            digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        )
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         with pytest.raises(ValidationError):
             h.algorithm = "md5"
 
     def test_schema_version_frozen(self):
-        h = ArtifactHash(
-            schema_version="1.0",
-            algorithm="sha256",
-            digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        )
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         with pytest.raises(ValidationError):
             h.schema_version = "2.0"
 
@@ -490,11 +445,7 @@ class TestArtifactCollectionImmutability:
     """The artifacts tuple must not expose mutable list API."""
 
     def test_artifacts_is_tuple(self):
-        h = ArtifactHash(
-            schema_version="1.0",
-            algorithm="sha256",
-            digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        )
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         record = _make_record(artifacts=[h])
         assert isinstance(record.artifacts, tuple)
 
@@ -512,11 +463,7 @@ class TestArtifactCollectionImmutability:
 
     def test_list_input_converts_to_tuple(self):
         """Pydantic must accept list input and convert to immutable tuple."""
-        h = ArtifactHash(
-            schema_version="1.0",
-            algorithm="sha256",
-            digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        )
+        h = ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         record = _make_record(artifacts=[h])
         assert type(record.artifacts) is tuple
         assert len(record.artifacts) == 1
@@ -536,7 +483,7 @@ class TestSimulatedModeMutationBypass:
                 schema_version="1.0",
                 source="sim",
                 collection_mode=ExecutionEvidenceMode.SIMULATION,
-                collection_timestamp=datetime.now(UTC),
+                collection_timestamp=datetime.now(timezone.utc),
             ),
         )
         # Provenance itself is frozen — cannot change mode
@@ -555,7 +502,7 @@ class TestSimulatedModeMutationBypass:
                 schema_version="1.0",
                 source="live",
                 collection_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                collection_timestamp=datetime.now(UTC),
+                collection_timestamp=datetime.now(timezone.utc),
             ),
         )
         with pytest.raises(ValidationError):
@@ -576,16 +523,12 @@ class TestRecordedCloudPostConstructionSafety:
                 schema_version="1.0",
                 source="cloud",
                 collection_mode=ExecutionEvidenceMode.RECORDED_CLOUD,
-                collection_timestamp=datetime.now(UTC),
+                collection_timestamp=datetime.now(timezone.utc),
                 source_execution_identifier="run-123",
-                source_execution_timestamp=datetime.now(UTC),
+                source_execution_timestamp=datetime.now(timezone.utc),
             ),
             artifacts=[
-                ArtifactHash(
-                    schema_version="1.0",
-                    algorithm="sha256",
-                    digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                )
+                ArtifactHash(schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             ],
         )
 
@@ -634,7 +577,7 @@ class TestConstructionTimeValidation:
                 schema_version="1.0",
                 source="src",
                 collection_mode="UNKNOWN_MODE",
-                collection_timestamp=datetime.now(UTC),
+                collection_timestamp=datetime.now(timezone.utc),
             )
 
     def test_missing_source_rejects(self):
@@ -643,12 +586,12 @@ class TestConstructionTimeValidation:
             Provenance(
                 schema_version="1.0",
                 collection_mode=ExecutionEvidenceMode.FIXTURE,
-                collection_timestamp=datetime.now(UTC),
+                collection_timestamp=datetime.now(timezone.utc),
             )
 
     def test_blank_evidence_record_schema_version(self):
         with pytest.raises(ValidationError, match="must not be blank"):
-            _make_record.__wrapped__ if hasattr(_make_record, "__wrapped__") else None
+            _make_record.__wrapped__ if hasattr(_make_record, '__wrapped__') else None
             EvidenceRecord(
                 schema_version="   ",
                 evidence_id="e1",
@@ -693,19 +636,11 @@ class TestConstructionTimeValidation:
 
     def test_blank_artifact_hash_schema_version(self):
         with pytest.raises(ValidationError, match="must not be blank"):
-            ArtifactHash(
-                schema_version="  ",
-                algorithm="sha256",
-                digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            )
+            ArtifactHash(schema_version="  ", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     def test_blank_artifact_hash_algorithm(self):
         with pytest.raises(ValidationError):
-            ArtifactHash(
-                schema_version="1.0",
-                algorithm="  ",
-                digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            )
+            ArtifactHash(schema_version="1.0", algorithm="  ", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     def test_blank_artifact_hash_digest(self):
         with pytest.raises(ValidationError, match="must not be blank"):
@@ -717,7 +652,7 @@ class TestConstructionTimeValidation:
             schema_version="1.0",
             source="cloud",
             collection_mode=ExecutionEvidenceMode.RECORDED_CLOUD,
-            collection_timestamp=datetime.now(UTC),
+            collection_timestamp=datetime.now(timezone.utc),
             source_execution_identifier="run-123",
             # missing source_execution_timestamp
         )
@@ -734,9 +669,7 @@ class TestConstructionTimeValidation:
                 provenance=prov,
                 artifacts=[
                     ArtifactHash(
-                        schema_version="1.0",
-                        algorithm="sha256",
-                        digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                     )
                 ],
             )
@@ -757,15 +690,14 @@ class TestConstructionTimeValidation:
                     schema_version="1.0",
                     source="cloud",
                     collection_mode=ExecutionEvidenceMode.RECORDED_CLOUD,
-                    collection_timestamp=datetime.now(UTC),
+                    collection_timestamp=datetime.now(timezone.utc),
                     source_execution_identifier="run-123",
-                    source_execution_timestamp=datetime.now(UTC),
+                    source_execution_timestamp=datetime.now(timezone.utc),
                 ),
                 artifacts=[
                     ArtifactHash(
-                        schema_version="1.0",
-                        algorithm="sha256",
-                        digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        schema_version="1.0", algorithm="sha256", digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                     )
                 ],
             )
+

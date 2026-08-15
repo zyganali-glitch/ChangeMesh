@@ -78,6 +78,19 @@ Record actual environment only; do not fill unknown values with guesses.
 - **Tracked vs Ignored Boundary:** `.gitignore` explicitly ignores real `.env`, `.env.*` (while preserving `!.env.example`), `*service-account*.json`, `*credentials*.json`, `application_default_credentials.json`, `*adc.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.pkcs12`, `api_key.txt`, `*.secret`, `*.token`, `tmp/`, `artifacts/private/`, `private/`, and `secrets/`.
 - **Evidence & Verification:** 14 automated tests in `tests/test_p06_03_config_safety.py` and 0-secret scan across all tracked repository files (`PASS`).
 
+### Canonical Command Interface Boundary (P-06.04)
+
+- **Canonical Dispatcher:** `scripts/cmd.py` implemented with standard library `argparse` exposing all 9 canonical developer workflow commands: `format`, `lint`, `type-check`, `unit`, `integration`, `e2e`, `demo`, `deploy`, `teardown`.
+- **Non-Mutating Verification Semantics:** Verification commands (`format`, `lint`, `type-check`) are strictly check-only and never mutate repository files:
+  - `format`: Executes `ruff format --check .` (never `ruff format` without `--check`).
+  - `lint`: Executes `ruff check .` (never passes `--fix`).
+  - `type-check`: Executes `mypy domain tests` with exact exit code propagation.
+- **Integration Safety & Script Entry Dispatch:**
+  - Default: `uv run python scripts/cmd.py integration` fails closed with exit code 1, emitting an error message to stderr and executing zero cloud/network calls.
+  - Authorized path: `uv run python scripts/cmd.py integration --live-write-danger` dispatches the existing standalone script `python tests/test_gcp_access.py` directly, avoiding broken pytest fixture collection.
+- **Deferred Future-Phase Guarding:** Lifecycle commands owned by future phases (`e2e`, `demo` -> P-24/P-25; `deploy`, `teardown` -> P-28) fail closed with exit code 1 and emit `NOT_RUN`.
+- **Evidence & Verification:** 15 automated unit/contract tests in `tests/test_p06_04_commands.py` (`PASS`). Zero cloud access required for CLI inspection, help, and unit validation.
+
 ## Environment-variable registry
 
 | Variable | Purpose | Required | Secret | Safe example | Owner phase |
@@ -94,27 +107,28 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 
 > **Note on P-06.02 verification:** P-06.02 dependency commands below were verified in fresh isolated Python 3.13.5 virtual environments on the canonical checkout. Separate-directory clean-checkout verification remains P-06.05 `PENDING`.
 
-| Purpose | Command | Status | Last verified |
-|---|---|---|---|
-| Install (dev/test uv locked) | `uv sync --frozen` | `VERIFIED` | 2026-08-15 |
-| Install (runtime hash-locked) | `pip install --require-hashes -r requirements.txt` | `VERIFIED` | 2026-08-15 |
-| Install (dev/test hash-locked) | `pip install --require-hashes -r requirements-dev.txt` | `VERIFIED` | 2026-08-15 |
-| Lock generation | `uv lock` | `VERIFIED` | 2026-08-15 |
-| Lock export (runtime) | `uv export --frozen --no-dev --no-emit-local -o requirements.txt` | `VERIFIED` | 2026-08-15 |
-| Lock export (dev/test) | `uv export --frozen --all-groups --no-emit-local -o requirements-dev.txt` | `VERIFIED` | 2026-08-15 |
-| Dependency check | `uv pip check` | `VERIFIED` | 2026-08-15 |
-| Unit tests (Contracts) | `python -m pytest tests/test_p05_01_contracts.py` | `VERIFIED` | 2026-08-11 |
-| Unit tests (P-05.05 Events) | `python -m pytest tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` (82 passed) | 2026-08-13 |
-| Unit tests (P-05.06 Conventions) | `python -m pytest tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (214 passed) | 2026-08-15 |
-| Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` (590 passed) | 2026-08-15 |
-| Unit tests (P-06.03 Config Safety) | `python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` | `VERIFIED` (14 passed) | 2026-08-15 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `FAIL` (608 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | 2026-08-15 |
-| Format | `uv run python scripts/cmd.py format` | `VERIFIED` (Command exists, fails closed due to historical files) | 2026-08-15 |
-| Lint | `uv run python scripts/cmd.py lint` | `VERIFIED` (Command exists, fails closed due to historical files) | 2026-08-15 |
-| Type-check | `uv run python scripts/cmd.py type-check` | `VERIFIED` (Command exists, fails closed on P-05 stubs) | 2026-08-15 |
-| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` (Runs safely, excludes live-write tests) | 2026-08-15 |
-| Integration | `uv run python scripts/cmd.py integration` | `VERIFIED` (Fails closed without `--live-write-danger`) | 2026-08-15 |
-| E2E | `uv run python scripts/cmd.py e2e` | `NOT_RUN` (Owning phase P-24/P-25 pending) | 2026-08-15 |
-| Demo | `uv run python scripts/cmd.py demo` | `NOT_RUN` (Owning phase P-24 pending) | 2026-08-15 |
-| Deploy | `uv run python scripts/cmd.py deploy` | `NOT_RUN` (Owning phase P-28 pending) | 2026-08-15 |
-| Teardown | `uv run python scripts/cmd.py teardown` | `NOT_RUN` (Owning phase P-28 pending) | 2026-08-15 |
+| Purpose | Command | Interface Status | Underlying Check Status | Side-Effect Class / Scope | Last verified |
+|---|---|---|---|---|---|
+| Install (dev/test uv locked) | `uv sync --frozen` | `VERIFIED` | `PASS` | Local venv synchronization | 2026-08-15 |
+| Install (runtime hash-locked) | `pip install --require-hashes -r requirements.txt` | `VERIFIED` | `PASS` | Local venv installation | 2026-08-15 |
+| Install (dev/test hash-locked) | `pip install --require-hashes -r requirements-dev.txt` | `VERIFIED` | `PASS` | Local venv installation | 2026-08-15 |
+| Lock generation | `uv lock` | `VERIFIED` | `PASS` | Deterministic lockfile update | 2026-08-15 |
+| Lock export (runtime) | `uv export --frozen --no-dev --no-emit-local -o requirements.txt` | `VERIFIED` | `PASS` | Runtime requirements export | 2026-08-15 |
+| Lock export (dev/test) | `uv export --frozen --all-groups --no-emit-local -o requirements-dev.txt` | `VERIFIED` | `PASS` | Dev requirements export | 2026-08-15 |
+| Dependency check | `uv pip check` | `VERIFIED` | `PASS` | Local dependency consistency | 2026-08-15 |
+| Unit tests (Contracts) | `python -m pytest tests/test_p05_01_contracts.py` | `VERIFIED` | `PASS` (41 passed) | Local non-mutating test | 2026-08-11 |
+| Unit tests (P-05.05 Events) | `python -m pytest tests/test_p05_05_event_envelope.py -v --tb=short` | `VERIFIED` | `PASS` (82 passed) | Local non-mutating test | 2026-08-13 |
+| Unit tests (P-05.06 Conventions) | `python -m pytest tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` | `PASS` (214 passed) | Local non-mutating test | 2026-08-15 |
+| Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py tests/test_p05_06_contract_conventions.py -v --tb=short` | `VERIFIED` | `PASS` (590 passed) | Local non-mutating test | 2026-08-15 |
+| Unit tests (P-06.03 Config Safety) | `python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` | `VERIFIED` | `PASS` (14 passed) | Local non-mutating test | 2026-08-15 |
+| Unit tests (P-06.04 Commands) | `python -m pytest tests/test_p06_04_commands.py -v --tb=short` | `VERIFIED` | `PASS` (15 passed) | Local non-mutating test | 2026-08-15 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `VERIFIED` | `FAIL` (619 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-15 |
+| Format | `uv run python scripts/cmd.py format` | `VERIFIED` | `FAIL` (Reports unformatted historical files) | Non-mutating (`ruff format --check .`) | 2026-08-15 |
+| Lint | `uv run python scripts/cmd.py lint` | `VERIFIED` | `FAIL` (Reports historical lint debt) | Non-mutating (`ruff check .`, no `--fix`) | 2026-08-15 |
+| Type-check | `uv run python scripts/cmd.py type-check` | `VERIFIED` | `FAIL` (Reports 2 errors in `test_gcp_access.py`) | Non-mutating (`mypy domain tests`) | 2026-08-15 |
+| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` | `PASS` (619 passed) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-15 |
+| Integration | `uv run python scripts/cmd.py integration` | `VERIFIED` | `FAIL_CLOSED` (Exit 1, zero cloud access without `--live-write-danger`) | Guarded live writes (`tests/test_gcp_access.py`) | 2026-08-15 |
+| E2E | `uv run python scripts/cmd.py e2e` | `VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24/P-25 pending) | Deferred workflow | 2026-08-15 |
+| Demo | `uv run python scripts/cmd.py demo` | `VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24 pending) | Deferred demo | 2026-08-15 |
+| Deploy | `uv run python scripts/cmd.py deploy` | `VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-28 pending) | Deferred infrastructure | 2026-08-15 |
+| Teardown | `uv run python scripts/cmd.py teardown` | `VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-28 pending) | Deferred teardown | 2026-08-15 |

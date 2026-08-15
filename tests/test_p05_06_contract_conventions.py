@@ -7,47 +7,59 @@ serialization conventions frozen in domain/contracts/conventions.py.
 import ast
 import hashlib
 import importlib
+import math
 import pathlib
 import re
+from datetime import datetime, timedelta, timezone
 from collections import Counter
-from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 import domain.contracts
+import domain.contracts.conventions as conv
 from domain.contracts import (
-    REDACTION_SENTINEL,
-    ApprovalCompressionCard,
     ArtifactHash,
-    AutonomyClass,
-    AutonomyDecision,
-    CapabilityPassport,
-    ChangeRequest,
-    ChangeState,
-    DataClassLevel,
-    EventDeliveryDisposition,
-    EventEnvelope,
-    EvidenceRecord,
-    EvidenceState,
-    ExecutionEvidenceMode,
     HashAlgorithm,
-    MemoryRecord,
-    MemoryTrustStatus,
-    Provenance,
-    RehearsalResult,
-    RehearsalScenario,
-    SuccessCriterion,
-    canonical_json_bytes,
-    canonical_model_sha256,
-    classify_event_delivery,
-    format_utc_timestamp,
+    sha256_hex,
     is_valid_sha256_digest,
     normalize_utc_datetime,
+    UtcDateTime,
+    format_utc_timestamp,
     parse_utc_timestamp,
+    REDACTION_SENTINEL,
+    SECRET_KEY_PATTERNS,
     redact_mapping,
-    sha256_hex,
+    canonical_json_bytes,
+    canonical_model_sha256,
 )
+from domain.contracts import (
+    DataClassLevel,
+    DataClass,
+    SuccessCriterion,
+    ChangeRequest,
+    AgentDescriptor,
+    ToolDescriptor,
+    ChangeState,
+    ExecutionEvidenceMode,
+    EvidenceState,
+    Provenance,
+    TraceReference,
+    EvidenceRecord,
+    MemoryRecord,
+    MemoryTrustStatus,
+    CapabilityPassport,
+    RehearsalScenario,
+    RehearsalResult,
+    FaultInjectionSpec,
+    AutonomyClass,
+    AutonomyDecision,
+    ApprovalCompressionCard,
+    EventEnvelope,
+    EventDeliveryDisposition,
+    classify_event_delivery,
+)
+
 
 # ===========================================================================
 # SECTION 1: HASH ALGORITHM CONVENTION
@@ -163,31 +175,45 @@ class TestArtifactHashConvention:
 
     def test_rejects_md5(self):
         with pytest.raises(ValidationError):
-            ArtifactHash(schema_version="1.0", algorithm="md5", digest=_VALID_DIGEST)
+            ArtifactHash(
+                schema_version="1.0", algorithm="md5", digest=_VALID_DIGEST
+            )
 
     def test_rejects_sha1(self):
         with pytest.raises(ValidationError):
-            ArtifactHash(schema_version="1.0", algorithm="sha1", digest=_VALID_DIGEST)
+            ArtifactHash(
+                schema_version="1.0", algorithm="sha1", digest=_VALID_DIGEST
+            )
 
     def test_rejects_sha512(self):
         with pytest.raises(ValidationError):
-            ArtifactHash(schema_version="1.0", algorithm="sha512", digest=_VALID_DIGEST)
+            ArtifactHash(
+                schema_version="1.0", algorithm="sha512", digest=_VALID_DIGEST
+            )
 
     def test_rejects_sha_256_alias(self):
         with pytest.raises(ValidationError):
-            ArtifactHash(schema_version="1.0", algorithm="SHA-256", digest=_VALID_DIGEST)
+            ArtifactHash(
+                schema_version="1.0", algorithm="SHA-256", digest=_VALID_DIGEST
+            )
 
     def test_rejects_sha_256_lower_alias(self):
         with pytest.raises(ValidationError):
-            ArtifactHash(schema_version="1.0", algorithm="sha-256", digest=_VALID_DIGEST)
+            ArtifactHash(
+                schema_version="1.0", algorithm="sha-256", digest=_VALID_DIGEST
+            )
 
     def test_rejects_malformed_digest(self):
         with pytest.raises(ValidationError, match="64 lowercase hex"):
-            ArtifactHash(schema_version="1.0", algorithm="sha256", digest="abc")
+            ArtifactHash(
+                schema_version="1.0", algorithm="sha256", digest="abc"
+            )
 
     def test_rejects_short_digest(self):
         with pytest.raises(ValidationError):
-            ArtifactHash(schema_version="1.0", algorithm="sha256", digest="a" * 63)
+            ArtifactHash(
+                schema_version="1.0", algorithm="sha256", digest="a" * 63
+            )
 
     def test_rejects_uppercase_digest(self):
         with pytest.raises(ValidationError):
@@ -225,7 +251,7 @@ class TestTimestampNormalization:
     """UTC-aware timestamp normalization."""
 
     def test_aware_utc_accepted(self):
-        dt = datetime(2026, 8, 13, 20, 0, 0, tzinfo=UTC)
+        dt = datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc)
         result = normalize_utc_datetime(dt)
         assert result.tzinfo is not None
         assert result == dt
@@ -234,7 +260,7 @@ class TestTimestampNormalization:
         est = timezone(timedelta(hours=-5))
         dt = datetime(2026, 8, 13, 15, 0, 0, tzinfo=est)
         result = normalize_utc_datetime(dt)
-        assert result.tzinfo == UTC
+        assert result.tzinfo == timezone.utc
         assert result.hour == 20  # 15:00 EST = 20:00 UTC
 
     def test_naive_rejected(self):
@@ -246,17 +272,17 @@ class TestTimestampFormatting:
     """Canonical UTC wire format."""
 
     def test_format_ends_with_z(self):
-        dt = datetime(2026, 8, 13, 20, 8, 25, tzinfo=UTC)
+        dt = datetime(2026, 8, 13, 20, 8, 25, tzinfo=timezone.utc)
         result = format_utc_timestamp(dt)
         assert result.endswith("Z")
 
     def test_fixed_microsecond_precision(self):
-        dt = datetime(2026, 8, 13, 20, 8, 25, tzinfo=UTC)
+        dt = datetime(2026, 8, 13, 20, 8, 25, tzinfo=timezone.utc)
         result = format_utc_timestamp(dt)
         assert result == "2026-08-13T20:08:25.000000Z"
 
     def test_with_microseconds(self):
-        dt = datetime(2026, 8, 13, 20, 8, 25, 123456, tzinfo=UTC)
+        dt = datetime(2026, 8, 13, 20, 8, 25, 123456, tzinfo=timezone.utc)
         result = format_utc_timestamp(dt)
         assert result == "2026-08-13T20:08:25.123456Z"
 
@@ -275,14 +301,14 @@ class TestTimestampParsing:
     """Strict canonical timestamp parsing."""
 
     def test_round_trip(self):
-        dt = datetime(2026, 8, 13, 20, 8, 25, 123456, tzinfo=UTC)
+        dt = datetime(2026, 8, 13, 20, 8, 25, 123456, tzinfo=timezone.utc)
         wire = format_utc_timestamp(dt)
         parsed = parse_utc_timestamp(wire)
         assert parsed == dt
 
     def test_result_is_utc_aware(self):
         parsed = parse_utc_timestamp("2026-08-13T20:08:25.000000Z")
-        assert parsed.tzinfo == UTC
+        assert parsed.tzinfo == timezone.utc
 
     def test_locale_format_rejected(self):
         with pytest.raises(ValueError, match="Invalid canonical timestamp"):
@@ -301,9 +327,11 @@ class TestCrossTimezoneEquivalence:
     """Equivalent instants in different offsets canonicalize identically."""
 
     def test_same_instant_different_offsets(self):
-        utc_dt = datetime(2026, 8, 13, 20, 0, 0, tzinfo=UTC)
-        est_dt = datetime(2026, 8, 13, 15, 0, 0, tzinfo=timezone(timedelta(hours=-5)))
-        jst_dt = datetime(2026, 8, 14, 5, 0, 0, tzinfo=timezone(timedelta(hours=9)))
+        utc_dt = datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc)
+        est_dt = datetime(2026, 8, 13, 15, 0, 0,
+                          tzinfo=timezone(timedelta(hours=-5)))
+        jst_dt = datetime(2026, 8, 14, 5, 0, 0,
+                          tzinfo=timezone(timedelta(hours=9)))
 
         assert format_utc_timestamp(utc_dt) == format_utc_timestamp(est_dt)
         assert format_utc_timestamp(utc_dt) == format_utc_timestamp(jst_dt)
@@ -313,8 +341,8 @@ class TestContractNaiveTimestampRejection:
     """Every domain contract with machine timestamps rejects naive datetimes."""
 
     _NAIVE_DT = datetime(2026, 8, 13, 20, 0, 0)
-    _AWARE_UTC = datetime(2026, 8, 13, 20, 0, 0, tzinfo=UTC)
-    _AWARE_FUTURE = datetime(2026, 8, 14, 20, 0, 0, tzinfo=UTC)
+    _AWARE_UTC = datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc)
+    _AWARE_FUTURE = datetime(2026, 8, 14, 20, 0, 0, tzinfo=timezone.utc)
 
     def test_change_request_naive_requested_at(self):
         sc = SuccessCriterion(
@@ -559,7 +587,7 @@ class TestContractCrossOffsetNormalization:
             requested_by="user-1",
             requested_at=self._OFFSET_DT,
         )
-        assert cr.requested_at.tzinfo == UTC
+        assert cr.requested_at.tzinfo == timezone.utc
         assert cr.requested_at.hour == 20
 
     def test_provenance_normalizes_to_utc(self):
@@ -571,9 +599,9 @@ class TestContractCrossOffsetNormalization:
             source_execution_identifier="run-1",
             source_execution_timestamp=self._FUTURE_OFFSET,
         )
-        assert prov.collection_timestamp.tzinfo == UTC
+        assert prov.collection_timestamp.tzinfo == timezone.utc
         assert prov.collection_timestamp.hour == 20
-        assert prov.source_execution_timestamp.tzinfo == UTC
+        assert prov.source_execution_timestamp.tzinfo == timezone.utc
         assert prov.source_execution_timestamp.hour == 20
 
     def test_memory_record_normalizes_to_utc(self):
@@ -587,9 +615,9 @@ class TestContractCrossOffsetNormalization:
             expiry_timestamp=self._FUTURE_OFFSET,
             data_classification=DataClassLevel.INTERNAL,
         )
-        assert mem.capture_timestamp.tzinfo == UTC
+        assert mem.capture_timestamp.tzinfo == timezone.utc
         assert mem.capture_timestamp.hour == 20
-        assert mem.expiry_timestamp.tzinfo == UTC
+        assert mem.expiry_timestamp.tzinfo == timezone.utc
         assert mem.expiry_timestamp.hour == 20
 
     def test_capability_passport_normalizes_to_utc(self):
@@ -607,11 +635,11 @@ class TestContractCrossOffsetNormalization:
             revoked_at=self._OFFSET_DT,
             revocation_reason="revoked",
         )
-        assert passp.issued_at.tzinfo == UTC
+        assert passp.issued_at.tzinfo == timezone.utc
         assert passp.issued_at.hour == 20
-        assert passp.expires_at.tzinfo == UTC
+        assert passp.expires_at.tzinfo == timezone.utc
         assert passp.expires_at.hour == 20
-        assert passp.revoked_at.tzinfo == UTC
+        assert passp.revoked_at.tzinfo == timezone.utc
         assert passp.revoked_at.hour == 20
 
     def test_rehearsal_scenario_normalizes_to_utc(self):
@@ -624,7 +652,7 @@ class TestContractCrossOffsetNormalization:
             created_at=self._OFFSET_DT,
             scenario_version="1.0",
         )
-        assert scen.created_at.tzinfo == UTC
+        assert scen.created_at.tzinfo == timezone.utc
         assert scen.created_at.hour == 20
 
     def test_rehearsal_result_normalizes_to_utc(self):
@@ -645,9 +673,9 @@ class TestContractCrossOffsetNormalization:
             completed_at=self._FUTURE_OFFSET,
             evidence_record_ids=("ev-1",),
         )
-        assert res.started_at.tzinfo == UTC
+        assert res.started_at.tzinfo == timezone.utc
         assert res.started_at.hour == 20
-        assert res.completed_at.tzinfo == UTC
+        assert res.completed_at.tzinfo == timezone.utc
         assert res.completed_at.hour == 20
 
     def test_autonomy_decision_normalizes_to_utc(self):
@@ -661,7 +689,7 @@ class TestContractCrossOffsetNormalization:
             decided_at=self._OFFSET_DT,
             rationale="safe",
         )
-        assert dec.decided_at.tzinfo == UTC
+        assert dec.decided_at.tzinfo == timezone.utc
         assert dec.decided_at.hour == 20
 
     def test_approval_compression_card_normalizes_to_utc(self):
@@ -691,7 +719,7 @@ class TestContractCrossOffsetNormalization:
             remaining_decision_summary="authorize deployment",
             created_at=self._OFFSET_DT,
         )
-        assert card.created_at.tzinfo == UTC
+        assert card.created_at.tzinfo == timezone.utc
         assert card.created_at.hour == 20
 
     def test_event_envelope_normalizes_to_utc(self):
@@ -704,7 +732,7 @@ class TestContractCrossOffsetNormalization:
             timestamp=self._OFFSET_DT,
             idempotency_key="idem-1",
         )
-        assert env.timestamp.tzinfo == UTC
+        assert env.timestamp.tzinfo == timezone.utc
         assert env.timestamp.hour == 20
 
 
@@ -723,21 +751,11 @@ class TestRedactionSentinel:
 class TestSecretKeyRedaction:
     """Structural secret-key redaction."""
 
-    @pytest.mark.parametrize(
-        "key",
-        [
-            "token",
-            "access_token",
-            "refresh_token",
-            "api_key",
-            "secret",
-            "password",
-            "private_key",
-            "credential",
-            "credentials",
-            "service_account",
-        ],
-    )
+    @pytest.mark.parametrize("key", [
+        "token", "access_token", "refresh_token", "api_key",
+        "secret", "password", "private_key", "credential",
+        "credentials", "service_account",
+    ])
     def test_known_secret_redacted(self, key):
         result = redact_mapping({key: "super-secret-value"})
         assert result[key] == REDACTION_SENTINEL
@@ -772,7 +790,6 @@ class TestSecretKeyRedaction:
         result = redact_mapping({"api_key": "MY_SUPER_SECRET"})
         # The secret value must not appear anywhere in the result
         import json
-
         serialized = json.dumps(result)
         assert "MY_SUPER_SECRET" not in serialized
 
@@ -805,18 +822,19 @@ class TestCanonicalJsonBytes:
         assert b'"PASS"' in result
 
     def test_datetime_serialized_canonical(self):
-        dt = datetime(2026, 8, 13, 20, 0, 0, tzinfo=UTC)
+        dt = datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc)
         result = canonical_json_bytes({"ts": dt})
         assert b'"2026-08-13T20:00:00.000000Z"' in result
 
     def test_equivalent_timezone_offsets_identical(self):
-        utc = datetime(2026, 8, 13, 20, 0, 0, tzinfo=UTC)
-        est = datetime(2026, 8, 13, 15, 0, 0, tzinfo=timezone(timedelta(hours=-5)))
+        utc = datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc)
+        est = datetime(2026, 8, 13, 15, 0, 0,
+                       tzinfo=timezone(timedelta(hours=-5)))
         assert canonical_json_bytes({"ts": utc}) == canonical_json_bytes({"ts": est})
 
     def test_tuple_as_array(self):
         result = canonical_json_bytes({"items": (1, 2, 3)})
-        assert b"[1,2,3]" in result
+        assert b'[1,2,3]' in result
 
     def test_none_as_null(self):
         result = canonical_json_bytes({"x": None})
@@ -845,7 +863,7 @@ class TestCanonicalJsonBytes:
 
     def test_non_ascii_deterministic(self):
         result = canonical_json_bytes({"name": "Üniversite"})
-        assert "Üniversite".encode() in result
+        assert "Üniversite".encode("utf-8") in result
 
     def test_utf8_encoding(self):
         result = canonical_json_bytes({"name": "Türkçe"})
@@ -906,53 +924,35 @@ class TestEnumVocabularyFreeze:
 
     def test_execution_evidence_mode_values(self):
         assert set(m.value for m in ExecutionEvidenceMode) == {
-            "FIXTURE",
-            "SIMULATION",
-            "RECORDED_CLOUD",
-            "LIVE_WRITE",
+            "FIXTURE", "SIMULATION", "RECORDED_CLOUD", "LIVE_WRITE",
         }
 
     def test_evidence_state_values(self):
         assert set(m.value for m in EvidenceState) == {
-            "PASS",
-            "WARN",
-            "FAIL",
-            "NOT_RUN",
-            "SIMULATED",
-            "BLOCKED",
-            "QUARANTINED",
+            "PASS", "WARN", "FAIL", "NOT_RUN",
+            "SIMULATED", "BLOCKED", "QUARANTINED",
         }
 
     def test_autonomy_class_values(self):
         assert set(m.value for m in AutonomyClass) == {
-            "AUTO_EXECUTE",
-            "AUTO_EXECUTE_AND_NOTIFY",
-            "REHEARSE_THEN_EXECUTE",
-            "HUMAN_AUTHORITY_REQUIRED",
+            "AUTO_EXECUTE", "AUTO_EXECUTE_AND_NOTIFY",
+            "REHEARSE_THEN_EXECUTE", "HUMAN_AUTHORITY_REQUIRED",
             "BLOCKED",
         }
 
     def test_event_delivery_disposition_values(self):
         assert set(m.value for m in EventDeliveryDisposition) == {
-            "ACCEPT",
-            "DUPLICATE",
-            "OUT_OF_ORDER",
-            "CONFLICT",
+            "ACCEPT", "DUPLICATE", "OUT_OF_ORDER", "CONFLICT",
         }
 
     def test_data_class_level_values(self):
         assert set(m.value for m in DataClassLevel) == {
-            "PUBLIC",
-            "INTERNAL",
-            "CONFIDENTIAL",
-            "RESTRICTED",
+            "PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED",
         }
 
     def test_memory_trust_status_values(self):
         assert set(m.value for m in MemoryTrustStatus) == {
-            "UNTRUSTED",
-            "TRUSTED",
-            "QUARANTINED",
+            "UNTRUSTED", "TRUSTED", "QUARANTINED",
         }
 
     def test_hash_algorithm_values(self):
@@ -962,38 +962,32 @@ class TestEnumVocabularyFreeze:
 class TestEnumNoDuplicateSynonyms:
     """No duplicate aliases within one enum."""
 
-    @pytest.mark.parametrize(
-        "enum_cls",
-        [
-            DataClassLevel,
-            ChangeState,
-            ExecutionEvidenceMode,
-            EvidenceState,
-            MemoryTrustStatus,
-            AutonomyClass,
-            EventDeliveryDisposition,
-            HashAlgorithm,
-        ],
-    )
+    @pytest.mark.parametrize("enum_cls", [
+        DataClassLevel,
+        ChangeState,
+        ExecutionEvidenceMode,
+        EvidenceState,
+        MemoryTrustStatus,
+        AutonomyClass,
+        EventDeliveryDisposition,
+        HashAlgorithm,
+    ])
     def test_no_duplicate_values_within_enum(self, enum_cls):
         values = [m.value for m in enum_cls]
         counter = Counter(values)
         duplicates = {v: c for v, c in counter.items() if c > 1}
         assert not duplicates, f"Duplicate values in {enum_cls.__name__}: {duplicates}"
 
-    @pytest.mark.parametrize(
-        "enum_cls",
-        [
-            DataClassLevel,
-            ChangeState,
-            ExecutionEvidenceMode,
-            EvidenceState,
-            MemoryTrustStatus,
-            AutonomyClass,
-            EventDeliveryDisposition,
-            HashAlgorithm,
-        ],
-    )
+    @pytest.mark.parametrize("enum_cls", [
+        DataClassLevel,
+        ChangeState,
+        ExecutionEvidenceMode,
+        EvidenceState,
+        MemoryTrustStatus,
+        AutonomyClass,
+        EventDeliveryDisposition,
+        HashAlgorithm,
+    ])
     def test_no_duplicate_names_within_enum(self, enum_cls):
         names = [m.name for m in enum_cls]
         counter = Counter(names)
@@ -1018,7 +1012,9 @@ class TestEnumLocaleNeutrality:
     @pytest.mark.parametrize("enum_cls", _ALL_ENUMS)
     def test_values_are_ascii(self, enum_cls):
         for m in enum_cls:
-            assert m.value.isascii(), f"{enum_cls.__name__}.{m.name} = {m.value!r} is not ASCII"
+            assert m.value.isascii(), (
+                f"{enum_cls.__name__}.{m.name} = {m.value!r} is not ASCII"
+            )
 
     @pytest.mark.parametrize("enum_cls", _ALL_ENUMS)
     def test_member_names_upper_snake(self, enum_cls):
@@ -1092,17 +1088,9 @@ class TestCredentialFieldAbsence:
     """No credential fields in domain contracts."""
 
     _FORBIDDEN_FIELDS = {
-        "token",
-        "access_token",
-        "refresh_token",
-        "api_key",
-        "secret",
-        "password",
-        "private_key",
-        "credential",
-        "credentials",
-        "service_account",
-        "client_secret",
+        "token", "access_token", "refresh_token", "api_key",
+        "secret", "password", "private_key", "credential",
+        "credentials", "service_account", "client_secret",
     }
 
     @pytest.mark.parametrize("module_name", _CONTRACT_MODULES)
@@ -1128,12 +1116,8 @@ class TestProviderNeutrality:
     """No provider imports in conventions or domain contracts (AST-verified)."""
 
     _FORBIDDEN_IMPORTS = {
-        "google",
-        "vertexai",
-        "pubsub",
-        "firestore",
-        "github",
-        "opentelemetry",
+        "google", "vertexai", "pubsub", "firestore",
+        "github", "opentelemetry",
     }
 
     def _assert_node_clean(self, node: ast.AST, source_name: str):
@@ -1225,7 +1209,7 @@ class TestEventEnvelopeTimestampRegression:
             change_id="change-1",
             correlation_id="corr-1",
             producer_revision="rev-1",
-            timestamp=datetime(2026, 8, 14, 0, 0, 0, tzinfo=UTC),
+            timestamp=datetime(2026, 8, 14, 0, 0, 0, tzinfo=timezone.utc),
             idempotency_key="idem-cause",
         )
 
@@ -1237,7 +1221,7 @@ class TestEventEnvelopeTimestampRegression:
             causation_id="cause-1",
             correlation_id="corr-1",
             producer_revision="rev-1",
-            timestamp=datetime(2026, 8, 13, 0, 0, 0, tzinfo=UTC),
+            timestamp=datetime(2026, 8, 13, 0, 0, 0, tzinfo=timezone.utc),
             idempotency_key="idem-child",
         )
 
@@ -1255,7 +1239,7 @@ class TestEventEnvelopeTimestampRegression:
             change_id="change-1",
             correlation_id="corr-1",
             producer_revision="rev-1",
-            timestamp=datetime(2026, 8, 13, 20, 0, 0, tzinfo=UTC),
+            timestamp=datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc),
             idempotency_key="idem-1",
         )
 
@@ -1270,7 +1254,7 @@ class TestEventEnvelopeTimestampRegression:
             change_id="change-1",
             correlation_id="corr-1",
             producer_revision="rev-1",
-            timestamp=datetime(2026, 8, 13, 20, 0, 0, tzinfo=UTC),
+            timestamp=datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc),
             idempotency_key="idem-1",
         )
 
@@ -1287,7 +1271,7 @@ class TestEventEnvelopeTimestampRegression:
         # Equal model instances
         assert env_utc == env_offset
         assert env_utc.timestamp == env_offset.timestamp
-        assert env_offset.timestamp.tzinfo == UTC
+        assert env_offset.timestamp.tzinfo == timezone.utc
 
         # Duplicate classification succeeds across offset forms
         result = classify_event_delivery(env_offset, {"evt-1": env_utc}, {})
@@ -1301,7 +1285,7 @@ class TestEventEnvelopeTimestampRegression:
             change_id="change-1",
             correlation_id="corr-1",
             producer_revision="rev-1",
-            timestamp=datetime(2026, 8, 13, 20, 0, 0, tzinfo=UTC),
+            timestamp=datetime(2026, 8, 13, 20, 0, 0, tzinfo=timezone.utc),
             idempotency_key="idem-1",
         )
 
@@ -1407,36 +1391,16 @@ class TestPublicExports:
         """All P-05.01–P-05.05 exports still present."""
         exports = set(domain.contracts.__all__)
         prior = {
-            "DataClassLevel",
-            "DataClass",
-            "SuccessCriterion",
-            "ChangeRequest",
-            "AgentDescriptor",
-            "ToolDescriptor",
-            "ChangeState",
-            "IllegalTransitionError",
-            "CHANGE_LIFECYCLE_VERSION",
-            "can_transition",
-            "require_transition",
-            "is_terminal",
-            "EvidenceRecord",
-            "EvidenceState",
-            "ExecutionEvidenceMode",
-            "Provenance",
-            "TraceReference",
-            "ArtifactHash",
-            "MemoryRecord",
-            "MemoryTrustStatus",
-            "CapabilityPassport",
-            "RehearsalScenario",
-            "RehearsalResult",
-            "FaultInjectionSpec",
-            "AutonomyClass",
-            "AutonomyDecision",
-            "ApprovalCompressionCard",
-            "EventEnvelope",
-            "EventDeliveryDisposition",
-            "classify_event_delivery",
+            "DataClassLevel", "DataClass", "SuccessCriterion",
+            "ChangeRequest", "AgentDescriptor", "ToolDescriptor",
+            "ChangeState", "IllegalTransitionError", "CHANGE_LIFECYCLE_VERSION",
+            "can_transition", "require_transition", "is_terminal",
+            "EvidenceRecord", "EvidenceState", "ExecutionEvidenceMode",
+            "Provenance", "TraceReference", "ArtifactHash",
+            "MemoryRecord", "MemoryTrustStatus", "CapabilityPassport",
+            "RehearsalScenario", "RehearsalResult", "FaultInjectionSpec",
+            "AutonomyClass", "AutonomyDecision", "ApprovalCompressionCard",
+            "EventEnvelope", "EventDeliveryDisposition", "classify_event_delivery",
         }
         for name in prior:
             assert name in exports, f"Missing prior export: {name}"

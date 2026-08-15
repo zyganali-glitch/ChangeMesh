@@ -13,6 +13,8 @@ RehearsalResult reuses existing P-05.03 evidence vocabulary
 (EvidenceState, Provenance, ExecutionEvidenceMode).
 """
 
+from typing import Optional, Tuple
+
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from domain.contracts.conventions import UtcDateTime
@@ -42,7 +44,7 @@ class FaultInjectionSpec(BaseModel):
     fault_id: str
     fault_type: str
     target: str
-    parameters: tuple[tuple[str, str], ...] = ()
+    parameters: Tuple[Tuple[str, str], ...] = ()
 
     @field_validator("fault_id", "fault_type", "target")
     @classmethod
@@ -53,7 +55,7 @@ class FaultInjectionSpec(BaseModel):
 
     @field_validator("parameters")
     @classmethod
-    def _validate_parameters(cls, v: tuple[tuple[str, str], ...]) -> tuple[tuple[str, str], ...]:
+    def _validate_parameters(cls, v: Tuple[Tuple[str, str], ...]) -> Tuple[Tuple[str, str], ...]:
         for key, _ in v:
             if not key or not key.strip():
                 raise ValueError("parameters keys must not be blank")
@@ -88,19 +90,16 @@ class RehearsalScenario(BaseModel):
     scenario_id: str
     change_request_id: str
     description: str
-    target_refs: tuple[str, ...]
-    success_criterion_ids: tuple[str, ...] = ()
-    tool_double_ids: tuple[str, ...] = ()
-    fault_injections: tuple[FaultInjectionSpec, ...] = ()
+    target_refs: Tuple[str, ...]
+    success_criterion_ids: Tuple[str, ...] = ()
+    tool_double_ids: Tuple[str, ...] = ()
+    fault_injections: Tuple[FaultInjectionSpec, ...] = ()
     created_at: UtcDateTime
     scenario_version: str
 
     @field_validator(
-        "schema_version",
-        "scenario_id",
-        "change_request_id",
-        "scenario_version",
-        "description",
+        "schema_version", "scenario_id", "change_request_id",
+        "scenario_version", "description",
     )
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
@@ -109,12 +108,10 @@ class RehearsalScenario(BaseModel):
         return v
 
     @field_validator(
-        "target_refs",
-        "success_criterion_ids",
-        "tool_double_ids",
+        "target_refs", "success_criterion_ids", "tool_double_ids",
     )
     @classmethod
-    def _validate_ref_tuples(cls, v: tuple[str, ...], info) -> tuple[str, ...]:
+    def _validate_ref_tuples(cls, v: Tuple[str, ...], info) -> Tuple[str, ...]:
         for ref in v:
             if not ref or not ref.strip():
                 raise ValueError(f"{info.field_name} elements must not be blank")
@@ -165,13 +162,11 @@ class RehearsalResult(BaseModel):
     provenance: Provenance
     started_at: UtcDateTime
     completed_at: UtcDateTime
-    evidence_record_ids: tuple[str, ...] = ()
-    diagnostic_refs: tuple[str, ...] = ()
+    evidence_record_ids: Tuple[str, ...] = ()
+    diagnostic_refs: Tuple[str, ...] = ()
 
     @field_validator(
-        "schema_version",
-        "result_id",
-        "scenario_id",
+        "schema_version", "result_id", "scenario_id",
         "change_request_id",
     )
     @classmethod
@@ -181,11 +176,10 @@ class RehearsalResult(BaseModel):
         return v
 
     @field_validator(
-        "evidence_record_ids",
-        "diagnostic_refs",
+        "evidence_record_ids", "diagnostic_refs",
     )
     @classmethod
-    def _validate_ref_tuples(cls, v: tuple[str, ...], info) -> tuple[str, ...]:
+    def _validate_ref_tuples(cls, v: Tuple[str, ...], info) -> Tuple[str, ...]:
         for ref in v:
             if not ref or not ref.strip():
                 raise ValueError(f"{info.field_name} elements must not be blank")
@@ -198,35 +192,36 @@ class RehearsalResult(BaseModel):
         # ShadowLab hard invariant: must be SIMULATION
         if self.provenance.collection_mode != ExecutionEvidenceMode.SIMULATION:
             raise ValueError(
-                "ShadowLab RehearsalResult requires provenance.collection_mode == SIMULATION"
+                "ShadowLab RehearsalResult requires "
+                "provenance.collection_mode == SIMULATION"
             )
 
         # Completion cannot precede start
         if self.completed_at < self.started_at:
-            raise ValueError("completed_at must not precede started_at")
+            raise ValueError(
+                "completed_at must not precede started_at"
+            )
 
         # Executed results should carry evidence references
-        if (
-            self.state
-            in (
-                EvidenceState.PASS,
-                EvidenceState.FAIL,
-                EvidenceState.WARN,
-                EvidenceState.SIMULATED,
+        if self.state in (
+            EvidenceState.PASS,
+            EvidenceState.FAIL,
+            EvidenceState.WARN,
+            EvidenceState.SIMULATED,
+        ) and not self.evidence_record_ids:
+            raise ValueError(
+                f"{self.state.value} result must have at least one "
+                "evidence_record_id"
             )
-            and not self.evidence_record_ids
-        ):
-            raise ValueError(f"{self.state.value} result must have at least one evidence_record_id")
 
         # NOT_RUN/BLOCKED must not manufacture execution proof
-        if (
-            self.state
-            in (
-                EvidenceState.NOT_RUN,
-                EvidenceState.BLOCKED,
+        if self.state in (
+            EvidenceState.NOT_RUN,
+            EvidenceState.BLOCKED,
+        ) and self.evidence_record_ids:
+            raise ValueError(
+                f"{self.state.value} result must not carry "
+                "evidence_record_ids"
             )
-            and self.evidence_record_ids
-        ):
-            raise ValueError(f"{self.state.value} result must not carry evidence_record_ids")
 
         return self

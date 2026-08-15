@@ -12,17 +12,16 @@ These conventions are deterministic, locale-neutral, and testable.
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Annotated, Any
+from typing import Annotated, Any, Mapping, Sequence, Union
 
 from pydantic import AfterValidator, BaseModel
+
 
 # ===========================================================================
 # 1. HASH ALGORITHM CONVENTION
 # ===========================================================================
-
 
 class HashAlgorithm(str, Enum):
     """Canonical content/artifact hashing algorithm.
@@ -55,7 +54,6 @@ def sha256_hex(data: bytes) -> str:
 # 2. TIMESTAMP CONVENTION
 # ===========================================================================
 
-
 def normalize_utc_datetime(value: datetime) -> datetime:
     """Normalize a timezone-aware datetime to UTC.
 
@@ -68,8 +66,11 @@ def normalize_utc_datetime(value: datetime) -> datetime:
     if not isinstance(value, datetime):
         raise TypeError(f"Expected datetime, got {type(value).__name__}")
     if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
-        raise ValueError("Naive datetime rejected: all domain timestamps must be timezone-aware")
-    return value.astimezone(UTC)
+        raise ValueError(
+            "Naive datetime rejected: all domain timestamps must be "
+            "timezone-aware"
+        )
+    return value.astimezone(timezone.utc)
 
 
 UtcDateTime = Annotated[
@@ -108,9 +109,10 @@ def parse_utc_timestamp(value: str) -> datetime:
         naive = datetime.strptime(value, _CANONICAL_TS_FORMAT)
     except ValueError:
         raise ValueError(
-            f"Invalid canonical timestamp: {value!r}.  Expected format: YYYY-MM-DDTHH:MM:SS.ffffffZ"
+            f"Invalid canonical timestamp: {value!r}.  "
+            f"Expected format: YYYY-MM-DDTHH:MM:SS.ffffffZ"
         )
-    return naive.replace(tzinfo=UTC)
+    return naive.replace(tzinfo=timezone.utc)
 
 
 # ===========================================================================
@@ -121,20 +123,18 @@ REDACTION_SENTINEL = "[REDACTED]"
 
 # Known secret/credential field-name substrings (matched against
 # normalized lowercase machine keys).
-SECRET_KEY_PATTERNS: frozenset[str] = frozenset(
-    {
-        "token",
-        "access_token",
-        "refresh_token",
-        "api_key",
-        "secret",
-        "password",
-        "private_key",
-        "credential",
-        "credentials",
-        "service_account",
-    }
-)
+SECRET_KEY_PATTERNS: frozenset[str] = frozenset({
+    "token",
+    "access_token",
+    "refresh_token",
+    "api_key",
+    "secret",
+    "password",
+    "private_key",
+    "credential",
+    "credentials",
+    "service_account",
+})
 
 
 def _is_secret_key(key: str) -> bool:
@@ -187,7 +187,6 @@ def _redact_sequence(seq: Sequence[Any]) -> list[Any]:
 # 4. SERIALIZATION CONVENTION
 # ===========================================================================
 
-
 def _prepare_value(value: Any) -> Any:
     """Recursively prepare a value for canonical JSON serialization."""
     if value is None:
@@ -207,13 +206,19 @@ def _prepare_value(value: Any) -> Any:
         return value
     if isinstance(value, float):
         import math
-
         if math.isnan(value) or math.isinf(value):
-            raise ValueError(f"NaN/Infinity not permitted in canonical JSON: {value!r}")
+            raise ValueError(
+                f"NaN/Infinity not permitted in canonical JSON: {value!r}"
+            )
         return value
     if isinstance(value, bytes):
-        raise TypeError(f"bytes not supported in canonical JSON serialization: {value!r}")
-    raise TypeError(f"Unsupported type for canonical JSON serialization: {type(value).__name__}")
+        raise TypeError(
+            f"bytes not supported in canonical JSON serialization: {value!r}"
+        )
+    raise TypeError(
+        f"Unsupported type for canonical JSON serialization: "
+        f"{type(value).__name__}"
+    )
 
 
 def canonical_json_bytes(value: Any) -> bytes:

@@ -240,3 +240,25 @@
 - Boundary with P-06.03: P-06.02 establishes dependency manifests and lockfiles only. No `.env`, secret templates, or config files are created.
 - Boundary with P-06.04: P-06.02 does not create a general command runner or CI framework.
 - Boundary with P-06.05: P-06.02 validates fresh isolated virtual environment installation; P-06.05 later validates full separate-directory clean Git checkout reproduction.
+
+## ADR-0017 — Canonical Developer Command Interface and Non-Mutating Verification Semantics (P-06.04)
+- Date: 2026-08-15
+- Status: Accepted
+- Context: Micro-task P-06.04 requires defining standard developer commands for `format`, `lint`, `type-check`, `unit`, `integration`, `e2e`, `demo`, `deploy`, `teardown`. Commands must establish deterministic CI/CD boundaries without silently mutating source files, without executing live cloud mutations by default, and without breaking historical standalone scripts under pytest collection.
+- Decision:
+    1. **Canonical Interface Dispatcher (`scripts/cmd.py`):** Standard library `argparse` CLI exposing all 9 commands, callable via `uv run python scripts/cmd.py <command>`.
+    2. **Non-Mutating Verification Gates:**
+        - `format`: Executes `ruff format --check .` (never `ruff format` without `--check`). Propagates exit code 1 truthfully when unformatted files exist.
+        - `lint`: Executes `ruff check .` (strictly non-mutating, zero `--fix`).
+        - `type-check`: Executes `mypy domain tests` with exact exit code propagation.
+    3. **Fail-Closed Integration Safety & Standalone Script Entry:**
+        - Default `integration` command fails closed (`exit 1`) with zero cloud/network access.
+        - Explicitly authorized `integration --live-write-danger` dispatches `python tests/test_gcp_access.py` directly, avoiding missing pytest fixture errors on standalone scripts.
+    4. **Guarded Deferred Lifecycle Commands:** `e2e`, `demo`, `deploy`, `teardown` fail closed with `exit 1` and print `NOT_RUN` (owning phases P-24/P-25/P-28 pending).
+    5. **Zero-Secret CLI Introspection:** Help and dispatch require no cloud credentials or ambient secrets.
+- Consequences:
+    - Eliminates mass-formatting churn across frozen domain contracts and historical tests.
+    - Accurately distinguishes command interface verification from underlying check status.
+    - 15 automated command contract tests in `tests/test_p06_04_commands.py` verify all dispatcher behaviors with zero network/cloud dependency.
+- Boundary with P-06.05: P-06.04 defines and verifies standard command contracts. P-06.05 owns first separate-directory clean-checkout reproduction.
+

@@ -9,50 +9,55 @@ inward on these contracts.  These contracts never depend outward on
 providers.
 """
 
-from .agent_descriptor import AgentDescriptor
-from .autonomy import ApprovalCompressionCard, AutonomyClass, AutonomyDecision
-from .capability import CapabilityPassport
-from .change_lifecycle import (
-    CHANGE_LIFECYCLE_VERSION,
-    ChangeState,
-    IllegalTransitionError,
-    can_transition,
-    is_terminal,
-    require_transition,
-)
 from .change_request import ChangeRequest
-from .conventions import (
-    REDACTION_SENTINEL,
-    SECRET_KEY_PATTERNS,
-    HashAlgorithm,
-    UtcDateTime,
-    canonical_json_bytes,
-    canonical_model_sha256,
-    format_utc_timestamp,
-    is_valid_sha256_digest,
-    normalize_utc_datetime,
-    parse_utc_timestamp,
-    redact_mapping,
-    sha256_hex,
-)
+from .success_criterion import SuccessCriterion
+from .agent_descriptor import AgentDescriptor
+from .tool_descriptor import ToolDescriptor
 from .data_class import DataClass, DataClassLevel
-from .event_envelope import (
-    EventDeliveryDisposition,
-    EventEnvelope,
-    classify_event_delivery,
-)
+
 from .evidence import (
-    ArtifactHash,
     EvidenceRecord,
     EvidenceState,
     ExecutionEvidenceMode,
     Provenance,
     TraceReference,
+    ArtifactHash,
 )
+
+from .change_lifecycle import (
+    ChangeState,
+    IllegalTransitionError,
+    CHANGE_LIFECYCLE_VERSION,
+    can_transition,
+    require_transition,
+    is_terminal,
+)
+
 from .memory import MemoryRecord, MemoryTrustStatus
-from .rehearsal import FaultInjectionSpec, RehearsalResult, RehearsalScenario
-from .success_criterion import SuccessCriterion
-from .tool_descriptor import ToolDescriptor
+from .capability import CapabilityPassport
+from .rehearsal import RehearsalScenario, RehearsalResult, FaultInjectionSpec
+from .autonomy import AutonomyClass, AutonomyDecision, ApprovalCompressionCard
+
+from .event_envelope import (
+    EventEnvelope,
+    EventDeliveryDisposition,
+    classify_event_delivery,
+)
+
+from .conventions import (
+    HashAlgorithm,
+    is_valid_sha256_digest,
+    sha256_hex,
+    normalize_utc_datetime,
+    UtcDateTime,
+    format_utc_timestamp,
+    parse_utc_timestamp,
+    REDACTION_SENTINEL,
+    SECRET_KEY_PATTERNS,
+    redact_mapping,
+    canonical_json_bytes,
+    canonical_model_sha256,
+)
 
 __all__ = [
     # P-05.01 — Foundational contracts
@@ -104,3 +109,4 @@ __all__ = [
     "canonical_json_bytes",
     "canonical_model_sha256",
 ]
+

@@ -1,15 +1,15 @@
 import pytest
 
 from domain.contracts.change_lifecycle import (
-    ALLOWED_TRANSITIONS,
-    RETRY_RESUME_TARGETS,
     ChangeState,
     IllegalTransitionError,
+    ALLOWED_TRANSITIONS,
+    RETRY_RESUME_TARGETS,
     can_transition,
-    is_terminal,
     require_transition,
+    is_terminal,
+    CHANGE_LIFECYCLE_VERSION
 )
-
 
 class TestP0502Lifecycle:
     """State machine validation tests corresponding to LIFECYCLE-001 through LIFECYCLE-021."""
@@ -17,22 +17,9 @@ class TestP0502Lifecycle:
     def test_lifecycle_001_declared_states_are_valid(self):
         """LIFECYCLE-001: All declared states are valid enum members."""
         expected_states = {
-            "RECEIVED",
-            "DISCOVERING",
-            "QUALIFYING",
-            "REHEARSING",
-            "GROUNDED",
-            "AWAITING_AUTHORITY",
-            "AUTHORIZED",
-            "EXECUTING",
-            "VERIFYING",
-            "CERTIFYING",
-            "RETRY_SCHEDULED",
-            "COMPENSATING",
-            "BLOCKED",
-            "COMPLETE",
-            "FAILED",
-            "CANCELLED",
+            "RECEIVED", "DISCOVERING", "QUALIFYING", "REHEARSING", "GROUNDED",
+            "AWAITING_AUTHORITY", "AUTHORIZED", "EXECUTING", "VERIFYING", "CERTIFYING",
+            "RETRY_SCHEDULED", "COMPENSATING", "BLOCKED", "COMPLETE", "FAILED", "CANCELLED"
         }
         actual_states = {state.value for state in ChangeState}
         assert actual_states == expected_states
@@ -49,18 +36,18 @@ class TestP0502Lifecycle:
             ChangeState.EXECUTING,
             ChangeState.VERIFYING,
             ChangeState.CERTIFYING,
-            ChangeState.COMPLETE,
+            ChangeState.COMPLETE
         ]
-
+        
         for i in range(len(happy_path) - 1):
-            assert can_transition(happy_path[i], happy_path[i + 1])
-            require_transition(happy_path[i], happy_path[i + 1])  # Should not raise
+            assert can_transition(happy_path[i], happy_path[i+1])
+            require_transition(happy_path[i], happy_path[i+1]) # Should not raise
 
     def test_lifecycle_003_illegal_forward_skips_rejected(self):
         """LIFECYCLE-003: Illegal forward skips are rejected."""
         assert not can_transition(ChangeState.RECEIVED, ChangeState.EXECUTING)
         assert not can_transition(ChangeState.DISCOVERING, ChangeState.GROUNDED)
-
+        
         with pytest.raises(IllegalTransitionError):
             require_transition(ChangeState.RECEIVED, ChangeState.EXECUTING)
 
@@ -72,42 +59,28 @@ class TestP0502Lifecycle:
 
     def test_lifecycle_005_terminal_states_no_outgoing(self):
         """LIFECYCLE-005: All terminal states have zero outgoing transitions."""
-        terminals = [
-            ChangeState.BLOCKED,
-            ChangeState.COMPLETE,
-            ChangeState.FAILED,
-            ChangeState.CANCELLED,
-        ]
+        terminals = [ChangeState.BLOCKED, ChangeState.COMPLETE, ChangeState.FAILED, ChangeState.CANCELLED]
         for t in terminals:
             assert is_terminal(t)
             assert len(ALLOWED_TRANSITIONS[t]) == 0
-
+            
             # Verify they cannot transition to themselves either
             assert not can_transition(t, t)
 
     def test_lifecycle_006_terminal_states_cannot_retry(self):
         """LIFECYCLE-006: No terminal state can retry."""
-        terminals = [
-            ChangeState.BLOCKED,
-            ChangeState.COMPLETE,
-            ChangeState.FAILED,
-            ChangeState.CANCELLED,
-        ]
+        terminals = [ChangeState.BLOCKED, ChangeState.COMPLETE, ChangeState.FAILED, ChangeState.CANCELLED]
         for t in terminals:
             assert not can_transition(t, ChangeState.RETRY_SCHEDULED)
 
     def test_lifecycle_007_retry_branch_explicit(self):
         """LIFECYCLE-007: Retry branch entry is explicit."""
         explicitly_retriable = {
-            ChangeState.DISCOVERING,
-            ChangeState.QUALIFYING,
-            ChangeState.REHEARSING,
-            ChangeState.EXECUTING,
-            ChangeState.VERIFYING,
-            ChangeState.CERTIFYING,
-            ChangeState.COMPENSATING,
+            ChangeState.DISCOVERING, ChangeState.QUALIFYING, ChangeState.REHEARSING,
+            ChangeState.EXECUTING, ChangeState.VERIFYING, ChangeState.CERTIFYING,
+            ChangeState.COMPENSATING
         }
-
+        
         for state in ChangeState:
             if state in explicitly_retriable:
                 assert can_transition(state, ChangeState.RETRY_SCHEDULED)
@@ -119,16 +92,10 @@ class TestP0502Lifecycle:
         # For every valid retriable origin x every ChangeState target
         for origin in RETRY_RESUME_TARGETS:
             for target in ChangeState:
-                expected = target in RETRY_RESUME_TARGETS[origin] or target in [
-                    ChangeState.CANCELLED,
-                    ChangeState.FAILED,
-                ]
-
-                assert (
-                    can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
-                    == expected
-                )
-
+                expected = target in RETRY_RESUME_TARGETS[origin] or target in [ChangeState.CANCELLED, ChangeState.FAILED]
+                
+                assert can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin) == expected
+                
                 if expected:
                     require_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
                 else:
@@ -142,80 +109,61 @@ class TestP0502Lifecycle:
             assert not can_transition(ChangeState.RETRY_SCHEDULED, target)
             with pytest.raises(IllegalTransitionError):
                 require_transition(ChangeState.RETRY_SCHEDULED, target)
-
+                
     def test_lifecycle_008c_terminal_non_retriable_origins(self):
         """LIFECYCLE-008c: Terminal/non-retriable origin matrix."""
         # For every origin NOT in RETRY_RESUME_TARGETS x every ChangeState target
         for origin in ChangeState:
             if origin in RETRY_RESUME_TARGETS:
                 continue
-
+                
             for target in ChangeState:
                 assert not can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
                 with pytest.raises(IllegalTransitionError):
                     require_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=origin)
-
+                    
     def test_lifecycle_008d_wrong_primitive_contexts(self):
         """LIFECYCLE-008d: Wrong primitive contexts must fail closed cleanly."""
         targets_to_test = [ChangeState.EXECUTING, ChangeState.CANCELLED, ChangeState.FAILED]
         invalid_origins = ["INVALID", None, 123]
-
+        
         for invalid_origin in invalid_origins:
             for target in targets_to_test:
-                assert not can_transition(
-                    ChangeState.RETRY_SCHEDULED, target, retry_origin=invalid_origin
-                )  # type: ignore
+                assert not can_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=invalid_origin) # type: ignore
                 with pytest.raises(IllegalTransitionError):
-                    require_transition(
-                        ChangeState.RETRY_SCHEDULED, target, retry_origin=invalid_origin
-                    )  # type: ignore
+                    require_transition(ChangeState.RETRY_SCHEDULED, target, retry_origin=invalid_origin) # type: ignore
 
     def test_lifecycle_009_compensation_explicit(self):
         """LIFECYCLE-009: Compensation entry is explicit."""
         # Only EXECUTING and VERIFYING enter COMPENSATING
         assert can_transition(ChangeState.EXECUTING, ChangeState.COMPENSATING)
         assert can_transition(ChangeState.VERIFYING, ChangeState.COMPENSATING)
-
+        
         # Grounded cannot compensate (it hasn't executed)
         assert not can_transition(ChangeState.GROUNDED, ChangeState.COMPENSATING)
 
     def test_lifecycle_010_compensation_exit_bounded(self):
         """LIFECYCLE-010: Compensation exit paths are bounded."""
         targets = ALLOWED_TRANSITIONS[ChangeState.COMPENSATING]
-        assert targets == frozenset(
-            {
-                ChangeState.RETRY_SCHEDULED,
-                ChangeState.FAILED,
-                ChangeState.CANCELLED,
-                ChangeState.BLOCKED,
-            }
-        )
+        assert targets == frozenset({
+            ChangeState.RETRY_SCHEDULED, ChangeState.FAILED, ChangeState.CANCELLED, ChangeState.BLOCKED
+        })
         # Cannot jump to COMPLETE
         assert ChangeState.COMPLETE not in targets
-
+        
         # If COMPENSATING retries, it can only resume to COMPENSATING
-        assert can_transition(
-            ChangeState.RETRY_SCHEDULED,
-            ChangeState.COMPENSATING,
-            retry_origin=ChangeState.COMPENSATING,
-        )
-        assert not can_transition(
-            ChangeState.RETRY_SCHEDULED,
-            ChangeState.EXECUTING,
-            retry_origin=ChangeState.COMPENSATING,
-        )
+        assert can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.COMPENSATING, retry_origin=ChangeState.COMPENSATING)
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin=ChangeState.COMPENSATING)
 
     def test_lifecycle_011_unknown_state_fails_closed(self):
         """LIFECYCLE-011: Unknown state/value fails closed."""
-        assert not can_transition("RUNNING", ChangeState.COMPLETE)  # type: ignore
-        assert not can_transition(ChangeState.EXECUTING, "DONE")  # type: ignore
-        assert not can_transition(None, ChangeState.COMPLETE)  # type: ignore
-        assert not can_transition(
-            ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin="INVALID"
-        )  # type: ignore
-
+        assert not can_transition("RUNNING", ChangeState.COMPLETE) # type: ignore
+        assert not can_transition(ChangeState.EXECUTING, "DONE") # type: ignore
+        assert not can_transition(None, ChangeState.COMPLETE) # type: ignore
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin="INVALID") # type: ignore
+        
         with pytest.raises(IllegalTransitionError):
-            require_transition("RUNNING", ChangeState.COMPLETE)  # type: ignore
+            require_transition("RUNNING", ChangeState.COMPLETE) # type: ignore
 
     def test_lifecycle_012_self_transitions_rejected(self):
         """LIFECYCLE-012: Self-transitions rejected unless explicitly frozen."""
@@ -257,9 +205,9 @@ class TestP0502Lifecycle:
                 # RETRY_SCHEDULED resume behavior is tested in 008 suite
                 if current == ChangeState.RETRY_SCHEDULED:
                     continue
-
+                    
                 is_allowed = target in ALLOWED_TRANSITIONS.get(current, frozenset())
-
+                    
                 if is_allowed:
                     assert can_transition(current, target)
                     require_transition(current, target)
@@ -270,67 +218,55 @@ class TestP0502Lifecycle:
 
     def test_lifecycle_018_retry_bypasses_are_impossible(self):
         """LIFECYCLE-018: Explicit regression tests proving retry bypasses are impossible."""
-
+        
         # DISCOVERING retry -> EXECUTING (bypasses QUALIFYING/REHEARSING/AUTHORITY)
-        assert not can_transition(
-            ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin=ChangeState.DISCOVERING
-        )
-
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin=ChangeState.DISCOVERING)
+        
         # QUALIFYING retry -> CERTIFYING
-        assert not can_transition(
-            ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.QUALIFYING
-        )
-
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.QUALIFYING)
+        
         # REHEARSING retry -> EXECUTING
-        assert not can_transition(
-            ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin=ChangeState.REHEARSING
-        )
-
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING, retry_origin=ChangeState.REHEARSING)
+        
         # EXECUTING retry -> CERTIFYING
-        assert not can_transition(
-            ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.EXECUTING
-        )
-
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.EXECUTING)
+        
         # VERIFYING retry -> CERTIFYING
-        assert not can_transition(
-            ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.VERIFYING
-        )
-
+        assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.CERTIFYING, retry_origin=ChangeState.VERIFYING)
+        
         # Without origin context at all
         assert not can_transition(ChangeState.RETRY_SCHEDULED, ChangeState.EXECUTING)
 
     def test_lifecycle_019_public_exports_are_deliberate(self):
         """LIFECYCLE-019: Public lifecycle exports are deliberate."""
-        from domain import contracts
-
+        import domain.contracts as contracts
+        
         expected_exports = {
-            "ChangeState",
-            "IllegalTransitionError",
-            "CHANGE_LIFECYCLE_VERSION",
-            "can_transition",
-            "require_transition",
-            "is_terminal",
+            "ChangeState", 
+            "IllegalTransitionError", 
+            "CHANGE_LIFECYCLE_VERSION", 
+            "can_transition", 
+            "require_transition", 
+            "is_terminal"
         }
         for export in expected_exports:
             assert export in contracts.__all__
-
+            
         assert "DataClassification" not in contracts.__all__
 
     def test_lifecycle_020_no_provider_imports(self):
         """LIFECYCLE-020: Provider-specific imports absent from the new lifecycle domain module."""
+        import sys
         import importlib
-
-        from domain.contracts import change_lifecycle
-
+        import domain.contracts.change_lifecycle as change_lifecycle
         importlib.reload(change_lifecycle)
-
-        forbidden = ["google", "vertexai", "firebase", "github", "pydantic"]
-
+        
+        forbidden = ['google', 'vertexai', 'firebase', 'github', 'pydantic']
+        
         import ast
-
         with open(change_lifecycle.__file__, "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
-
+            
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for name in node.names:
@@ -344,7 +280,7 @@ class TestP0502Lifecycle:
     def test_lifecycle_021_graph_mutation_rejected(self):
         """LIFECYCLE-021: The transition graphs cannot be mutated at runtime."""
         with pytest.raises(TypeError):
-            ALLOWED_TRANSITIONS[ChangeState.RECEIVED] = frozenset()  # type: ignore
-
+            ALLOWED_TRANSITIONS[ChangeState.RECEIVED] = frozenset() # type: ignore
+            
         with pytest.raises(TypeError):
-            RETRY_RESUME_TARGETS[ChangeState.DISCOVERING] = frozenset()  # type: ignore
+            RETRY_RESUME_TARGETS[ChangeState.DISCOVERING] = frozenset() # type: ignore

@@ -1,8 +1,9 @@
-# P-Ω Whole-Repository Integrity Audit — P-06.03 Live-Doc Parity Repair
+# P-Ω Whole-Repository Integrity Audit — P-06.04 Canonical Command Interface
 
-> **Produced by:** P-06.03 Safe Local Configuration Templates and Secret Handling (Live-Doc Parity Repair)
-> **Date:** 2026-08-15
-> **Baseline Remote SHA:** `23d24659f9b695eada4e7e349f35bc53bed9047c`
+> **Produced by:** P-06.04 Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown (Surgical Scope & Semantics Repair)  
+> **Date:** 2026-08-15  
+> **Repair Entry Remote SHA:** `fb1c483c755962e21738b85d80740a6d78d938e5`  
+> **Trusted Pre-P-06.04 Baseline SHA:** `03ec56003998d2f7621d5806019d1c414c74ddec`  
 
 ---
 
@@ -10,57 +11,77 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Baseline SHA & remote tracking | **PASS** | `23d24659f9b695eada4e7e349f35bc53bed9047c` verified at entry; clean working tree. |
-| **B** | Python runtime version preserved | **PASS** | `.python-version` pinned to `3.13.5`; `pyproject.toml` requires `>=3.13,<3.14`. |
-| **C** | Node.js runtime evaluated & absent | **PASS** | Node remains `NOT_REQUIRED`. Zero npm/Node tooling or package.json files exist. |
-| **D** | Canonical dependency manifest (Source of Truth) | **PASS** | `pyproject.toml` (PEP 621 / PEP 735) is sole canonical editable manifest declaring direct runtime (`google-adk`, `google-genai`, `pydantic`, `google-cloud-firestore`, `google-cloud-pubsub`) and direct dev/test (`pytest`, `pyyaml`, `google-auth`, `google-cloud-run`). |
-| **E** | Deterministic lock artifact & uv version enforcement | **PASS** | `[tool.uv] required-version = "==0.11.28"` enforced; `uv.lock` freezes 74 packages with SHA-256 integrity hashes. |
-| **F** | Canonical local configuration template | **PASS** | Root `.env.example` created and tracked; defines exactly canonical environment variables (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GEMINI_MODEL`, `GITHUB_TOKEN`, `DEMO_REPO`). |
-| **G** | Secret-value policy enforcement | **PASS** | Zero secret defaults in `.env.example`; `GITHUB_TOKEN=` is strictly empty; zero dummy tokens or live credential signatures. |
-| **H** | Local authentication & ADC policy | **PASS** | `.env.example` documents Application Default Credentials (`gcloud auth application-default login`); distribution or configuration of service-account JSON key files is explicitly prohibited. |
-| **I** | .gitignore credential & artifact protection | **PASS** | `.gitignore` audited and strengthened to ignore `.env`, `.env.*`, `*service-account*.json`, `*credentials*.json`, `application_default_credentials.json`, `*adc.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.pkcs12`, `api_key.txt`, `*.secret`, `*.token`, `tmp/`, `artifacts/private/`, `private/`, `secrets/` while tracking `!.env.example`. |
-| **J** | Config-safety automated tests | **PASS** | 14 automated unit tests in `tests/test_p06_03_config_safety.py` pass (`14 passed, 0 failed, 0 errors`). |
-| **K** | Repository-wide deterministic secret scan | **PASS** | Scanned all 125 tracked files across repository; 0 secrets, private keys, or credentials found (`PASS`). |
-| **L** | Domain contracts provider neutrality & isolation | **PASS** | `domain/contracts/` unmodified; zero credential fields, zero provider imports, and AST neutrality confirmed. |
-| **M** | Future-phase non-leakage | **PASS** | P-06.04 (standard commands), P-06.05 (separate-directory clean checkout reproduction), P-07 (agent skeleton), P-28 (deployment) strictly preserved as `PENDING` (except P-06.04 which is now `DONE`). |
-| **N** | Documentation & command registry parity | **PASS** | `AGENT_ENVIRONMENT_AND_API.md` updated with P-06.04 configuration boundary, config-safety test entry (`VERIFIED`), and full suite status (`FAIL`, 608 passed, 3 errors). |
-| **O** | P-06.04 Implementation | **PASS** | Canonical command interface `scripts/cmd.py` implemented. CI Plan documented. `ruff` and `mypy` integrated correctly without mass-formatting. |
-| **O** | Combined P-05 regression suite | **PASS** | All 6 contract test files pass with 590 passed (`590 passed, 0 failed, 0 errors`). |
-| **P** | Full repository suite status honestly recorded | **PASS** | Full suite execution produces `FAIL` (604 passed, 3 errors: known `test_gcp_access.py` missing fixture 'project'). Honestly reported as `FAIL`. |
-| **Q** | Master Plan & HANDOFF exact parity | **PASS** | Master plan marks P-06.03 `DONE` with detailed evidence recording 125 tracked files; P-06 remains `IN_PROGRESS`; P-06.04 remains `PENDING`; HANDOFF records 125 tracked files and points verbatim to `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`. |
-| **R** | Bilingual Public Document Parity (README.md / README.tr.md) | **PASS** | `README.md` and `README.tr.md` synchronized to reflect P-06.03 `DONE`, `.env.example` verified template, and P-06.04/P-06.05 `PENDING`. |
-| **S** | Threat Model Implementation-State Parity | **PASS** | `docs/THREAT_MODEL.md` Section 14 updated to reflect P-06.03 `DONE` with 14 config-safety tests and 0-secret scan. |
-| **T** | Non-Goals and Red Lines Integrity | **PASS** | Zero runtime framework, secret manager client, or cloud credentials introduced into domain boundaries. |
-| **U** | Git working tree & rollback baseline integrity | **PASS** | Entry baseline SHA `23d24659f9b695eada4e7e349f35bc53bed9047c` verified; all edits strictly attributable to P-06.03 live-doc parity repair. |
-| **V** | Dead-code, unused-import & placeholder closure | **PASS** | Direct inspection verifies zero dead code, unused imports, or placeholders exist across tracked surfaces. |
+| **A** | Entry SHA & baseline tracking | **PASS** | Entry SHA `fb1c483c755962e21738b85d80740a6d78d938e5` and pre-P-06.04 baseline SHA `03ec56003998d2f7621d5806019d1c414c74ddec` verified. |
+| **B** | Out-of-scope domain contracts restoration | **PASS** | All 10 domain contract files (`domain/contracts/__init__.py`, `autonomy.py`, `capability.py`, `change_lifecycle.py`, `conventions.py`, `data_class.py`, `event_envelope.py`, `evidence.py`, `memory.py`, `rehearsal.py`) restored byte-for-byte to baseline `03ec56003998d2f7621d5806019d1c414c74ddec`. Zero mass-formatting churn. |
+| **C** | Out-of-scope historical tests restoration | **PASS** | Historical test files (`tests/test_p05_01_contracts.py` through `test_p05_06_contract_conventions.py`, `test_p06_03_config_safety.py`, `test_gcp_access.py`) restored byte-for-byte to baseline `03ec56003998d2f7621d5806019d1c414c74ddec`. Zero modernizing churn. |
+| **D** | Canonical command interface dispatcher | **PASS** | `scripts/cmd.py` implemented exposing all 9 canonical commands (`format`, `lint`, `type-check`, `unit`, `integration`, `e2e`, `demo`, `deploy`, `teardown`) via `argparse` CLI and direct functional interfaces. |
+| **E** | Format command check-only non-mutating semantics | **PASS** | `format_cmd` executes `ruff format --check .` (never mutates source code, zero `--fix`). Returns non-zero truthfully when unformatted files exist. Interface `VERIFIED`, underlying check `FAIL`. |
+| **F** | Lint command non-mutating semantics | **PASS** | `lint_cmd` executes `ruff check .` (strictly non-mutating, zero `--fix`). Propagates exit code 1 truthfully on historical lint debt without artificial weakening. Interface `VERIFIED`, underlying check `FAIL`. |
+| **G** | Type-check command contract & propagation | **PASS** | `typecheck_cmd` executes `mypy domain tests` without blanket suppressions, propagating exit code truthfully (reports 2 errors in `tests/test_gcp_access.py`). Interface `VERIFIED`, underlying check `FAIL`. |
+| **H** | Unit command test execution & isolation | **PASS** | `unit_cmd` executes `pytest tests/ --ignore=tests/test_gcp_access.py` with exit code 0 (`619 passed`). Excludes real GCP mutations. Interface `VERIFIED`, underlying check `PASS`. |
+| **I** | Integration command default fail-closed guard | **PASS** | `integration_cmd` fails closed with exit code 1 by default, outputting an error message to stderr with zero cloud access and zero network side effects. Interface `VERIFIED`. |
+| **J** | Integration authorized script entry dispatch | **PASS** | `integration_cmd` with `--live-write-danger` dispatches `python tests/test_gcp_access.py` directly (avoiding broken pytest fixture collection). Verified via mock dispatch in dedicated tests without live cloud execution. |
+| **K** | Deferred future commands fail-closed | **PASS** | `e2e`, `demo`, `deploy`, `teardown` fail closed with exit code 1 and output `NOT_RUN` (owning phases P-24, P-25, P-28 pending). |
+| **L** | Dedicated P-06.04 automated command tests | **PASS** | 15 automated unit/contract tests in `tests/test_p06_04_commands.py` passing (`15 passed, 0 failed`). Zero secret and zero cloud requirement. |
+| **M** | P-06.03 config-safety regression suite | **PASS** | 14 automated tests in `tests/test_p06_03_config_safety.py` passing (`14 passed, 0 failed`). |
+| **N** | Combined P-05 domain contracts regression suite | **PASS** | All 6 P-05 contract test files pass with 590 passed (`590 passed, 0 failed`). |
+| **O** | Full repository test suite status honestly recorded | **PASS** | Full suite execution honestly recorded as `FAIL` (619 passed, 3 errors: known baseline missing `project` fixture in `test_gcp_access.py`). |
+| **P** | CI execution plan contract | **PASS** | `docs/CI_PLAN.md` documented detailing execution order, failure behavior, safe vs guarded commands, and future phase ownership. |
+| **Q** | Dependency manifest & lock parity | **PASS** | `pyproject.toml` tool configuration audited; `uv.lock` and `requirements-dev.txt` include direct dev tools `ruff` and `mypy`; `requirements.txt` strictly excludes dev tooling; `uv sync --frozen` and `uv pip check` succeed with 0 incompatibilities. |
+| **R** | Tracked-file count & historical evidence integrity | **PASS** | Historical P-06.03 evidence (125 tracked files) preserved in records; current P-06.04 tracked-file count (128 files: 125 + `docs/CI_PLAN.md`, `scripts/cmd.py`, `tests/test_p06_04_commands.py`) freshly computed and verified via `git ls-files`. |
+| **S** | Bilingual Public Document Parity (README.md / README.tr.md) | **PASS** | `README.md` and `README.tr.md` synchronized: P-06.04 is marked `DONE`, P-06 is `IN_PROGRESS`, only P-06.05 clean-checkout reproduction remains `PENDING`. |
+| **T** | Master Plan & HANDOFF exact parity | **PASS** | `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` and `docs/HANDOFF.md` synchronized with P-06.04 evidence, 619 unit passes, full suite status, and exact next task pointer. |
+| **U** | P-06.05 clean-checkout non-leakage | **PASS** | P-06.05 is NOT started. No separate-directory clone executed. `CLEAN_CHECKOUT_VERIFIED` claim is not made. |
+| **V** | Dead-code, unused-import & placeholder closure | **PASS** | Newly authored P-06.04 code (`scripts/cmd.py`, `tests/test_p06_04_commands.py`) is 100% clean with zero unused imports, zero lint errors, and zero dead code. |
 
 ---
 
 ## 2. Test Execution Summary
 
-| Suite | File | Passed | Errors | Status |
-|---|---|---:|---:|---|
-| P-05.01 | `tests/test_p05_01_contracts.py` | 41 | 0 | **PASS** |
-| P-05.02 | `tests/test_p05_02_lifecycle.py` | 24 | 0 | **PASS** |
-| P-05.03 | `tests/test_p05_03_evidence_contracts.py` | 54 | 0 | **PASS** |
-| P-05.04 | `tests/test_p05_04_core_innovation_contracts.py` | 175 | 0 | **PASS** |
-| P-05.05 | `tests/test_p05_05_event_envelope.py` | 82 | 0 | **PASS** |
-| P-05.06 | `tests/test_p05_06_contract_conventions.py` | 214 | 0 | **PASS** |
-| **Combined P-05** | *All 6 contract test files* | **590** | **0** | **PASS** |
-| P-06.03 | `tests/test_p06_03_config_safety.py` | 14 | 0 | **PASS** |
-| P-06.04 | `tests/test_p06_04_commands.py` | 4 | 0 | **PASS** |
-| **Full Repository** | `tests/` | **608** | **3** | **FAIL** (Known unrelated GCP fixture errors only) |
-
-### Known Unrelated Errors (GCP Access Fixture)
-
-| Test | Error | Root Cause |
-|---|---|---|
-| `test_firestore_access` | fixture 'project' not found | Missing conftest fixture in `test_gcp_access.py` |
-| `test_pubsub_access` | fixture 'project' not found | Missing conftest fixture in `test_gcp_access.py` |
-| `test_cloud_run_access` | fixture 'project' not found | Missing conftest fixture in `test_gcp_access.py` |
+| Suite | Scope / File | Passed | Errors / Fails | Status | Interface Status |
+|---|---|---:|---:|---|---|
+| P-05.01 | `tests/test_p05_01_contracts.py` | 41 | 0 | **PASS** | VERIFIED |
+| P-05.02 | `tests/test_p05_02_lifecycle.py` | 24 | 0 | **PASS** | VERIFIED |
+| P-05.03 | `tests/test_p05_03_evidence_contracts.py` | 54 | 0 | **PASS** | VERIFIED |
+| P-05.04 | `tests/test_p05_04_core_innovation_contracts.py` | 175 | 0 | **PASS** | VERIFIED |
+| P-05.05 | `tests/test_p05_05_event_envelope.py` | 82 | 0 | **PASS** | VERIFIED |
+| P-05.06 | `tests/test_p05_06_contract_conventions.py` | 214 | 0 | **PASS** | VERIFIED |
+| **Combined P-05** | *All 6 domain contract test files* | **590** | **0** | **PASS** | VERIFIED |
+| P-06.03 | `tests/test_p06_03_config_safety.py` | 14 | 0 | **PASS** | VERIFIED |
+| P-06.04 | `tests/test_p06_04_commands.py` | 15 | 0 | **PASS** | VERIFIED |
+| **Total Unit / Local** | `uv run python scripts/cmd.py unit` | **619** | **0** | **PASS** | VERIFIED |
+| **Full Repository** | `python -m pytest tests/` | **619** | **3** | **FAIL** (Known baseline GCP fixture errors) | VERIFIED |
 
 ---
 
-## 3. P-Ω Final Verdict
+## 3. Command Execution Summary
 
-**PASS** — All 22 whole-repository integrity audit checks pass. P-06.03 establishes a safe root configuration template (`.env.example`) defining registered canonical environment variables with zero secret defaults (`GITHUB_TOKEN` empty), promotes Application Default Credentials (ADC) for local development while prohibiting long-lived service account key files, and fortifies `.gitignore` against credential and sensitive artifact leaks while preserving `.env.example` tracking. 14 automated config-safety tests pass, and repository-wide deterministic secret scanning over all 125 tracked files confirms 0 secrets. Dead-code and unused-import check is verified with 0 unused imports remaining across all test surfaces. Combined P-05 regression suite remains at 590 passed, and full repository test suite is honestly recorded as `FAIL` (604 passed, 3 errors) due to baseline GCP fixture errors. Full live-document parity is 100% synchronized across Master Plan (125 tracked files), HANDOFF (125 tracked files), and P-Ω Audit Report (125 tracked files) as well as all English and Turkish surfaces. Next eligible task is `P-06.04 — Define standard commands for format, lint, type-check, unit, integration, E2E, demo, deploy, teardown`.
+| Command | Check Semantics | Side-Effect Behavior | Underlying Check Result | Interface Contract Status |
+|---|---|---|---|---|
+| `uv run python scripts/cmd.py format` | `ruff format --check .` | Strictly non-mutating (check-only) | `FAIL` (Reports unformatted historical files) | **VERIFIED** |
+| `uv run python scripts/cmd.py lint` | `ruff check .` | Strictly non-mutating (zero `--fix`) | `FAIL` (Reports historical lint debt) | **VERIFIED** |
+| `uv run python scripts/cmd.py type-check` | `mypy domain tests` | Non-mutating type validation | `FAIL` (Reports 2 errors in `tests/test_gcp_access.py`) | **VERIFIED** |
+| `uv run python scripts/cmd.py unit` | `pytest tests/ --ignore=tests/test_gcp_access.py` | Local deterministic test execution | `PASS` (619 passed) | **VERIFIED** |
+| `uv run python scripts/cmd.py integration` | Standalone script guard | Fails closed by default; zero cloud calls | `FAIL_CLOSED` (Exit 1) | **VERIFIED** |
+| `uv run python scripts/cmd.py integration --live-write-danger` | `python tests/test_gcp_access.py` | Dispatches script directly (mock-tested) | `NOT_RUN` (Not executed against live cloud in repair) | **VERIFIED** |
+| `uv run python scripts/cmd.py e2e` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-24/P-25 pending) | **VERIFIED** |
+| `uv run python scripts/cmd.py demo` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-24 pending) | **VERIFIED** |
+| `uv run python scripts/cmd.py deploy` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-28 pending) | **VERIFIED** |
+| `uv run python scripts/cmd.py teardown` | Deferred command guard | Fails closed (`exit 1`, `NOT_RUN`) | `NOT_RUN` (Owning phase P-28 pending) | **VERIFIED** |
+
+---
+
+## 4. Known Baseline Errors (Unrelated GCP Access Fixtures)
+
+| Test | Error | Root Cause |
+|---|---|---|
+| `test_firestore_access` | fixture 'project' not found | Standalone script collected by pytest in `tests/test_gcp_access.py` |
+| `test_pubsub_access` | fixture 'project' not found | Standalone script collected by pytest in `tests/test_gcp_access.py` |
+| `test_cloud_run_access` | fixture 'project' not found | Standalone script collected by pytest in `tests/test_gcp_access.py` |
+
+---
+
+## 5. P-Ω Final Verdict
+
+**PASS** — All 22 whole-repository integrity audit checks pass.
+P-06.04 defines the canonical developer command interface in `scripts/cmd.py` with non-mutating verification semantics for `format` (`--check`) and `lint` (zero `--fix`), deterministic exit-code propagation, fail-closed integration safety with direct script dispatch upon explicit authorization, and safe fail-closed guards for deferred future commands. 15 automated command contract tests pass. Historical P-05 domain contracts (590 tests) and P-06.03 config-safety contracts (14 tests) are preserved without mass-formatting churn. Total unit test suite passes with 619 tests. Full repository test suite is honestly reported as `FAIL` (619 passed, 3 errors) due to known baseline fixture errors. Historical P-06.03 125 tracked-file evidence is distinguished from current 128 tracked files. Full live-document parity is synchronized across README (EN/TR), Master Plan, HANDOFF, CI Plan, and Environment Memory. P-06.05 has not been started. Next eligible task is `P-06.05 — Run first clean-checkout reproduction from separate directory`.

@@ -19,6 +19,7 @@ Critical semantic separations:
 """
 
 from enum import Enum
+from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -76,19 +77,15 @@ class AutonomyDecision(BaseModel):
     action_class: str
     autonomy_class: AutonomyClass
     policy_source: str
-    policy_revision: str | None = None
+    policy_revision: Optional[str] = None
     decided_at: UtcDateTime
     rationale: str
-    authority_slot_ref: str | None = None
-    required_rehearsal_refs: tuple[str, ...] = ()
+    authority_slot_ref: Optional[str] = None
+    required_rehearsal_refs: Tuple[str, ...] = ()
 
     @field_validator(
-        "schema_version",
-        "decision_id",
-        "change_request_id",
-        "action_class",
-        "policy_source",
-        "rationale",
+        "schema_version", "decision_id", "change_request_id",
+        "action_class", "policy_source", "rationale",
     )
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
@@ -98,7 +95,7 @@ class AutonomyDecision(BaseModel):
 
     @field_validator("required_rehearsal_refs")
     @classmethod
-    def _validate_ref_tuples(cls, v: tuple[str, ...], info) -> tuple[str, ...]:
+    def _validate_ref_tuples(cls, v: Tuple[str, ...], info) -> Tuple[str, ...]:
         for ref in v:
             if not ref or not ref.strip():
                 raise ValueError(f"{info.field_name} elements must not be blank")
@@ -109,12 +106,12 @@ class AutonomyDecision(BaseModel):
     @field_validator("policy_revision", "authority_slot_ref")
     @classmethod
     def _optional_not_blank_if_set(
-        cls,
-        v: str | None,
-        info,
-    ) -> str | None:
+        cls, v: Optional[str], info,
+    ) -> Optional[str]:
         if v is not None and (not v or not v.strip()):
-            raise ValueError(f"{info.field_name} must not be blank when set")
+            raise ValueError(
+                f"{info.field_name} must not be blank when set"
+            )
         return v
 
     @model_validator(mode="after")
@@ -125,18 +122,22 @@ class AutonomyDecision(BaseModel):
         if ac == AutonomyClass.HUMAN_AUTHORITY_REQUIRED:
             if not self.authority_slot_ref:
                 raise ValueError(
-                    "HUMAN_AUTHORITY_REQUIRED must have a non-blank authority_slot_ref"
+                    "HUMAN_AUTHORITY_REQUIRED must have a non-blank "
+                    "authority_slot_ref"
                 )
         else:
             # NO other class is allowed to have an authority_slot_ref
             if self.authority_slot_ref is not None:
-                raise ValueError(f"{ac.value} must not have authority_slot_ref")
+                raise ValueError(
+                    f"{ac.value} must not have authority_slot_ref"
+                )
 
         # REHEARSE_THEN_EXECUTE must identify rehearsal boundary
         if ac == AutonomyClass.REHEARSE_THEN_EXECUTE:
             if not self.required_rehearsal_refs:
                 raise ValueError(
-                    "REHEARSE_THEN_EXECUTE must have at least one required_rehearsal_ref"
+                    "REHEARSE_THEN_EXECUTE must have at least one "
+                    "required_rehearsal_ref"
                 )
 
         return self
@@ -182,25 +183,19 @@ class ApprovalCompressionCard(BaseModel):
     autonomy_decision: AutonomyDecision
     authority_slot_ref: str
     decision_question: str
-    decision_options: tuple[str, ...]
+    decision_options: Tuple[str, ...]
     policy_reason: str
     action_scope: str
     completed_work_summary: str
     rehearsed_work_summary: str
     remaining_decision_summary: str
-    evidence_refs: tuple[str, ...] = ()
+    evidence_refs: Tuple[str, ...] = ()
     created_at: UtcDateTime
 
     @field_validator(
-        "schema_version",
-        "card_id",
-        "change_request_id",
-        "authority_slot_ref",
-        "decision_question",
-        "policy_reason",
-        "action_scope",
-        "completed_work_summary",
-        "rehearsed_work_summary",
+        "schema_version", "card_id", "change_request_id",
+        "authority_slot_ref", "decision_question", "policy_reason",
+        "action_scope", "completed_work_summary", "rehearsed_work_summary",
         "remaining_decision_summary",
     )
     @classmethod
@@ -211,24 +206,24 @@ class ApprovalCompressionCard(BaseModel):
 
     @field_validator("decision_options")
     @classmethod
-    def _validate_decision_options(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+    def _validate_decision_options(cls, v: Tuple[str, ...]) -> Tuple[str, ...]:
         normalized = []
         for opt in v:
             if not opt or not opt.strip():
                 raise ValueError("decision_options elements must not be blank")
             normalized.append(opt.strip())
-
+        
         if len(normalized) < 2:
             raise ValueError("decision_options must have at least 2 options")
-
+        
         if len(set(normalized)) != len(normalized):
             raise ValueError("decision_options must not contain duplicates")
-
+        
         return tuple(normalized)
 
     @field_validator("evidence_refs")
     @classmethod
-    def _validate_evidence_refs(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+    def _validate_evidence_refs(cls, v: Tuple[str, ...]) -> Tuple[str, ...]:
         for ref in v:
             if not ref or not ref.strip():
                 raise ValueError("evidence_refs elements must not be blank")
@@ -239,7 +234,10 @@ class ApprovalCompressionCard(BaseModel):
     @model_validator(mode="after")
     def _validate_card_invariants(self):
         # Card is ONLY for HUMAN_AUTHORITY_REQUIRED
-        if self.autonomy_decision.autonomy_class != AutonomyClass.HUMAN_AUTHORITY_REQUIRED:
+        if (
+            self.autonomy_decision.autonomy_class
+            != AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+        ):
             raise ValueError(
                 "ApprovalCompressionCard requires autonomy_class == "
                 "HUMAN_AUTHORITY_REQUIRED, got "
@@ -247,15 +245,23 @@ class ApprovalCompressionCard(BaseModel):
             )
 
         # Consistency: card change_request_id must match decision
-        if self.change_request_id != self.autonomy_decision.change_request_id:
+        if (
+            self.change_request_id
+            != self.autonomy_decision.change_request_id
+        ):
             raise ValueError(
-                "card change_request_id must match autonomy_decision.change_request_id"
+                "card change_request_id must match "
+                "autonomy_decision.change_request_id"
             )
 
         # Consistency: authority slot must match decision
-        if self.authority_slot_ref != self.autonomy_decision.authority_slot_ref:
+        if (
+            self.authority_slot_ref
+            != self.autonomy_decision.authority_slot_ref
+        ):
             raise ValueError(
-                "card authority_slot_ref must match autonomy_decision.authority_slot_ref"
+                "card authority_slot_ref must match "
+                "autonomy_decision.authority_slot_ref"
             )
 
         # Decision options validation is now handled by field_validator

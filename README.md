@@ -16,7 +16,7 @@
 > - **Reproducible dependency manifests & lockfiles (P-06.02):** `IMPLEMENTED` (`DONE` — PEP 621 / PEP 735 `pyproject.toml`, `[tool.uv]` version enforcement, `uv.lock`, runtime `requirements.txt`, dev/test `requirements-dev.txt`)
 > - **Safe local configuration & secret handling (P-06.03):** `IMPLEMENTED` (`DONE` — `.env.example` template with zero secret defaults, ADC-first local auth, comprehensive `.gitignore` credential/artifact protection, 14 config-safety tests)
 > - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py` defined for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown with strict execution safety boundaries)
-> - **Phase P-06 Local Dev & Dependency Freeze:** `IN_PROGRESS` (P-06.04 standard commands and P-06.05 clean-checkout reproduction remain `PENDING`)
+> - **Phase P-06 Local Dev & Dependency Freeze:** `IN_PROGRESS` (P-06.05 clean-checkout reproduction remains `PENDING`)
 > - **Runtime product & agent implementation:** Begins in Phase P-07+ (`PLANNED`).
 >
 > Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.

@@ -82,7 +82,15 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Root cause: Prematurely adopting a JS frontend framework (React/Next.js/Vite) before verifying if vanilla web assets are sufficient for the judge/operator dashboard.
 - Incorrect approach: Defaulting to Node.js / TypeScript / npm tooling for simple dashboard interfaces in a Python-first AI hackathon project.
 - Correct approach: Formally evaluate runtime necessity. Pin Python 3.13.5 as the single unified backend/agent runtime and declare Node `NOT_REQUIRED`, serving the dashboard as vanilla HTML/CSS/JS with zero build steps.
-- Prevention rule: In Google-native ADK projects, default to single-runtime Python architecture unless rich client-side state genuinely demands a dedicated frontend framework.
+### LESSON-20260815-02 — Developer verification commands must be non-mutating check-only gates, not auto-mutations
+- Date/time: 2026-08-15
+- Active task: P-06.04
+- Symptom: Running `scripts/cmd.py format` mutated 30+ files across frozen domain contracts, creating massive untracked churn. Meanwhile, authorized integration called `pytest tests/test_gcp_access.py`, which caused pytest collection to fail on missing `project` fixtures because `test_gcp_access.py` is a standalone script.
+- Root cause: Confusing formatting check commands (`ruff format --check`) with auto-fix formatters (`ruff format`), and confusing pytest collection with standalone script execution.
+- Incorrect approach: Allowing developer verification commands to mutate source code, or editing frozen legacy test scripts merely to satisfy pytest collection.
+- Correct approach: Use `ruff format --check .` for verification commands. When standalone scripts need execution upon explicit authorization, dispatch them directly with `python <script>` rather than invoking pytest collection.
+- Prevention rule: Verification commands must never mutate files. Distinguish command interface verification from underlying check results: a verification command works correctly when it faithfully reports repository debt without rewriting history or modifying frozen domain contracts.
 - Status: `ACTIVE`
+
 
 
