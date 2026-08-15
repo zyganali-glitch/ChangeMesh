@@ -748,7 +748,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-07 — Google ADK Agent Skeleton
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-07.01 — Implement Change Orchestrator ADK skeleton with no external writes
 
@@ -796,11 +796,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-07.05 — Add agent revision metadata to every event/evidence record
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Add agent revision metadata to every event/evidence record.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No agent action lacks exact revision provenance.
 - **Required evidence:** Schema/event tests.
+- **Evidence:** Implemented exact, machine-checkable agent identity and revision provenance without escape hatches across domain contracts and agent execution traces. Implemented frozen `AgentRevisionProvenance` contract (`agent_id: str`, `agent_revision: str`, `role: Optional[str] = None`) in `domain/contracts/agent_descriptor.py` and exported in `domain/contracts/__init__.py`, strictly forbidding extra fields and rejecting ambiguous escape hatches (`unknown`, `latest`, `current`, `null`, `none`, `*`, `undefined`, or blank strings). Enhanced `Provenance` contract in `domain/contracts/evidence.py` with `agent_id`, `agent_revision`, `agent_role`, and structured `agent_provenance` (with mutual-completeness enforcement between `agent_id` and `agent_revision`, while preserving 100% backward compatibility for non-agent sources such as `fixture-runner`). Enhanced `EventEnvelope` in `domain/contracts/event_envelope.py` with `producer_id`, `producer_role`, and structured `agent_provenance`, ensuring delivery conflict semantics correctly classify differing producer revisions for the same `event_id` as `EventDeliveryDisposition.CONFLICT`. Added `get_revision_provenance()` methods to `AgentDescriptor`, `AgentDefinition`, `RoutingTraceRecord`, `RoutingResult`, and `BranchExecutionTrace`. Updated `BranchCoordinator._execute_branch_isolated()` to populate `selected_agent_revision` for both executed and rejected branches, and updated `CoordinationResult.get_canonical_state_projection()` to include `"agent_revision"` in `branch_outcomes`. 82 dedicated tests in `tests/test_p07_05_agent_revision_provenance.py` passed (`82 passed`). Combined regression suite (`tests/test_p05_03_evidence_contracts.py`, `tests/test_p05_05_event_envelope.py`, `tests/test_p05_06_contract_conventions.py`, `tests/test_p07_01_change_orchestrator.py`, `tests/test_p07_02_agent_definitions.py`, `tests/test_p07_03_routing.py`, `tests/test_p07_04_concurrency.py`, `tests/test_p07_05_agent_revision_provenance.py`) passed cleanly (`601 passed`). Canonical unit test command `uv run python scripts/cmd.py unit` passed with 870 tests (`870 passed`, 0 failures). Static checks (`ruff check`, `ruff format --check`, and `mypy`) verified with 0 errors. Documentation synchronized across `docs/API_CONTRACTS.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/ARCHITECTURE.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md`.
 - **Mandatory documentation sync:** Capability docs.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

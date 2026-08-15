@@ -134,7 +134,7 @@ class TestPositiveConstruction:
         assert loaded.causation_id == "evt-001"
 
     def test_exact_required_fields(self):
-        """EventEnvelope has exactly the P-05.05 required fields."""
+        """EventEnvelope has canonical required and provenance fields."""
         fields = set(EventEnvelope.model_fields.keys())
         expected = {
             "schema_version",
@@ -145,6 +145,9 @@ class TestPositiveConstruction:
             "producer_revision",
             "timestamp",
             "idempotency_key",
+            "producer_id",
+            "producer_role",
+            "agent_provenance",
         }
         assert fields == expected
 

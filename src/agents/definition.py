@@ -16,7 +16,7 @@ from typing import Type
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from domain.contracts.agent_descriptor import AgentDescriptor
+from domain.contracts.agent_descriptor import AgentDescriptor, AgentRevisionProvenance
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.tool_descriptor import ToolDescriptor
 
@@ -475,4 +475,12 @@ class AgentDefinition(BaseModel):
             declared_capabilities=list(self.declared_capabilities),
             permitted_data_classifications=list(self.permitted_data_classifications),
             permitted_tool_ids=list(self.permitted_tool_ids),
+        )
+
+    def get_revision_provenance(self) -> AgentRevisionProvenance:
+        """Return canonical machine-checkable AgentRevisionProvenance."""
+        return AgentRevisionProvenance(
+            agent_id=self.agent_id,
+            agent_revision=self.agent_revision,
+            role=self.role,
         )

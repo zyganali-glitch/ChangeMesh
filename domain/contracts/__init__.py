@@ -11,7 +11,7 @@ providers.
 
 from .change_request import ChangeRequest
 from .success_criterion import SuccessCriterion
-from .agent_descriptor import AgentDescriptor
+from .agent_descriptor import AgentDescriptor, AgentRevisionProvenance
 from .tool_descriptor import ToolDescriptor
 from .data_class import DataClass, DataClassLevel
 
@@ -66,6 +66,7 @@ __all__ = [
     "SuccessCriterion",
     "ChangeRequest",
     "AgentDescriptor",
+    "AgentRevisionProvenance",
     "ToolDescriptor",
     # P-05.02 — Lifecycle
     "ChangeState",

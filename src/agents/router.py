@@ -33,6 +33,7 @@ from typing import Callable, Sequence, Type
 from google.adk.agents.base_agent import BaseAgent
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from domain.contracts.agent_descriptor import AgentRevisionProvenance
 from domain.contracts.conventions import UtcDateTime
 from src.agents.definition import AgentDefinition
 from src.agents.registry import (
@@ -135,6 +136,16 @@ class RoutingTraceRecord(BaseModel):
             raise ValueError(f"{info.field_name} must not be blank")
         return v.strip()
 
+    def get_selected_revision_provenance(self) -> AgentRevisionProvenance | None:
+        """Return structured AgentRevisionProvenance for the selected specialist, if routed."""
+        if self.selected_agent_id and self.selected_agent_revision:
+            return AgentRevisionProvenance(
+                agent_id=self.selected_agent_id,
+                agent_revision=self.selected_agent_revision,
+                role=self.selected_role,
+            )
+        return None
+
 
 class RoutingResult(BaseModel):
     """Result of a deterministic routing evaluation.
@@ -159,6 +170,10 @@ class RoutingResult(BaseModel):
     def is_successful(self) -> bool:
         """Alias for is_routed."""
         return self.is_routed
+
+    def get_selected_revision_provenance(self) -> AgentRevisionProvenance | None:
+        """Return structured AgentRevisionProvenance for the selected specialist, if routed."""
+        return self.trace.get_selected_revision_provenance()
 
 
 def _is_canonical_specialist_definition(definition: AgentDefinition) -> bool:

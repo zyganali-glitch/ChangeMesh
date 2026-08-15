@@ -1,7 +1,7 @@
 """ChangeMesh domain contracts — evidence contracts."""
 
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -25,6 +25,7 @@ class EvidenceState(str, Enum):
     QUARANTINED = "QUARANTINED"
 
 
+from domain.contracts.agent_descriptor import AgentRevisionProvenance
 from domain.contracts.conventions import (
     HashAlgorithm,
     UtcDateTime,
@@ -81,7 +82,12 @@ class TraceReference(BaseModel):
 
 
 class Provenance(BaseModel):
-    """Provenance contract describing origin and mode."""
+    """Provenance contract describing origin, collection mode, and agent revision.
+
+    When evidence is produced or recorded by an agent, `agent_id` and
+    `agent_revision` (or `agent_provenance`) provide exact machine-checkable
+    agent revision provenance.
+    """
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: str
@@ -90,6 +96,10 @@ class Provenance(BaseModel):
     collection_timestamp: UtcDateTime
     source_execution_identifier: Optional[str] = None
     source_execution_timestamp: Optional[UtcDateTime] = None
+    agent_id: Optional[str] = None
+    agent_revision: Optional[str] = None
+    agent_role: Optional[str] = None
+    agent_provenance: Optional[AgentRevisionProvenance] = None
 
     @field_validator("schema_version", "source", "source_execution_identifier")
     @classmethod
@@ -97,6 +107,75 @@ class Provenance(BaseModel):
         if v is not None and (not v or not v.strip()):
             raise ValueError(f"{info.field_name} must not be blank")
         return v
+
+    @field_validator("agent_id", "agent_revision")
+    @classmethod
+    def _validate_agent_id_and_revision(cls, v: Optional[str], info) -> Optional[str]:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError(f"{info.field_name} must not be blank")
+            cleaned = v.strip()
+            if cleaned.lower() in ("unknown", "latest", "current", "null", "none", "*", "undefined"):
+                raise ValueError(f"{info.field_name} cannot be an ambiguous escape hatch: {v!r}")
+            return cleaned
+        return None
+
+    @field_validator("agent_role")
+    @classmethod
+    def _validate_agent_role(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError("agent_role must not be blank when provided")
+            return v.strip()
+        return None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sync_agent_provenance_before(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            ap = data.get("agent_provenance")
+            if ap is not None:
+                if isinstance(ap, AgentRevisionProvenance):
+                    data.setdefault("agent_id", ap.agent_id)
+                    data.setdefault("agent_revision", ap.agent_revision)
+                    if ap.role and "agent_role" not in data:
+                        data["agent_role"] = ap.role
+                elif isinstance(ap, dict):
+                    data.setdefault("agent_id", ap.get("agent_id"))
+                    data.setdefault("agent_revision", ap.get("agent_revision"))
+                    if ap.get("role") and "agent_role" not in data:
+                        data["agent_role"] = ap.get("role")
+            elif data.get("agent_id") is not None and data.get("agent_revision") is not None:
+                data["agent_provenance"] = AgentRevisionProvenance(
+                    agent_id=data["agent_id"],
+                    agent_revision=data["agent_revision"],
+                    role=data.get("agent_role"),
+                )
+        return data
+
+    @model_validator(mode="after")
+    def _validate_agent_provenance_completeness(self):
+        # Enforce mutual completeness: agent_id requires agent_revision and vice-versa
+        has_id = self.agent_id is not None
+        has_rev = self.agent_revision is not None
+        if has_id != has_rev:
+            raise ValueError(
+                "Agent revision provenance requires both agent_id and agent_revision; "
+                f"got agent_id={self.agent_id!r}, agent_revision={self.agent_revision!r}"
+            )
+        return self
+
+    def get_agent_provenance(self) -> Optional[AgentRevisionProvenance]:
+        """Return structured AgentRevisionProvenance if agent metadata is present."""
+        if self.agent_provenance is not None:
+            return self.agent_provenance
+        if self.agent_id is not None and self.agent_revision is not None:
+            return AgentRevisionProvenance(
+                agent_id=self.agent_id,
+                agent_revision=self.agent_revision,
+                role=self.agent_role,
+            )
+        return None
 
 
 class EvidenceRecord(BaseModel):

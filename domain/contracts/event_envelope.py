@@ -16,10 +16,11 @@ causal ordering.
 """
 
 from enum import Enum
-from typing import Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from domain.contracts.agent_descriptor import AgentRevisionProvenance
 from domain.contracts.conventions import UtcDateTime
 
 
@@ -53,8 +54,8 @@ class EventEnvelope(BaseModel):
     """Canonical provider-neutral event envelope.
 
     Carries event identity, change identity, causal chain metadata,
-    correlation identity, producer provenance, schema version, and
-    idempotency key.
+    correlation identity, producer provenance (including exact agent identity
+    and revision), schema version, and idempotency key.
 
     Immutability: Once validated, the envelope is frozen and cannot be
     mutated in place.
@@ -80,6 +81,9 @@ class EventEnvelope(BaseModel):
     producer_revision: str
     timestamp: UtcDateTime
     idempotency_key: str
+    producer_id: Optional[str] = None
+    producer_role: Optional[str] = None
+    agent_provenance: Optional[AgentRevisionProvenance] = None
 
     # -- field validators: mandatory non-blank strings -----------------------
 
@@ -88,7 +92,6 @@ class EventEnvelope(BaseModel):
         "event_id",
         "change_id",
         "correlation_id",
-        "producer_revision",
         "idempotency_key",
     )
     @classmethod
@@ -96,6 +99,37 @@ class EventEnvelope(BaseModel):
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
         return v
+
+    @field_validator("producer_revision")
+    @classmethod
+    def _validate_producer_revision(cls, v: str, info) -> str:
+        if not v or not v.strip():
+            raise ValueError(f"{info.field_name} must not be blank")
+        cleaned = v.strip()
+        if cleaned.lower() in ("unknown", "latest", "current", "null", "none", "*", "undefined"):
+            raise ValueError(f"{info.field_name} cannot be an ambiguous escape hatch: {v!r}")
+        return cleaned
+
+    @field_validator("producer_id")
+    @classmethod
+    def _validate_producer_id(cls, v: Optional[str], info) -> Optional[str]:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError(f"{info.field_name} must not be blank")
+            cleaned = v.strip()
+            if cleaned.lower() in ("unknown", "latest", "current", "null", "none", "*", "undefined"):
+                raise ValueError(f"{info.field_name} cannot be an ambiguous escape hatch: {v!r}")
+            return cleaned
+        return None
+
+    @field_validator("producer_role")
+    @classmethod
+    def _validate_producer_role(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError("producer_role must not be blank when provided")
+            return v.strip()
+        return None
 
     @field_validator("causation_id")
     @classmethod
@@ -105,6 +139,30 @@ class EventEnvelope(BaseModel):
         if v is not None and (not v or not v.strip()):
             raise ValueError("causation_id must not be blank")
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sync_agent_provenance_before(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            ap = data.get("agent_provenance")
+            if ap is not None:
+                if isinstance(ap, AgentRevisionProvenance):
+                    data.setdefault("producer_id", ap.agent_id)
+                    data.setdefault("producer_revision", ap.agent_revision)
+                    if ap.role and "producer_role" not in data:
+                        data["producer_role"] = ap.role
+                elif isinstance(ap, dict):
+                    data.setdefault("producer_id", ap.get("agent_id"))
+                    data.setdefault("producer_revision", ap.get("agent_revision"))
+                    if ap.get("role") and "producer_role" not in data:
+                        data["producer_role"] = ap.get("role")
+            elif data.get("producer_id") is not None and data.get("producer_revision") is not None:
+                data["agent_provenance"] = AgentRevisionProvenance(
+                    agent_id=data["producer_id"],
+                    agent_revision=data["producer_revision"],
+                    role=data.get("producer_role"),
+                )
+        return data
 
     # -- model validator: self-causation rejection ---------------------------
 
@@ -116,6 +174,18 @@ class EventEnvelope(BaseModel):
                 "Self-causation rejected: event_id cannot equal causation_id"
             )
         return self
+
+    def get_agent_provenance(self) -> Optional[AgentRevisionProvenance]:
+        """Return structured AgentRevisionProvenance if producer identity is present."""
+        if self.agent_provenance is not None:
+            return self.agent_provenance
+        if self.producer_id is not None and self.producer_revision is not None:
+            return AgentRevisionProvenance(
+                agent_id=self.producer_id,
+                agent_revision=self.producer_revision,
+                role=self.producer_role,
+            )
+        return None
 
 
 # ---------------------------------------------------------------------------

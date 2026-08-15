@@ -41,10 +41,10 @@ Additional core targets:
 
 ## 4. Core modules
 
-- `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions)
-- `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches IMPLEMENTED; P-07.05 agent revision metadata PENDING)
+- `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions; P-07.05 agent revision metadata IMPLEMENTED: AgentRevisionProvenance, Provenance/EventEnvelope integration)
+- `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches IMPLEMENTED; P-07.05 agent revision metadata IMPLEMENTED)
 - `api`: API entrypoint for HTTP/REST and webhook invocations (PLANNED)
-- `orchestration`: deterministic local routing/delegation IMPLEMENTED under P-07.03; multi-agent branch coordination, parallel execution, single-writer aggregation, and sequential fallback IMPLEMENTED under P-07.04 via `src/agents/coordinator.py`; durable saga transitions, Firestore persistence, Pub/Sub orchestration, and recovery remain PLANNED under their later owning phases
+- `orchestration`: deterministic local routing/delegation IMPLEMENTED under P-07.03; multi-agent branch coordination, parallel execution, single-writer aggregation, sequential fallback, and exact revision tracing IMPLEMENTED under P-07.04/P-07.05 via `src/agents/coordinator.py`; durable saga transitions, Firestore persistence, Pub/Sub orchestration, and recovery remain PLANNED under their later owning phases
 - `events`: Pub/Sub envelope, replay, dead-letter handling (PLANNED)
 - `state`: Firestore repositories and idempotency (PLANNED)
 - `memory`: trust typing, provenance, TTL, contradiction, quarantine (PLANNED)
@@ -105,6 +105,13 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Non-Bypassable Sequential Fallback**: Every request for parallel execution (`plan.strategy == PARALLEL`, `force_strategy == PARALLEL`, or `ChangeOrchestrator.execute_parallel()`) must pass `BranchCoordinator.is_parallel_safe()`. If any safety invariant is violated (duplicate specialist targets, Release Steward concurrency), execution automatically falls back to `ExecutionStrategy.SEQUENTIAL` with `fallback_triggered=True` and a recorded deterministic fallback reason.
 *   **Deep Runtime Input Isolation**: Branch inputs (`BranchPlan.branches`, `BranchSpec.routing_request`, and payloads) are deep-copied on intake and dispatch (`isolated_spec = copy.deepcopy(spec)`). In-place mutations performed inside one branch runner cannot leak to concurrent branches or modify caller-owned input collections.
 *   **Single-Writer Aggregation**: Branch outputs are aggregated strictly by `BranchCoordinator` into deterministic plan order regardless of arrival order.
+
+### 5.9 Agent Revision Metadata and Provenance Invariants (P-07.05)
+
+*   **Unambiguous Machine-Checkable Revision Identity**: Every agent-produced event, evidence, routing trace, and coordination trace must carry exact agent identity (`agent_id`) bound to exact semantic revision (`agent_revision`). Two different agents using `1.0.0` remain machine-distinguishable.
+*   **Zero Escape Hatches**: No `unknown`, `latest`, `current`, `null`, `none`, `*`, `undefined`, or blank string may satisfy revision provenance.
+*   **Event Conflict Semantics**: Same `event_id` with changed immutable revision provenance deterministically produces `EventDeliveryDisposition.CONFLICT` rather than duplicate replay.
+*   **Canonical State Projection**: Multi-agent coordination state projection (`CoordinationResult.get_canonical_state_projection()`) strips wall-clock timestamps while preserving exact `agent_id`, `agent_revision`, and `role`.
 
 ## 6. State labels
 

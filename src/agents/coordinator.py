@@ -44,6 +44,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from domain.contracts.agent_descriptor import AgentRevisionProvenance
 from domain.contracts.autonomy import AutonomyClass, AutonomyDecision
 from domain.contracts.conventions import UtcDateTime
 from src.agents.definition import AgentDefinition
@@ -173,6 +174,7 @@ class BranchExecutionTrace(BaseModel):
     routing_outcome: RoutingOutcome
     selected_agent_id: str | None = None
     selected_role: str | None = None
+    selected_agent_revision: str | None = None
     status: BranchStatus
     error_message: str | None = None
     started_at: UtcDateTime
@@ -184,6 +186,16 @@ class BranchExecutionTrace(BaseModel):
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
         return v.strip()
+
+    def get_selected_revision_provenance(self) -> AgentRevisionProvenance | None:
+        """Return structured AgentRevisionProvenance for the branch specialist, if selected."""
+        if self.selected_agent_id and self.selected_agent_revision:
+            return AgentRevisionProvenance(
+                agent_id=self.selected_agent_id,
+                agent_revision=self.selected_agent_revision,
+                role=self.selected_role,
+            )
+        return None
 
 
 class BranchResult(BaseModel):
@@ -305,6 +317,7 @@ class CoordinationResult(BaseModel):
                     "branch_id": br.branch_id,
                     "status": br.status.value,
                     "agent_id": br.routing_result.trace.selected_agent_id,
+                    "agent_revision": br.routing_result.trace.selected_agent_revision,
                     "role": br.routing_result.trace.selected_role,
                     "output_type": type(br.output).__name__ if br.output else None,
                     "output_data": br.output.model_dump(mode="json") if br.output else None,
@@ -522,6 +535,7 @@ class BranchCoordinator:
                 routing_outcome=routing_res.outcome,
                 selected_agent_id=routing_res.trace.selected_agent_id,
                 selected_role=routing_res.trace.selected_role,
+                selected_agent_revision=routing_res.trace.selected_agent_revision,
                 status=BranchStatus.REJECTED,
                 error_message=f"Routing rejected: {routing_res.trace.rejection_reason}",
                 started_at=started_at,
@@ -592,6 +606,7 @@ class BranchCoordinator:
             routing_outcome=routing_res.outcome,
             selected_agent_id=routing_res.trace.selected_agent_id,
             selected_role=routing_res.trace.selected_role,
+            selected_agent_revision=routing_res.trace.selected_agent_revision,
             status=status,
             error_message=error_msg,
             started_at=started_at,

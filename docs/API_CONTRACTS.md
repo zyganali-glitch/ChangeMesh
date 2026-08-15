@@ -1,9 +1,9 @@
 # ChangeMesh Domain Contract API Reference
 
-> **Status:** `P-05.06 — IMPLEMENTED`
-> **Produced by:** P-05.06
+> **Status:** `P-07.05 — IMPLEMENTED`
+> **Produced by:** P-05.01–P-05.06, P-07.01–P-07.05
 > **Date:** 2026-08-15
-> **Implementation state:** All domain contracts (P-05.01 foundational, P-05.02 lifecycle, P-05.03 evidence, P-05.04 core innovations, P-05.05 event envelope, and P-05.06 machine conventions) are fully implemented, enforced, and tested. Phase P-05 domain contracts are completely closed.
+> **Implementation state:** All domain contracts (P-05.01 foundational, P-05.02 lifecycle, P-05.03 evidence, P-05.04 core innovations, P-05.05 event envelope, P-05.06 machine conventions, and P-07.05 agent revision metadata provenance) are fully implemented, enforced, and tested.
 
 ## 1. Overview
 
@@ -18,6 +18,7 @@ from domain.contracts import (
     SuccessCriterion,
     ChangeRequest,
     AgentDescriptor,
+    AgentRevisionProvenance,
     ToolDescriptor,
     ChangeState,
     IllegalTransitionError,
@@ -136,13 +137,21 @@ Declared identity, role, and capabilities of an agent revision.
 | `permitted_data_classifications` | `list[DataClassLevel]` | Yes | Valid enum values |
 | `permitted_tool_ids` | `list[str]` | Yes | — |
 
-**Purpose:** Metadata describing what an agent is and what it claims to do.
-
-**Identifier:** `agent_id` — stable agent identity. `agent_revision` provides version precision.
-
-**Scope boundary:** `AgentDescriptor` is NOT `CapabilityPassport`. It carries no qualification proof, trust evidence, signature validity, or authorization state. Those belong to P-05.04.
-
 **Extra fields:** Rejected.
+
+### 6.1 AgentRevisionProvenance
+
+Exact machine-checkable agent identity and revision provenance contract (P-07.05).
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `agent_id` | `str` | Yes | Must not be blank; escape hatches (`unknown`, `latest`, `current`, etc.) strictly rejected |
+| `agent_revision` | `str` | Yes | Must not be blank; escape hatches strictly rejected |
+| `role` | `Optional[str]` | No | Must not be blank if provided |
+
+**Purpose:** Binds the stable agent identity (`agent_id`) to its exact semantic revision (`agent_revision`) and optional role (`role`).
+
+**Immutability & Zero Escape Hatches:** Frozen (`frozen=True`) and extra fields forbidden (`extra="forbid"`). Rejects free-form prose, model inference, and placeholder revision values.
 
 ---
 
@@ -217,7 +226,7 @@ Provider-neutral TraceReference contract for correlating an evidence record with
 | `span_id` | `Optional[str]` | No | Must not be blank if present |
 
 ### `Provenance`
-Provenance contract describing origin, mode, and historical context.
+Provenance contract describing origin, mode, historical context, and exact agent revision provenance (P-07.05).
 | Field | Type | Required | Validation |
 |---|---|---|---|
 | `schema_version` | `str` | Yes | Must not be blank |
@@ -226,6 +235,10 @@ Provenance contract describing origin, mode, and historical context.
 | `collection_timestamp` | `datetime` | Yes | — |
 | `source_execution_identifier` | `Optional[str]` | No | Must not be blank if present; required for `RECORDED_CLOUD` |
 | `source_execution_timestamp` | `Optional[datetime]`| No | Required for `RECORDED_CLOUD` |
+| `agent_id` | `Optional[str]` | No | Mutually required with `agent_revision`; escape hatches rejected |
+| `agent_revision` | `Optional[str]` | No | Mutually required with `agent_id`; escape hatches rejected |
+| `agent_role` | `Optional[str]` | No | Must not be blank if present |
+| `agent_provenance` | `Optional[AgentRevisionProvenance]` | No | Structured provenance model synced with agent fields |
 
 ### `EvidenceRecord`
 Canonical provider-neutral evidence fact schema.
@@ -463,7 +476,7 @@ Deterministic delivery classification for a provider-neutral event.
 
 ### `EventEnvelope`
 
-Canonical provider-neutral event envelope carrying event identity, change identity, causal chain metadata, correlation identity, producer provenance, and idempotency key.
+Canonical provider-neutral event envelope carrying event identity, change identity, causal chain metadata, correlation identity, exact producer revision provenance (P-07.05), and idempotency key.
 
 | Field | Type | Required | Validation |
 |---|---|---|---|
@@ -472,9 +485,12 @@ Canonical provider-neutral event envelope carrying event identity, change identi
 | `change_id` | `str` | Yes | Must not be blank |
 | `causation_id` | `Optional[str]` | No | None for root events; must not be blank if present; must not equal `event_id` (self-causation rejected) |
 | `correlation_id` | `str` | Yes | Must not be blank |
-| `producer_revision` | `str` | Yes | Must not be blank |
+| `producer_revision` | `str` | Yes | Must not be blank; escape hatches (`unknown`, `latest`, `current`, etc.) strictly rejected |
 | `timestamp` | `datetime` | Yes | Typed datetime; wall-clock timestamp is metadata, NOT causal authority |
 | `idempotency_key` | `str` | Yes | Must not be blank |
+| `producer_id` | `Optional[str]` | No | Must not be blank if present; escape hatches strictly rejected |
+| `producer_role` | `Optional[str]` | No | Must not be blank if present |
+| `agent_provenance` | `Optional[AgentRevisionProvenance]` | No | Structured agent provenance model synced with producer fields |
 
 **Identity fields:**
 - `event_id` — identity of one logical domain event
