@@ -143,4 +143,7 @@ For every crossing, the payload must be purpose-bound. The system uses identifie
 - **P-05:** Domain contract schemas and machine conventions complete (`DONE`).
   - `domain/contracts/conventions.py` implements structural secret-field redaction (`redact_mapping`, `REDACTION_SENTINEL = "[REDACTED]"` per `docs/CONTRACT_CONVENTIONS.md`).
   - **Honesty Boundary:** Machine convention redaction is **IMPLEMENTED**. Runtime DLP/Model Armor filtering, proxy interceptors, and automated log scrubbers remain **PLANNED** for runtime phases.
-- **P-06:** Implementation stack and dependency freeze (`PENDING`).
+- **P-06:** Local development environment and dependency freeze is `IN_PROGRESS`.
+  - P-06.01 runtime/language/repository-structure freeze is `DONE`.
+  - P-06.02 reproducible dependency manifest/lockfile foundation is `DONE`.
+  - P-06.03 configuration/secret-template work, P-06.04 standard command workflow, and P-06.05 separate-directory clean-checkout reproduction remain `PENDING`.
