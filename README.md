@@ -7,8 +7,8 @@
 ## Current status
 
 > [!IMPORTANT]
-> **Pre-implementation / competition build.**
-> This repository currently contains the project charter, architecture constraints, governance system, execution plan, and frozen dependency foundation.
+> **Implementation-in-progress competition build.**
+> This repository currently contains the project charter, architecture constraints, governance system, execution plan, frozen dependency foundation, and initial Google ADK agent fleet implementation.
 >
 > - **Architecture baseline (P-04):** `IMPLEMENTED` (`DONE`)
 > - **Domain contracts & machine conventions (P-05.01–P-05.06):** `IMPLEMENTED` (`DONE`)
@@ -17,8 +17,8 @@
 > - **Safe local configuration & secret handling (P-06.03):** `IMPLEMENTED` (`DONE` — `.env.example` template with zero secret defaults, ADC-first local auth, comprehensive `.gitignore` credential/artifact protection, 14 config-safety tests)
 > - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py` defined for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown with strict execution safety boundaries)
 > - **Phase P-06 Local Dev & Dependency Freeze:** `IMPLEMENTED` (`DONE` — P-06.01–P-06.05 complete; clean-checkout reproduction verified from separate directory in [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
-> - **Phase P-07 Google ADK Agent Skeleton:** `IN_PROGRESS` (P-07.01 Change Orchestrator ADK skeleton `IMPLEMENTED` with typed ChangeRequest intake, distinct change_id generation, ChangeState.RECEIVED initial state, and zero external writes; P-07.02 six specialized ADK agent definitions and bounded tool/instruction contracts `IMPLEMENTED`; P-07.03+ `PENDING`)
-> - **Runtime product & agent fleet implementation:** Begins in Phase P-07+ (`IN_PROGRESS`). Specialized agent fleet definitions (P-07.02) are `IMPLEMENTED`. Deterministic routing (P-07.03) and Gemini structured reasoning (P-08) remain `PENDING`.
+> - **Phase P-07 Google ADK Agent Skeleton & Fleet:** `IN_PROGRESS` (P-07.01 Change Orchestrator ADK skeleton `IMPLEMENTED` with typed ChangeRequest intake, distinct change_id generation, ChangeState.RECEIVED initial state, and zero external writes; P-07.02 six specialized ADK agent definitions and bounded tool/instruction contracts `IMPLEMENTED`; P-07.03 deterministic local routing/delegation `IMPLEMENTED`; P-07.04 and P-07.05 `PENDING`)
+> - **Runtime product & agent fleet implementation:** In progress in Phase P-07 (`IN_PROGRESS`). Change Orchestrator skeleton (P-07.01), specialized agent fleet definitions (P-07.02), and deterministic local routing/delegation (P-07.03) are `IMPLEMENTED`. Sequential fallback/concurrency (P-07.04), agent revision metadata (P-07.05), and Gemini structured reasoning (P-08) remain `PENDING`. Cloud deployment, persistence, and P-12 Agent Registry / Capability Passport runtime remain `PLANNED` / not implemented.
 >
 > Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
 
@@ -183,7 +183,7 @@ The P-04.01 component dependency architecture is documented in [`docs/ARCHITECTU
 - Adapter replaceability contract
 
 > [!IMPORTANT]
-> This is a **component dependency architecture**. Domain schemas and machine conventions are implemented and frozen in P-05. Implementation stack and dependency freeze are complete in P-06. The Change Orchestrator ADK skeleton (P-07.01) and specialized agent fleet definitions (P-07.02) are `IMPLEMENTED` with typed intake, distinct change ID generation, `ChangeState.RECEIVED` initial state, bounded tool sets, and zero external writes. Deterministic routing/delegation (P-07.03) and Gemini structured reasoning (P-08) remain `PENDING`. All other runtime, cloud adapter, and UI components remain `PLANNED` for their respective phases.
+> This is a **component dependency architecture**. Domain schemas and machine conventions are implemented and frozen in P-05. Implementation stack and dependency freeze are complete in P-06. The Change Orchestrator ADK skeleton (P-07.01), specialized agent fleet definitions (P-07.02), and deterministic local routing/delegation (P-07.03) are `IMPLEMENTED` with typed intake, distinct change ID generation, `ChangeState.RECEIVED` initial state, bounded tool sets, exact capability/schema matching, and zero external writes. Sequential fallback/parallel branches (P-07.04), agent revision metadata (P-07.05), and Gemini structured reasoning (P-08) remain `PENDING`. All other runtime, cloud adapter, and UI components remain `PLANNED` for their respective phases.
 
 ## Google-native implementation policy
 
@@ -279,7 +279,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
    ```bash
    uv run python scripts/cmd.py unit
    ```
-   *(Executes all 643 unit/contract tests across P-05 domain contracts, P-06.03 config safety, P-06.04 command contracts, and P-07.01 Change Orchestrator ADK skeleton with exit code 0).*
+   *(Executes all 759 unit/contract tests across P-05 domain contracts, P-06.03 config safety, P-06.04 command contracts, P-07.01 Change Orchestrator ADK skeleton, P-07.02 specialized agent fleet definitions, and P-07.03 deterministic routing/delegation with exit code 0).*
 
 ### Configuration & Authentication Boundary
 
@@ -292,7 +292,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 
 | Command | Action | Check Semantics | Baseline Result |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (643 passed) |
+| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (759 passed) |
 | `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `FAIL` (historical format debt) |
 | `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `FAIL` (historical lint debt) |
 | `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests`) | `FAIL` (historical type debt in `test_gcp_access.py`) |
