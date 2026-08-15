@@ -103,7 +103,7 @@ Record actual environment only; do not fill unknown values with guesses.
 
 ## Command registry
 
-Commands may be recorded as `VERIFIED` after the owning micro-task executes them successfully under its required validation environment. Clean-checkout reproduction from a separate directory was executed and verified under P-06.05 ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md)), establishing `CLEAN_CHECKOUT_VERIFIED` status for reproducible installation, baseline test suites, and canonical command contracts. Current underlying test counts reflect the latest local canonical P-07.04 verification.
+Commands may be recorded as `VERIFIED` after the owning micro-task executes them successfully under its required validation environment. Clean-checkout reproduction from a separate directory was executed and verified under P-06.05 ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md)), establishing `CLEAN_CHECKOUT_VERIFIED` status for reproducible installation, baseline test suites, and canonical command contracts. Current underlying test counts reflect the latest local canonical P-07.05 verification.
 
 | Purpose | Command | Interface Status | Underlying Check Status | Side-Effect Class / Scope | Last verified |
 |---|---|---|---|---|---|
