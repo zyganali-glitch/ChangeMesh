@@ -20,20 +20,27 @@ Tests proving all P-07.02 acceptance criteria and invariants:
 9. Impact Scout definition is read-only with no external-write capability.
 10. Release Steward definition cannot self-authorize.
 11. Evidence Auditor definition cannot claim deterministic-fact mutation authority.
-12. Policy Guardian definition does not claim policy-source ownership.
-13. Change Orchestrator definition does not gain durable-state ownership.
-14. Construction and import require no cloud credentials.
-15. Construction and import perform zero network calls.
-16. No Gemini or Vertex AI model invocations occur.
-17. No Firestore, Pub/Sub, or GitHub mutations occur.
-18. External/provider credential objects do not appear in schemas or metadata.
-19. Conversions to frozen domain contract AgentDescriptor are valid and complete.
-20. Input/Output schemas are frozen, reject extra fields, and validate non-blank inputs.
-21. Local ADK integration/smoke boundary with Runner and InMemorySessionService for all 6 agents.
+12. Policy Guardian definition does not claim policy-source ownership (evaluator/enforcer only).
+13. Policy Guardian output boundary uses the canonical typed AutonomyDecision contract.
+14. All five canonical AutonomyClass values remain representable.
+15. HUMAN_AUTHORITY_REQUIRED authority-slot invariants enforced.
+16. REHEARSE_THEN_EXECUTE rehearsal-ref invariants enforced.
+17. Non-canonical autonomy synonyms rejected.
+18. LIVE_WRITE != HUMAN_AUTHORITY_REQUIRED verified.
+19. Change Orchestrator definition does not gain durable-state ownership.
+20. Construction and import require no cloud credentials.
+21. Construction and import perform zero network calls.
+22. No Gemini or Vertex AI model invocations occur.
+23. No Firestore, Pub/Sub, or GitHub mutations occur.
+24. External/provider credential objects do not appear in schemas or metadata.
+25. Conversions to frozen domain contract AgentDescriptor are valid and complete.
+26. Input/Output schemas are frozen, reject extra fields, and validate non-blank inputs.
+27. Local ADK integration/smoke boundary with Runner and InMemorySessionService for all 6 agents.
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import patch
 
@@ -46,6 +53,7 @@ from google.genai.types import Content, Part
 from pydantic import BaseModel, ValidationError
 
 from domain.contracts.agent_descriptor import AgentDescriptor
+from domain.contracts.autonomy import AutonomyClass, AutonomyDecision
 from domain.contracts.data_class import DataClassLevel
 from src.agents import (
     CANONICAL_AGENT_CLASSES,
@@ -76,6 +84,39 @@ from src.agents import (
     list_canonical_agent_definitions,
 )
 from src.agents.definition import CANONICAL_TOOL_DESCRIPTORS
+
+# ===========================================================================
+# Helper: Create Valid Canonical AutonomyDecision
+# ===========================================================================
+
+
+def _make_autonomy_decision(
+    autonomy_class: AutonomyClass,
+    *,
+    decision_id: str = "dec-001",
+    change_request_id: str = "chg-001",
+    action_class: str = "action.schema.migrate",
+    policy_source: str = "policy.production.schema_changes",
+    policy_revision: str | None = "2026.1",
+    rationale: str = "Evaluated against organizational policy rules.",
+    authority_slot_ref: str | None = None,
+    required_rehearsal_refs: tuple[str, ...] = (),
+) -> AutonomyDecision:
+    """Helper to construct valid AutonomyDecision instances for tests."""
+    return AutonomyDecision(
+        schema_version="1.0.0",
+        decision_id=decision_id,
+        change_request_id=change_request_id,
+        action_class=action_class,
+        autonomy_class=autonomy_class,
+        policy_source=policy_source,
+        policy_revision=policy_revision,
+        decided_at=datetime.now(timezone.utc),
+        rationale=rationale,
+        authority_slot_ref=authority_slot_ref,
+        required_rehearsal_refs=required_rehearsal_refs,
+    )
+
 
 # ===========================================================================
 # 1. Exact Fleet Size and Canonical Identities
@@ -210,7 +251,7 @@ def test_agent_exposes_all_acceptance_fields_on_class_and_instance(
 
         # Input & Output Schemas
         if isinstance(target, type):
-            defn = target.get_definition()
+            defn = target.get_definition()  # type: ignore[attr-defined]
             assert issubclass(defn.input_schema, BaseModel)
             assert issubclass(defn.output_schema, BaseModel)
         else:
@@ -312,18 +353,31 @@ def test_impact_scout_definition_invariants() -> None:
 
 
 def test_policy_guardian_definition_invariants() -> None:
-    """Verify Policy Guardian enforces policy without authoring it or making human authority."""
+    """Verify Policy Guardian evaluates policy without claiming policy-source authority."""
     defn = PolicyGuardian.get_definition()
     assert defn.role == "policy_guardian"
     assert "organizational_policy_evaluation" in defn.declared_capabilities
     assert "privacy_boundary_check" in defn.declared_capabilities
     assert "separation_of_duty_enforcement" in defn.declared_capabilities
+    assert "autonomy_classification_evaluation" in defn.declared_capabilities
 
     # Prohibitions
     assert "author_organizational_policy" in defn.forbidden_actions
     assert "manufacture_human_authority" in defn.forbidden_actions
     assert "override_deterministic_facts" in defn.forbidden_actions
     assert "execute_external_changes" in defn.forbidden_actions
+
+    # Instruction contract checks: 5 canonical AutonomyClass members,
+    # ORGANIZATIONAL_POLICY authority, LIVE_WRITE
+    contract = defn.instruction_contract
+    assert "ORGANIZATIONAL_POLICY" in contract
+    assert "AUTO_EXECUTE" in contract
+    assert "AUTO_EXECUTE_AND_NOTIFY" in contract
+    assert "REHEARSE_THEN_EXECUTE" in contract
+    assert "HUMAN_AUTHORITY_REQUIRED" in contract
+    assert "BLOCKED" in contract
+    assert "LIVE_WRITE" in contract
+    assert "missing policy" in contract.lower()
 
 
 def test_migration_engineer_definition_invariants() -> None:
@@ -375,7 +429,7 @@ def test_release_steward_definition_invariants() -> None:
 
 
 # ===========================================================================
-# 5. Schema Validation & Immutability
+# 5. Schema Validation & Autonomy Authority Invariants
 # ===========================================================================
 
 
@@ -436,8 +490,8 @@ def test_impact_scout_schema_validation() -> None:
     assert out.conflict_detected is False
 
 
-def test_policy_guardian_schema_validation() -> None:
-    """Verify PolicyGuardianInput and Output validation."""
+def test_policy_guardian_schema_validation_and_typed_autonomy_decision() -> None:
+    """Verify PolicyGuardianOutput embeds the canonical typed AutonomyDecision domain contract."""
     inp = PolicyGuardianInput(
         change_id="chg-002",
         data_classification=DataClassLevel.CONFIDENTIAL,
@@ -447,13 +501,159 @@ def test_policy_guardian_schema_validation() -> None:
     )
     assert inp.data_classification == DataClassLevel.CONFIDENTIAL
 
+    # Create canonical AutonomyDecision with HUMAN_AUTHORITY_REQUIRED and slot ref
+    autonomy_dec = _make_autonomy_decision(
+        AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
+        authority_slot_ref="slot.security.lead_approval",
+    )
+
     out = PolicyGuardianOutput(
         change_id="chg-002",
-        policy_verdict="REQUIRES_APPROVAL",
-        autonomy_class="HUMAN_AUTHORITY_REQUIRED",
+        policy_verdict="REQUIRES_HUMAN_AUTHORITY",
+        autonomy_decision=autonomy_dec,
         violated_rules=["RULE_RESTRICTED_TABLE_ALTER"],
+        required_evidence_types=["EVIDENCE_PREFLIGHT_PASS", "EVIDENCE_DIFF_AUDIT"],
     )
+    assert isinstance(out.autonomy_decision, AutonomyDecision)
+    assert out.autonomy_decision.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+    assert out.autonomy_decision.authority_slot_ref == "slot.security.lead_approval"
     assert len(out.violated_rules) == 1
+    assert len(out.required_evidence_types) == 2
+
+
+@pytest.mark.parametrize(
+    "autonomy_cls,slot_ref,rehearsal_refs",
+    [
+        (AutonomyClass.AUTO_EXECUTE, None, ()),
+        (AutonomyClass.AUTO_EXECUTE_AND_NOTIFY, None, ()),
+        (AutonomyClass.REHEARSE_THEN_EXECUTE, None, ("scen-shadow-migration",)),
+        (AutonomyClass.HUMAN_AUTHORITY_REQUIRED, "slot.lead.review", ()),
+        (AutonomyClass.BLOCKED, None, ()),
+    ],
+)
+def test_all_five_canonical_autonomy_classes_representable_in_policy_guardian_output(
+    autonomy_cls: AutonomyClass,
+    slot_ref: str | None,
+    rehearsal_refs: tuple[str, ...],
+) -> None:
+    """Verify all 5 canonical AutonomyClass values are representable when invariants are met."""
+    autonomy_dec = _make_autonomy_decision(
+        autonomy_cls,
+        authority_slot_ref=slot_ref,
+        required_rehearsal_refs=rehearsal_refs,
+    )
+    out = PolicyGuardianOutput(
+        change_id="chg-autonomy-test",
+        policy_verdict=f"VERDICT_{autonomy_cls.value}",
+        autonomy_decision=autonomy_dec,
+    )
+    assert out.autonomy_decision.autonomy_class == autonomy_cls
+
+
+def test_human_authority_required_without_slot_ref_rejected() -> None:
+    """Verify HUMAN_AUTHORITY_REQUIRED without a non-blank authority_slot_ref is rejected."""
+    with pytest.raises(
+        ValidationError, match="HUMAN_AUTHORITY_REQUIRED must have a non-blank authority_slot_ref"
+    ):
+        _make_autonomy_decision(
+            AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
+            authority_slot_ref=None,
+        )
+
+    with pytest.raises(ValidationError, match="authority_slot_ref must not be blank when set"):
+        _make_autonomy_decision(
+            AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
+            authority_slot_ref="   ",
+        )
+
+
+def test_auto_execute_classes_with_authority_slot_ref_rejected() -> None:
+    """Verify AUTO_EXECUTE and AUTO_EXECUTE_AND_NOTIFY cannot carry an authority_slot_ref."""
+    with pytest.raises(ValidationError, match="AUTO_EXECUTE must not have authority_slot_ref"):
+        _make_autonomy_decision(
+            AutonomyClass.AUTO_EXECUTE,
+            authority_slot_ref="slot.unneeded",
+        )
+
+    with pytest.raises(
+        ValidationError, match="AUTO_EXECUTE_AND_NOTIFY must not have authority_slot_ref"
+    ):
+        _make_autonomy_decision(
+            AutonomyClass.AUTO_EXECUTE_AND_NOTIFY,
+            authority_slot_ref="slot.unneeded",
+        )
+
+    with pytest.raises(ValidationError, match="BLOCKED must not have authority_slot_ref"):
+        _make_autonomy_decision(
+            AutonomyClass.BLOCKED,
+            authority_slot_ref="slot.unneeded",
+        )
+
+
+def test_rehearse_then_execute_rehearsal_ref_invariants() -> None:
+    """Verify REHEARSE_THEN_EXECUTE requires non-empty required_rehearsal_refs."""
+    with pytest.raises(
+        ValidationError, match="REHEARSE_THEN_EXECUTE must have at least one required_rehearsal_ref"
+    ):
+        _make_autonomy_decision(
+            AutonomyClass.REHEARSE_THEN_EXECUTE,
+            required_rehearsal_refs=(),
+        )
+
+    # Valid with rehearsal ref
+    dec = _make_autonomy_decision(
+        AutonomyClass.REHEARSE_THEN_EXECUTE,
+        required_rehearsal_refs=("rehearsal.shadowlab.dryrun",),
+    )
+    assert dec.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
+    assert dec.required_rehearsal_refs == ("rehearsal.shadowlab.dryrun",)
+
+
+def test_non_canonical_autonomy_synonyms_rejected() -> None:
+    """Verify non-canonical synonyms (NEEDS_APPROVAL, MANUAL_REVIEW, UNSURE, etc.) fail closed."""
+    for invalid_synonym in [
+        "NEEDS_APPROVAL",
+        "MANUAL_REVIEW",
+        "UNSURE",
+        "AUTO",
+        "DENIED",
+        "PENDING",
+    ]:
+        with pytest.raises(ValidationError):
+            _make_autonomy_decision(
+                invalid_synonym,  # type: ignore[arg-type]
+                authority_slot_ref="slot-01",
+            )
+
+
+def test_live_write_does_not_imply_human_authority_required() -> None:
+    """Verify LIVE_WRITE can be classified as AUTO_EXECUTE or REHEARSE_THEN_EXECUTE by policy."""
+    # Autonomous live write allowed by organizational policy
+    dec_auto = _make_autonomy_decision(
+        AutonomyClass.AUTO_EXECUTE,
+        action_class="action.database.live_write",
+        rationale="Low-risk bounded live write authorized for autonomous execution.",
+    )
+    out_auto = PolicyGuardianOutput(
+        change_id="chg-lw-01",
+        policy_verdict="AUTONOMOUS_PERMITTED",
+        autonomy_decision=dec_auto,
+    )
+    assert out_auto.autonomy_decision.autonomy_class == AutonomyClass.AUTO_EXECUTE
+
+    # Rehearsal live write
+    dec_rehearse = _make_autonomy_decision(
+        AutonomyClass.REHEARSE_THEN_EXECUTE,
+        action_class="action.database.live_write",
+        required_rehearsal_refs=("shadowlab.dryrun.table_migration",),
+        rationale="Live write permitted after successful ShadowLab rehearsal.",
+    )
+    out_rehearse = PolicyGuardianOutput(
+        change_id="chg-lw-02",
+        policy_verdict="REHEARSAL_REQUIRED",
+        autonomy_decision=dec_rehearse,
+    )
+    assert out_rehearse.autonomy_decision.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
 
 
 def test_migration_engineer_schema_validation() -> None:

@@ -50,7 +50,7 @@ class PolicyGuardian(BaseAgent):
         "organizational_policy_evaluation",
         "privacy_boundary_check",
         "separation_of_duty_enforcement",
-        "autonomy_classification_determination",
+        "autonomy_classification_evaluation",
     ]
     capabilities: ClassVar[list[str]] = declared_capabilities
     forbidden_actions: ClassVar[list[str]] = [

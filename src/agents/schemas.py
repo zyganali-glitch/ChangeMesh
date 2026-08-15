@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from domain.contracts.autonomy import AutonomyDecision
 from domain.contracts.data_class import DataClassLevel
 
 # ===========================================================================
@@ -102,8 +103,9 @@ class PolicyGuardianInput(BaseModel):
 class PolicyGuardianOutput(BaseModel):
     """Output boundary schema for the Policy Guardian agent.
 
-    Carries the policy evaluation verdict, autonomy classification, and
-    required evidence types.
+    Carries the policy evaluation verdict, canonical typed AutonomyDecision,
+    violated rules, and required evidence types. Policy Guardian evaluates and
+    enforces organizational policy, but ORGANIZATIONAL_POLICY remains the authority source.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -111,11 +113,11 @@ class PolicyGuardianOutput(BaseModel):
     schema_version: str = "1.0.0"
     change_id: str
     policy_verdict: str
-    autonomy_class: str
+    autonomy_decision: AutonomyDecision
     violated_rules: list[str] = Field(default_factory=list)
     required_evidence_types: list[str] = Field(default_factory=list)
 
-    @field_validator("schema_version", "change_id", "policy_verdict", "autonomy_class")
+    @field_validator("schema_version", "change_id", "policy_verdict")
     @classmethod
     def _must_not_be_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
