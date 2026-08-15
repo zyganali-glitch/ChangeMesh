@@ -49,6 +49,8 @@ from src.agents import (
     CANONICAL_AGENT_CLASSES,
     CANONICAL_AGENT_IDS,
     CANONICAL_ROLES,
+    CANONICAL_SPECIALIST_AGENT_IDS,
+    CANONICAL_SPECIALIST_ROLES,
     AgentDefinition,
     ChangeOrchestrator,
     DeterministicRouter,
@@ -67,6 +69,7 @@ from src.agents import (
     RoutingRequest,
     RoutingResult,
     RoutingTraceRecord,
+    get_canonical_agent_definition,
     list_canonical_agent_definitions,
 )
 
@@ -555,41 +558,16 @@ def test_cross_specialist_capability_combination_fails_closed() -> None:
 def test_ambiguous_multiple_matching_specialists_fail_closed() -> None:
     """Verify that multiple matching specialists fail closed with AMBIGUOUS_MATCH.
 
-    Exercised using custom AgentDefinitions without mutating the canonical registry.
+    Exercised using duplicate genuine canonical definitions without mutating registry
+    and without invented agent identities or non-canonical metadata.
     """
-    # Create two synthetic definitions declaring the same capability
-    agent_a = AgentDefinition(
-        agent_id="agent-specialist-a",
-        role="specialist_a",
-        agent_revision="1.0.0",
-        description="Specialist A for testing ambiguity",
-        declared_capabilities=["shared_ambiguous_capability"],
-        forbidden_actions=["mutation"],
-        input_schema=ImpactScoutInput,
-        output_schema=ImpactScoutInput,
-        instruction_contract="Instruction A",
-        permitted_tool_ids=["tool-1"],
-        permitted_data_classifications=[DataClassLevel.INTERNAL],
-    )
-    agent_b = AgentDefinition(
-        agent_id="agent-specialist-b",
-        role="specialist_b",
-        agent_revision="1.0.0",
-        description="Specialist B for testing ambiguity",
-        declared_capabilities=["shared_ambiguous_capability"],
-        forbidden_actions=["mutation"],
-        input_schema=ImpactScoutInput,
-        output_schema=ImpactScoutInput,
-        instruction_contract="Instruction B",
-        permitted_tool_ids=["tool-2"],
-        permitted_data_classifications=[DataClassLevel.INTERNAL],
-    )
-
-    custom_router = DeterministicRouter(agent_definitions=[agent_a, agent_b])
+    impact_def = get_canonical_agent_definition("agent-impact-scout")
+    # Injected candidate list with duplicate genuine canonical definitions
+    custom_router = DeterministicRouter(agent_definitions=[impact_def, impact_def])
     payload = _make_impact_scout_input()
     req = RoutingRequest(
         change_id="chg-ambig-001",
-        required_capabilities=["shared_ambiguous_capability"],
+        required_capabilities=["repository_blast_radius_analysis"],
         payload=payload,
     )
     result = custom_router.route(req)
@@ -598,8 +576,7 @@ def test_ambiguous_multiple_matching_specialists_fail_closed() -> None:
     assert result.is_routed is False
     assert result.trace.capability_match_passed is False
     assert result.trace.rejection_reason == RoutingRejectionReason.AMBIGUOUS_MATCH
-    assert "agent-specialist-a" in result.trace.evaluated_candidates
-    assert "agent-specialist-b" in result.trace.evaluated_candidates
+    assert len(result.trace.evaluated_candidates) == 2
 
 
 # ===========================================================================
@@ -845,3 +822,296 @@ def test_routed_specialist_executes_with_google_adk_runner() -> None:
     assert any(isinstance(ev, Event) for ev in events)
     assert any(getattr(ev, "author", None) == "impact_scout" for ev in events)
     assert any(getattr(ev, "turn_complete", False) is True for ev in events)
+
+
+# ===========================================================================
+# 24. Canonical Fleet Provenance & Anti-Spoofing Tests
+# ===========================================================================
+
+
+def test_single_invented_agent_definition_never_yields_routed() -> None:
+    """Verify a single completely synthetic AgentDefinition cannot yield ROUTED."""
+    synthetic_def = AgentDefinition(
+        agent_id="agent-invented-synthetic",
+        role="synthetic_worker",
+        agent_revision="1.0.0",
+        description="Invented worker agent",
+        declared_capabilities=["synthetic_custom_capability"],
+        forbidden_actions=["mutation"],
+        input_schema=ImpactScoutInput,
+        output_schema=ImpactScoutInput,
+        instruction_contract="Instruction for synthetic worker",
+        permitted_tool_ids=["tool-custom"],
+        permitted_data_classifications=[DataClassLevel.INTERNAL],
+    )
+    router = DeterministicRouter(agent_definitions=[synthetic_def])
+    payload = _make_impact_scout_input()
+    req = RoutingRequest(
+        change_id="chg-synth-001",
+        required_capabilities=["synthetic_custom_capability"],
+        payload=payload,
+    )
+    result = router.route(req)
+
+    assert result.outcome == RoutingOutcome.REJECTED
+    assert result.is_routed is False
+    assert result.selected_agent_class is None
+    assert result.selected_definition is None
+    assert result.trace.capability_match_passed is False
+    assert result.trace.rejection_reason == RoutingRejectionReason.UNKNOWN_CAPABILITY
+
+
+def test_invented_agent_id_and_role_with_canonical_capability_fails_closed() -> None:
+    """Verify an invented agent claiming a genuine canonical capability cannot be routed."""
+    synthetic_def = AgentDefinition(
+        agent_id="agent-custom-scout",
+        role="custom_scout",
+        agent_revision="1.0.0",
+        description="Custom scout claiming real capability",
+        declared_capabilities=["repository_blast_radius_analysis"],
+        forbidden_actions=["mutation"],
+        input_schema=ImpactScoutInput,
+        output_schema=ImpactScoutInput,
+        instruction_contract="Instruction for custom scout",
+        permitted_tool_ids=["tool-custom"],
+        permitted_data_classifications=[DataClassLevel.INTERNAL],
+    )
+    router = DeterministicRouter(agent_definitions=[synthetic_def])
+    payload = _make_impact_scout_input()
+    req = RoutingRequest(
+        change_id="chg-synth-002",
+        required_capabilities=["repository_blast_radius_analysis"],
+        payload=payload,
+    )
+    result = router.route(req)
+
+    assert result.outcome == RoutingOutcome.REJECTED
+    assert result.is_routed is False
+    assert result.selected_agent_class is None
+    assert result.selected_definition is None
+    assert result.trace.rejection_reason == RoutingRejectionReason.NO_MATCHING_SPECIALIST
+
+
+def test_canonical_id_spoof_with_forged_capability_rejected() -> None:
+    """Verify a spoofed canonical definition with a forged capability cannot make it routable."""
+    canonical_impact = get_canonical_agent_definition("agent-impact-scout")
+    spoofed_def = AgentDefinition(
+        agent_id=canonical_impact.agent_id,
+        role=canonical_impact.role,
+        agent_revision=canonical_impact.agent_revision,
+        description=canonical_impact.description,
+        declared_capabilities=["forged_capability_never_in_canonical_fleet"],
+        forbidden_actions=canonical_impact.forbidden_actions,
+        input_schema=canonical_impact.input_schema,
+        output_schema=canonical_impact.output_schema,
+        instruction_contract=canonical_impact.instruction_contract,
+        permitted_tool_ids=canonical_impact.permitted_tool_ids,
+        permitted_data_classifications=canonical_impact.permitted_data_classifications,
+    )
+    router = DeterministicRouter(agent_definitions=[spoofed_def])
+    payload = _make_impact_scout_input()
+
+    # 1. Requesting the forged capability fails closed with UNKNOWN_CAPABILITY
+    req_forged = RoutingRequest(
+        change_id="chg-spoof-001",
+        required_capabilities=["forged_capability_never_in_canonical_fleet"],
+        payload=payload,
+    )
+    result_forged = router.route(req_forged)
+    assert result_forged.outcome == RoutingOutcome.REJECTED
+    assert result_forged.is_routed is False
+    assert result_forged.selected_agent_class is None
+    assert result_forged.trace.rejection_reason == RoutingRejectionReason.UNKNOWN_CAPABILITY
+
+    # 2. Requesting genuine capability against tampered candidate fails closed (tampered candidate
+    # discarded)
+    req_real = RoutingRequest(
+        change_id="chg-spoof-002",
+        required_capabilities=["repository_blast_radius_analysis"],
+        payload=payload,
+    )
+    result_real = router.route(req_real)
+    assert result_real.outcome == RoutingOutcome.REJECTED
+    assert result_real.is_routed is False
+    assert result_real.selected_agent_class is None
+    assert result_real.trace.rejection_reason == RoutingRejectionReason.NO_MATCHING_SPECIALIST
+
+
+def test_canonical_id_spoof_with_transferred_capability_rejected() -> None:
+    """Verify forging another agent's capability onto a canonical agent is rejected."""
+    canonical_impact = get_canonical_agent_definition("agent-impact-scout")
+    # Forging Policy Guardian's capability onto Impact Scout's ID
+    spoofed_def = AgentDefinition(
+        agent_id=canonical_impact.agent_id,
+        role=canonical_impact.role,
+        agent_revision=canonical_impact.agent_revision,
+        description=canonical_impact.description,
+        declared_capabilities=["privacy_boundary_check"],
+        forbidden_actions=canonical_impact.forbidden_actions,
+        input_schema=canonical_impact.input_schema,
+        output_schema=canonical_impact.output_schema,
+        instruction_contract=canonical_impact.instruction_contract,
+        permitted_tool_ids=canonical_impact.permitted_tool_ids,
+        permitted_data_classifications=canonical_impact.permitted_data_classifications,
+    )
+    router = DeterministicRouter(agent_definitions=[spoofed_def])
+    payload = _make_impact_scout_input()
+
+    req = RoutingRequest(
+        change_id="chg-spoof-003",
+        required_capabilities=["privacy_boundary_check"],
+        payload=payload,
+    )
+    result = router.route(req)
+    assert result.outcome == RoutingOutcome.REJECTED
+    assert result.is_routed is False
+    assert result.selected_agent_class is None
+    assert result.trace.rejection_reason == RoutingRejectionReason.NO_MATCHING_SPECIALIST
+
+
+def test_canonical_id_spoof_with_altered_input_schema_rejected() -> None:
+    """Verify tampering with a canonical specialist's input_schema causes candidate rejection."""
+    canonical_impact = get_canonical_agent_definition("agent-impact-scout")
+    spoofed_def = AgentDefinition(
+        agent_id=canonical_impact.agent_id,
+        role=canonical_impact.role,
+        agent_revision=canonical_impact.agent_revision,
+        description=canonical_impact.description,
+        declared_capabilities=canonical_impact.declared_capabilities,
+        forbidden_actions=canonical_impact.forbidden_actions,
+        input_schema=PolicyGuardianInput,  # Altered input schema!
+        output_schema=canonical_impact.output_schema,
+        instruction_contract=canonical_impact.instruction_contract,
+        permitted_tool_ids=canonical_impact.permitted_tool_ids,
+        permitted_data_classifications=canonical_impact.permitted_data_classifications,
+    )
+    router = DeterministicRouter(agent_definitions=[spoofed_def])
+    payload = _make_impact_scout_input()
+
+    req = RoutingRequest(
+        change_id="chg-spoof-004",
+        required_capabilities=["repository_blast_radius_analysis"],
+        payload=payload,
+    )
+    result = router.route(req)
+    assert result.outcome == RoutingOutcome.REJECTED
+    assert result.is_routed is False
+    assert result.selected_agent_class is None
+    assert result.trace.rejection_reason == RoutingRejectionReason.NO_MATCHING_SPECIALIST
+
+
+def test_successful_routed_result_guarantees_all_canonical_invariants() -> None:
+    """Verify that every successful route satisfies all canonical provenance invariants."""
+    router = DeterministicRouter()
+    orch = ChangeOrchestrator()
+
+    test_matrix: list[tuple[str, BaseModel, str, str, type]] = [
+        (
+            "repository_blast_radius_analysis",
+            _make_impact_scout_input("chg-inv-001"),
+            "agent-impact-scout",
+            "impact_scout",
+            ImpactScout,
+        ),
+        (
+            "organizational_policy_evaluation",
+            _make_policy_guardian_input("chg-inv-002"),
+            "agent-policy-guardian",
+            "policy_guardian",
+            PolicyGuardian,
+        ),
+        (
+            "migration_artifact_generation",
+            _make_migration_engineer_input("chg-inv-003"),
+            "agent-migration-engineer",
+            "migration_engineer",
+            MigrationEngineer,
+        ),
+        (
+            "semantic_evidence_sufficiency_review",
+            _make_evidence_auditor_input("chg-inv-004"),
+            "agent-evidence-auditor",
+            "evidence_auditor",
+            EvidenceAuditor,
+        ),
+        (
+            "release_bundle_packaging",
+            _make_release_steward_input("chg-inv-005"),
+            "agent-release-steward",
+            "release_steward",
+            ReleaseSteward,
+        ),
+    ]
+
+    for req_cap, payload, expected_id, expected_role, expected_cls in test_matrix:
+        req = RoutingRequest(
+            change_id=getattr(payload, "change_id"),
+            required_capabilities=[req_cap],
+            payload=payload,
+        )
+
+        # Direct router evaluation
+        result = router.route(req)
+        assert result.outcome == RoutingOutcome.ROUTED
+        assert result.is_routed is True
+        assert result.is_successful is True
+
+        # Invariant 1: selected_agent_class is not None and is canonical BaseAgent subclass
+        assert result.selected_agent_class is not None
+        assert result.selected_agent_class is expected_cls
+        assert issubclass(result.selected_agent_class, BaseAgent)
+
+        # Invariant 2: selected_definition is genuine canonical definition
+        assert result.selected_definition is not None
+        canonical_def = get_canonical_agent_definition(expected_id)
+        assert result.selected_definition == canonical_def
+
+        # Invariant 3: selected agent identity is in canonical specialist tuples
+        assert result.trace.selected_agent_id in CANONICAL_SPECIALIST_AGENT_IDS
+        assert result.trace.selected_agent_id == expected_id
+        assert result.trace.selected_role in CANONICAL_SPECIALIST_ROLES
+        assert result.trace.selected_role == expected_role
+
+        # Invariant 4: capability exists in canonical selected definition
+        assert req_cap in result.selected_definition.declared_capabilities
+
+        # Invariant 5: payload matches canonical input schema
+        assert isinstance(result.payload, result.selected_definition.input_schema)
+
+        # Invariant 6: trace facts
+        assert result.trace.capability_match_passed is True
+        assert result.trace.contract_match_passed is True
+        assert result.trace.rejection_reason is None
+
+        # Orchestrator delegation wrapper parity
+        orch_result = orch.route_delegation(req)
+        assert orch_result.outcome == RoutingOutcome.ROUTED
+        assert orch_result.selected_agent_class is expected_cls
+
+
+def test_orchestrator_definition_cannot_be_injected_as_delegation_target() -> None:
+    """Verify passing only Orchestrator definition cannot yield delegation."""
+    orch_def = get_canonical_agent_definition("agent-change-orchestrator")
+    router = DeterministicRouter(agent_definitions=[orch_def])
+    payload = _make_impact_scout_input()
+
+    # 1. Specialist capability with only orchestrator candidate fails closed (no matching
+    # specialist)
+    req_spec = RoutingRequest(
+        change_id="chg-orch-001",
+        required_capabilities=["repository_blast_radius_analysis"],
+        payload=payload,
+    )
+    res_spec = router.route(req_spec)
+    assert res_spec.outcome == RoutingOutcome.REJECTED
+    assert res_spec.trace.rejection_reason == RoutingRejectionReason.NO_MATCHING_SPECIALIST
+
+    # 2. Orchestrator capability fails closed with SELF_DELEGATION_PROHIBITED
+    req_self = RoutingRequest(
+        change_id="chg-orch-002",
+        required_capabilities=["lifecycle_coordination"],
+        payload=payload,
+    )
+    res_self = router.route(req_self)
+    assert res_self.outcome == RoutingOutcome.REJECTED
+    assert res_self.trace.rejection_reason == RoutingRejectionReason.SELF_DELEGATION_PROHIBITED

@@ -9,8 +9,11 @@ Responsibilities:
 - Orchestrator coordinates routing; cannot delegate to itself.
 - Valid delegation targets are strictly the five specialized agents:
   Impact Scout, Policy Guardian, Migration Engineer, Evidence Auditor, Release Steward.
-- Exact string matching for declared capabilities (no fuzzy, no substring, no synonyms).
+- Exact string matching for declared capabilities against canonical P-07.02 definitions
+  (no fuzzy, no substring, no synonyms, no invented capabilities).
 - Exact input contract validation against target agent's canonical input_schema.
+- Canonical provenance is non-bypassable: caller/injected definitions cannot invent
+  agents, forge capabilities, or spoof canonical identity/schema relationships.
 - Fail closed on: blank capability, unknown capability, no match, contract mismatch,
   self-delegation attempt, ambiguous multiple matching specialists, untyped payload.
 - Produce a deterministic, machine-testable local RoutingTraceRecord.
@@ -33,7 +36,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from domain.contracts.conventions import UtcDateTime
 from src.agents.definition import AgentDefinition
 from src.agents.registry import (
+    CANONICAL_SPECIALIST_AGENT_IDS,
+    CANONICAL_SPECIALIST_ROLES,
     get_canonical_agent_class,
+    get_canonical_agent_definition,
     list_canonical_agent_definitions,
 )
 
@@ -155,15 +161,48 @@ class RoutingResult(BaseModel):
         return self.is_routed
 
 
+def _is_canonical_specialist_definition(definition: AgentDefinition) -> bool:
+    """Verify that an AgentDefinition matches genuine canonical P-07.02 metadata."""
+    if not isinstance(definition, AgentDefinition):
+        return False
+    if definition.agent_id not in CANONICAL_SPECIALIST_AGENT_IDS:
+        return False
+    if definition.role not in CANONICAL_SPECIALIST_ROLES:
+        return False
+
+    try:
+        canonical_def = get_canonical_agent_definition(definition.agent_id)
+    except (KeyError, ValueError):
+        return False
+
+    return (
+        definition.role == canonical_def.role
+        and definition.agent_revision == canonical_def.agent_revision
+        and list(definition.declared_capabilities) == list(canonical_def.declared_capabilities)
+        and definition.input_schema is canonical_def.input_schema
+        and definition.output_schema is canonical_def.output_schema
+        and list(definition.forbidden_actions) == list(canonical_def.forbidden_actions)
+        and definition.instruction_contract == canonical_def.instruction_contract
+        and list(definition.permitted_tool_ids) == list(canonical_def.permitted_tool_ids)
+        and list(definition.permitted_data_classifications)
+        == list(canonical_def.permitted_data_classifications)
+    )
+
+
 class DeterministicRouter:
     """Deterministic Agent Router for ChangeMesh.
 
     Selects a specialized agent from the fleet only when:
-    1. The candidate agent is a specialist (Change Orchestrator cannot be delegated to).
-    2. The candidate agent's declared_capabilities exactly contain ALL required capabilities.
-    3. Exactly one specialist matches the capability requirements (fails closed on
-       ambiguous matches).
-    4. The supplied payload conforms to the selected agent's canonical input_schema.
+    1. The candidate agent is strictly one of the five canonical specialists
+       (Change Orchestrator cannot be delegated to; invented agents are rejected).
+    2. The candidate definition matches genuine canonical P-07.02 metadata
+       (caller-supplied definitions cannot invent capabilities, roles, or schemas).
+    3. The candidate agent's canonical declared_capabilities exactly contain ALL
+       required capabilities.
+    4. Exactly one canonical specialist matches the capability requirements
+       (fails closed on ambiguous matches).
+    5. The supplied payload conforms to the selected specialist's canonical input_schema.
+    6. The selected_agent_class is a non-None genuine canonical BaseAgent subclass.
 
     Zero Gemini/LLM reasoning, zero network calls, zero external writes.
     """
@@ -213,32 +252,20 @@ class DeterministicRouter:
                     trace=trace,
                 )
 
-        # Check for orchestrator-only capability requested (self-delegation prohibition)
-        orchestrator_defs = [
-            d
-            for d in self._definitions
-            if d.role == "change_orchestrator" or d.agent_id == "agent-change-orchestrator"
-        ]
-        orchestrator_caps: set[str] = set()
-        for orch_d in orchestrator_defs:
-            orchestrator_caps.update(orch_d.declared_capabilities)
+        # Derivation of canonical truth: strictly from canonical registry
+        orchestrator_def = get_canonical_agent_definition("agent-change-orchestrator")
+        orchestrator_caps = set(orchestrator_def.declared_capabilities)
 
-        # Find candidate specialists (strictly excluding Change Orchestrator)
-        specialist_defs = [
-            d
-            for d in self._definitions
-            if d.role != "change_orchestrator" and d.agent_id != "agent-change-orchestrator"
-        ]
+        canonical_specialist_caps: set[str] = set()
+        for s_id in CANONICAL_SPECIALIST_AGENT_IDS:
+            s_def = get_canonical_agent_definition(s_id)
+            canonical_specialist_caps.update(s_def.declared_capabilities)
 
-        evaluated_candidates = [d.agent_id for d in specialist_defs]
+        all_canonical_fleet_caps = orchestrator_caps | canonical_specialist_caps
 
-        # Check if requested capabilities exist anywhere in the fleet
-        all_fleet_caps: set[str] = set()
-        for d in self._definitions:
-            all_fleet_caps.update(d.declared_capabilities)
-
+        # Check if requested capabilities exist anywhere in canonical fleet truth
         for req_cap in request.required_capabilities:
-            if req_cap not in all_fleet_caps:
+            if req_cap not in all_canonical_fleet_caps:
                 trace = RoutingTraceRecord(
                     trace_id=trace_id,
                     change_id=request.change_id,
@@ -248,19 +275,19 @@ class DeterministicRouter:
                     capability_match_passed=False,
                     contract_match_passed=False,
                     rejection_reason=RoutingRejectionReason.UNKNOWN_CAPABILITY,
-                    evaluated_candidates=evaluated_candidates,
+                    evaluated_candidates=[],
                 )
                 return RoutingResult(
                     outcome=RoutingOutcome.REJECTED,
                     trace=trace,
                 )
 
-        # Check if requested capabilities only belong to orchestrator (self-delegation attempt)
+        # Check for orchestrator-only capability requested (self-delegation prohibition)
         if any(req_cap in orchestrator_caps for req_cap in request.required_capabilities):
-            specialist_caps: set[str] = set()
-            for d in specialist_defs:
-                specialist_caps.update(d.declared_capabilities)
-            if any(req_cap not in specialist_caps for req_cap in request.required_capabilities):
+            if any(
+                req_cap not in canonical_specialist_caps
+                for req_cap in request.required_capabilities
+            ):
                 trace = RoutingTraceRecord(
                     trace_id=trace_id,
                     change_id=request.change_id,
@@ -270,21 +297,39 @@ class DeterministicRouter:
                     capability_match_passed=False,
                     contract_match_passed=False,
                     rejection_reason=RoutingRejectionReason.SELF_DELEGATION_PROHIBITED,
-                    evaluated_candidates=evaluated_candidates,
+                    evaluated_candidates=[],
                 )
                 return RoutingResult(
                     outcome=RoutingOutcome.REJECTED,
                     trace=trace,
                 )
 
-        # Filter specialists where ALL required capabilities match exactly
+        # Filter candidate definitions from self._definitions:
+        # Candidate must be a verified canonical specialist (reject invented & spoofed definitions).
+        evaluated_candidates: list[str] = []
         matching_specialists: list[AgentDefinition] = []
-        for specialist in specialist_defs:
+
+        for d in self._definitions:
+            # Self-delegation target check: ignore orchestrator as target
+            if d.role == "change_orchestrator" or d.agent_id == "agent-change-orchestrator":
+                continue
+
+            evaluated_candidates.append(d.agent_id)
+
+            # Strict provenance verification against canonical P-07.02 definition
+            if not _is_canonical_specialist_definition(d):
+                # Spoofed or invented definition: cannot be routed
+                continue
+
+            # Fetch canonical definition
+            canonical_def = get_canonical_agent_definition(d.agent_id)
+
+            # Exact capability matching against canonical declared capabilities
             if all(
-                req_cap in specialist.declared_capabilities
+                req_cap in canonical_def.declared_capabilities
                 for req_cap in request.required_capabilities
             ):
-                matching_specialists.append(specialist)
+                matching_specialists.append(canonical_def)
 
         # Handle 0 matches
         if len(matching_specialists) == 0:
@@ -325,7 +370,48 @@ class DeterministicRouter:
         # Exactly 1 specialist matched capability requirements
         selected_specialist = matching_specialists[0]
 
-        # Validate input contract match
+        # Verify selected agent is strictly one of the five canonical specialists
+        if selected_specialist.agent_id not in CANONICAL_SPECIALIST_AGENT_IDS:
+            trace = RoutingTraceRecord(
+                trace_id=trace_id,
+                change_id=request.change_id,
+                outcome=RoutingOutcome.REJECTED,
+                required_capabilities=list(request.required_capabilities),
+                payload_type=payload_type_name,
+                capability_match_passed=False,
+                contract_match_passed=False,
+                rejection_reason=RoutingRejectionReason.NO_MATCHING_SPECIALIST,
+                evaluated_candidates=evaluated_candidates,
+            )
+            return RoutingResult(
+                outcome=RoutingOutcome.REJECTED,
+                trace=trace,
+            )
+
+        # Resolve canonical agent class (must be non-None BaseAgent subclass)
+        try:
+            agent_class = get_canonical_agent_class(selected_specialist.agent_id)
+        except (KeyError, ValueError):
+            agent_class = None
+
+        if agent_class is None or not issubclass(agent_class, BaseAgent):
+            trace = RoutingTraceRecord(
+                trace_id=trace_id,
+                change_id=request.change_id,
+                outcome=RoutingOutcome.REJECTED,
+                required_capabilities=list(request.required_capabilities),
+                payload_type=payload_type_name,
+                capability_match_passed=False,
+                contract_match_passed=False,
+                rejection_reason=RoutingRejectionReason.NO_MATCHING_SPECIALIST,
+                evaluated_candidates=evaluated_candidates,
+            )
+            return RoutingResult(
+                outcome=RoutingOutcome.REJECTED,
+                trace=trace,
+            )
+
+        # Validate input contract match against CANONICAL input_schema
         if not isinstance(request.payload, selected_specialist.input_schema):
             trace = RoutingTraceRecord(
                 trace_id=trace_id,
@@ -347,12 +433,7 @@ class DeterministicRouter:
                 selected_definition=selected_specialist,
             )
 
-        # Both capability and contract matched!
-        try:
-            agent_class = get_canonical_agent_class(selected_specialist.agent_id)
-        except KeyError:
-            agent_class = None
-
+        # Both capability and contract matched with full canonical provenance!
         trace = RoutingTraceRecord(
             trace_id=trace_id,
             change_id=request.change_id,

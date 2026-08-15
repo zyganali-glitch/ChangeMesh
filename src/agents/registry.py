@@ -66,6 +66,22 @@ CANONICAL_AGENT_IDS: tuple[str, ...] = (
     "agent-release-steward",
 )
 
+CANONICAL_SPECIALIST_ROLES: tuple[str, ...] = (
+    "impact_scout",
+    "policy_guardian",
+    "migration_engineer",
+    "evidence_auditor",
+    "release_steward",
+)
+
+CANONICAL_SPECIALIST_AGENT_IDS: tuple[str, ...] = (
+    "agent-impact-scout",
+    "agent-policy-guardian",
+    "agent-migration-engineer",
+    "agent-evidence-auditor",
+    "agent-release-steward",
+)
+
 # Build immutable lookup maps
 _BY_ROLE: dict[str, CanonicalAgentClass] = {cls.role: cls for cls in CANONICAL_AGENT_CLASSES}
 _BY_ID: dict[str, CanonicalAgentClass] = {cls.agent_id: cls for cls in CANONICAL_AGENT_CLASSES}
