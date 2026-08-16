@@ -37,6 +37,7 @@ class HmacAuthorityDecisionVerifier:
         self._verification_secret = verification_secret
         self._lock = threading.RLock()
         self._consumed_token_ids: Set[str] = set()
+        self._decisions: dict[str, VerifiedAuthorityDecision] = {}
 
     @staticmethod
     def compute_token_signature(
@@ -181,6 +182,9 @@ class HmacAuthorityDecisionVerifier:
                     failure_reason=str(e),
                 )
 
+            # Store only upon successful cryptographic verification
+            self._decisions[decision.decision_id] = decision
+
             return AuthorityVerificationResult(
                 is_valid=True,
                 status="VALID",
@@ -203,6 +207,52 @@ class HmacAuthorityDecisionVerifier:
             expected_scope=expected_scope,
             now=now,
         )
+
+    def find_active_authority(
+        self,
+        plan_hash: str,
+        authority_slot_ref: str,
+        action_scope: str,
+        now: Optional[datetime] = None,
+    ) -> Optional[VerifiedAuthorityDecision]:
+        """Find an active, unexpired, non-revoked authority decision matching all binding facts."""
+        if now is None:
+            now = datetime.now(timezone.utc)
+        with self._lock:
+            for decision in self._decisions.values():
+                if decision.is_active_for(
+                    plan_hash=plan_hash,
+                    authority_slot_ref=authority_slot_ref,
+                    action_scope=action_scope,
+                    now=now,
+                ):
+                    return decision
+            return None
+
+    def get_decision(self, decision_id: str) -> Optional[VerifiedAuthorityDecision]:
+        """Retrieve a decision by ID."""
+        with self._lock:
+            return self._decisions.get(decision_id)
+
+    def revoke_decision(self, decision_id: str) -> bool:
+        """Revoke an active authority decision."""
+        with self._lock:
+            dec = self._decisions.get(decision_id)
+            if dec is None:
+                return False
+            self._decisions[decision_id] = dec.model_copy(update={"is_revoked": True})
+            return True
+
+    def supersede_decision(self, old_decision_id: str, new_decision_id: str) -> bool:
+        """Mark an authority decision as superseded by a newer decision."""
+        with self._lock:
+            old = self._decisions.get(old_decision_id)
+            if old is None:
+                return False
+            self._decisions[old_decision_id] = old.model_copy(
+                update={"superseded_by": new_decision_id}
+            )
+            return True
 
 
 # Canonical alias

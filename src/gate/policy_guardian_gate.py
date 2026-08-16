@@ -31,10 +31,8 @@ from src.gate.reversibility import (
     ReversibilityClassifier,
 )
 from src.gate.token import (
-    AuthorityDecisionVerifier,
-    InMemoryVerifiedAuthorityStore,
+    AuthorityDecisionResolver,
     SignedAuthorityEnvelope,
-    VerifiedAuthorityDecision,
 )
 
 CANONICAL_SCHEMA_VERSION = "1.0.0"
@@ -60,18 +58,16 @@ class PolicyGuardianGate:
 
     def __init__(
         self,
-        authority_verifier: Optional[AuthorityDecisionVerifier] = None,
-        authority_store: Optional[InMemoryVerifiedAuthorityStore] = None,
+        authority_verifier: Optional[AuthorityDecisionResolver] = None,
+        authority_resolver: Optional[AuthorityDecisionResolver] = None,
     ) -> None:
-        self._authority_verifier = authority_verifier
-        self._authority_store = authority_store
+        self._authority_verifier = authority_verifier or authority_resolver
 
     def evaluate_inputs(
         self,
         inputs: DeterministicPolicyInputs,
         plan_hash: Optional[str] = None,
         approval_token: Optional[SignedAuthorityEnvelope] = None,
-        verified_authority: Optional[VerifiedAuthorityDecision] = None,
         assessment: Optional[ReversibilityAssessment] = None,
         now: Optional[datetime] = None,
     ) -> PolicyGateEvaluationResult:
@@ -187,97 +183,7 @@ class PolicyGuardianGate:
         expected_slot = "slot:lead_dba"
 
         if is_human_required:
-            # Case A: Explicit VerifiedAuthorityDecision passed
-            if verified_authority is not None:
-                if not plan_hash or not plan_hash.strip():
-                    return PolicyGateEvaluationResult(
-                        change_id=inputs.change_id,
-                        autonomy_class=AutonomyClass.BLOCKED,
-                        is_authorized=False,
-                        reversibility_assessment=assessment,
-                        audit_trace_id=trace_id,
-                        decision_summary=(
-                            "BLOCKED: Explicit active plan hash required for authority evaluation"
-                        ),
-                    )
-                if not verified_authority.is_active_for(
-                    plan_hash=plan_hash,
-                    authority_slot_ref=expected_slot,
-                    action_scope=expected_scope,
-                    now=now,
-                ):
-                    if verified_authority.is_revoked:
-                        reason = "Authority decision has been revoked"
-                    elif verified_authority.superseded_by is not None:
-                        reason = (
-                            f"Authority decision has been superseded by "
-                            f"{verified_authority.superseded_by}"
-                        )
-                    elif verified_authority.expires_at <= now:
-                        reason = (
-                            f"Authority decision expired at "
-                            f"{verified_authority.expires_at.isoformat()}"
-                        )
-                    elif verified_authority.plan_hash != plan_hash:
-                        reason = (
-                            f"Authority decision bound to different plan hash "
-                            f"{verified_authority.plan_hash!r} != {plan_hash!r}"
-                        )
-                    elif verified_authority.authority_slot_ref != expected_slot:
-                        reason = (
-                            f"Authority slot mismatch: "
-                            f"{verified_authority.authority_slot_ref!r} != {expected_slot!r}"
-                        )
-                    elif verified_authority.action_scope != expected_scope:
-                        reason = (
-                            f"Action scope mismatch: "
-                            f"{verified_authority.action_scope!r} != {expected_scope!r}"
-                        )
-                    else:
-                        reason = "Authority decision inactive"
-                    return PolicyGateEvaluationResult(
-                        change_id=inputs.change_id,
-                        autonomy_class=AutonomyClass.BLOCKED,
-                        is_authorized=False,
-                        reversibility_assessment=assessment,
-                        audit_trace_id=trace_id,
-                        decision_summary=f"DENIED: {reason}",
-                    )
-                return PolicyGateEvaluationResult(
-                    change_id=inputs.change_id,
-                    autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
-                    is_authorized=True,
-                    reversibility_assessment=assessment,
-                    audit_trace_id=trace_id,
-                    decision_summary=(
-                        f"AUTHORIZED: Valid prior verified authority "
-                        f"{verified_authority.decision_id} by "
-                        f"{verified_authority.approver_id} (reused without re-prompt)"
-                    ),
-                )
-
-            # Case B: Check authority store for active prior decision
-            if self._authority_store is not None and plan_hash and plan_hash.strip():
-                stored_dec = self._authority_store.find_active_authority(
-                    plan_hash=plan_hash,
-                    authority_slot_ref=expected_slot,
-                    action_scope=expected_scope,
-                    now=now,
-                )
-                if stored_dec is not None:
-                    return PolicyGateEvaluationResult(
-                        change_id=inputs.change_id,
-                        autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
-                        is_authorized=True,
-                        reversibility_assessment=assessment,
-                        audit_trace_id=trace_id,
-                        decision_summary=(
-                            f"AUTHORIZED: Valid prior verified authority {stored_dec.decision_id} "
-                            f"by {stored_dec.approver_id} (reused without re-prompt)"
-                        ),
-                    )
-
-            # Case C: Verification via SignedAuthorityEnvelope
+            # Case A: Verification via SignedAuthorityEnvelope (First call / fresh authority)
             if approval_token is not None:
                 if not plan_hash or not plan_hash.strip():
                     return PolicyGateEvaluationResult(
@@ -308,8 +214,6 @@ class PolicyGuardianGate:
                     now=now,
                 )
                 if val.is_valid and val.decision is not None:
-                    if self._authority_store is not None:
-                        self._authority_store.store_decision(val.decision)
                     return PolicyGateEvaluationResult(
                         change_id=inputs.change_id,
                         autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
@@ -331,7 +235,34 @@ class PolicyGuardianGate:
                         decision_summary=f"DENIED: Invalid token ({val.status})",
                     )
 
-            # Case D: No token or prior decision -> Generate compressed decision card
+            # Case B: Injected authority resolver lookup for active prior decision
+            # (Reuse without re-prompt)
+            if self._authority_verifier is not None and plan_hash and plan_hash.strip():
+                stored_dec = self._authority_verifier.find_active_authority(
+                    plan_hash=plan_hash,
+                    authority_slot_ref=expected_slot,
+                    action_scope=expected_scope,
+                    now=now,
+                )
+                if stored_dec is not None and stored_dec.is_active_for(
+                    plan_hash=plan_hash,
+                    authority_slot_ref=expected_slot,
+                    action_scope=expected_scope,
+                    now=now,
+                ):
+                    return PolicyGateEvaluationResult(
+                        change_id=inputs.change_id,
+                        autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
+                        is_authorized=True,
+                        reversibility_assessment=assessment,
+                        audit_trace_id=trace_id,
+                        decision_summary=(
+                            f"AUTHORIZED: Valid prior verified authority {stored_dec.decision_id} "
+                            f"by {stored_dec.approver_id} (reused without re-prompt)"
+                        ),
+                    )
+
+            # Case C: No token or active prior decision -> Generate compressed decision card
             blast_stmt = (
                 f"Blast radius estimated at {inputs.blast_radius_score:.2f} "
                 f"({inputs.blast_radius_reason})"
@@ -486,7 +417,6 @@ class PolicyGuardianGate:
         blast_radius: float = 1.0,
         plan_hash: Optional[str] = None,
         approval_token: Optional[SignedAuthorityEnvelope] = None,
-        verified_authority: Optional[VerifiedAuthorityDecision] = None,
         data_classification: DataClassLevel = DataClassLevel.RESTRICTED,
         privilege_level: PrivilegeLevel = PrivilegeLevel.DDL_ADMIN,
         novelty_tier: NoveltyTier = NoveltyTier.ANOMALOUS,
@@ -521,7 +451,6 @@ class PolicyGuardianGate:
             inputs=inputs,
             plan_hash=plan_hash,
             approval_token=approval_token,
-            verified_authority=verified_authority,
             assessment=assessment,
             now=now,
         )

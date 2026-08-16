@@ -34,9 +34,10 @@ from src.gate.reversibility import (
 )
 from src.gate.token import (
     ApprovalValidationResult,
+    AuthorityDecisionLookup,
+    AuthorityDecisionResolver,
     AuthorityDecisionVerifier,
     AuthorityVerificationResult,
-    InMemoryVerifiedAuthorityStore,
     SignedApprovalToken,
     SignedAuthorityEnvelope,
     VerifiedAuthorityDecision,
@@ -62,7 +63,8 @@ __all__ = [
     "AuthorityVerificationResult",
     "ApprovalValidationResult",
     "AuthorityDecisionVerifier",
-    "InMemoryVerifiedAuthorityStore",
+    "AuthorityDecisionResolver",
+    "AuthorityDecisionLookup",
     "PolicyGateEvaluationResult",
     "PolicyGuardianGate",
     "FrictionMetricsArtifact",

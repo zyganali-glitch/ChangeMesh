@@ -8,7 +8,6 @@ and is owned entirely by outer adapters.
 
 from __future__ import annotations
 
-import threading
 from datetime import datetime, timezone
 from typing import Optional, Protocol, runtime_checkable
 
@@ -149,8 +148,9 @@ ApprovalValidationResult = AuthorityVerificationResult
 
 
 @runtime_checkable
-class AuthorityDecisionVerifier(Protocol):
-    """Provider-neutral protocol for outer adapters that verify cryptographic authority envelopes.
+class AuthorityDecisionResolver(Protocol):
+    """Provider-neutral protocol for outer adapters that verify cryptographic authority envelopes
+    and resolve active verified authority decisions.
 
     Core layers consume this protocol without holding cryptographic secrets.
     """
@@ -177,28 +177,6 @@ class AuthorityDecisionVerifier(Protocol):
         """Compatibility method mapping directly to verify_envelope."""
         ...
 
-
-class InMemoryVerifiedAuthorityStore:
-    """Thread-safe in-memory store for materialized VerifiedAuthorityDecision records.
-
-    Allows valid prior decisions to be reused across operations within the same plan,
-    slot, and scope without re-prompting the human authority.
-    """
-
-    def __init__(self) -> None:
-        self._lock = threading.RLock()
-        self._decisions: dict[str, VerifiedAuthorityDecision] = {}
-
-    def store_decision(self, decision: VerifiedAuthorityDecision) -> None:
-        """Store a verified decision."""
-        with self._lock:
-            self._decisions[decision.decision_id] = decision
-
-    def get_decision(self, decision_id: str) -> Optional[VerifiedAuthorityDecision]:
-        """Retrieve a decision by ID."""
-        with self._lock:
-            return self._decisions.get(decision_id)
-
     def find_active_authority(
         self,
         plan_hash: str,
@@ -207,35 +185,9 @@ class InMemoryVerifiedAuthorityStore:
         now: Optional[datetime] = None,
     ) -> Optional[VerifiedAuthorityDecision]:
         """Find an active, unexpired, non-revoked authority decision matching all binding facts."""
-        if now is None:
-            now = datetime.now(timezone.utc)
-        with self._lock:
-            for decision in self._decisions.values():
-                if decision.is_active_for(
-                    plan_hash=plan_hash,
-                    authority_slot_ref=authority_slot_ref,
-                    action_scope=action_scope,
-                    now=now,
-                ):
-                    return decision
-            return None
+        ...
 
-    def revoke_decision(self, decision_id: str) -> bool:
-        """Revoke an active authority decision."""
-        with self._lock:
-            dec = self._decisions.get(decision_id)
-            if dec is None:
-                return False
-            self._decisions[decision_id] = dec.model_copy(update={"is_revoked": True})
-            return True
 
-    def supersede_decision(self, old_decision_id: str, new_decision_id: str) -> bool:
-        """Mark an authority decision as superseded by a newer decision."""
-        with self._lock:
-            old = self._decisions.get(old_decision_id)
-            if old is None:
-                return False
-            self._decisions[old_decision_id] = old.model_copy(
-                update={"superseded_by": new_decision_id}
-            )
-            return True
+# Provider-neutral protocol aliases
+AuthorityDecisionVerifier = AuthorityDecisionResolver
+AuthorityDecisionLookup = AuthorityDecisionResolver

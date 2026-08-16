@@ -1257,8 +1257,7 @@ Schedule is risk control, not permission to skip gates.
 - **Required action:** Implement approval validity, scope, expiry, reuse, supersession.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Valid prior authority prevents repeated prompts; changed scope/expiry requires new decision.
-- **Required evidence:** Policy tests.
-- **Evidence:** Implemented credential-free `SignedAuthorityEnvelope`, `VerifiedAuthorityDecision`, and `InMemoryVerifiedAuthorityStore` in `src/gate/token.py`, and adapter-owned `HmacAuthorityDecisionVerifier` in `integrations/authority/hmac_adapter.py`. Enforces HMAC-SHA256 signatures, single-use envelope replay prevention, exact active plan hash binding (zero placeholder hashes), and reusable verified authority decisions across unchanged bindings without repeated prompts. `tests/test_p14_reversibility_gate.py` passes all lifecycle and reuse matrix tests.
+- **Evidence:** Implemented credential-free `SignedAuthorityEnvelope`, `VerifiedAuthorityDecision`, and `AuthorityDecisionResolver` protocol in `src/gate/token.py`, and adapter-owned `HmacAuthorityDecisionVerifier` in `integrations/authority/hmac_adapter.py`. Enforces HMAC-SHA256 signatures, single-use envelope replay prevention, exact active plan hash binding (zero placeholder hashes), adapter-owned verified decision persistence, and reusable verified authority decisions across unchanged bindings without repeated prompts. `tests/test_p14_reversibility_gate.py` passes all lifecycle, structural bypass removal, and reuse matrix tests.
 - **Mandatory documentation sync:** Memory Trust Layer.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

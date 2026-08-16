@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-14 Final Authority-Boundary Closure Repair
+# P-Ω Whole-Repository Integrity Audit — P-14 Final Trusted-Authority Provenance Repair
 
-> **Scope:** P-14 Final Authority-Boundary Closure Repair (Fail-Closed Public Entry Points, Credential-Free Core Contracts, Adapter-Only HMAC Verification, Reusable Verified Authority & Supersession Semantics, Zero Placeholder Plan Hashes)
-> **Date:** 2026-08-16
-> **Verified Remote Entry SHA:** `80b24b9df73abf5cbaab8110e60e4d09d810b115`
+> **Scope:** P-14 Final Trusted-Authority Provenance Repair (Removal of Direct Verified-Authority Inputs, Protocol-Based Authority Resolution, Adapter-Owned Decision Persistence, Adversarial Exploit Invariants)
+> **Date:** 2026-08-17
+> **Verified Remote Entry SHA:** `d3b493c7afbbbcbf86bdc907ccd46bac7b0be4a5`
 > **Canonical Branch:** `main`
 
 ---
@@ -11,12 +11,13 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Canonical entry remote | **PASS** | `origin/main` verified as `80b24b9df73abf5cbaab8110e60e4d09d810b115` prior to surgical repair. |
-| Fail-Closed Public Entry Points | **PASS** | `PolicyGuardianGate.evaluate_change_sql()` and `ReversibilityClassifier.classify_sql()` enforce fail-closed defaults; omitted facts strictly fail closed and cannot obtain `AUTO_EXECUTE`. |
-| Zero Placeholder Plan Hashes | **PASS** | Removed `"plan-hash-1"` defaults; missing/blank plan hashes fail closed; tokens and authority decisions strictly bind to explicit active plan hash. |
-| Credential-Free Core Contracts | **PASS** | `src/gate/token.py` defines `SignedAuthorityEnvelope`, `VerifiedAuthorityDecision`, and `AuthorityDecisionVerifier` protocol with zero cryptographic secret parameters or fields. |
-| Adapter-Only Cryptographic Verification | **PASS** | `HmacAuthorityDecisionVerifier` in `integrations/authority/hmac_adapter.py` owns HMAC secret and replay protection, materializing credential-free `VerifiedAuthorityDecision`. |
-| Reusable Authority & Supersession | **PASS** | `InMemoryVerifiedAuthorityStore` and `PolicyGuardianGate` support reusing valid prior authority without re-prompting while invalidating reuse on changed plan, scope, slot, expiry, revocation, or supersession. |
+| Canonical entry remote | **PASS** | `origin/main` verified as `d3b493c7afbbbcbf86bdc907ccd46bac7b0be4a5` prior to surgical repair. |
+| Direct Verified-Authority Bypass Removal | **PASS** | `PolicyGuardianGate.evaluate_inputs()` and `PolicyGuardianGate.evaluate_change_sql()` completely removed `verified_authority` parameter; callers cannot pass arbitrary `VerifiedAuthorityDecision` objects. |
+| Trusted Adapter / Resolver Architecture | **PASS** | Trust enters only via injected `AuthorityDecisionResolver` protocol; `HmacAuthorityDecisionVerifier` in `integrations/authority/hmac_adapter.py` owns HMAC secrets and decision storage. |
+| Reusable Authority & Supersession | **PASS** | Injected authority resolver supports reusing valid prior authority without re-prompting while invalidating reuse on changed plan, scope, slot, expiry, revocation, or supersession. |
+| Zero Placeholder Plan Hashes | **PASS** | Missing/blank plan hashes fail closed; tokens and authority decisions strictly bind to explicit active plan hash. |
+| Credential-Free Core Contracts | **PASS** | `src/gate/token.py` defines `SignedAuthorityEnvelope`, `VerifiedAuthorityDecision`, and `AuthorityDecisionResolver` protocol with zero cryptographic secret parameters or fields. |
+| Adapter-Only Cryptographic Verification | **PASS** | `HmacAuthorityDecisionVerifier` in `integrations/authority/hmac_adapter.py` owns HMAC secret and replay protection, materializing credential-free `VerifiedAuthorityDecision` only upon cryptographic verification. |
 | Mandatory Passport Evidence Verification | **PASS** | `evidence_verifier` mandatory in `PassportIssuer.issue_passport` and `PassportVerifier.verify`; negative matrix tests prove fake IDs, expired, revoked, wrong revision, and failed scenarios fail closed. |
 | ShadowLab Correction Re-Rehearsal | **PASS** | `PlanCorrectionEngine.evaluate_corrected_plan()` executes forward/rollback DDL and expand-contract compatibility views against `SimulatedDatabaseClient`; invalid mutated plans fail re-rehearsal. |
 | Zero Fabricated Digests | **PASS** | `PolicyGuardianGate` and `ApprovalCompressionEngine` evaluate strictly from verified facts and fail closed when evidence digests are missing. |
@@ -25,8 +26,8 @@
 | Donor Manifest Lint | **PASS** | 20 components valid in `uv run python tools/governance/donor_manifest_lint.py` (exit code `0`). |
 | Formatter & Linter | **PASS** | `uv run python scripts/cmd.py format` and `uv run python scripts/cmd.py lint` pass with 0 errors across 142 files. |
 | Type-Checker | **PASS** | `uv run python scripts/cmd.py type-check` passes with 0 errors across 101 source files. |
-| Canonical Unit Command | **PASS** | 1175 passed, 1 warning in `uv run python scripts/cmd.py unit` (exit code `0`). |
-| Full Repository Suite | **FAIL** | 1175 passed, 1 warning, 3 errors from missing `project` fixture in `tests/test_gcp_access.py` (`test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`). Exact state: **FAIL — known historical baseline GCP fixture debt**. |
+| Canonical Unit Command | **PASS** | 1176 passed, 1 warning in `uv run python scripts/cmd.py unit` (exit code `0`). |
+| Full Repository Suite | **FAIL** | 1176 passed, 1 warning, 3 errors from missing `project` fixture in `tests/test_gcp_access.py` (`test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`). Exact state: **FAIL — known historical baseline GCP fixture debt**. |
 | Git Diff Hygiene | **PASS** | `git diff --check` passes with 0 whitespace or conflict marker issues. |
 
 ---
@@ -39,8 +40,8 @@
 | `uv run python scripts/cmd.py format` | `0` | **PASS** | 142 files formatted, 0 violations |
 | `uv run python scripts/cmd.py lint` | `0` | **PASS** | 0 linter violations |
 | `uv run python scripts/cmd.py type-check` | `0` | **PASS** | 0 type violations across 101 source files |
-| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1175 passed, 1 warning |
-| `uv run python -m pytest tests/` | `1` | **FAIL** | 1175 passed, 1 warning, 3 errors (`tests/test_gcp_access.py`: missing `project` fixture) |
+| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1176 passed, 1 warning |
+| `uv run python -m pytest tests/` | `1` | **FAIL** | 1176 passed, 1 warning, 3 errors (`tests/test_gcp_access.py`: missing `project` fixture) |
 | `git diff --check` | `0` | **PASS** | Zero whitespace or lint errors |
 
 ---
@@ -49,12 +50,12 @@
 
 | Surface | Status | Verification Summary |
 |---|---|---|
-| 1. Implementation ↔ Tests | **PASS** | 1175 canonical unit tests pass with zero failures. |
-| 2. Implementation ↔ Architecture | **PASS** | Credential-free core contracts and adapter-only HMAC verification match architectural boundaries. |
+| 1. Implementation ↔ Tests | **PASS** | 1176 canonical unit tests pass with zero failures. |
+| 2. Implementation ↔ Architecture | **PASS** | Credential-free core contracts, protocol-based authority resolution, and adapter-owned HMAC verification match architectural boundaries. |
 | 3. Implementation ↔ README | **PASS** | README documents current unit test counts and honest `PLANNED` / `NOT_RUN` boundaries. |
 | 4. Master Plan ↔ Repository | **PASS** | P-10 through P-14 closed with verified evidence; P-15.00 PENDING. |
 | 5. Claims ↔ Evidence | **PASS** | All claims backed by test execution; simulated sandbox evidence explicitly labeled `SIMULATION`. |
-| 6. Local ↔ Remote Revision | **PASS** | Entry SHA (`80b24b9df73abf5cbaab8110e60e4d09d810b115`) verified; single linear closure commit prepared. |
+| 6. Local ↔ Remote Revision | **PASS** | Entry SHA (`d3b493c7afbbbcbf86bdc907ccd46bac7b0be4a5`) verified; single linear closure commit prepared. |
 | 7. English ↔ Turkish Surfaces | **PASS** | Synchronized across documentation surfaces. |
 | 8. Demo ↔ Actual Runtime | **PASS** | Demo limits labeled as internal project thresholds. |
 | 9. Devpost / Judge Claims ↔ Frozen Tag | **PASS** | Preserved honest local verification states and `NOT_RUN` boundaries. |
@@ -64,6 +65,6 @@
 ## 4. Final Honest Phase-Closure State
 
 - **Audit Character:** P-Ω repository integrity audit (not external independent certification).
-- **Phases P-10 through P-14 Status:** `DONE` (all authority-boundary and reuse repairs complete).
+- **Phases P-10 through P-14 Status:** `DONE` (trusted authority provenance repair complete).
 - **Full Suite State:** `FAIL — known historical baseline GCP fixture debt` (preserved honestly, not masked).
 - **Next Eligible Master Plan Task:** `P-15.00 — Impact Scout donor preflight` (PENDING / UNEXECUTED — DO NOT START).
