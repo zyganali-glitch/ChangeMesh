@@ -38,12 +38,18 @@ P-08.02
 P-08.03
 P-08.04
 P-08.05
+P-09.01
 
 **Active Phase:**
 P-09
 
 **Next Exact Task:**
-P-09.01 — Create topic/subscription topology for change, agent work, approvals, evidence, retries, dead letters
+P-09.02 — Implement publish/consume adapters with schema validation and correlation IDs
+
+## Current P-09.01 State
+
+P-09.01 is `DONE`. Minimal, versioned (`1.0.0`) canonical topic and subscription topology is defined in `events/topology.py` and exported to declarative manifest `events/topology_manifest.json`. Declared 6 logical topics (`changemesh-lifecycle-v1`, `changemesh-agent-work-v1`, `changemesh-approval-v1`, `changemesh-evidence-v1`, `changemesh-retry-v1`, `changemesh-dead-letter-v1`) and 6 attached subscriptions. Subscriptions route dead letters to `changemesh-dead-letter-v1` (5 attempts) with dead-letter subscription cycle prohibition. All 16 `ChangeState` values are mapped deterministically (see diagram `docs/diagrams/pubsub_topology.md`). The dedicated suite `tests/test_p09_01_topology.py` passes 17 tests. Canonical unit passes 1047 tests (1 warning).
+
 
 ## Current P-08.03 State
 

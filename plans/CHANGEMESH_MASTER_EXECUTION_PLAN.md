@@ -122,7 +122,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-06` | Local Development Environment and Dependency Freeze | `DONE` | `P-05` |
 | `P-07` | Google ADK Agent Skeleton | `DONE` | `P-06` |
 | `P-08` | Gemini Integration and Structured Reasoning Boundary | `DONE` | `P-07` |
-| `P-09` | Pub/Sub Event Backbone | `PENDING` | `P-08` |
+| `P-09` | Pub/Sub Event Backbone | `IN_PROGRESS` | `P-08` |
 | `P-10` | Firestore State, Idempotency, and Saga Persistence | `PENDING` | `P-09` |
 | `P-11` | Memory Trust Layer | `PENDING` | `P-10` |
 | `P-12` | Agent Registry and Capability Passport | `PENDING` | `P-11` |
@@ -866,15 +866,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-09 — Pub/Sub Event Backbone
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-09.01 — Create topic/subscription topology for change, agent work, approvals, evidence, retries, dead letters
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create topic/subscription topology for change, agent work, approvals, evidence, retries, dead letters.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Topology minimal, versioned, mapped to lifecycle.
 - **Required evidence:** Infrastructure config and diagram.
+- **Evidence:** Defined canonical, minimal, versioned (`1.0.0`) topic/subscription topology in `events/topology.py` and exported machine-readable declarative infrastructure manifest in `events/topology_manifest.json`. Declared 6 logical topics (`changemesh-lifecycle-v1`, `changemesh-agent-work-v1`, `changemesh-approval-v1`, `changemesh-evidence-v1`, `changemesh-retry-v1`, `changemesh-dead-letter-v1`) and 6 attached subscriptions with explicit ack deadlines, retry backoff policies ([1.0s, 60.0s]), and dead-letter routing to `changemesh-dead-letter-v1` (5 delivery attempts). Dead-letter subscription cycle is strictly forbidden and validated (`dead_letter_policy=None`). All 16 `ChangeState` values are mapped to primary/secondary topics in `lifecycle_routes` without missing or unknown states. Produced architecture diagram in `docs/diagrams/pubsub_topology.md` and synchronized `docs/ARCHITECTURE.md` and `AGENT_ENVIRONMENT_AND_API.md`. Zero `google.cloud.pubsub` imports in provider-neutral `events/` package; zero credential tokens. `tests/test_p09_01_topology.py` passes 17 dedicated tests. Canonical unit suite passes 1047 tests (1 warning).
 - **Mandatory documentation sync:** Architecture, environment.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

@@ -1,0 +1,286 @@
+{
+  "schema_version": "1.0.0",
+  "topics": [
+    {
+      "topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "description": "ChangeMesh change state progression and saga lifecycle transitions",
+      "labels": {
+        "system": "changemesh",
+        "tier": "backbone",
+        "kind": "lifecycle"
+      }
+    },
+    {
+      "topic_id": "changemesh-agent-work-v1",
+      "logical_kind": "AGENT_WORK",
+      "description": "Specialist agent task dispatch, routing requests, and multi-agent coordination",
+      "labels": {
+        "system": "changemesh",
+        "tier": "backbone",
+        "kind": "agent-work"
+      }
+    },
+    {
+      "topic_id": "changemesh-approval-v1",
+      "logical_kind": "APPROVAL_AUTHORITY",
+      "description": "Human authority request notification and explicit authority receipts",
+      "labels": {
+        "system": "changemesh",
+        "tier": "backbone",
+        "kind": "approval"
+      }
+    },
+    {
+      "topic_id": "changemesh-evidence-v1",
+      "logical_kind": "EVIDENCE",
+      "description": "Generated evidence records, rehearsal outcomes, proofs, and audits",
+      "labels": {
+        "system": "changemesh",
+        "tier": "backbone",
+        "kind": "evidence"
+      }
+    },
+    {
+      "topic_id": "changemesh-retry-v1",
+      "logical_kind": "RETRY",
+      "description": "Scheduled retry triggers and delayed re-execution dispatch",
+      "labels": {
+        "system": "changemesh",
+        "tier": "backbone",
+        "kind": "retry"
+      }
+    },
+    {
+      "topic_id": "changemesh-dead-letter-v1",
+      "logical_kind": "DEAD_LETTER",
+      "description": "Terminal dead-letter sink for unparseable, malformed, or exhausted events",
+      "labels": {
+        "system": "changemesh",
+        "tier": "backbone",
+        "kind": "dead-letter"
+      }
+    }
+  ],
+  "subscriptions": [
+    {
+      "subscription_id": "changemesh-lifecycle-sub-v1",
+      "topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "description": "Change Orchestrator / Saga listener for change lifecycle transitions",
+      "ack_deadline_seconds": 30,
+      "dead_letter_policy": {
+        "dead_letter_topic": "changemesh-dead-letter-v1",
+        "max_delivery_attempts": 5
+      },
+      "retry_policy": {
+        "minimum_backoff_seconds": 1.0,
+        "maximum_backoff_seconds": 60.0
+      },
+      "labels": {
+        "consumer": "change-orchestrator"
+      }
+    },
+    {
+      "subscription_id": "changemesh-agent-work-sub-v1",
+      "topic_id": "changemesh-agent-work-v1",
+      "logical_kind": "AGENT_WORK",
+      "description": "Specialist agent fleet worker dispatch listener",
+      "ack_deadline_seconds": 60,
+      "dead_letter_policy": {
+        "dead_letter_topic": "changemesh-dead-letter-v1",
+        "max_delivery_attempts": 5
+      },
+      "retry_policy": {
+        "minimum_backoff_seconds": 1.0,
+        "maximum_backoff_seconds": 60.0
+      },
+      "labels": {
+        "consumer": "agent-fleet"
+      }
+    },
+    {
+      "subscription_id": "changemesh-approval-sub-v1",
+      "topic_id": "changemesh-approval-v1",
+      "logical_kind": "APPROVAL_AUTHORITY",
+      "description": "Authority manager listener for human approval notifications and receipts",
+      "ack_deadline_seconds": 30,
+      "dead_letter_policy": {
+        "dead_letter_topic": "changemesh-dead-letter-v1",
+        "max_delivery_attempts": 5
+      },
+      "retry_policy": {
+        "minimum_backoff_seconds": 1.0,
+        "maximum_backoff_seconds": 60.0
+      },
+      "labels": {
+        "consumer": "authority-manager"
+      }
+    },
+    {
+      "subscription_id": "changemesh-evidence-sub-v1",
+      "topic_id": "changemesh-evidence-v1",
+      "logical_kind": "EVIDENCE",
+      "description": "Evidence Recorder and PubSub timeline projection listener",
+      "ack_deadline_seconds": 30,
+      "dead_letter_policy": {
+        "dead_letter_topic": "changemesh-dead-letter-v1",
+        "max_delivery_attempts": 5
+      },
+      "retry_policy": {
+        "minimum_backoff_seconds": 1.0,
+        "maximum_backoff_seconds": 60.0
+      },
+      "labels": {
+        "consumer": "evidence-ledger"
+      }
+    },
+    {
+      "subscription_id": "changemesh-retry-sub-v1",
+      "topic_id": "changemesh-retry-v1",
+      "logical_kind": "RETRY",
+      "description": "Retry manager listener for delayed re-execution dispatch",
+      "ack_deadline_seconds": 30,
+      "dead_letter_policy": {
+        "dead_letter_topic": "changemesh-dead-letter-v1",
+        "max_delivery_attempts": 5
+      },
+      "retry_policy": {
+        "minimum_backoff_seconds": 1.0,
+        "maximum_backoff_seconds": 60.0
+      },
+      "labels": {
+        "consumer": "retry-manager"
+      }
+    },
+    {
+      "subscription_id": "changemesh-dead-letter-sub-v1",
+      "topic_id": "changemesh-dead-letter-v1",
+      "logical_kind": "DEAD_LETTER",
+      "description": "Dead-letter diagnostic processor and failure handoff generator",
+      "ack_deadline_seconds": 60,
+      "dead_letter_policy": null,
+      "retry_policy": {
+        "minimum_backoff_seconds": 1.0,
+        "maximum_backoff_seconds": 60.0
+      },
+      "labels": {
+        "consumer": "dead-letter-diagnostics"
+      }
+    }
+  ],
+  "lifecycle_routes": [
+    {
+      "state": "RECEIVED",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": null,
+      "description": "Initial change intake event"
+    },
+    {
+      "state": "DISCOVERING",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-agent-work-v1",
+      "description": "Impact scout repository discovery dispatch"
+    },
+    {
+      "state": "QUALIFYING",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-agent-work-v1",
+      "description": "Policy qualification and boundary checks"
+    },
+    {
+      "state": "REHEARSING",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-evidence-v1",
+      "description": "ShadowLab rehearsal twin execution and evidence generation"
+    },
+    {
+      "state": "GROUNDED",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": null,
+      "description": "Evidence grounded; policy evaluation for autonomy vs human authority"
+    },
+    {
+      "state": "AWAITING_AUTHORITY",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-approval-v1",
+      "description": "Human authority escalation notification and card dispatch"
+    },
+    {
+      "state": "AUTHORIZED",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-approval-v1",
+      "description": "Authority confirmed; proceeding to execution"
+    },
+    {
+      "state": "EXECUTING",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-agent-work-v1",
+      "description": "Release steward / migration engineer execution dispatch"
+    },
+    {
+      "state": "VERIFYING",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-evidence-v1",
+      "description": "Post-execution verification and test suite checks"
+    },
+    {
+      "state": "CERTIFYING",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-evidence-v1",
+      "description": "Evidence auditor blind semantic certification"
+    },
+    {
+      "state": "RETRY_SCHEDULED",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-retry-v1",
+      "description": "Transient failure backoff schedule and retry dispatch"
+    },
+    {
+      "state": "COMPENSATING",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-agent-work-v1",
+      "description": "Saga rollback and compensating action dispatch"
+    },
+    {
+      "state": "BLOCKED",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-evidence-v1",
+      "description": "Policy or boundary block terminal transition"
+    },
+    {
+      "state": "COMPLETE",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-evidence-v1",
+      "description": "Successful change lifecycle completion and passport sealing"
+    },
+    {
+      "state": "FAILED",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": "changemesh-dead-letter-v1",
+      "description": "Terminal failure transition and dead-letter diagnostic handoff"
+    },
+    {
+      "state": "CANCELLED",
+      "primary_topic_id": "changemesh-lifecycle-v1",
+      "logical_kind": "CHANGE_LIFECYCLE",
+      "secondary_topic_id": null,
+      "description": "Explicit cancellation terminal transition"
+    }
+  ]
+}
