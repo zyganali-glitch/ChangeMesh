@@ -25,8 +25,11 @@ class SimulatedDatabaseClient:
 
     def _init_sandbox(self) -> None:
         cursor = self._conn.cursor()
-        cursor.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, created_at TEXT)")
-        cursor.execute("INSERT INTO users VALUES (1, 'alice@example.com', '2026-01-01')")
+        cursor.execute(
+            "CREATE TABLE users "
+            "(id INTEGER PRIMARY KEY, email TEXT, legacy_id TEXT, created_at TEXT)"
+        )
+        cursor.execute("INSERT INTO users VALUES (1, 'alice@example.com', 'leg-01', '2026-01-01')")
         self._conn.commit()
 
     def execute_ddl(self, ddl: str, step_name: str = "step_ddl") -> Tuple[bool, str]:

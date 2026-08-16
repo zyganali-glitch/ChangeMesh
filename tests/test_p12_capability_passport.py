@@ -177,7 +177,7 @@ def test_stale_and_revoked_evidence_rejection():
 def test_newer_revision_fails_qualification_routing_selects_proven():
     """Prove newer revision fails qualification and router falls back to proven revision."""
     ev_reg, verifier = _setup_evidence_verifier()
-    agent_reg = InMemoryAgentRegistry()
+    agent_reg = InMemoryAgentRegistry(evidence_verifier=verifier)
     router = PassportAwareRouter(registry=agent_reg, evidence_verifier=verifier)
     now = _utc_now()
     tid = "tenant-p12-demo"
@@ -290,7 +290,7 @@ def test_passport_judge_projection_structure():
     """Verify projection contains selected revision, capabilities, and qualification evidence."""
 
     ev_reg, verifier = _setup_evidence_verifier()
-    agent_reg = InMemoryAgentRegistry()
+    agent_reg = InMemoryAgentRegistry(evidence_verifier=verifier)
     router = PassportAwareRouter(registry=agent_reg, evidence_verifier=verifier)
     now = _utc_now()
     tid = "tenant-judge-proj"
@@ -339,3 +339,120 @@ def test_passport_judge_projection_structure():
     assert projection.selected_revision == "rev-steward-1"
     assert "PR_GENERATION" in projection.qualified_capabilities
     assert "ev-pr-01" in projection.qualification_evidence_ids
+
+
+def test_passport_evidence_verification_exhaustive_negative_matrix():
+    """Verify passport issuance and validation fail closed across all negative evidence states."""
+    ev_reg, verifier = _setup_evidence_verifier()
+    now = _utc_now()
+    aid = "test_agent"
+    rev = "sha-rev-test-1"
+
+    # 1. Missing verifier argument fails
+    req_valid_format = PassportIssuanceRequest(
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capabilities=("AST_STATIC_ANALYSIS",),
+        qualification_evidence_ids=("ev-valid-01",),
+        issuer="qualification_pipeline",
+    )
+    with pytest.raises((ValueError, TypeError)):
+        PassportIssuer.issue_passport(req_valid_format, evidence_verifier=None, now=now)  # type: ignore[arg-type]
+
+    # 2. Fake evidence ID ("ev-made-up") fails closed
+    req_fake_id = PassportIssuanceRequest(
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capabilities=("AST_STATIC_ANALYSIS",),
+        qualification_evidence_ids=("ev-made-up",),
+        issuer="qualification_pipeline",
+    )
+    with pytest.raises(QualificationEvidenceVerificationError) as exc_fake:
+        PassportIssuer.issue_passport(req_fake_id, evidence_verifier=verifier, now=now)
+    assert exc_fake.value.status == "EVIDENCE_MISSING"
+
+    # 3. Revoked evidence fails closed
+    ev_revoked = QualificationEvidenceRecord(
+        evidence_id="ev-revoked-01",
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capability="AST_STATIC_ANALYSIS",
+        scenario_id="SCENARIO_NORMAL_MIGRATION",
+        passed=True,
+        evidence_state=EvidenceState.SIMULATED,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="4" * 64,
+        collected_at=now - timedelta(hours=2),
+        expires_at=now + timedelta(days=30),
+        is_revoked=True,
+        revocation_reason="Compromised simulation snapshot",
+    )
+    ev_reg.register_evidence(ev_revoked)
+
+    req_revoked = PassportIssuanceRequest(
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capabilities=("AST_STATIC_ANALYSIS",),
+        qualification_evidence_ids=("ev-revoked-01",),
+        issuer="qualification_pipeline",
+    )
+    with pytest.raises(QualificationEvidenceVerificationError) as exc_rev:
+        PassportIssuer.issue_passport(req_revoked, evidence_verifier=verifier, now=now)
+    assert exc_rev.value.status == "EVIDENCE_REVOKED"
+
+    # 4. Wrong revision in evidence fails closed
+    ev_wrong_rev = QualificationEvidenceRecord(
+        evidence_id="ev-wrong-rev-01",
+        agent_id=aid,
+        agent_revision="sha-other-revision",
+        qualified_capability="AST_STATIC_ANALYSIS",
+        scenario_id="SCENARIO_NORMAL_MIGRATION",
+        passed=True,
+        evidence_state=EvidenceState.SIMULATED,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="5" * 64,
+        collected_at=now - timedelta(hours=1),
+        expires_at=now + timedelta(days=30),
+    )
+    ev_reg.register_evidence(ev_wrong_rev)
+
+    req_wrong_rev = PassportIssuanceRequest(
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capabilities=("AST_STATIC_ANALYSIS",),
+        qualification_evidence_ids=("ev-wrong-rev-01",),
+        issuer="qualification_pipeline",
+    )
+    with pytest.raises(QualificationEvidenceVerificationError) as exc_mismatch:
+        PassportIssuer.issue_passport(req_wrong_rev, evidence_verifier=verifier, now=now)
+    assert exc_mismatch.value.status == "REVISION_MISMATCH"
+
+    # 5. Failed qualification scenario evidence fails closed
+    ev_failed = QualificationEvidenceRecord(
+        evidence_id="ev-failed-01",
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capability="AST_STATIC_ANALYSIS",
+        scenario_id="SCENARIO_NORMAL_MIGRATION",
+        passed=False,
+        evidence_state=EvidenceState.FAIL,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="6" * 64,
+        collected_at=now - timedelta(hours=1),
+        expires_at=now + timedelta(days=30),
+    )
+    ev_reg.register_evidence(ev_failed)
+
+    req_failed = PassportIssuanceRequest(
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capabilities=("AST_STATIC_ANALYSIS",),
+        qualification_evidence_ids=("ev-failed-01",),
+        issuer="qualification_pipeline",
+    )
+    with pytest.raises(QualificationEvidenceVerificationError) as exc_qual_fail:
+        PassportIssuer.issue_passport(req_failed, evidence_verifier=verifier, now=now)
+    assert exc_qual_fail.value.status == "QUALIFICATION_FAILED"

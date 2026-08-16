@@ -160,6 +160,253 @@ class PlanCorrectionEngine:
     MAX_ATTEMPTS = 2
 
     @classmethod
+    def evaluate_corrected_plan(
+        cls,
+        plan: MigrationPlan,
+        scenario_id: str,
+    ) -> tuple[bool, RehearsalOutcome, str]:
+        """Deterministically evaluate/re-rehearse a corrected plan in ShadowLab simulation."""
+        logs: list[str] = [
+            f"[REHEARSAL_RETRY] Re-rehearsing candidate plan {plan.plan_id} for {scenario_id}",
+        ]
+
+        if scenario_id == "SCENARIO_MISSING_ROLLBACK":
+            # 1. Structural inspection: every destructive/mutating step must have valid rollback_sql
+            if not plan.has_rollback:
+                logs.append("[REHEARSAL_CHECK] FAILED: Plan declared has_rollback=False")
+                digest = compute_simulation_digest(scenario_id, logs)
+                outcome = RehearsalOutcome(
+                    scenario_id=scenario_id,
+                    evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                    evidence_state=EvidenceState.FAIL,
+                    passed=False,
+                    steps_executed=0,
+                    retries_attempted=1,
+                    fault_recovered=False,
+                    compensation_executed=False,
+                    evidence_digest=digest,
+                    simulation_logs=tuple(logs),
+                    details="Plan evaluation failed: has_rollback is False.",
+                )
+                return False, outcome, "Plan lacks rollback declaration"
+
+            for step in plan.steps:
+                if step.action_type in (
+                    "DROP_COLUMN",
+                    "DROP_TABLE",
+                    "RENAME_COLUMN",
+                    "ALTER_COLUMN",
+                ):
+                    if not step.rollback_sql or not step.rollback_sql.strip():
+                        logs.append(
+                            f"[REHEARSAL_CHECK] FAILED: Step {step.step_id} has no rollback SQL"
+                        )
+                        digest = compute_simulation_digest(scenario_id, logs)
+                        outcome = RehearsalOutcome(
+                            scenario_id=scenario_id,
+                            evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                            evidence_state=EvidenceState.FAIL,
+                            passed=False,
+                            steps_executed=0,
+                            retries_attempted=1,
+                            fault_recovered=False,
+                            compensation_executed=False,
+                            evidence_digest=digest,
+                            simulation_logs=tuple(logs),
+                            details=f"Step {step.step_id} missing rollback SQL.",
+                        )
+                        return False, outcome, f"Step {step.step_id} missing rollback SQL"
+
+            # 2. Execution in SimulatedDatabaseClient
+            db = SimulatedDatabaseClient()
+            try:
+                # Execute forward steps
+                for step in plan.steps:
+                    ok, msg = db.execute_ddl(step.sql, step.step_id)
+                    logs.append(f"[FORWARD_STEP] {step.step_id}: ok={ok}, msg={msg}")
+                    if not ok:
+                        logs.append(
+                            f"[REHEARSAL_CHECK] Forward step {step.step_id} execution failed: {msg}"
+                        )
+                        digest = compute_simulation_digest(scenario_id, logs)
+                        outcome = RehearsalOutcome(
+                            scenario_id=scenario_id,
+                            evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                            evidence_state=EvidenceState.FAIL,
+                            passed=False,
+                            steps_executed=1,
+                            retries_attempted=1,
+                            fault_recovered=False,
+                            compensation_executed=False,
+                            evidence_digest=digest,
+                            simulation_logs=tuple(logs),
+                            details=f"Forward DDL failed on {step.step_id}",
+                        )
+                        return False, outcome, f"Forward DDL failed: {msg}"
+
+                # Execute rollback steps in reverse order
+                for step in reversed(plan.steps):
+                    if step.rollback_sql:
+                        rb_ok, rb_msg = db.execute_ddl(step.rollback_sql, f"rb_{step.step_id}")
+                        logs.append(f"[ROLLBACK_STEP] rb_{step.step_id}: ok={rb_ok}, msg={rb_msg}")
+                        if not rb_ok:
+                            logs.append(f"[REHEARSAL_CHECK] Rollback execution failed: {rb_msg}")
+                            digest = compute_simulation_digest(scenario_id, logs)
+                            outcome = RehearsalOutcome(
+                                scenario_id=scenario_id,
+                                evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                                evidence_state=EvidenceState.FAIL,
+                                passed=False,
+                                steps_executed=2,
+                                retries_attempted=1,
+                                fault_recovered=False,
+                                compensation_executed=False,
+                                evidence_digest=digest,
+                                simulation_logs=tuple(logs),
+                                details=f"Rollback DDL failed on {step.step_id}",
+                            )
+                            return False, outcome, f"Rollback DDL failed: {rb_msg}"
+
+                logs.append(
+                    "[REHEARSAL_2_CHECK] Policy Gate: PASSED "
+                    "(verified down-migration executed and sandbox reverted)"
+                )
+                digest = compute_simulation_digest(scenario_id, logs)
+                outcome = RehearsalOutcome(
+                    scenario_id=scenario_id,
+                    evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                    evidence_state=EvidenceState.SIMULATED,
+                    passed=True,
+                    steps_executed=len(plan.steps) * 2,
+                    retries_attempted=1,
+                    fault_recovered=True,
+                    compensation_executed=False,
+                    evidence_digest=digest,
+                    simulation_logs=tuple(logs),
+                    details=(
+                        "Irreversible migration detected; "
+                        "synthesized and verified down-migration script."
+                    ),
+                )
+                return (
+                    True,
+                    outcome,
+                    "Synthesized down migration script satisfying reversibility policy",
+                )
+            finally:
+                db.close()
+
+        elif scenario_id == "SCENARIO_LEGACY_CLIENT_BREAK":
+            # 1. Structural inspection: must use expand-contract pattern
+            if not plan.uses_expand_contract:
+                logs.append("[REHEARSAL_CHECK] FAILED: Plan declared uses_expand_contract=False")
+                digest = compute_simulation_digest(scenario_id, logs)
+                outcome = RehearsalOutcome(
+                    scenario_id=scenario_id,
+                    evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                    evidence_state=EvidenceState.FAIL,
+                    passed=False,
+                    steps_executed=0,
+                    retries_attempted=1,
+                    fault_recovered=False,
+                    compensation_executed=False,
+                    evidence_digest=digest,
+                    simulation_logs=tuple(logs),
+                    details="Plan lacks Expand-Contract pattern.",
+                )
+                return False, outcome, "Plan lacks Expand-Contract pattern"
+
+            # Check that steps include compatibility view or additive column
+            has_view = any(
+                "view" in s.sql.lower() or s.action_type == "CREATE_VIEW" for s in plan.steps
+            )
+            has_add_col = any(
+                "add column" in s.sql.lower() or s.action_type == "ADD_COLUMN" for s in plan.steps
+            )
+            if not (has_view and has_add_col):
+                logs.append(
+                    "[REHEARSAL_CHECK] FAILED: Missing additive column or compatibility view step"
+                )
+                digest = compute_simulation_digest(scenario_id, logs)
+                outcome = RehearsalOutcome(
+                    scenario_id=scenario_id,
+                    evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                    evidence_state=EvidenceState.FAIL,
+                    passed=False,
+                    steps_executed=0,
+                    retries_attempted=1,
+                    fault_recovered=False,
+                    compensation_executed=False,
+                    evidence_digest=digest,
+                    simulation_logs=tuple(logs),
+                    details="Plan lacks expand-contract compatibility view steps.",
+                )
+                return False, outcome, "Missing additive column or compatibility view step"
+
+            # 2. Execution against SimulatedDatabaseClient
+            db = SimulatedDatabaseClient()
+            try:
+                for step in plan.steps:
+                    ok, msg = db.execute_ddl(step.sql, step.step_id)
+                    logs.append(f"[EXPAND_CONTRACT_STEP] {step.step_id}: ok={ok}, msg={msg}")
+                    if not ok:
+                        logs.append(f"[REHEARSAL_CHECK] DDL execution failed: {msg}")
+                        digest = compute_simulation_digest(scenario_id, logs)
+                        outcome = RehearsalOutcome(
+                            scenario_id=scenario_id,
+                            evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                            evidence_state=EvidenceState.FAIL,
+                            passed=False,
+                            steps_executed=1,
+                            retries_attempted=1,
+                            fault_recovered=False,
+                            compensation_executed=False,
+                            evidence_digest=digest,
+                            simulation_logs=tuple(logs),
+                            details=f"DDL failed on {step.step_id}",
+                        )
+                        return False, outcome, f"Expand-contract DDL failed: {msg}"
+
+                logs.append(
+                    "[REHEARSAL_2_CHECK] AST Blast Radius: PASSED "
+                    "(Mobile App remains compatible with v1 view)"
+                )
+                digest = compute_simulation_digest(scenario_id, logs)
+                outcome = RehearsalOutcome(
+                    scenario_id=scenario_id,
+                    evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                    evidence_state=EvidenceState.SIMULATED,
+                    passed=True,
+                    steps_executed=len(plan.steps),
+                    retries_attempted=1,
+                    fault_recovered=True,
+                    compensation_executed=False,
+                    evidence_digest=digest,
+                    simulation_logs=tuple(logs),
+                    details="Breaking change detected; applied Expand-Contract dual-write view.",
+                )
+                return True, outcome, "Transformed breaking change into Expand-Contract pattern"
+            finally:
+                db.close()
+
+        logs.append(f"[REHEARSAL_CHECK] No evaluator registered for scenario {scenario_id!r}")
+        digest = compute_simulation_digest(scenario_id, logs)
+        outcome = RehearsalOutcome(
+            scenario_id=scenario_id,
+            evidence_mode=ExecutionEvidenceMode.SIMULATION,
+            evidence_state=EvidenceState.FAIL,
+            passed=False,
+            steps_executed=0,
+            retries_attempted=1,
+            fault_recovered=False,
+            compensation_executed=False,
+            evidence_digest=digest,
+            simulation_logs=tuple(logs),
+            details=f"No evaluator registered for scenario {scenario_id!r}",
+        )
+        return False, outcome, f"No evaluator for scenario {scenario_id!r}"
+
+    @classmethod
     def correct_and_rehearse(
         cls,
         initial_plan: MigrationPlan,
@@ -184,40 +431,24 @@ class PlanCorrectionEngine:
                 update={"steps": tuple(corrected_steps), "has_rollback": True}
             )
 
-            # Re-rehearse with corrected plan
-            logs: list[str] = [
-                "[AUTO_CORRECTION] Synthesized down-migration rollback script",
-                f"[REHEARSAL_2] Rehearsing corrected plan {corrected_plan.plan_id} with rollback",
-                "[REHEARSAL_2_CHECK] Policy Gate: PASSED (verified down-migration script present)",
-            ]
-            digest = compute_simulation_digest(failing_scenario_id, logs)
-            outcome = RehearsalOutcome(
-                scenario_id=failing_scenario_id,
-                evidence_mode=ExecutionEvidenceMode.SIMULATION,
-                evidence_state=EvidenceState.SIMULATED,
-                passed=True,
-                steps_executed=2,
-                retries_attempted=1,
-                fault_recovered=True,
-                compensation_executed=False,
-                evidence_digest=digest,
-                simulation_logs=tuple(logs),
-                details="Irreversible migration detected; synthesized down-migration script.",
+            eval_passed, outcome, reason = cls.evaluate_corrected_plan(
+                corrected_plan, failing_scenario_id
             )
             return PlanCorrectionResult(
-                is_corrected=True,
-                status="CORRECTED",
+                is_corrected=eval_passed,
+                status="CORRECTED" if eval_passed else "CORRECTION_FAILED",
                 attempts_used=1,
                 corrected_plan=corrected_plan,
                 rehearsal_outcome=outcome,
-                reason="Synthesized down migration script satisfying reversibility policy",
+                reason=reason,
             )
 
         elif failing_scenario_id == "SCENARIO_LEGACY_CLIENT_BREAK":
             # Convert breaking rename to Expand-Contract pattern
             target_t = initial_plan.target_table
             v_sql = (
-                f"CREATE OR REPLACE VIEW v_users_v1 AS "
+                f"DROP VIEW IF EXISTS v_users_v1; "
+                f"CREATE VIEW v_users_v1 AS "
                 f"SELECT *, user_email AS email FROM {target_t};"
             )
             corrected_steps = [
@@ -242,32 +473,16 @@ class PlanCorrectionEngine:
                 }
             )
 
-            logs = [
-                "[AUTO_CORRECTION] Transformed column rename into Expand-Contract pattern",
-                "[REHEARSAL_2] Rehearsing expand-contract migration with compatibility view",
-                "[REHEARSAL_2_CHECK] AST Blast Radius: PASSED (Mobile App remains compatible)",
-            ]
-            digest = compute_simulation_digest(failing_scenario_id, logs)
-            outcome = RehearsalOutcome(
-                scenario_id=failing_scenario_id,
-                evidence_mode=ExecutionEvidenceMode.SIMULATION,
-                evidence_state=EvidenceState.SIMULATED,
-                passed=True,
-                steps_executed=2,
-                retries_attempted=1,
-                fault_recovered=True,
-                compensation_executed=False,
-                evidence_digest=digest,
-                simulation_logs=tuple(logs),
-                details="Breaking change detected; applied Expand-Contract dual-write view.",
+            eval_passed, outcome, reason = cls.evaluate_corrected_plan(
+                corrected_plan, failing_scenario_id
             )
             return PlanCorrectionResult(
-                is_corrected=True,
-                status="CORRECTED",
+                is_corrected=eval_passed,
+                status="CORRECTED" if eval_passed else "CORRECTION_FAILED",
                 attempts_used=1,
                 corrected_plan=corrected_plan,
                 rehearsal_outcome=outcome,
-                reason="Transformed breaking change into Expand-Contract pattern",
+                reason=reason,
             )
 
         return PlanCorrectionResult(

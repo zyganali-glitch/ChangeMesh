@@ -13,6 +13,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from domain.contracts.autonomy import AutonomyClass
+from domain.contracts.data_class import DataClassLevel
+from domain.contracts.evidence import EvidenceState
 from src.gate.action_map import CanonicalActionType, get_canonical_action_map
 from src.gate.compression import (
     ApprovalCompressionEngine,
@@ -27,6 +29,8 @@ from src.gate.policy_guardian_gate import (
 )
 from src.gate.reversibility import (
     DeterministicPolicyInputs,
+    NoveltyTier,
+    PrivilegeLevel,
     RehearsalStatus,
     ReversibilityClass,
     ReversibilityClassifier,
@@ -297,21 +301,44 @@ def test_trusted_authority_decision_verification_lifecycle():
     assert val_exp.is_valid is False
     assert val_exp.status == "EXPIRED"
 
-    # 4. Successful Verification and Single-Use Consumption
+    # 4. Verify with wrong slot ref
+    val_wrong_slot = verifier.verify_and_consume(
+        token=token,
+        expected_plan_hash=plan_hash,
+        expected_slot_ref="slot:other_dba",
+        now=now + timedelta(minutes=1),
+    )
+    assert val_wrong_slot.is_valid is False
+    assert val_wrong_slot.status == "SLOT_MISMATCH"
+
+    # 5. Verify with wrong scope
+    val_wrong_scope = verifier.verify_and_consume(
+        token=token,
+        expected_plan_hash=plan_hash,
+        expected_slot_ref=slot_ref,
+        expected_scope="Target: Staging. Change: chg-123",
+        now=now + timedelta(minutes=2),
+    )
+    assert val_wrong_scope.is_valid is False
+    assert val_wrong_scope.status == "SCOPE_MISMATCH"
+
+    # 6. Successful Verification and Single-Use Consumption
     val_ok = verifier.verify_and_consume(
         token=token,
         expected_plan_hash=plan_hash,
         expected_slot_ref=slot_ref,
+        expected_scope="Target: Production",
         now=now + timedelta(minutes=5),
     )
     assert val_ok.is_valid is True
     assert val_ok.status == "VALID"
 
-    # 5. Replay attempt fails closed (Single-use consumption)
+    # 7. Replay attempt fails closed (Single-use consumption)
     val_replay = verifier.verify_and_consume(
         token=token,
         expected_plan_hash=plan_hash,
         expected_slot_ref=slot_ref,
+        expected_scope="Target: Production",
         now=now + timedelta(minutes=6),
     )
     assert val_replay.is_valid is False
@@ -347,13 +374,16 @@ def test_policy_guardian_gate_with_injected_authority_verifier():
     assert eval_human_no_tok.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
     assert eval_human_no_tok.is_authorized is False
     assert eval_human_no_tok.compression_card is not None
+    # Verify card contains bounded future expiry in remaining decision summary
+    assert "Expires At:" in eval_human_no_tok.compression_card.remaining_decision_summary
 
-    # 3. High blast radius with valid signed token -> AUTHORIZED
+    # 3. High blast radius with valid signed token matching exact scope -> AUTHORIZED
     token = TestHmacAuthoritySigner.sign_token(
         plan_hash=plan_hash,
         approver_id="lead-dba@enterprise.org",
         authority_slot_ref="slot:lead_dba",
         secret_key=secret,
+        action_scope="Target: Production. Change: chg-human",
     )
     eval_human_tok = gate.evaluate_change_sql(
         change_id="chg-human",
@@ -388,7 +418,9 @@ def test_friction_metrics_calculation_from_real_traces():
     eval3 = gate.evaluate_change_sql("c3", "CREATE VIEW v AS SELECT 1;", None, blast_radius=0.2)
     eval4 = gate.evaluate_change_sql("c4", "DROP TABLE c;", None, blast_radius=0.5)
 
-    token = TestHmacAuthoritySigner.sign_token("plan-h5", "dba@org", "slot:lead_dba", secret)
+    token = TestHmacAuthoritySigner.sign_token(
+        "plan-h5", "dba@org", "slot:lead_dba", secret, action_scope="Target: Production. Change: c5"
+    )
     eval5 = gate.evaluate_change_sql(
         "c5",
         "ALTER TABLE d DROP COLUMN z;",
@@ -412,3 +444,99 @@ def test_friction_metrics_calculation_from_real_traces():
     md = artifact.to_markdown_summary()
     assert "Workflow Friction Reduction Metrics" in md
     assert "Overall Fleet Autonomy Ratio" in md
+
+
+# ============================================================================
+# P-14.07: Table-Driven Seven Deterministic Inputs Policy Matrix
+# ============================================================================
+
+
+def test_seven_deterministic_inputs_policy_matrix():
+    """Verify PolicyGuardianGate deterministically evaluates all 7 input dimensions."""
+    gate = PolicyGuardianGate()
+
+    # 1. ANOMALOUS novelty -> BLOCKED (fail closed)
+    res_anom = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-anom",
+            blast_radius_score=0.1,
+            reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            novelty_tier=NoveltyTier.ANOMALOUS,
+        )
+    )
+    assert res_anom.autonomy_class == AutonomyClass.BLOCKED
+    assert res_anom.is_authorized is False
+
+    # 2. EvidenceState.FAIL -> BLOCKED
+    res_ev_fail = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-ev-fail",
+            blast_radius_score=0.1,
+            reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            evidence_state=EvidenceState.FAIL,
+        )
+    )
+    assert res_ev_fail.autonomy_class == AutonomyClass.BLOCKED
+    assert res_ev_fail.is_authorized is False
+
+    # 3. EvidenceState.NOT_RUN -> BLOCKED
+    res_ev_not_run = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-not-run",
+            blast_radius_score=0.1,
+            reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            evidence_state=EvidenceState.NOT_RUN,
+        )
+    )
+    assert res_ev_not_run.autonomy_class == AutonomyClass.BLOCKED
+    assert res_ev_not_run.is_authorized is False
+
+    # 4. NOVEL_UNVERIFIED -> REHEARSE_THEN_EXECUTE (requires rehearsal before authorization)
+    res_novel = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-novel",
+            blast_radius_score=0.2,
+            reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            novelty_tier=NoveltyTier.NOVEL_UNVERIFIED,
+            rehearsal_status=RehearsalStatus.NOT_REQUIRED,
+        )
+    )
+    assert res_novel.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
+    assert res_novel.is_authorized is False
+
+    # 5. RESTRICTED sensitivity with SCHEMA_MODIFY and blast > 0.3 -> HUMAN_AUTHORITY_REQUIRED
+    res_restr = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-restr",
+            blast_radius_score=0.5,
+            reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            data_classification=DataClassLevel.RESTRICTED,
+            privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        )
+    )
+    assert res_restr.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+    assert res_restr.is_authorized is False
+
+    # 6. Rehearsal failed -> BLOCKED
+    res_reh_fail = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-reh-fail",
+            blast_radius_score=0.2,
+            reversibility_class=ReversibilityClass.REVERSIBLE_WITH_COMPENSATION,
+            rehearsal_status=RehearsalStatus.REHEARSAL_FAILED,
+        )
+    )
+    assert res_reh_fail.autonomy_class == AutonomyClass.BLOCKED
+    assert res_reh_fail.is_authorized is False
+
+    # 7. Rehearsal passed on compensation -> REHEARSE_THEN_EXECUTE authorized
+    res_reh_pass = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-reh-pass",
+            blast_radius_score=0.2,
+            reversibility_class=ReversibilityClass.REVERSIBLE_WITH_COMPENSATION,
+            rehearsal_status=RehearsalStatus.REHEARSAL_PASSED,
+        )
+    )
+    assert res_reh_pass.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
+    assert res_reh_pass.is_authorized is True

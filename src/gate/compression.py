@@ -117,21 +117,27 @@ class ApprovalCompressionEngine:
             authority_slot_ref=bundle.authority_slot_ref,
         )
 
-        # Render completed facts strictly from bundle
-        if bundle.completed_facts:
+        # Render completed facts strictly from bundle (verified facts with valid digests only)
+        verified_completed = [
+            f for f in bundle.completed_facts if f.is_verified and f.evidence_digest
+        ]
+        if verified_completed:
             completed_lines = [
                 f"{i + 1}. [{f.source_agent}] {f.statement}"
-                for i, f in enumerate(bundle.completed_facts)
+                for i, f in enumerate(verified_completed)
             ]
             completed_work = "\n".join(completed_lines)
         else:
             completed_work = "Completed analysis facts: NOT_RUN / NO_FACTS"
 
-        # Render rehearsed facts strictly from bundle
-        if bundle.rehearsed_facts:
+        # Render rehearsed facts strictly from bundle (verified facts with valid digests only)
+        verified_rehearsed = [
+            f for f in bundle.rehearsed_facts if f.is_verified and f.evidence_digest
+        ]
+        if verified_rehearsed:
             rehearsed_lines = [
                 f"{i + 1}. [{f.source_agent}] {f.statement}"
-                for i, f in enumerate(bundle.rehearsed_facts)
+                for i, f in enumerate(verified_rehearsed)
             ]
             rehearsed_work = "\n".join(rehearsed_lines)
         else:

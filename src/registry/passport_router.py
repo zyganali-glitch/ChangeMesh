@@ -63,7 +63,7 @@ class PassportAwareRouter:
         evidence_verifier: Optional[QualificationEvidenceVerifier] = None,
     ) -> None:
         self._registry = registry
-        self._evidence_verifier = evidence_verifier
+        self._evidence_verifier = evidence_verifier or QualificationEvidenceVerifier()
         self._requirements = get_standard_demo_requirements()
 
     def route_role(
@@ -90,10 +90,10 @@ class PassportAwareRouter:
             passport = self._registry.get_active_passport(tid, role_id, preferred_revision)
             if descriptor and passport:
                 val = PassportVerifier.verify(
-                    passport,
+                    passport=passport,
+                    evidence_verifier=self._evidence_verifier,
                     requirement=requirement,
                     expected_revision=preferred_revision,
-                    evidence_verifier=self._evidence_verifier,
                 )
                 if val.is_valid:
                     projection = PassportJudgeProjection(
@@ -138,10 +138,10 @@ class PassportAwareRouter:
         for desc, passp in candidates:
             if desc.agent_id == role_id:
                 val = PassportVerifier.verify(
-                    passp,
+                    passport=passp,
+                    evidence_verifier=self._evidence_verifier,
                     requirement=requirement,
                     expected_revision=desc.agent_revision,
-                    evidence_verifier=self._evidence_verifier,
                 )
                 if val.is_valid:
                     projection = PassportJudgeProjection(

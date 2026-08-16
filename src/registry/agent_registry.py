@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from domain.contracts.capability import CapabilityPassport
 from src.orchestrator.state_repository import validate_tenant_id
 from src.registry.capabilities import CapabilityType
+from src.registry.evidence_verifier import QualificationEvidenceVerifier
 from src.registry.passport_issuer import PassportVerifier
 
 CANONICAL_SCHEMA_VERSION = "1.0.0"
@@ -79,7 +80,7 @@ class AgentRegistry(ABC):
 class InMemoryAgentRegistry(AgentRegistry):
     """Thread-safe in-memory test double and local adapter for Agent Registry."""
 
-    def __init__(self) -> None:
+    def __init__(self, evidence_verifier: Optional[QualificationEvidenceVerifier] = None) -> None:
         self._lock = threading.RLock()
         self._descriptors: Dict[
             Tuple[str, str], AgentDescriptor
@@ -87,6 +88,7 @@ class InMemoryAgentRegistry(AgentRegistry):
         self._passports: Dict[
             str, Dict[Tuple[str, str], CapabilityPassport]
         ] = {}  # tenant_id -> (agent_id, revision) -> passport
+        self._evidence_verifier = evidence_verifier or QualificationEvidenceVerifier()
 
     def register_agent(self, descriptor: AgentDescriptor) -> AgentDescriptor:
         with self._lock:
@@ -114,7 +116,11 @@ class InMemoryAgentRegistry(AgentRegistry):
             passport = self._passports.get(tid, {}).get((agent_id, agent_revision))
             if passport is None:
                 return None
-            res = PassportVerifier.verify(passport, expected_revision=agent_revision)
+            res = PassportVerifier.verify(
+                passport=passport,
+                evidence_verifier=self._evidence_verifier,
+                expected_revision=agent_revision,
+            )
             return passport if res.is_valid else None
 
     def find_qualified_agents(
@@ -132,7 +138,11 @@ class InMemoryAgentRegistry(AgentRegistry):
                 if descriptor is None:
                     continue
                 # Verify passport
-                val_res = PassportVerifier.verify(passport, expected_revision=rev)
+                val_res = PassportVerifier.verify(
+                    passport=passport,
+                    evidence_verifier=self._evidence_verifier,
+                    expected_revision=rev,
+                )
                 if (
                     val_res.is_valid
                     and required_capability.value in passport.qualified_capabilities

@@ -75,28 +75,33 @@ class PassportIssuer:
     def issue_passport(
         cls,
         request: PassportIssuanceRequest,
-        evidence_verifier: Optional[QualificationEvidenceVerifier] = None,
+        evidence_verifier: QualificationEvidenceVerifier,
         now: Optional[datetime] = None,
     ) -> CapabilityPassport:
         """Issue a new CapabilityPassport only after verifying qualification evidence."""
+        if evidence_verifier is None:
+            raise ValueError(
+                "evidence_verifier is mandatory for passport issuance; "
+                "self-attestation is forbidden"
+            )
+
         if now is None:
             now = datetime.now(timezone.utc)
 
         # Enforce qualification verification boundary (self-attestation is forbidden)
-        if evidence_verifier is not None:
-            ver_res = evidence_verifier.verify_evidence_bundle(
-                evidence_ids=request.qualification_evidence_ids,
-                expected_agent_id=request.agent_id,
-                expected_agent_revision=request.agent_revision,
-                required_capabilities=request.qualified_capabilities,
-                now=now,
+        ver_res = evidence_verifier.verify_evidence_bundle(
+            evidence_ids=request.qualification_evidence_ids,
+            expected_agent_id=request.agent_id,
+            expected_agent_revision=request.agent_revision,
+            required_capabilities=request.qualified_capabilities,
+            now=now,
+        )
+        if not ver_res.is_valid:
+            raise QualificationEvidenceVerificationError(
+                f"Cannot issue passport for {request.agent_id}@{request.agent_revision}: "
+                f"{ver_res.status} ({ver_res.failure_reason})",
+                status=ver_res.status,
             )
-            if not ver_res.is_valid:
-                raise QualificationEvidenceVerificationError(
-                    f"Cannot issue passport for {request.agent_id}@{request.agent_revision}: "
-                    f"{ver_res.status} ({ver_res.failure_reason})",
-                    status=ver_res.status,
-                )
 
         expires_at = now + timedelta(seconds=request.validity_seconds)
         passport_id = f"pass-{request.agent_id}-{uuid.uuid4().hex[:8]}"
@@ -124,12 +129,18 @@ class PassportVerifier:
     def verify(
         cls,
         passport: CapabilityPassport,
+        evidence_verifier: QualificationEvidenceVerifier,
         requirement: Optional[AgentCapabilityRequirement] = None,
         expected_revision: Optional[str] = None,
-        evidence_verifier: Optional[QualificationEvidenceVerifier] = None,
         now: Optional[datetime] = None,
     ) -> PassportValidationResult:
         """Evaluate passport against revocation, expiry, revision, and required capabilities."""
+        if evidence_verifier is None:
+            raise ValueError(
+                "evidence_verifier is mandatory for passport verification; "
+                "unverified passports cannot be validated"
+            )
+
         if now is None:
             now = datetime.now(timezone.utc)
 
@@ -169,20 +180,19 @@ class PassportVerifier:
                 failure_reason="Passport has no qualification evidence references",
             )
 
-        # 5. Deep Evidence Verification (if verifier provided)
-        if evidence_verifier is not None:
-            ev_check = evidence_verifier.verify_evidence_bundle(
-                evidence_ids=passport.qualification_evidence_ids,
-                expected_agent_id=passport.agent_id,
-                expected_agent_revision=passport.agent_revision,
-                now=now,
+        # 5. Mandatory Deep Evidence Verification
+        ev_check = evidence_verifier.verify_evidence_bundle(
+            evidence_ids=passport.qualification_evidence_ids,
+            expected_agent_id=passport.agent_id,
+            expected_agent_revision=passport.agent_revision,
+            now=now,
+        )
+        if not ev_check.is_valid:
+            return PassportValidationResult(
+                is_valid=False,
+                status="EVIDENCE_UNVERIFIED",
+                failure_reason=f"Evidence invalid: {ev_check.failure_reason}",
             )
-            if not ev_check.is_valid:
-                return PassportValidationResult(
-                    is_valid=False,
-                    status="EVIDENCE_UNVERIFIED",
-                    failure_reason=f"Evidence invalid: {ev_check.failure_reason}",
-                )
 
         # 6. Capability Match Check
         if requirement is not None:

@@ -8,12 +8,13 @@ human authority slots, and validates signed approval tokens through injected ver
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict
 
 from domain.contracts.autonomy import ApprovalCompressionCard, AutonomyClass
+from domain.contracts.data_class import DataClassLevel
 from domain.contracts.evidence import EvidenceState
 from src.gate.compression import (
     ApprovalCompressionEngine,
@@ -22,6 +23,7 @@ from src.gate.compression import (
 )
 from src.gate.reversibility import (
     DeterministicPolicyInputs,
+    NoveltyTier,
     PrivilegeLevel,
     RehearsalStatus,
     ReversibilityAssessment,
@@ -65,8 +67,11 @@ class PolicyGuardianGate:
         plan_hash: str = "plan-hash-1",
         approval_token: Optional[SignedApprovalToken] = None,
         assessment: Optional[ReversibilityAssessment] = None,
+        now: Optional[datetime] = None,
     ) -> PolicyGateEvaluationResult:
         """Evaluate deterministic policy inputs against organizational autonomy policy."""
+        if now is None:
+            now = datetime.now(timezone.utc)
         trace_id = f"trace-gate-{uuid.uuid4().hex[:8]}"
 
         if assessment is None:
@@ -86,7 +91,34 @@ class PolicyGuardianGate:
                 ),
             )
 
-        # 1. Irreversible Destructive -> Blocked immediately
+        # 1. Hard Blockers: Anomalous Novelty, Failed Evidence, Quarantined,
+        # Destructive without Down Migration, Failed Rehearsal
+        if inputs.novelty_tier == NoveltyTier.ANOMALOUS:
+            return PolicyGateEvaluationResult(
+                change_id=inputs.change_id,
+                autonomy_class=AutonomyClass.BLOCKED,
+                is_authorized=False,
+                reversibility_assessment=assessment,
+                audit_trace_id=trace_id,
+                decision_summary="BLOCKED: Anomalous change intent detected (fail closed)",
+            )
+
+        if inputs.evidence_state in (
+            EvidenceState.FAIL,
+            EvidenceState.QUARANTINED,
+            EvidenceState.NOT_RUN,
+        ):
+            return PolicyGateEvaluationResult(
+                change_id=inputs.change_id,
+                autonomy_class=AutonomyClass.BLOCKED,
+                is_authorized=False,
+                reversibility_assessment=assessment,
+                audit_trace_id=trace_id,
+                decision_summary=(
+                    f"BLOCKED: Underlying evidence state is {inputs.evidence_state.value}"
+                ),
+            )
+
         if (
             inputs.reversibility_class == ReversibilityClass.IRREVERSIBLE_DESTRUCTIVE
             and not inputs.has_down_migration
@@ -100,74 +132,96 @@ class PolicyGuardianGate:
                 decision_summary="BLOCKED: Irreversible operation lacks down migration",
             )
 
-        # 2. Failed Evidence or Quarantined Input -> Blocked
-        if inputs.evidence_state == EvidenceState.FAIL:
+        if inputs.rehearsal_status == RehearsalStatus.REHEARSAL_FAILED:
             return PolicyGateEvaluationResult(
                 change_id=inputs.change_id,
                 autonomy_class=AutonomyClass.BLOCKED,
                 is_authorized=False,
                 reversibility_assessment=assessment,
                 audit_trace_id=trace_id,
-                decision_summary="BLOCKED: Underlying evidence or qualification failed",
+                decision_summary="BLOCKED: Required ShadowLab rehearsal failed",
             )
 
-        # 3. High Blast Radius, Destructive DDL, or Elevated Privilege -> HUMAN_AUTHORITY_REQUIRED
+        # 2. Human Authority Triggers:
+        # - Reversibility class is HUMAN_INTERVENTION_REQUIRED
+        # - High blast radius (> 0.8)
+        # - Elevated privilege (DDL_ADMIN, IAM_ADMIN, DATA_EXPORT)
+        # - RESTRICTED sensitivity with modifying privilege and moderate+ blast radius (> 0.3)
+        is_restricted_high_risk = (
+            inputs.data_classification == DataClassLevel.RESTRICTED
+            and inputs.privilege_level
+            in (
+                PrivilegeLevel.SCHEMA_MODIFY,
+                PrivilegeLevel.DDL_ADMIN,
+                PrivilegeLevel.DATA_EXPORT,
+            )
+            and inputs.blast_radius_score > 0.3
+        )
         is_human_required = (
             inputs.reversibility_class == ReversibilityClass.HUMAN_INTERVENTION_REQUIRED
             or inputs.blast_radius_score > 0.8
             or inputs.privilege_level
             in (PrivilegeLevel.DDL_ADMIN, PrivilegeLevel.IAM_ADMIN, PrivilegeLevel.DATA_EXPORT)
+            or is_restricted_high_risk
         )
+
+        expected_scope = f"Target: Production. Change: {inputs.change_id}"
 
         if is_human_required:
             if approval_token is None:
-                # Generate compressed decision card from locked facts
+                # Generate compressed decision card from verified locked facts (zero fake digests)
                 blast_stmt = (
                     f"Blast radius estimated at {inputs.blast_radius_score:.2f} "
                     f"({inputs.blast_radius_reason})"
                 )
+                completed_facts: tuple[LockedFact, ...] = ()
+                if inputs.evidence_digests:
+                    completed_facts = (
+                        LockedFact(
+                            fact_id=f"fact-blast-{inputs.change_id}",
+                            source_agent="impact_scout",
+                            category="BLAST_RADIUS",
+                            statement=blast_stmt,
+                            evidence_digest=inputs.evidence_digests[0],
+                            is_verified=True,
+                        ),
+                    )
+
                 rehearsed_facts: tuple[LockedFact, ...] = ()
-                if inputs.rehearsal_status == RehearsalStatus.REHEARSAL_PASSED:
+                if (
+                    inputs.rehearsal_status == RehearsalStatus.REHEARSAL_PASSED
+                    and inputs.rehearsal_digests
+                ):
                     rehearsed_facts = (
                         LockedFact(
                             fact_id=f"fact-rehearse-{inputs.change_id}",
                             source_agent="shadowlab",
                             category="REHEARSAL",
                             statement=f"Rehearsal status: {inputs.rehearsal_status.value}",
-                            evidence_digest=inputs.rehearsal_digests[0]
-                            if inputs.rehearsal_digests
-                            else "b" * 64,
+                            evidence_digest=inputs.rehearsal_digests[0],
+                            is_verified=True,
                         ),
                     )
 
                 bundle = LockedFactBundle(
                     change_request_id=inputs.change_id,
-                    completed_facts=(
-                        LockedFact(
-                            fact_id=f"fact-blast-{inputs.change_id}",
-                            source_agent="impact_scout",
-                            category="BLAST_RADIUS",
-                            statement=blast_stmt,
-                            evidence_digest=inputs.rehearsal_digests[0]
-                            if inputs.rehearsal_digests
-                            else "a" * 64,
-                        ),
-                    ),
+                    completed_facts=completed_facts,
                     rehearsed_facts=rehearsed_facts,
                     reversibility_assessment=assessment,
                     authority_slot_ref="slot:lead_dba",
                     decision_question=f"Authorize live execution of change {inputs.change_id}?",
                     decision_options=("APPROVE_EXECUTION", "REJECT_AND_REQUEST_REVISION"),
-                    action_scope=f"Target: Production. Change: {inputs.change_id}",
+                    action_scope=expected_scope,
                     risk_summary=(
-                        f"High blast radius ({inputs.blast_radius_score:.2f}) "
-                        f"or elevated privilege ({inputs.privilege_level.value})"
+                        f"High blast radius ({inputs.blast_radius_score:.2f}), "
+                        f"elevated privilege ({inputs.privilege_level.value}), "
+                        f"or sensitivity ({inputs.data_classification.value})"
                     ),
                     consequence_summary="Live execution will mutate production database state.",
-                    expires_at=datetime.now(timezone.utc),
-                    evidence_refs=inputs.rehearsal_digests,
+                    expires_at=now + timedelta(minutes=30),
+                    evidence_refs=inputs.rehearsal_digests + inputs.evidence_digests,
                 )
-                card = ApprovalCompressionEngine.generate_card(bundle)
+                card = ApprovalCompressionEngine.generate_card(bundle, now=now)
                 return PolicyGateEvaluationResult(
                     change_id=inputs.change_id,
                     autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
@@ -191,6 +245,8 @@ class PolicyGuardianGate:
                     token=approval_token,
                     expected_plan_hash=plan_hash,
                     expected_slot_ref="slot:lead_dba",
+                    expected_scope=expected_scope,
+                    now=now,
                 )
                 if val.is_valid:
                     return PolicyGateEvaluationResult(
@@ -214,11 +270,23 @@ class PolicyGuardianGate:
                         decision_summary=f"DENIED: Invalid token ({val.status})",
                     )
 
-        # 4. Multi-Phase / Compensation / Novel -> REHEARSE_THEN_EXECUTE
-        if (
+        # 3. Rehearsal Requirement Triggers:
+        # - Multi-Phase / Compensation
+        # - Novel unverified intent
+        # - Explicit rehearsal requested
+        # - Restricted/Confidential sensitivity with modifying privilege
+        is_rehearsal_required = (
             inputs.reversibility_class == ReversibilityClass.REVERSIBLE_WITH_COMPENSATION
+            or inputs.novelty_tier == NoveltyTier.NOVEL_UNVERIFIED
             or inputs.rehearsal_status != RehearsalStatus.NOT_REQUIRED
-        ):
+            or (
+                inputs.data_classification
+                in (DataClassLevel.RESTRICTED, DataClassLevel.CONFIDENTIAL)
+                and inputs.privilege_level == PrivilegeLevel.SCHEMA_MODIFY
+            )
+        )
+
+        if is_rehearsal_required:
             if inputs.rehearsal_status == RehearsalStatus.REHEARSAL_PASSED:
                 return PolicyGateEvaluationResult(
                     change_id=inputs.change_id,
@@ -241,11 +309,19 @@ class PolicyGuardianGate:
                     ),
                 )
 
-        # 5. Fully Reversible Automated -> AUTO_EXECUTE
+        # 4. Fully Reversible Automated -> AUTO_EXECUTE
         if (
             inputs.reversibility_class == ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED
             and inputs.blast_radius_score <= 0.3
             and inputs.has_down_migration
+            and inputs.novelty_tier == NoveltyTier.ROUTINE_KNOWN
+            and inputs.data_classification in (DataClassLevel.PUBLIC, DataClassLevel.INTERNAL)
+            and inputs.privilege_level
+            not in (
+                PrivilegeLevel.DDL_ADMIN,
+                PrivilegeLevel.IAM_ADMIN,
+                PrivilegeLevel.DATA_EXPORT,
+            )
         ):
             return PolicyGateEvaluationResult(
                 change_id=inputs.change_id,
@@ -256,7 +332,7 @@ class PolicyGuardianGate:
                 decision_summary="AUTO_EXECUTE: Fully reversible with automated rollback",
             )
 
-        # 6. Moderate Routine -> AUTO_EXECUTE_AND_NOTIFY
+        # 6. Moderate Routine / Extension -> AUTO_EXECUTE_AND_NOTIFY
         return PolicyGateEvaluationResult(
             change_id=inputs.change_id,
             autonomy_class=AutonomyClass.AUTO_EXECUTE_AND_NOTIFY,
@@ -275,6 +351,8 @@ class PolicyGuardianGate:
         plan_hash: str = "plan-hash-1",
         approval_token: Optional[SignedApprovalToken] = None,
         rehearsal_status: RehearsalStatus = RehearsalStatus.NOT_REQUIRED,
+        evidence_digests: Tuple[str, ...] = (),
+        rehearsal_digests: Tuple[str, ...] = (),
     ) -> PolicyGateEvaluationResult:
         """Convenience method to evaluate a SQL migration change."""
         assessment = ReversibilityClassifier.classify_sql(
@@ -290,6 +368,8 @@ class PolicyGuardianGate:
             has_down_migration=assessment.has_down_migration,
             rollback_summary=assessment.rollback_plan_summary,
             rehearsal_status=rehearsal_status,
+            evidence_digests=evidence_digests,
+            rehearsal_digests=rehearsal_digests,
         )
         return self.evaluate_inputs(
             inputs=inputs,

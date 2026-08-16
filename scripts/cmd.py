@@ -30,7 +30,6 @@ def typecheck_cmd(args=None):
     return run_command(["uv", "run", "mypy", "domain", "src", "integrations", "tests"])
 
 
-
 def unit_cmd(args=None):
     print("Running unit tests...")
     # Exclude test_gcp_access.py from unit tests as it performs real GCP mutations.

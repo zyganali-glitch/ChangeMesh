@@ -557,6 +557,85 @@ def test_firestore_adapter_concurrent_race_prevention():
     assert final_doc.version == 2
 
 
+def test_firestore_adapter_concurrent_fresh_reservation_race():
+    """Prove concurrent fresh reservations on Firestore adapter cannot both succeed."""
+    fake_client = FakeFirestoreClient()
+    repo = GoogleFirestoreSagaRepository(project_id="test-proj-123", firestore_client=fake_client)
+    now = _utc_now()
+    tid = "tenant-res-race"
+    cid = "chg-res-race-01"
+    rid = "res-race-key"
+
+    repo.create_tenant(
+        TenantRecord(tenant_id=tid, name="Res Race Org", created_at=now, updated_at=now)
+    )
+    change = ChangeRecord(
+        tenant_id=tid,
+        change_id=cid,
+        correlation_id="corr-res-race",
+        title="Reservation Race Test",
+        description="Testing reservation atomicity",
+        target_systems=("postgres",),
+        data_classification=DataClassLevel.INTERNAL,
+        requested_by="dba",
+        requested_at=now,
+        state=ChangeState.RECEIVED,
+        state_updated_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    repo.create_change(tid, change)
+
+    reservation = IdempotencyReservationRecord(
+        tenant_id=tid,
+        change_id=cid,
+        reservation_id=rid,
+        idempotency_key="key-fresh-concurrent",
+        action_type="POSTGRES_SCHEMA_MIGRATE",
+        payload_digest="a" * 64,
+        status=IdempotencyReservationStatus.RESERVED,
+        reserved_at=now,
+        expires_at=now + timedelta(seconds=60),
+    )
+
+    success_count = 0
+    conflict_count = 0
+
+    def try_reserve():
+        nonlocal success_count, conflict_count
+        try:
+            repo.create_idempotency_reservation(tid, cid, reservation)
+            success_count += 1
+        except PersistenceSchemaError:
+            conflict_count += 1
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(try_reserve) for _ in range(8)]
+        concurrent.futures.wait(futures)
+
+    assert success_count == 1
+    assert conflict_count == 7
+    stored = repo.get_idempotency_reservation(tid, cid, rid)
+    assert stored is not None
+    assert stored.reservation_id == rid
+
+
+def test_firestore_adapter_atomic_cas_fails_closed_without_transaction():
+    """Prove _atomic_cas_update fails closed when transaction semantics are missing."""
+
+    class NonTransactionalClient:
+        def collection(self, name: str):
+            return None
+
+    repo = GoogleFirestoreSagaRepository(
+        project_id="test-proj-123", firestore_client=NonTransactionalClient()
+    )
+    with pytest.raises(
+        RuntimeError, match="does not support required atomic transaction semantics"
+    ):
+        repo._atomic_cas_update(None, 1, {}, "path", TenantRecord)
+
+
 # ============================================================================
 # Child Documents & Zero Secret Tests
 # ============================================================================

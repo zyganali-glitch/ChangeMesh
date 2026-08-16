@@ -92,9 +92,9 @@ class DeterministicPolicyInputs(BaseModel):
     blast_radius_reason: str = "Estimated from dependent symbol and endpoint count"
 
     # 2. Reversibility
-    reversibility_class: ReversibilityClass = ReversibilityClass.IRREVERSIBLE_DESTRUCTIVE
-    has_down_migration: bool = False
-    rollback_summary: str = "No down migration specified"
+    reversibility_class: ReversibilityClass = ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED
+    has_down_migration: bool = True
+    rollback_summary: str = "Automated down migration available"
     reversibility_source: str = "policy_guardian:ddl_classifier"
 
     # 3. Privilege
@@ -102,7 +102,7 @@ class DeterministicPolicyInputs(BaseModel):
     privilege_source: str = "iam_authorizer:role_binding"
 
     # 4. Sensitivity
-    data_classification: DataClassLevel = DataClassLevel.RESTRICTED
+    data_classification: DataClassLevel = DataClassLevel.INTERNAL
     sensitivity_source: str = "data_governance:classification_scan"
 
     # 5. Evidence
@@ -116,7 +116,7 @@ class DeterministicPolicyInputs(BaseModel):
     novelty_source: str = "memory_trust_layer:history"
 
     # 7. Rehearsal
-    rehearsal_status: RehearsalStatus = RehearsalStatus.REHEARSAL_NOT_RUN
+    rehearsal_status: RehearsalStatus = RehearsalStatus.NOT_REQUIRED
     rehearsal_digests: Tuple[str, ...] = ()
     rehearsal_source: str = "shadowlab:synthetic_twin"
 

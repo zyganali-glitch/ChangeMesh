@@ -211,3 +211,53 @@ def test_typed_plan_correction_for_legacy_client_break():
     assert res.corrected_plan is not None
     assert res.corrected_plan.uses_expand_contract is True
     assert len(res.corrected_plan.steps) == 2
+    assert res.rehearsal_outcome is not None
+    assert res.rehearsal_outcome.passed is True
+    assert res.rehearsal_outcome.evidence_mode == ExecutionEvidenceMode.SIMULATION
+
+
+def test_typed_plan_correction_mutated_invalid_rehearsal_fails():
+    """Prove that an invalid or mutated plan fails deterministic re-rehearsal evaluation."""
+    # 1. Invalid plan for missing rollback scenario (has_rollback=False or missing rollback_sql)
+    invalid_plan_1 = MigrationPlan(
+        plan_id="plan-bad-rollback-01",
+        change_id="chg-bad-01",
+        target_table="users",
+        steps=(
+            PlanStep(
+                step_id="step_drop_legacy",
+                action_type="DROP_COLUMN",
+                sql="ALTER TABLE users DROP COLUMN legacy_id;",
+                rollback_sql="",  # Empty rollback SQL
+            ),
+        ),
+        has_rollback=True,
+    )
+    ok1, outcome1, _ = PlanCorrectionEngine.evaluate_corrected_plan(
+        invalid_plan_1, "SCENARIO_MISSING_ROLLBACK"
+    )
+    assert ok1 is False
+    assert outcome1.passed is False
+    assert outcome1.evidence_state == EvidenceState.FAIL
+
+    # 2. Invalid plan for legacy client break (uses_expand_contract=False)
+    invalid_plan_2 = MigrationPlan(
+        plan_id="plan-bad-expand-01",
+        change_id="chg-bad-02",
+        target_table="users",
+        steps=(
+            PlanStep(
+                step_id="step_rename",
+                action_type="RENAME_COLUMN",
+                sql="ALTER TABLE users RENAME COLUMN email TO user_email;",
+                rollback_sql="ALTER TABLE users RENAME COLUMN user_email TO email;",
+            ),
+        ),
+        uses_expand_contract=False,
+    )
+    ok2, outcome2, _ = PlanCorrectionEngine.evaluate_corrected_plan(
+        invalid_plan_2, "SCENARIO_LEGACY_CLIENT_BREAK"
+    )
+    assert ok2 is False
+    assert outcome2.passed is False
+    assert outcome2.evidence_state == EvidenceState.FAIL

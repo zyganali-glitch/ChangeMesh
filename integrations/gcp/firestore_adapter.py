@@ -154,43 +154,52 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
                 doc_ref.set(fs_data)
             return updated_dict
 
-        if hasattr(self._db, "transaction"):
-            transaction = self._db.transaction()
+        if not hasattr(self._db, "transaction") or not callable(self._db.transaction):
+            raise RuntimeError(
+                "Firestore client does not support required atomic transaction semantics "
+                "(fail-closed: non-atomic fallback is strictly prohibited)"
+            )
+
+        transaction = self._db.transaction()
+        try:
+            is_gcp_client = False
             try:
                 from google.cloud import firestore as gcp_firestore  # type: ignore[import-untyped]
+
+                if isinstance(transaction, gcp_firestore.Transaction):
+                    is_gcp_client = True
+            except (ImportError, AttributeError):
+                is_gcp_client = False
+
+            if is_gcp_client:
 
                 @gcp_firestore.transactional
                 def _runner(txn: Any) -> Dict[str, Any]:
                     return _step(txn)
 
                 result_dict = _runner(transaction)
-            except Exception:
+            else:
                 result_dict = _step(transaction)
-                if hasattr(transaction, "commit"):
+                if hasattr(transaction, "commit") and callable(transaction.commit):
                     transaction.commit()
-        else:
-            doc = doc_ref.get()
-            if not doc.exists:
-                raise DocumentNotFoundError(
-                    f"Document at {document_path} not found",
-                    document_path=document_path,
-                )
-            current_data = doc.to_dict() or {}
-            actual_version = current_data.get("version", 0)
-            if actual_version != expected_version:
+                elif hasattr(transaction, "_commit"):
+                    transaction._commit()
+        except (
+            OptimisticConcurrencyError,
+            DocumentNotFoundError,
+            TenantIsolationError,
+            PersistenceSchemaError,
+        ):
+            raise
+        except Exception as exc:
+            exc_name = exc.__class__.__name__
+            if "Conflict" in exc_name or "Aborted" in exc_name or "collision" in str(exc).lower():
                 raise OptimisticConcurrencyError(
-                    f"Version conflict on {document_path}: "
-                    f"expected {expected_version}, found {actual_version}",
+                    f"Firestore transaction conflict on {document_path}: {exc}",
                     document_path=document_path,
                     expected_version=expected_version,
-                    actual_version=actual_version,
-                )
-            new_version = actual_version + 1
-            result_dict = dict(candidate_dict)
-            result_dict["version"] = new_version
-            if "updated_at" in result_dict:
-                result_dict["updated_at"] = now
-            doc_ref.set(_to_firestore_dict(result_dict))
+                ) from exc
+            raise
 
         return record_class(**_from_firestore_dict(result_dict))
 
@@ -694,11 +703,79 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
             .collection("idempotency_reservations")
             .document(reservation.reservation_id)
         )
-        if doc_ref.get().exists:
-            raise PersistenceSchemaError(
-                f"Reservation {reservation.reservation_id!r} already exists"
+        doc_path = (
+            f"/tenants/{tid}/changes/{change_id}/idempotency_reservations/"
+            f"{reservation.reservation_id}"
+        )
+
+        def _step(txn: Any) -> Dict[str, Any]:
+            if hasattr(doc_ref, "get"):
+                try:
+                    snapshot = doc_ref.get(transaction=txn)
+                except TypeError:
+                    snapshot = doc_ref.get()
+            elif hasattr(txn, "get"):
+                snapshot = txn.get(doc_ref)
+            else:
+                raise RuntimeError("Invalid Firestore transaction/doc_ref interface")
+
+            if snapshot.exists:
+                raise PersistenceSchemaError(
+                    f"Reservation {reservation.reservation_id!r} already exists at {doc_path}"
+                )
+
+            data = _to_firestore_dict(reservation.model_dump())
+            if hasattr(txn, "set"):
+                txn.set(doc_ref, data)
+            elif hasattr(doc_ref, "set"):
+                doc_ref.set(data)
+            return reservation.model_dump()
+
+        if not hasattr(self._db, "transaction") or not callable(self._db.transaction):
+            raise RuntimeError(
+                "Firestore client does not support required atomic transaction semantics "
+                "(fail-closed: non-atomic reservation is strictly prohibited)"
             )
-        doc_ref.set(_to_firestore_dict(reservation.model_dump()))
+
+        transaction = self._db.transaction()
+        try:
+            is_gcp_client = False
+            try:
+                from google.cloud import firestore as gcp_firestore  # type: ignore[import-untyped]
+
+                if isinstance(transaction, gcp_firestore.Transaction):
+                    is_gcp_client = True
+            except (ImportError, AttributeError):
+                is_gcp_client = False
+
+            if is_gcp_client:
+
+                @gcp_firestore.transactional
+                def _runner(txn: Any) -> Dict[str, Any]:
+                    return _step(txn)
+
+                _runner(transaction)
+            else:
+                _step(transaction)
+                if hasattr(transaction, "commit") and callable(transaction.commit):
+                    transaction.commit()
+                elif hasattr(transaction, "_commit"):
+                    transaction._commit()
+        except (PersistenceSchemaError, DocumentNotFoundError, TenantIsolationError):
+            raise
+        except Exception as exc:
+            exc_name = exc.__class__.__name__
+            if (
+                "AlreadyExists" in exc_name
+                or "Conflict" in exc_name
+                or "Aborted" in exc_name
+                or "collision" in str(exc).lower()
+            ):
+                raise PersistenceSchemaError(
+                    f"Reservation conflict for {reservation.reservation_id!r}: {exc}"
+                ) from exc
+            raise
+
         return reservation
 
     def get_idempotency_reservation(

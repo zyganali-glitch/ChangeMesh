@@ -122,13 +122,24 @@ class TrustedAuthorityDecisionVerifier:
                 )
 
             # 3. Slot match check
-            if expected_slot_ref and token.authority_slot_ref != expected_slot_ref:
+            if expected_slot_ref is not None and token.authority_slot_ref != expected_slot_ref:
+                return ApprovalValidationResult(
+                    is_valid=False,
+                    status="SLOT_MISMATCH",
+                    failure_reason=(
+                        f"Token authority slot {token.authority_slot_ref!r} "
+                        f"does not match required slot {expected_slot_ref!r}"
+                    ),
+                )
+
+            # 4. Scope match check
+            if expected_scope is not None and token.action_scope != expected_scope:
                 return ApprovalValidationResult(
                     is_valid=False,
                     status="SCOPE_MISMATCH",
                     failure_reason=(
-                        f"Token authority slot {token.authority_slot_ref!r} "
-                        f"does not match required slot {expected_slot_ref!r}"
+                        f"Token action scope {token.action_scope!r} "
+                        f"does not match expected scope {expected_scope!r}"
                     ),
                 )
 
