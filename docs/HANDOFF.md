@@ -64,18 +64,35 @@
 - P-12.03
 - P-12.04
 - P-12.05
-- P-12.06
 - P-12
+- P-13.00
+- P-13.01
+- P-13.02
+- P-13.03
+- P-13.04
+- P-13.05
+- P-13.06
+- P-13.07
+- P-13
 
 **Active Phase:**
-P-13 (PENDING / NEXT)
+P-14 (PENDING / NEXT)
 
 **Next Exact Task:**
-P-13.00 — ShadowLab donor preflight
+P-14.00 — Reversibility Gate donor preflight
 
-## Current P-12 State (Phase Complete)
+## Current P-13 State (Phase Complete)
 
-Phase P-12 is `DONE`.
+Phase P-13 is `DONE`.
+- **P-13.00:** ShadowLab donor preflight verified `CCT-SHADOW-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `MCP-TOOL-001` (pinned at `99824e867b7e3e7f41ba8a011ea3bfdc7863fb79`).
+- **P-13.01:** Defined `ShadowScenario`, `InjectedFault`, `FaultType`, `RehearsalOutcome`, and 7 canonical rehearsal scenarios in `src/shadowlab/scenarios.py`.
+- **P-13.02:** Implemented deterministic tool doubles in `src/shadowlab/tool_doubles.py` (`SimulatedDatabaseClient`, `SimulatedApiClient`, `SimulatedGitClient`) enforcing strict `ExecutionEvidenceMode.SIMULATION` labeling.
+- **P-13.03:** Executed clean migration and 503 transient recovery scenarios with exponential retry backoff.
+- **P-13.04:** Executed partial interruption and saga compensation scenario returning database sandbox to clean initial state.
+- **P-13.05:** Implemented stale approval rejection and untrusted prompt-injection quarantine rehearsal scenarios.
+- **P-13.06:** Implemented simulation evidence digest computation (`compute_simulation_digest`) binding rehearsal outcomes to execution authorization.
+- **P-13.07:** Implemented automatic plan correction loops for missing rollbacks and breaking legacy client changes.
+- **Evidence:** `tests/test_p13_shadowlab.py` passes 11 dedicated tests. Canonical unit suite passes 1149 tests (1 warning). Zero domain contract mutations or provider SDK leaks. P-14.00 is next.
 - **P-12.00:** Capability Passport donor preflight verified `CCT-PASSPORT-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `CLOVER-REG-001` (pinned at `047051df170e70ca986e30eb4a1df8350172e2cf`).
 - **P-12.01:** Defined standard demo capability vocabulary (`CapabilityType`) and role requirements (`AgentCapabilityRequirement`) for `impact_scout`, `policy_guardian`, `migration_engineer`, `release_steward` in `src/registry/capabilities.py`.
 - **P-12.02:** Implemented `PassportIssuer` and `PassportIssuanceRequest` in `src/registry/passport_issuer.py` requiring non-empty qualification evidence references and prohibiting self-attestation.
