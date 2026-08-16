@@ -1,6 +1,7 @@
 """ChangeMesh Core Module.
 
-Contains core components including the canonical BoundedGeminiClient.
+Contains core components including the canonical BoundedGeminiClient
+and Gemini Structured Output validation & parsing contracts.
 """
 
 from src.core.gemini_client import (
@@ -39,6 +40,37 @@ from src.core.gemini_client import (
     get_canonical_safety_settings,
     sanitize_telemetry_call_id,
 )
+from src.core.gemini_structured_output import (
+    CANONICAL_ACTION_TYPES,
+    CANONICAL_AUTHORITY_LANE,
+    CANONICAL_SPECIALIST_ROLES,
+    CANONICAL_STRUCTURED_SCHEMA_VERSION,
+    GoalDecompositionResult,
+    GoalDecompositionSubGoal,
+    PolicyComplianceStatus,
+    PolicyExplanationResult,
+    PolicyImpactLevel,
+    PolicyRuleExplanation,
+    SemanticAssessmentVerdict,
+    SemanticAuditResult,
+    SemanticClaimAssessment,
+    SemanticEvidenceCitation,
+    SemanticRiskLevel,
+    StructuredOutputError,
+    StructuredOutputJSONError,
+    StructuredOutputSecurityError,
+    StructuredOutputValidationError,
+    build_goal_decomposition_prompt,
+    build_policy_explanation_prompt,
+    build_semantic_audit_prompt,
+    parse_goal_decomposition_output,
+    parse_policy_explanation_output,
+    parse_semantic_audit_output,
+    parse_structured_json,
+    validate_action_type,
+    validate_safe_endpoint,
+    validate_safe_relative_path,
+)
 
 __all__ = [
     # Canonical Client
@@ -70,7 +102,7 @@ __all__ = [
     # Telemetry & Response Models
     "ModelCallTelemetry",
     "ModelResponse",
-    # Exceptions
+    # Model Exceptions
     "ModelClientError",
     "ModelConfigurationError",
     "ModelInitializationError",
@@ -79,4 +111,37 @@ __all__ = [
     "ModelAPIError",
     "ModelSafetyBlockedError",
     "ModelEmptyResponseError",
+    # Structured Output Constants & Enums
+    "CANONICAL_AUTHORITY_LANE",
+    "CANONICAL_STRUCTURED_SCHEMA_VERSION",
+    "CANONICAL_ACTION_TYPES",
+    "CANONICAL_SPECIALIST_ROLES",
+    "SemanticAssessmentVerdict",
+    "SemanticRiskLevel",
+    "PolicyImpactLevel",
+    "PolicyComplianceStatus",
+    # Structured Output Models
+    "GoalDecompositionSubGoal",
+    "GoalDecompositionResult",
+    "PolicyRuleExplanation",
+    "PolicyExplanationResult",
+    "SemanticEvidenceCitation",
+    "SemanticClaimAssessment",
+    "SemanticAuditResult",
+    # Structured Output Exceptions
+    "StructuredOutputError",
+    "StructuredOutputJSONError",
+    "StructuredOutputValidationError",
+    "StructuredOutputSecurityError",
+    # Structured Output Validation & Parsers
+    "validate_safe_relative_path",
+    "validate_safe_endpoint",
+    "validate_action_type",
+    "parse_structured_json",
+    "parse_goal_decomposition_output",
+    "parse_policy_explanation_output",
+    "parse_semantic_audit_output",
+    "build_goal_decomposition_prompt",
+    "build_policy_explanation_prompt",
+    "build_semantic_audit_prompt",
 ]

@@ -491,7 +491,7 @@ last_reviewed: '2026-08-16T11:53:00Z'
 
 ```yaml
 component_id: ZK-VALID-001
-status: APPROVED_FOR_IMPLEMENTATION
+status: VERIFIED
 donor_id: D-ZEROKIT
 repository: zyganali-glitch/zerokit-ai-control-plane
 source_commit: d663db8c706cb914e1af5caf651df08edb5c50c0
@@ -515,14 +515,15 @@ required_tests:
 - path traversal and unsafe endpoint rejection (ChangeMesh intentional delta)
 - positive validation for conforming structured outputs
 - no ZeroKit product semantics (forbidden carry-over)
-competition_introduction_commit: PENDING
+competition_introduction_commit: P-08.02
 evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
 - P-08.00 Gemini boundary donor preflight PASS
+- P-08.02 tests/test_p08_02_structured_output.py 36 tests PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T11:53:00Z'
+last_reviewed: '2026-08-16T13:36:00Z'
 ```
 
 ### ZK-CLAIM-001

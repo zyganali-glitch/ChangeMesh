@@ -124,3 +124,16 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Correct approach: (1) Own retry explicitly in `BoundedGeminiClient` with bounded max attempts (3), observable status codes, and injected deterministic sleep functions for instant test execution; (2) Defensively extract candidate output tokens checking both `candidates_token_count` and `response_token_count`.
 - Prevention rule: External SDK integrations must enforce exactly one explicit retry authority and defensively handle evolving response metadata schemas.
 - Status: `ACTIVE`
+
+### LESSON-20260816-02 — Pydantic v2 Strict types vs JSON String Enum Parsing and Security Fail-Closed Boundaries
+- Date/time: 2026-08-16
+- Active task: P-08.02
+- Symptom: Setting model-wide `ConfigDict(strict=True)` in Pydantic v2 blocks deserialization of JSON strings into Enum instances (e.g. `"LOW"` -> `SemanticRiskLevel.LOW`) because `strict=True` requires the input value to already be an exact Python Enum instance.
+- Root cause: Pydantic v2 strict mode enforces exact Python types on all fields including Enums when configured globally.
+- Incorrect approach: Disabling type strictness entirely or writing complex custom pre-validators for all enums.
+- Correct approach: Use `ConfigDict(extra="forbid", frozen=True)` on the model, use `StrictInt`, `StrictStr`, `StrictBool` on scalar fields to strictly forbid silent coercion (e.g. string to int or bool to str), allow Enum fields to parse valid string values natively while rejecting invalid ones, and apply deterministic security validators (`validate_safe_relative_path`, `validate_safe_endpoint`, `validate_action_type`) to reject path traversal and malicious payloads.
+- Prevention rule: When validating JSON model responses, pair `StrictStr`/`StrictInt` with controlled enum vocabularies, `extra="forbid"`, and deterministic security boundary checks.
+- Tests/evidence: `tests/test_p08_02_structured_output.py` (36 tests passed).
+- Affected files: `src/core/gemini_structured_output.py`, `tests/test_p08_02_structured_output.py`.
+- Reusable beyond this task: Yes (all future LLM structured output parsing and schema validation).
+- Status: `ACTIVE`
