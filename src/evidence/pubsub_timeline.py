@@ -21,6 +21,7 @@ from domain.contracts.conventions import (
     sha256_hex,
 )
 from domain.contracts.event_envelope import EventEnvelope
+from events.wire import scan_payload_for_secrets
 
 TIMELINE_SCHEMA_VERSION = "1.0.0"
 
@@ -106,6 +107,21 @@ class CausalEventTimeline:
                 f"timeline change_id {self.change_id!r}"
             )
 
+        if envelope.event_id in self._entries_by_id:
+            raise ValueError(f"Event ID {envelope.event_id!r} already exists in timeline")
+
+        if envelope.causation_id:
+            parent = self._entries_by_id.get(envelope.causation_id)
+            if not parent:
+                raise ValueError(
+                    f"Causal predecessor {envelope.causation_id!r} not found in timeline"
+                )
+            if parent.correlation_id != envelope.correlation_id:
+                raise ValueError("Correlation ID mismatch between cause and child")
+
+        if payload is not None:
+            scan_payload_for_secrets(payload)
+
         # Compute causal depth
         depth = 0
         if envelope.causation_id and envelope.causation_id in self._entries_by_id:
@@ -173,13 +189,9 @@ class CausalEventTimeline:
                     ready.append(child_id)
             ready.sort(key=sort_key)
 
-        # If cycle occurred, append remaining entries deterministically
+        # If cycle occurred, fail closed
         if len(ordered_ids) < len(entries):
-            remaining = sorted(
-                [e.event_id for e in entries if e.event_id not in ordered_ids],
-                key=sort_key,
-            )
-            ordered_ids.extend(remaining)
+            raise ValueError("Causal cycle detected in timeline DAG")
 
         return tuple(
             self._entries_by_id[eid].model_copy(update={"depth": depth_map.get(eid, 0)})
@@ -212,6 +224,10 @@ class CausalEventTimeline:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CausalEventTimeline:
         """Deserialize a timeline from a dictionary."""
+        schema_version = data.get("schema_version")
+        if schema_version != TIMELINE_SCHEMA_VERSION:
+            raise ValueError(f"Unsupported timeline schema_version: {schema_version}")
+
         change_id = data.get("change_id")
         if not change_id or not isinstance(change_id, str):
             raise ValueError("Missing or invalid change_id in timeline data")
@@ -220,6 +236,20 @@ class CausalEventTimeline:
         events_list = data.get("events", [])
         for item in events_list:
             entry = CausalTimelineEntry.model_validate(item)
+            if entry.event_id in timeline._entries_by_id:
+                raise ValueError(f"Duplicate event_id {entry.event_id!r} in timeline data")
             timeline._entries_by_id[entry.event_id] = entry
+
+        # Verify digest if provided
+        expected_digest = data.get("timeline_digest")
+        if expected_digest is not None:
+            actual_digest = timeline.compute_timeline_digest()
+            if actual_digest != expected_digest:
+                raise ValueError(
+                    f"Timeline digest mismatch. Expected {expected_digest}, got {actual_digest}"
+                )
+
+        # Check for cycles
+        timeline.get_causally_ordered_entries()
 
         return timeline

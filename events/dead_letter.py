@@ -6,40 +6,16 @@ and routing logic for poison or exhausted events.
 
 from __future__ import annotations
 
-import re
-
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from domain.contracts.conventions import (
     UtcDateTime,
     normalize_utc_datetime,
 )
-from events.retry import FailureClassification
+from events.retry import FailureClassification, sanitize_error_message
 from events.wire import scan_payload_for_secrets
 
 DEAD_LETTER_SCHEMA_VERSION = "1.0.0"
-
-
-def sanitize_error_message(msg: str) -> str:
-    """Sanitize error messages to ensure no tokens or passwords leak into logs/artifacts."""
-    # Redact common secret substrings if present
-    sanitized = re.sub(
-        r"(?:api[_-]?key|token|secret|password)\s*[:=]\s*['\"][^'\"]+['\"]",
-        "[REDACTED_SECRET]",
-        msg,
-        flags=re.IGNORECASE,
-    )
-    sanitized = re.sub(
-        r"\bBearer\s+[A-Za-z0-9_\-\.]{10,}\b",
-        "[REDACTED_BEARER]",
-        sanitized,
-        flags=re.IGNORECASE,
-    )
-    sanitized = re.sub(r"-{5}BEGIN[^-]+-{5}[\s\S]+?-{5}END[^-]+-{5}", "[REDACTED_KEY]", sanitized)
-    sanitized = re.sub(
-        r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}\b", "[REDACTED_TOKEN]", sanitized
-    )
-    return sanitized
 
 
 class TerminalFailureHandoff(BaseModel):

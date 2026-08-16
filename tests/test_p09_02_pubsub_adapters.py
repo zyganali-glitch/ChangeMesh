@@ -221,6 +221,39 @@ def test_consumer_unsupported_wire_version_rejection():
     assert "Unsupported wire_version" in (res.error_message or "")
 
 
+def test_consumer_unsupported_envelope_schema_version_rejection():
+    """Verify messages with unsupported envelope schema_version are rejected."""
+    envelope_dict = _make_envelope().model_dump(mode="json")
+    envelope_dict["schema_version"] = "99.0.0"
+
+    bad_data = {
+        "wire_version": "1.0.0",
+        "topic_id": "changemesh-lifecycle-v1",
+        "envelope": envelope_dict,
+        "payload": {},
+    }
+    raw_data = json.dumps(bad_data).encode("utf-8")
+
+    consumer = GooglePubSubConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-lifecycle-sub-v1",
+        subscriber_client=MagicMock(),
+    )
+
+    callback_called = []
+    res = consumer.process_raw_message(
+        raw_data=raw_data,
+        attributes={},
+        message_id="msg-bad-env-ver",
+        callback=lambda msg: callback_called.append(msg),
+    )
+
+    assert res.disposition == EventDeliveryDisposition.CONFLICT
+    assert res.callback_invoked is False
+    assert len(callback_called) == 0
+    assert "Unsupported envelope schema_version" in (res.error_message or "")
+
+
 def test_consumer_duplicate_delivery_safety():
     """Verify duplicate message returns DUPLICATE and does NOT invoke callback again."""
     delivery_state = InMemoryDeliveryState()
@@ -254,6 +287,43 @@ def test_consumer_duplicate_delivery_safety():
     assert res2.disposition == EventDeliveryDisposition.DUPLICATE
     assert res2.callback_invoked is False
     assert callback_count[0] == 1
+
+
+def test_consumer_retry_ownership_transient_failure():
+    """Verify TRANSIENT_RETRYABLE errors raise to trigger transport NACK/retry."""
+    consumer = GooglePubSubConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-lifecycle-sub-v1",
+        subscriber_client=MagicMock(),
+    )
+    envelope = _make_envelope(event_id="evt-retry-1")
+    raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
+
+    def failing_callback(msg: EventWireMessage) -> None:
+        raise RuntimeError("Some temporary network glitch")
+
+    with pytest.raises(RuntimeError, match="Some temporary network glitch"):
+        consumer.process_raw_message(raw_data, {}, "msg-retry", failing_callback)
+
+
+def test_consumer_retry_ownership_deterministic_failure():
+    """Verify DETERMINISTIC_INVALID errors return ACCEPT to stop transport retry."""
+    consumer = GooglePubSubConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-lifecycle-sub-v1",
+        subscriber_client=MagicMock(),
+    )
+    envelope = _make_envelope(event_id="evt-det-1")
+    raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
+
+    def det_failing_callback(msg: EventWireMessage) -> None:
+        raise ValueError("Schema validation failed: missing field")
+
+    res = consumer.process_raw_message(raw_data, {}, "msg-det", det_failing_callback)
+    # Should ACCEPT and NOT raise, relying on dead-letter pipeline
+    assert res.disposition == EventDeliveryDisposition.ACCEPT
+    assert res.callback_invoked is True
+    assert "Schema validation failed" in (res.error_message or "")
 
 
 def test_consumer_event_id_conflict():
@@ -365,15 +435,47 @@ def test_secret_in_payload_fails_closed():
         EventWireMessage(
             topic_id="changemesh-lifecycle-v1",
             envelope=envelope,
-            payload={"token": "ghp_" + "1234567890abcdef1234567890abcdef1234"},
+            payload={"github": "ghp_" + "1234567890abcdef1234567890abcdef1234"},
         )
 
-    # 4. Prohibited key name
+    # 4. Prohibited key name (original)
     with pytest.raises(ValueError, match="Prohibited credential field name"):
         EventWireMessage(
             topic_id="changemesh-lifecycle-v1",
             envelope=envelope,
             payload={"client_secret": "any_value"},
+        )
+
+    # 5. api_key structural payload rejected
+    with pytest.raises(ValueError, match="Prohibited credential field name"):
+        EventWireMessage(
+            topic_id="changemesh-lifecycle-v1",
+            envelope=envelope,
+            payload={"api_key": "ordinary-looking-value"},
+        )
+
+    # 6. token structural payload rejected
+    with pytest.raises(ValueError, match="Prohibited credential field name"):
+        EventWireMessage(
+            topic_id="changemesh-lifecycle-v1",
+            envelope=envelope,
+            payload={"token": "ordinary-looking-value"},
+        )
+
+    # 7. nested credential structural payload rejected
+    with pytest.raises(ValueError, match="Prohibited credential field name"):
+        EventWireMessage(
+            topic_id="changemesh-lifecycle-v1",
+            envelope=envelope,
+            payload={"nested": {"credential": "ordinary-looking-value"}},
+        )
+
+    # 8. nested service_account sequence structural payload rejected
+    with pytest.raises(ValueError, match="Prohibited credential field name"):
+        EventWireMessage(
+            topic_id="changemesh-lifecycle-v1",
+            envelope=envelope,
+            payload={"nested": [{"service_account": "ordinary-looking-value"}]},
         )
 
 

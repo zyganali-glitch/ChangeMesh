@@ -62,8 +62,8 @@ class DeadLetterPolicyConfig(BaseModel):
     @field_validator("max_delivery_attempts")
     @classmethod
     def _validate_max_attempts(cls, v: int) -> int:
-        if v < 1 or v > 100:
-            raise ValueError(f"max_delivery_attempts must be between 1 and 100, got {v}")
+        if v < 5 or v > 100:
+            raise ValueError(f"max_delivery_attempts must be between 5 and 100, got {v}")
         return v
 
 

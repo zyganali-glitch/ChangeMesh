@@ -1,6 +1,6 @@
 # ChangeMesh Component Provenance
 
-Implementation status: `IN_PROGRESS` (component-level status governed by `docs/DONOR_REUSE_MANIFEST.md`; `ZK-VALID-001` became `VERIFIED` in P-08.02)
+Implementation status: `IN_PROGRESS` (component-level status governed by `docs/DONOR_REUSE_MANIFEST.md`; `ZK-VALID-001` in P-08.02, `ZK-PRIV-001` in P-08.03, `CCT-SEM-001` in P-08.04, `CCT-FLIGHT-001` in P-09.05)
 Architecture donor preflight gate (P-04.00): `PASS`
 Gemini boundary donor preflight gate (P-08.00): `PASS`
 
@@ -53,6 +53,18 @@ ChangeMesh is a new product/repository. Design benefits from ideas in owner's ea
 - **Competition Introduction Commit:** `7cce78daca6ab37c027fea9d4637f3ecca4cfc28`
 - **Test Evidence:** `tests/test_p08_04_blind_audit.py` (18 tests PASS)
 - **Materially New Contribution:** Python-native ADK Evidence Auditor boundary with separate locked deterministic claims and model-visible neutral context, expected-answer field rejection, bounded evidence/prompt sizes, Gemini structured output parsing, claim/citation scope enforcement, and deterministic reconciliation preserving `EvidenceState`. No Codex/OpenAI runtime, GPT model, donor event stream, or donor project identity carries over.
+
+### CCT-FLIGHT-001 — Causal Event Timeline and Execution Integrity Boundary
+- **Status:** `VERIFIED`
+- **Donor ID:** `D-CCT` (`zyganali-glitch/codex-control-tower`)
+- **Immutable Donor SHA:** `65ee1b72faf9a7202d9166eed43fb671804815a8`
+- **Source Paths:** `cli/commands/flight-recorder.js`, `tests/test_codex_review.js`
+- **License State:** `VERIFIED_COMPATIBLE` (owner-authored)
+- **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
+- **ChangeMesh Target:** `src/evidence/pubsub_timeline.py`
+- **Competition Introduction Commit:** `4b66d381e7d8aaae1616cb62d34452fb11d15b32`
+- **Test Evidence:** `tests/test_p09_05_pubsub_timeline.py` (8 dedicated tests PASS; 54 P-09 dedicated tests PASS)
+- **Materially New Contribution:** Python-native causal event timeline implementing Kahn's topological sort algorithm over `causation_id` links, proving causal parent events precede child events regardless of network arrival sequence or wall-clock timestamp skew. Causally unlinked concurrent events are deterministically tie-broken by `(timestamp, event_id)`. Ingest-level payload secret sanitization and fail-closed validation, canonical JSON round-trip serialization with restart continuity, and deterministic SHA-256 timeline digest computation (`compute_timeline_digest()`). Zero Codex event models, frontend styling, or Google Cloud SDK types in core evidence timeline.
 
 ## Mandatory final disclosure
 

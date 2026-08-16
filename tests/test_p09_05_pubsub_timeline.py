@@ -13,6 +13,8 @@ Validates:
 
 from datetime import datetime, timezone
 
+import pytest
+
 from domain.contracts.agent_descriptor import AgentRevisionProvenance
 from domain.contracts.event_envelope import EventEnvelope
 from src.evidence.pubsub_timeline import (
@@ -78,10 +80,10 @@ def test_causal_dag_ordering_overrules_clock_skew():
         timestamp=datetime(2026, 8, 16, 12, 0, 15, tzinfo=timezone.utc),
     )
 
-    # Record out of order
-    timeline.record_event(env3, topic_id="changemesh-agent-work-v1")
+    # Record IN order so missing predecessor check passes
     timeline.record_event(env1, topic_id="changemesh-lifecycle-v1")
     timeline.record_event(env2, topic_id="changemesh-agent-work-v1")
+    timeline.record_event(env3, topic_id="changemesh-agent-work-v1")
 
     ordered = timeline.get_causally_ordered_entries()
     assert len(ordered) == 3
@@ -120,26 +122,42 @@ def test_independent_concurrent_events_deterministic_tiebreak():
     assert ordered[1].event_id == "evt-sibling-b"
 
 
-def test_payload_secret_redaction():
-    """Verify secrets in event payloads are redacted with [REDACTED] in timeline."""
+def test_payload_secret_fails_closed():
+    """Verify secrets in event payloads fail closed at timeline ingestion."""
     timeline = CausalEventTimeline(change_id="chg-demo-001")
 
     env = _make_envelope(event_id="evt-secret-test")
-    entry = timeline.record_event(
-        envelope=env,
-        topic_id="changemesh-lifecycle-v1",
-        payload={
-            "status": "ready",
-            "api_key": "super_secret_12345678",
-            "password": "db_password_value",
-            "safe_count": 42,
-        },
-    )
 
-    assert entry.payload_summary["status"] == "ready"
-    assert entry.payload_summary["safe_count"] == 42
-    assert entry.payload_summary["api_key"] == "[REDACTED]"
-    assert entry.payload_summary["password"] == "[REDACTED]"
+    with pytest.raises(
+        ValueError,
+        match="Credential material is forbidden|Prohibited credential field",
+    ):
+        timeline.record_event(
+            envelope=env,
+            topic_id="changemesh-lifecycle-v1",
+            payload={
+                "status": "ready",
+                "api_key": "super_secret_12345678",
+                "password": "db_password_value",
+                "safe_count": 42,
+            },
+        )
+
+
+def test_missing_predecessor_fails_closed():
+    timeline = CausalEventTimeline(change_id="chg-demo-001")
+    env = _make_envelope(event_id="evt-1", causation_id="missing-parent")
+    with pytest.raises(ValueError, match="Causal predecessor 'missing-parent' not found"):
+        timeline.record_event(env, topic_id="changemesh-agent-work-v1")
+
+
+def test_correlation_mismatch_fails_closed():
+    timeline = CausalEventTimeline(change_id="chg-demo-001")
+    env1 = _make_envelope(event_id="evt-1", correlation_id="corr-1")
+    env2 = _make_envelope(event_id="evt-2", causation_id="evt-1", correlation_id="corr-2")
+    timeline.record_event(env1, topic_id="changemesh-lifecycle-v1")
+    with pytest.raises(ValueError, match="Correlation ID mismatch"):
+        timeline.record_event(env2, topic_id="changemesh-agent-work-v1")
 
 
 def test_timeline_serialization_and_restart_continuity():

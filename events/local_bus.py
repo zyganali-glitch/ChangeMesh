@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import logging
 import threading
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from domain.contracts.event_envelope import EventDeliveryDisposition
@@ -24,8 +26,10 @@ from domain.contracts.evidence import (
     Provenance,
 )
 from events.consumer import EventConsumer, EventConsumeResult
+from events.dead_letter import build_dead_letter_record
 from events.delivery_state import InMemoryDeliveryState
 from events.publisher import EventPublisher, EventPublishResult
+from events.retry import FailureClassification, classify_failure, sanitize_error_message
 from events.wire import EventWireMessage
 
 logger = logging.getLogger(__name__)
@@ -182,7 +186,7 @@ class LocalEventConsumer(EventConsumer):
                 message_id=message_id,
                 transport="LOCAL",
                 callback_invoked=False,
-                error_message=f"Schema validation error: {e}",
+                error_message=sanitize_error_message(f"Schema validation error: {e}"),
             )
 
         # 2. Delivery classification
@@ -202,11 +206,33 @@ class LocalEventConsumer(EventConsumer):
                     callback_invoked=True,
                 )
             except Exception as e:
+                classification = classify_failure(e)
+                if classification == FailureClassification.TRANSIENT_RETRYABLE:
+                    logger.warning(
+                        "Transient failure in local callback for message %s (event %s); "
+                        "raising to NACK transport: %s",
+                        message_id,
+                        event_id,
+                        e,
+                    )
+                    raise e
+
                 logger.error(
-                    "Local callback failed for message %s (event %s): %s",
+                    "Local callback failed with deterministic error for message %s (event %s): %s",
                     message_id,
                     event_id,
                     e,
+                )
+                dl_record = build_dead_letter_record(
+                    dead_letter_id=f"dl-{uuid.uuid4().hex[:8]}",
+                    original_event_id=event_id,
+                    change_id=wire_msg.envelope.change_id,
+                    correlation_id=wire_msg.envelope.correlation_id,
+                    original_topic_id=wire_msg.topic_id,
+                    failure_classification=classification,
+                    raw_error=e,
+                    attempts_made=1,
+                    timestamp=datetime.now(timezone.utc),
                 )
                 return EventConsumeResult(
                     disposition=EventDeliveryDisposition.ACCEPT,
@@ -214,7 +240,8 @@ class LocalEventConsumer(EventConsumer):
                     message_id=message_id,
                     transport="LOCAL",
                     callback_invoked=True,
-                    error_message=f"Callback execution failure: {e}",
+                    error_message=sanitize_error_message(f"Callback execution failure: {e}"),
+                    dead_letter_record=dl_record,
                 )
 
         elif disposition == EventDeliveryDisposition.DUPLICATE:

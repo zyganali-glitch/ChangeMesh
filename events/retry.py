@@ -7,6 +7,7 @@ transient retryable failures from deterministic non-retryable errors.
 from __future__ import annotations
 
 import math
+import re
 from enum import Enum
 from typing import Any, Callable, Optional, Sequence
 
@@ -41,6 +42,28 @@ def classify_failure(exc: Exception | str) -> FailureClassification:
         if marker in msg:
             return FailureClassification.DETERMINISTIC_INVALID
     return FailureClassification.TRANSIENT_RETRYABLE
+
+
+def sanitize_error_message(msg: str) -> str:
+    """Sanitize error messages to ensure no tokens or passwords leak into logs/artifacts."""
+    # Redact common secret substrings if present
+    sanitized = re.sub(
+        r"(?:api[_-]?key|token|secret|password)\s*[:=]\s*['\"][^'\"]+['\"]",
+        "[REDACTED_SECRET]",
+        msg,
+        flags=re.IGNORECASE,
+    )
+    sanitized = re.sub(
+        r"\bBearer\s+[A-Za-z0-9_\-\.]{10,}\b",
+        "[REDACTED_BEARER]",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    sanitized = re.sub(r"-{5}BEGIN[^-]+-{5}[\s\S]+?-{5}END[^-]+-{5}", "[REDACTED_KEY]", sanitized)
+    sanitized = re.sub(
+        r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}\b", "[REDACTED_TOKEN]", sanitized
+    )
+    return sanitized
 
 
 class EventRetryPolicy(BaseModel):
@@ -146,7 +169,7 @@ def execute_with_retry(
                 RetryAttemptRecord(
                     attempt_number=attempt_num,
                     classification=classification,
-                    error_message=str(e),
+                    error_message=sanitize_error_message(str(e)),
                     backoff_delay_seconds=delay,
                 )
             )
@@ -158,7 +181,7 @@ def execute_with_retry(
                     total_attempts=attempt_num,
                     final_classification=FailureClassification.DETERMINISTIC_INVALID,
                     attempts=attempt_records,
-                    terminal_error=str(e),
+                    terminal_error=sanitize_error_message(str(e)),
                 )
 
             # If more attempts remain, invoke backoff sleep hook
@@ -171,7 +194,7 @@ def execute_with_retry(
                     total_attempts=pol.max_attempts,
                     final_classification=FailureClassification.TERMINAL_EXHAUSTED,
                     attempts=attempt_records,
-                    terminal_error=str(e),
+                    terminal_error=sanitize_error_message(str(e)),
                 )
 
     return RetryExecutionResult(

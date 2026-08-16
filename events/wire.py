@@ -16,6 +16,7 @@ from typing import Any, Mapping, Optional
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from domain.contracts.conventions import (
+    SECRET_KEY_PATTERNS,
     UtcDateTime,
     canonical_json_bytes,
     format_utc_timestamp,
@@ -50,19 +51,10 @@ def scan_payload_for_secrets(data: Any, path: str = "") -> None:
                     "Credential material is forbidden in event payloads."
                 )
     elif isinstance(data, dict):
+        _all_forbidden = SECRET_KEY_PATTERNS | frozenset({"bearer", "client_secret", "oauth_token"})
         for k, v in data.items():
             k_lower = str(k).lower()
-            if any(
-                forbidden in k_lower
-                for forbidden in (
-                    "private_key",
-                    "client_secret",
-                    "bearer",
-                    "password",
-                    "oauth_token",
-                    "access_token",
-                )
-            ):
+            if any(forbidden in k_lower for forbidden in _all_forbidden):
                 raise ValueError(
                     f"Prohibited credential field name {k!r} at {path!r} in event payload."
                 )
@@ -101,6 +93,15 @@ class EventWireMessage(BaseModel):
         if v != WIRE_SCHEMA_VERSION:
             raise ValueError(f"Unsupported wire_version {v!r}. Expected {WIRE_SCHEMA_VERSION!r}.")
         return v
+
+    @model_validator(mode="after")
+    def _validate_envelope_schema_version(self) -> EventWireMessage:
+        if self.envelope.schema_version != "1.0.0":
+            raise ValueError(
+                f"Unsupported envelope schema_version {self.envelope.schema_version!r}. "
+                "Expected '1.0.0'."
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_payload_secrecy(self) -> EventWireMessage:

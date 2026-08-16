@@ -67,3 +67,19 @@ provider assumptions, and donor fixture identities were not carried over.
   - Deterministic path traversal (`validate_safe_relative_path`), unsafe endpoint (`validate_safe_endpoint`), and action allowlist (`validate_action_type`) security validators.
   - Zero carry-over of ZeroKit configuration schemas (`panel_registry`, `rbac_registry`, `field_registry`), function names, or frontend global variables.
   - Truthful disclosure: The conceptual idea of multi-section strict dictionary validation originated in `D-ZEROKIT` before the competition; the entire Python implementation, domain models, and test suite were written from scratch during the competition period.
+
+### CCT-FLIGHT-001 — Causal Event Timeline and Execution Integrity Boundary
+- **Donor Repository:** `zyganali-glitch/codex-control-tower` (Donor ID: `D-CCT`)
+- **Immutable Donor Commit:** `65ee1b72faf9a7202d9166eed43fb671804815a8` (authored prior to competition build period)
+- **Source Paths:** `cli/commands/flight-recorder.js`, `tests/test_codex_review.js`
+- **License / Ownership:** Owner-authored / `VERIFIED_COMPATIBLE`
+- **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
+- **ChangeMesh Target Path:** `src/evidence/pubsub_timeline.py`
+- **Competition Introduction Commit:** `4b66d381e7d8aaae1616cb62d34452fb11d15b32`
+- **Test Evidence:** `tests/test_p09_05_pubsub_timeline.py` (8 dedicated tests PASS; 54 P-09 dedicated tests PASS)
+- **Materially New Competition Work:**
+  - Complete clean-room Python implementation of causal DAG event sequencing using Kahn's algorithm over `causation_id` links, proving parent events precede child events even in the presence of severe clock skew or out-of-order network arrival.
+  - Deterministic tie-breaking for causally unlinked concurrent events by `(timestamp, event_id)`.
+  - Ingest-level payload secret scanning and fail-closed validation, preventing credentials from entering the event ledger or timeline.
+  - Canonical JSON serialization with round-trip restart continuity and deterministic SHA-256 timeline digest hashing (`compute_timeline_digest()`).
+  - Strict exclusion of Codex/OpenAI runtime, local CLI event structures, and frontend visual styling.

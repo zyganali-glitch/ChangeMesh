@@ -12,6 +12,7 @@ from typing import Any, Callable, Mapping, Optional
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.contracts.event_envelope import EventDeliveryDisposition
+from events.dead_letter import DeadLetterEventRecord
 from events.wire import EventWireMessage
 
 
@@ -26,6 +27,7 @@ class EventConsumeResult(BaseModel):
     transport: str
     callback_invoked: bool
     error_message: Optional[str] = None
+    dead_letter_record: Optional[DeadLetterEventRecord] = None
 
     @field_validator("event_id", "message_id", "transport")
     @classmethod

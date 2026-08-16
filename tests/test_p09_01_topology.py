@@ -90,6 +90,19 @@ def test_dead_letter_policy_integrity_and_cycle_prevention():
             assert sub.dead_letter_policy.max_delivery_attempts == 5
 
 
+def test_dead_letter_policy_max_attempts_bounds():
+    """Verify DeadLetterPolicyConfig rejects values outside 5-100."""
+    with pytest.raises(ValidationError, match="between 5 and 100"):
+        DeadLetterPolicyConfig(dead_letter_topic="t1", max_delivery_attempts=4)
+
+    with pytest.raises(ValidationError, match="between 5 and 100"):
+        DeadLetterPolicyConfig(dead_letter_topic="t1", max_delivery_attempts=101)
+
+    # Valid values
+    DeadLetterPolicyConfig(dead_letter_topic="t1", max_delivery_attempts=5)
+    DeadLetterPolicyConfig(dead_letter_topic="t1", max_delivery_attempts=100)
+
+
 def test_retry_policy_bounds():
     """Verify retry policies have positive and ordered backoff values."""
     topo = get_canonical_topology()
