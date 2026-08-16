@@ -123,7 +123,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-07` | Google ADK Agent Skeleton | `DONE` | `P-06` |
 | `P-08` | Gemini Integration and Structured Reasoning Boundary | `DONE` | `P-07` |
 | `P-09` | Pub/Sub Event Backbone | `DONE` | `P-08` |
-| `P-10` | Firestore State, Idempotency, and Saga Persistence | `PENDING` | `P-09` |
+| `P-10` | Firestore State, Idempotency, and Saga Persistence | `IN_PROGRESS` | `P-09` |
 | `P-11` | Memory Trust Layer | `PENDING` | `P-10` |
 | `P-12` | Agent Registry and Capability Passport | `PENDING` | `P-11` |
 | `P-13` | ShadowLab Rehearsal Twin | `PENDING` | `P-12` |
@@ -925,15 +925,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-10 — Firestore State, Idempotency, and Saga Persistence
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-10.01 — Design Firestore collections, indexes, tenancy boundary, retention, document-size limits
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Design Firestore collections, indexes, tenancy boundary, retention, document-size limits.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Supports change, task, evidence, memory refs, approval, passport metadata.
 - **Required evidence:** Data-model review.
+- **Evidence:** Designed canonical Firestore persistence data model in `docs/P-10.01_FIRESTORE_DATA_MODEL.md`. Defined exhaustive 11-pattern query/access matrix (Q01–Q11). Established hierarchical tenant-partitioned subcollection topology (`/tenants/{tenant_id}/changes/{change_id}` with child subcollections `/tasks`, `/checkpoints`, `/idempotency_reservations`, `/evidence_refs`, `/approvals` and tenant-level `/passports`). Established strict fail-closed tenancy isolation requiring mandatory `tenant_id` on all repository interfaces and prohibiting unscoped collection group queries. Specified field-level document schemas for all 8 entity types with immutable/mutable classification, ISO-8601 UTC timestamps (`UtcDateTime`), monotonic `version` counters, and `extra="forbid"` schema validation. Defined compare-and-set (CAS) optimistic concurrency control (OCC) semantics with `OptimisticConcurrencyError` and P-09 `execute_with_retry()` delegation. Specified exactly three required composite indexes (`(state ASC, updated_at DESC)`, `(agent_id ASC, agent_revision ASC, is_revoked ASC)`, `(resolution_status ASC, card_created_at DESC)`) while deliberately omitting collection group and speculative indexes. Defined category-by-category operational retention policies and native Firestore TTL field bindings on `ttl_expires_at` (30 days post-terminal in production, 24 hours in demo), strictly preserving the invariant that operational TTL deletion never deletes records from the long-term immutable Evidence Ledger (P-22). Enforced 256 KiB ChangeMesh document-size safety ceiling (25% of Firestore 1 MiB hard limit) with SHA-256 artifact hash offloading for payloads > 16 KiB. Completed adversarial data-model review resolving all 7 challenges (unbounded subcollections, cross-tenant isolation, duplicate retry engines, idempotency key deferral, evidence ledger preservation, diff blob prohibitions, provider neutrality). Preserved all P-09 transport and causal invariants. Synchronized `docs/ARCHITECTURE.md`, `AGENT_ENVIRONMENT_AND_API.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md`. Zero domain contract modifications or provider SDK leaks. P-10.02 remains PENDING.
 - **Mandatory documentation sync:** Architecture, environment.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

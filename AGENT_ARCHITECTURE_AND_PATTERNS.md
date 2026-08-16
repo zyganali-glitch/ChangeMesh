@@ -45,7 +45,7 @@ No agent receives unrestricted credentials. Every tool call is scoped by role, c
 - `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches IMPLEMENTED; P-07.05 agent revision metadata IMPLEMENTED)
 - `src/core`: core system utilities and outer provider clients (P-08.01 `BoundedGeminiClient` and P-08.02 structured output in `src/core/` IMPLEMENTED; P-08.03 boundary enforcement is called by the client and owned by Policy Guardian; P-08.05 metrics and budget enforcement IMPLEMENTED)
 - `events`: Pub/Sub topology, wire serialization, publisher/consumer protocols, retry schedules, dead-letter routing, and local event bus (P-09.01–P-09.04 IMPLEMENTED)
-- `state`: Firestore repositories and idempotency (PLANNED)
+- `state` / `src/orchestrator`: Firestore persistence data model (P-10.01 DESIGN COMPLETE in `docs/P-10.01_FIRESTORE_DATA_MODEL.md`); repository implementation and idempotency (P-10.02+ PENDING)
 - `memory`: trust typing, provenance, TTL, contradiction, quarantine (PLANNED)
 - `capability`: passport generation, validation, expiry, revocation (PLANNED)
 - `shadowlab`: scenario definitions, tool doubles, fault injection, results (PLANNED)

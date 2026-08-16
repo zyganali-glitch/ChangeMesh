@@ -1,9 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-10.00 Saga Persistence Donor Preflight Closure
+# P-Ω Whole-Repository Integrity Audit — P-10.01 Firestore Data Model Design Closure
 
-> **Scope:** P-10.00 Saga Persistence Donor Preflight Closure (D-UIPATH, D-CONTEXTSEAL, Saga Source-Target Map, 6-Layer Idempotency Separation, Future-Phase Non-Leakage)
+> **Scope:** P-10.01 Firestore Data Model Design Closure (Collections, Indexes, Tenancy Boundary, Retention, Document-Size Limits, OCC Versioning, Referential Rules, Zero-Secret Persistence)
 > **Date:** 2026-08-16
-> **Evidence-Parity Repair Entry Remote SHA:** `8e56b7e68fc0d1f9897b6e0aca0be692dc140639`
-> **Historical Initial Entry Remote SHA:** `ea847038c46acd6bbc2838729b968188bb852404`
+> **Verified Remote Entry SHA:** `5baee46704dbb379a77cb9623824c9175623d8ba`
 > **Canonical Branch:** `main`
 
 ---
@@ -12,45 +11,37 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Canonical entry remote | **PASS** | `origin/main` verified as `8e56b7e68fc0d1f9897b6e0aca0be692dc140639` before evidence-parity repair edits (original P-10.00 initial entry was `ea847038c46acd6bbc2838729b968188bb852404`). |
-| Immutable Donor Pins | **PASS** | `D-UIPATH` pinned at `dc2267939c2aef0aba2737da65f53352c5cf8fb2`; `D-CONTEXTSEAL` pinned at `0dc924db9d82037d2e813548bdee27af5f180889`. |
-| P-10.00 Preflight Report | **PASS** | [`docs/P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md`](P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md) verified with 13 comprehensive sections and semantic design-leakage boundaries preserved. |
-| Saga Source-Target Map | **PASS** | Retained vs transformed vs excluded behaviors defined for `UIPATH-STATE-001`, `UIPATH-AUTH-001`, `CS-MIG-001`, `CS-PASS-001`, and `CS-WRITE-001`. |
-| 6-Layer Idempotency Separation | **PASS** | Clear separation across P-09 wire headers, P-09 in-memory transport delivery state, P-09 process-local dead-letter replay state, P-10 durable workflow step reservations, P-19 external write execution, and P-20 saga orchestration. Zero competing retry owners (`execute_with_retry()` sole owner). Exact durable idempotency storage key deferred to P-10.03. |
-| Compensation vs Persistence | **PASS** | Persistence of checkpoint and rollback plans owned by P-10 in Firestore; execution of compensation owned by P-17/P-20 without prescribing execution mechanisms. |
-| Future-Phase Non-Leakage | **PASS** | Strict non-leakage fences established for P-11 (Memory Trust), P-12 (Capability Passport), P-13 (ShadowLab), P-14 (Approval Compression), P-15 (Impact Scout), P-16 (Policy Guardian), P-17 (Migration Engineer), P-18 (Evidence Auditor), P-19 (Release Steward), P-20 (Orchestrator Saga), and P-22 (Evidence Ledger). |
-| Provider-Neutrality Boundary | **PASS** | `domain/contracts/` strictly isolated from Google Cloud Firestore, Pub/Sub, ADK, and GitHub SDKs. Firestore adapter isolated to `src/orchestrator/` and `integrations/gcp/`. |
-| Security & Privacy Constraints | **PASS** | Zero credentials in persistence, bounded references/hashes over blobs, explicit tenancy isolation (preventing cross-tenant access), strict fail-closed schema validation. Exact tenant identifier and storage hierarchy remain P-10.01 design decisions. |
-| P-09 Invariants Preserved | **PASS** | Causal DAG timeline, child-before-parent arrival, approximate delivery attempts, single local retry owner, and terminal failure handoff `human_authority_required=False` preserved. |
-| P-10.01 Decisions Undecided | **PASS** | Final Firestore collection names, document hierarchy, composite indexes, tenancy key/path representation, retention durations, and size ceilings intentionally deferred to P-10.01. |
-| Excluded Donor Behaviors | **PASS** | UiPath runtime, Maestro, Action Center, Data Service, Phase-0 interview, DataHub MCP tools, and automatic merge strictly excluded. |
-| Donor-Reuse Auditor Evaluation | **PASS** | Read-only adversarial audit returned 0 blocking findings and 0 warnings. |
-| Donor Manifest Lint | **PASS** | 20 components valid in `uv run python tools/governance/donor_manifest_lint.py` (SHASUM `6fff130b9e6ff413697385f1b513947aff99a7f0709bbf54e03ae8064ad2dc08`). |
-| Canonical Unit Command | **PASS** | 1109 passed, 1 warning in `uv run python scripts/cmd.py unit`. |
+| Canonical entry remote | **PASS** | `origin/main` verified as `5baee46704dbb379a77cb9623824c9175623d8ba` before P-10.01 design edits. |
+| Canonical Design Artifact | **PASS** | [`docs/P-10.01_FIRESTORE_DATA_MODEL.md`](P-10.01_FIRESTORE_DATA_MODEL.md) created with 16 comprehensive sections covering all Master Plan acceptance criteria. |
+| Query / Access Pattern Matrix | **PASS** | 11 operational query patterns (Q01–Q11) formally derived with owners, predicates, cardinality, ordering, consistency, index requirements, and cross-tenant prohibitions. |
+| Hierarchical Tenant Topology | **PASS** | Strict path-based hierarchy established under `/tenants/{tenant_id}/changes/{change_id}` with child subcollections `/tasks`, `/checkpoints`, `/idempotency_reservations`, `/evidence_refs`, `/approvals` and tenant-level `/passports`. |
+| Tenancy Isolation Boundary | **PASS** | Path-based partitioning with mandatory `tenant_id` on all repository interfaces; unscoped collection group queries prohibited. |
+| Document Schema Matrix | **PASS** | Field-level specifications for all 8 document types with immutable/mutable classifications, `UtcDateTime` ISO-8601 formatting, monotonic `version` tokens, and `extra="forbid"` schema validation. |
+| Concurrency & Versioning (OCC) | **PASS** | Compare-And-Set (CAS) optimistic concurrency control with monotonic `version` counter and `OptimisticConcurrencyError` delegation to P-09 `execute_with_retry()`. |
+| Index Specifications | **PASS** | Exactly 3 composite indexes specified (`(state ASC, updated_at DESC)`, `(agent_id ASC, agent_revision ASC, is_revoked ASC)`, `(resolution_status ASC, card_created_at DESC)`); collection group and speculative indexes deliberately omitted. |
+| Retention & Native TTL | **PASS** | Operational retention mapped to native Firestore TTL (`ttl_expires_at`: 30d prod / 24h demo post-terminal); strict invariant preserved that saga TTL never deletes records from the immutable Evidence Ledger (P-22). |
+| Document-Size Ceilings | **PASS** | 256 KiB ChangeMesh safety ceiling (25% of Firestore 1 MiB hard limit); SHA-256 artifact hash offloading for payloads > 16 KiB; large diffs and source code trees prohibited. |
+| Security & Privacy Boundaries | **PASS** | Zero-secret persistence verified; credentials isolated to outer adapters; structural field-level secret redaction enforced. |
+| Adversarial Review | **PASS** | All 7 review challenges (unbounded subcollections, cross-tenant isolation, duplicate retry owners, idempotency deferral, evidence ledger preservation, diff blob limits, provider neutrality) resolved. |
+| Future-Phase Non-Leakage | **PASS** | Clean boundaries maintained for P-10.02 (state repository), P-10.03 (idempotency formulas/algorithms), P-10.04 (checkpoint recovery loop), P-10.05 (teardown scripts), P-11, P-12, P-14, P-19, P-20, and P-22. |
+| Provider-Neutrality Boundary | **PASS** | Zero Google/Firestore SDK imports in `domain/contracts/`. |
+| P-09 Invariants Preserved | **PASS** | Causal DAG timeline, single local retry owner, and `TerminalFailureHandoff.human_authority_required=False` strictly preserved. |
+| Donor Manifest Lint | **PASS** | 20 components valid in `uv run python tools/governance/donor_manifest_lint.py` (exit code `0`, SHASUM `6fff130b9e6ff413697385f1b513947aff99a7f0709bbf54e03ae8064ad2dc08`). |
+| Canonical Unit Command | **PASS** | 1109 passed, 1 warning in `uv run python scripts/cmd.py unit` (9.22s, exit code `0`). |
 | Full Repository Suite | **FAIL** | 1109 passed, 1 warning, 3 errors from missing `project` fixture in `tests/test_gcp_access.py` (`test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`). Exact state: **FAIL — known historical baseline GCP fixture debt**. |
-| Documentation Parity | **PASS** | `docs/DONOR_REUSE_MANIFEST.md`, `docs/COMPONENT_PROVENANCE.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md` synchronized. |
-| Zero Product / Test Code Modified | **PASS** | Preflight is documentation-only; `git diff --name-only` confirms zero changes to `domain/`, `src/`, `events/`, `integrations/`, or `tests/`. |
+| Documentation Parity | **PASS** | `docs/ARCHITECTURE.md`, `AGENT_ENVIRONMENT_AND_API.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md` synchronized. |
+| Zero Product Code Modified | **PASS** | Design-only task; zero changes to `domain/`, `src/`, `events/`, `integrations/`, or `tests/`. |
 
 ---
 
 ## 2. Validation Commands and Exact Outcomes
 
-### Fresh Evidence-Parity Verification (Current Run)
-
 | Command | Exit Code | Result | Details |
 |---|---|---|---|
 | `uv run python tools/governance/donor_manifest_lint.py` | `0` | **PASS** | 20 components valid (SHASUM `6fff130b9e6ff413697385f1b513947aff99a7f0709bbf54e03ae8064ad2dc08`) |
-| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1109 passed, 1 warning in 7.07s |
-| `uv run python -m pytest tests/` | `1` | **FAIL** | 1109 passed, 1 warning, 3 errors in 7.79s (`tests/test_gcp_access.py`: missing `project` fixture for `test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`) |
+| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1109 passed, 1 warning in 9.22s |
+| `uv run python -m pytest tests/` | `1` | **FAIL** | 1109 passed, 1 warning, 3 errors in 7.76s (`tests/test_gcp_access.py`: missing `project` fixture for `test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`) |
 | `git diff --check` | `0` | **PASS** | Zero whitespace or lint errors |
-
-### Historical Initial Baseline (Preserved for Audit Continuity)
-
-| Metric / Command | Historical Baseline Value | Notes |
-|---|---|---|
-| Initial Entry SHA | `ea847038c46acd6bbc2838729b968188bb852404` | Remote HEAD before P-10.00 initial work |
-| Initial Manifest Lint | 20 components valid (SHASUM `3c8d179426f8f533bf6fefcf2a912bb0e7195c806540c7ff92d77cb36f452097`) | Prior manifest hash before P-10.00 donor additions |
-| Initial Unit Timing | 1109 passed, 1 warning in 6.78s | Original timing recorded at initial P-10.00 entry |
 
 ---
 
@@ -59,12 +50,12 @@
 | Surface | Status | Verification Summary |
 |---|---|---|
 | 1. Implementation ↔ Tests | **PASS** | 1109 canonical unit tests pass with zero failures. |
-| 2. Implementation ↔ Architecture | **PASS** | `docs/ARCHITECTURE.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, and `docs/P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md` accurately document component ownership, single retry owner, provider neutrality, and saga persistence boundaries. |
-| 3. Implementation ↔ README | **PASS** | English and Turkish READMEs document current unit test counts (1109 passed, 1 warning), P-09 phase closure, and honest `PLANNED` / `NOT_RUN` boundaries. |
-| 4. Master Plan ↔ Repository | **PASS** | P-10.00 marked `DONE` with verified evidence; P-10.01 marked `PENDING`. |
-| 5. Claims ↔ Evidence | **PASS** | Local boundaries verified; cloud deployments honestly reported as `NOT_RUN` / `BLOCKED`. |
-| 6. Local ↔ Remote Revision | **PASS** | Entry SHA (`8e56b7e68fc0d1f9897b6e0aca0be692dc140639`) verified before edits; local working tree audited and verified. |
-| 7. English ↔ Turkish Surfaces | **PASS** | `README.md` and `README.tr.md` test counts (1109 passed, 1 warning), status, and boundaries synchronized. |
+| 2. Implementation ↔ Architecture | **PASS** | `docs/ARCHITECTURE.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, and `docs/P-10.01_FIRESTORE_DATA_MODEL.md` accurately document component ownership, tenancy boundary, OCC versioning, single retry owner, provider neutrality, and saga persistence boundaries. |
+| 3. Implementation ↔ README | **PASS** | README documents current unit test counts (1109 passed, 1 warning) and honest `PLANNED` / `NOT_RUN` boundaries. |
+| 4. Master Plan ↔ Repository | **PASS** | P-10.01 marked `DONE` with verified evidence; P-10.02 marked `PENDING`. |
+| 5. Claims ↔ Evidence | **PASS** | Data model design verified; cloud deployments honestly reported as `NOT_RUN` / `BLOCKED`. |
+| 6. Local ↔ Remote Revision | **PASS** | Entry SHA (`5baee46704dbb379a77cb9623824c9175623d8ba`) verified; local working tree audited and verified. |
+| 7. English ↔ Turkish Surfaces | **PASS** | Test counts and status synchronized across documentation surfaces. |
 | 8. Demo ↔ Actual Runtime | **PASS** | Demo limits labeled as internal project thresholds. |
 | 9. Devpost / Judge Claims ↔ Frozen Tag | **PASS** | `docs/JUDGING_MAP.md` updated with honest local verification states and preserved `NOT_RUN` boundaries. |
 
@@ -73,7 +64,7 @@
 ## 4. Final Honest Phase-Closure State
 
 - **Audit Character:** P-Ω repository integrity audit (not external independent certification).
-- **Task P-10.00 Status:** `DONE`.
-- **Phase P-10 Status:** `IN_PROGRESS` (P-10.00 closed; P-10.01–P-10.05 PENDING).
+- **Task P-10.01 Status:** `DONE`.
+- **Phase P-10 Status:** `IN_PROGRESS` (P-10.00 & P-10.01 closed; P-10.02–P-10.05 PENDING).
 - **Full Suite State:** `FAIL — known historical baseline GCP fixture debt` (preserved honestly, not masked).
-- **Next Eligible Master Plan Task:** `P-10.01` — Design Firestore collections, indexes, tenancy boundary, retention, document-size limits (UNEXECUTED / AWAITING INSTRUCTION).
+- **Next Eligible Master Plan Task:** `P-10.02 — Implement state repository with optimistic concurrency/version checks` (UNEXECUTED / PENDING).

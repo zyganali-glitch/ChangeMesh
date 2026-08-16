@@ -135,6 +135,26 @@ Record actual environment only; do not fill unknown values with guesses.
 - **Canonical Metrics Artifact:** `build_model_metrics_artifact()` and `export_metrics_artifact_json()` provide deterministic non-secret execution artifacts with strict secrecy guarantees (zero prompt, response, or credential text).
 - **Bounds:** Rate values are finite and non-negative; token counts are non-negative; existing timeout [1s, 60s] and output-token [1, 8192] bounds remain active.
 
+### Firestore Persistence Data Model Boundary (P-10.01)
+
+- **Canonical Design Artifact:** `docs/P-10.01_FIRESTORE_DATA_MODEL.md`.
+- **Collection Hierarchy:** Strictly hierarchical tenant-partitioned topology:
+  - Root: `/tenants/{tenant_id}`
+  - Subcollections:
+    - `/tenants/{tenant_id}/changes/{change_id}`
+    - `/tenants/{tenant_id}/changes/{change_id}/tasks/{task_id}`
+    - `/tenants/{tenant_id}/changes/{change_id}/checkpoints/{checkpoint_id}`
+    - `/tenants/{tenant_id}/changes/{change_id}/idempotency_reservations/{idempotency_key}`
+    - `/tenants/{tenant_id}/changes/{change_id}/evidence_refs/{evidence_id}`
+    - `/tenants/{tenant_id}/changes/{change_id}/approvals/{card_id}`
+    - `/tenants/{tenant_id}/passports/{passport_id}`
+- **Fail-Closed Tenancy:** Path-based partitioning with mandatory `tenant_id` as the first argument in all repository calls. Unpartitioned cross-tenant queries and collection group searches are prohibited.
+- **Optimistic Concurrency Control (OCC):** Monotonic integer `version` field incremented atomically on every mutation via Compare-And-Set (CAS) transactions. Concurrency conflicts raise `OptimisticConcurrencyError` and retry via P-09's `execute_with_retry()`.
+- **Document-Size Safety Ceiling:** 256 KiB (262,144 bytes) safety ceiling (25% of Firestore's 1 MiB provider limit). Payloads > 16 KiB are offloaded to storage and referenced by SHA-256 hex digests. Prohibited in Firestore: git source trees, raw diffs > 4 KiB, proprietary database dumps, unredacted credentials, raw LLM prompt dumps.
+- **Operational Retention & Native TTL:** Document expiration is managed by Firestore native TTL on `ttl_expires_at` (30 days post-terminal in production, 24 hours in demo). Operational TTL deletion never deletes records from the long-term immutable Evidence Ledger (P-22).
+- **Zero-Secret Persistence:** Strictly zero API keys, credentials, service-account JSON keys, or private tokens stored in Firestore documents.
+- **Deferred Implementation Boundaries:** Repository implementation deferred to P-10.02; idempotency hashing formula and reservation algorithm deferred to P-10.03; checkpoint recovery loop deferred to P-10.04/P-20; retention teardown scripts deferred to P-10.05.
+
 ## Environment-variable registry
 
 | Variable | Purpose | Required | Secret | Safe example | Owner phase |
