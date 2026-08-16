@@ -1,6 +1,6 @@
 """ChangeMesh ShadowLab scenario schema and standard test scenarios.
 
-P-13.01: Defines declarative synthetic rehearsal scenarios with injected faults,
+P-13.01 & P-13.05: Defines declarative synthetic rehearsal scenarios with injected faults,
 preconditions, expected policy outcomes, retry limits, and simulation labeling.
 """
 
@@ -28,6 +28,7 @@ class FaultType(str, Enum):
     PROMPT_INJECTION_ATTEMPT = "PROMPT_INJECTION_ATTEMPT"
     MISSING_ROLLBACK_STEP = "MISSING_ROLLBACK_STEP"
     LEGACY_CLIENT_SCHEMA_BREAK = "LEGACY_CLIENT_SCHEMA_BREAK"
+    PROCESS_CRASH_MID_WORKFLOW = "PROCESS_CRASH_MID_WORKFLOW"
 
 
 class InjectedFault(BaseModel):
@@ -37,7 +38,7 @@ class InjectedFault(BaseModel):
 
     fault_type: FaultType
     target_step: str
-    failure_count: int = 1  # Number of times step fails before succeeding (for transient faults)
+    failure_count: int = 1
     error_message: str = "Injected synthetic fault for resilience rehearsal"
 
     @field_validator("target_step", "error_message")
@@ -81,7 +82,7 @@ class RehearsalOutcome(BaseModel):
     schema_version: str = CANONICAL_SCHEMA_VERSION
     scenario_id: str
     evidence_mode: ExecutionEvidenceMode = ExecutionEvidenceMode.SIMULATION
-    evidence_state: EvidenceState  # PASS, FAIL, SIMULATED, etc.
+    evidence_state: EvidenceState  # PASS, FAIL, SIMULATED
     passed: bool
     steps_executed: int
     retries_attempted: int
@@ -90,6 +91,7 @@ class RehearsalOutcome(BaseModel):
     evidence_digest: str  # SHA-256 of execution trace
     simulation_logs: Tuple[str, ...]
     details: str
+    backoff_delays_ms: Tuple[int, ...] = ()
 
 
 def compute_simulation_digest(scenario_id: str, logs: Sequence[str]) -> str:
@@ -99,7 +101,7 @@ def compute_simulation_digest(scenario_id: str, logs: Sequence[str]) -> str:
 
 
 def get_standard_shadow_scenarios() -> Dict[str, ShadowScenario]:
-    """Canonical battery of 7 ShadowLab rehearsal scenarios."""
+    """Canonical battery of 8 ShadowLab rehearsal scenarios."""
     return {
         "SCENARIO_NORMAL_MIGRATION": ShadowScenario(
             scenario_id="SCENARIO_NORMAL_MIGRATION",
@@ -129,7 +131,7 @@ def get_standard_shadow_scenarios() -> Dict[str, ShadowScenario]:
         "SCENARIO_PARTIAL_INTERRUPTION_COMPENSATION": ShadowScenario(
             scenario_id="SCENARIO_PARTIAL_INTERRUPTION_COMPENSATION",
             name="Partial Apply Interruption & Saga Compensation Rehearsal",
-            description="Step 2 encounters database lock timeout; orchestrator triggers step 1 compensation",
+            description="Step 2 encounters database lock timeout; triggers saga compensation",
             preconditions={"database": "postgres", "lock_contention": "high"},
             injected_fault=InjectedFault(
                 fault_type=FaultType.DATABASE_LOCK_TIMEOUT,
@@ -199,6 +201,21 @@ def get_standard_shadow_scenarios() -> Dict[str, ShadowScenario]:
             ),
             expected_policy_outcome="DENY_RETRY",
             max_retry_limit=2,
-            pass_criteria="Detects client breakage and expands migration to expand-contract pattern",
+            pass_criteria="Detects client breakage and applies expand-contract pattern",
+        ),
+        "SCENARIO_RESTART_RESUME": ShadowScenario(
+            scenario_id="SCENARIO_RESTART_RESUME",
+            name="Process Crash & Saga Checkpoint Resume Rehearsal",
+            description="Process crashes after step 1; recovers from checkpoint and completes",
+            preconditions={"crash_at_step": "step_1"},
+            injected_fault=InjectedFault(
+                fault_type=FaultType.PROCESS_CRASH_MID_WORKFLOW,
+                target_step="step_1",
+                failure_count=1,
+                error_message="Simulated process restart mid-workflow",
+            ),
+            expected_policy_outcome="ALLOW",
+            max_retry_limit=2,
+            pass_criteria="Recovers saga state from durable checkpoint and continues execution",
         ),
     }

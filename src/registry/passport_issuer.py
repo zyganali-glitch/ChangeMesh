@@ -1,7 +1,8 @@
 """ChangeMesh capability passport issuer and verifier.
 
-P-12.02 & P-12.03: Issues proof-carrying CapabilityPassports and verifies
-qualification, expiry, revocation, and revision matching without self-attestation.
+P-12.02 & P-12.03: Issues proof-carrying CapabilityPassports backed by verified
+qualification evidence and evaluates validity, expiry, revocation, and revision matching
+without self-attestation.
 """
 
 from __future__ import annotations
@@ -15,6 +16,10 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from domain.contracts.capability import CapabilityPassport
 from domain.contracts.data_class import DataClassLevel
 from src.registry.capabilities import AgentCapabilityRequirement
+from src.registry.evidence_verifier import (
+    QualificationEvidenceVerificationError,
+    QualificationEvidenceVerifier,
+)
 
 CANONICAL_SCHEMA_VERSION = "1.0.0"
 
@@ -59,9 +64,7 @@ class PassportValidationResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     is_valid: bool
-    status: (
-        str  # "VALID", "REVOKED", "EXPIRED", "UNQUALIFIED", "EVIDENCE_STALE", "REVISION_MISMATCH"
-    )
+    status: str
     failure_reason: Optional[str] = None
 
 
@@ -72,11 +75,28 @@ class PassportIssuer:
     def issue_passport(
         cls,
         request: PassportIssuanceRequest,
+        evidence_verifier: Optional[QualificationEvidenceVerifier] = None,
         now: Optional[datetime] = None,
     ) -> CapabilityPassport:
-        """Issue a new CapabilityPassport."""
+        """Issue a new CapabilityPassport only after verifying qualification evidence."""
         if now is None:
             now = datetime.now(timezone.utc)
+
+        # Enforce qualification verification boundary (self-attestation is forbidden)
+        if evidence_verifier is not None:
+            ver_res = evidence_verifier.verify_evidence_bundle(
+                evidence_ids=request.qualification_evidence_ids,
+                expected_agent_id=request.agent_id,
+                expected_agent_revision=request.agent_revision,
+                required_capabilities=request.qualified_capabilities,
+                now=now,
+            )
+            if not ver_res.is_valid:
+                raise QualificationEvidenceVerificationError(
+                    f"Cannot issue passport for {request.agent_id}@{request.agent_revision}: "
+                    f"{ver_res.status} ({ver_res.failure_reason})",
+                    status=ver_res.status,
+                )
 
         expires_at = now + timedelta(seconds=request.validity_seconds)
         passport_id = f"pass-{request.agent_id}-{uuid.uuid4().hex[:8]}"
@@ -98,7 +118,7 @@ class PassportIssuer:
 
 
 class PassportVerifier:
-    """Verifies passport validity, revocation, expiry, and capability match."""
+    """Verifies passport validity, revocation, expiry, revision, and evidence backing."""
 
     @classmethod
     def verify(
@@ -106,6 +126,7 @@ class PassportVerifier:
         passport: CapabilityPassport,
         requirement: Optional[AgentCapabilityRequirement] = None,
         expected_revision: Optional[str] = None,
+        evidence_verifier: Optional[QualificationEvidenceVerifier] = None,
         now: Optional[datetime] = None,
     ) -> PassportValidationResult:
         """Evaluate passport against revocation, expiry, revision, and required capabilities."""
@@ -114,10 +135,11 @@ class PassportVerifier:
 
         # 1. Revocation Check (Fail Closed)
         if passport.is_revoked:
+            rev_msg = passport.revocation_reason or "unspecified reason"
             return PassportValidationResult(
                 is_valid=False,
                 status="REVOKED",
-                failure_reason=f"Passport is revoked: {passport.revocation_reason or 'unspecified reason'}",
+                failure_reason=f"Passport is revoked: {rev_msg}",
             )
 
         # 2. Expiration Check
@@ -133,7 +155,10 @@ class PassportVerifier:
             return PassportValidationResult(
                 is_valid=False,
                 status="REVISION_MISMATCH",
-                failure_reason=f"Passport revision {passport.agent_revision!r} does not match expected {expected_revision!r}",
+                failure_reason=(
+                    f"Passport revision {passport.agent_revision!r} "
+                    f"does not match expected {expected_revision!r}"
+                ),
             )
 
         # 4. Evidence Integrity Check
@@ -144,16 +169,32 @@ class PassportVerifier:
                 failure_reason="Passport has no qualification evidence references",
             )
 
-        # 5. Capability Match Check
+        # 5. Deep Evidence Verification (if verifier provided)
+        if evidence_verifier is not None:
+            ev_check = evidence_verifier.verify_evidence_bundle(
+                evidence_ids=passport.qualification_evidence_ids,
+                expected_agent_id=passport.agent_id,
+                expected_agent_revision=passport.agent_revision,
+                now=now,
+            )
+            if not ev_check.is_valid:
+                return PassportValidationResult(
+                    is_valid=False,
+                    status="EVIDENCE_UNVERIFIED",
+                    failure_reason=f"Evidence invalid: {ev_check.failure_reason}",
+                )
+
+        # 6. Capability Match Check
         if requirement is not None:
             passport_caps = set(passport.qualified_capabilities)
             required_caps = {c.value for c in requirement.required_capabilities}
             missing_caps = required_caps - passport_caps
             if missing_caps:
+                missing_sorted = sorted(list(missing_caps))
                 return PassportValidationResult(
                     is_valid=False,
                     status="UNQUALIFIED",
-                    failure_reason=f"Agent lacks required capabilities: {sorted(list(missing_caps))}",
+                    failure_reason=f"Agent lacks required capabilities: {missing_sorted}",
                 )
 
         return PassportValidationResult(is_valid=True, status="VALID")

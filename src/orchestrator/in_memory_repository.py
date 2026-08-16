@@ -85,7 +85,7 @@ class InMemorySagaStateRepository(SagaStateRepository):
             tid = validate_tenant_id(tenant_id)
             if change.tenant_id != tid:
                 raise TenantIsolationError(
-                    f"Change tenant_id {change.tenant_id!r} does not match operation tenant_id {tid!r}"
+                    f"Change tenant_id {change.tenant_id!r} != operation tenant_id {tid!r}"
                 )
             scan_for_secrets(change.model_dump())
             if tid not in self._changes:
@@ -138,7 +138,7 @@ class InMemorySagaStateRepository(SagaStateRepository):
             tid = validate_tenant_id(tenant_id)
             if change.tenant_id != tid:
                 raise TenantIsolationError(
-                    f"Change tenant_id {change.tenant_id!r} does not match operation tenant_id {tid!r}"
+                    f"Change tenant_id {change.tenant_id!r} != operation tenant_id {tid!r}"
                 )
             scan_for_secrets(change.model_dump())
             current = self.get_change(tid, change.change_id)
@@ -149,7 +149,8 @@ class InMemorySagaStateRepository(SagaStateRepository):
                 )
             if current.version != expected_version:
                 raise OptimisticConcurrencyError(
-                    f"Version conflict on change {change.change_id!r}: expected {expected_version}, found {current.version}",
+                    f"Version conflict on change {change.change_id!r}: "
+                    f"expected {expected_version}, found {current.version}",
                     document_path=f"/tenants/{tid}/changes/{change.change_id}",
                     expected_version=expected_version,
                     actual_version=current.version,
@@ -228,7 +229,8 @@ class InMemorySagaStateRepository(SagaStateRepository):
                 raise DocumentNotFoundError(f"Task {task.task_id!r} not found")
             if current.version != expected_version:
                 raise OptimisticConcurrencyError(
-                    f"Version conflict on task {task.task_id!r}: expected {expected_version}, found {current.version}",
+                    f"Version conflict on task {task.task_id!r}: "
+                    f"expected {expected_version}, found {current.version}",
                     document_path=f"/tenants/{tid}/changes/{change_id}/tasks/{task.task_id}",
                     expected_version=expected_version,
                     actual_version=current.version,
@@ -383,7 +385,8 @@ class InMemorySagaStateRepository(SagaStateRepository):
                 raise DocumentNotFoundError(f"Approval card {approval.card_id!r} not found")
             if current.version != expected_version:
                 raise OptimisticConcurrencyError(
-                    f"Version conflict on approval {approval.card_id!r}: expected {expected_version}, found {current.version}",
+                    f"Version conflict on approval {approval.card_id!r}: "
+                    f"expected {expected_version}, found {current.version}",
                     document_path=f"/tenants/{tid}/changes/{change_id}/approvals/{approval.card_id}",
                     expected_version=expected_version,
                     actual_version=current.version,
@@ -441,7 +444,8 @@ class InMemorySagaStateRepository(SagaStateRepository):
                 raise DocumentNotFoundError(f"Passport {passport.passport_id!r} not found")
             if current.version != expected_version:
                 raise OptimisticConcurrencyError(
-                    f"Version conflict on passport {passport.passport_id!r}: expected {expected_version}, found {current.version}",
+                    f"Version conflict on passport {passport.passport_id!r}: "
+                    f"expected {expected_version}, found {current.version}",
                     document_path=f"/tenants/{tid}/passports/{passport.passport_id}",
                     expected_version=expected_version,
                     actual_version=current.version,
@@ -507,12 +511,18 @@ class InMemorySagaStateRepository(SagaStateRepository):
             if current is None:
                 raise DocumentNotFoundError(f"Reservation {reservation.reservation_id!r} not found")
             if current.version != expected_version:
+                doc_p = (
+                    f"/tenants/{tid}/changes/{change_id}/"
+                    f"idempotency_reservations/{reservation.reservation_id}"
+                )
                 raise OptimisticConcurrencyError(
-                    f"Version conflict on reservation {reservation.reservation_id!r}: expected {expected_version}, found {current.version}",
-                    document_path=f"/tenants/{tid}/changes/{change_id}/idempotency_reservations/{reservation.reservation_id}",
+                    f"Version conflict on reservation {reservation.reservation_id!r}: "
+                    f"expected {expected_version}, found {current.version}",
+                    document_path=doc_p,
                     expected_version=expected_version,
                     actual_version=current.version,
                 )
+
             new_version = current.version + 1
             updated = reservation.model_copy(update={"version": new_version})
             self._idempotency_reservations[tid][change_id][reservation.reservation_id] = updated

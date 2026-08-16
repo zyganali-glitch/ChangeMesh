@@ -72,7 +72,7 @@ class AgentRegistry(ABC):
         tenant_id: str,
         required_capability: CapabilityType,
     ) -> List[Tuple[AgentDescriptor, CapabilityPassport]]:
-        """Find all registered agent revisions holding an active passport for the required capability."""
+        """Find registered agent revisions holding an active passport for capability."""
         pass
 
 

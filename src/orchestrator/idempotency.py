@@ -1,7 +1,7 @@
 """ChangeMesh idempotency key and reservation manager.
 
-P-10.03: Enforces replay protection and single-execution semantics for
-workflow steps, branch intentions, PR intentions, approvals, passports,
+P-10.03: Enforces replay protection, semantic conflict detection, and single-execution
+semantics for workflow steps, branch intentions, PR intentions, approvals, passports,
 and external-write intents.
 """
 
@@ -22,6 +22,7 @@ from src.orchestrator.state_repository import (
     CANONICAL_SCHEMA_VERSION,
     IdempotencyReservationRecord,
     IdempotencyReservationStatus,
+    PersistenceSchemaError,
     SagaStateRepository,
     validate_tenant_id,
 )
@@ -132,7 +133,6 @@ class IdempotencyKeyManager:
     @staticmethod
     def compute_reservation_doc_id(idempotency_key: str) -> str:
         """Generate a valid, non-colliding Firestore document ID for the reservation."""
-        # Sanitize for safe Firestore document ID characters
         clean_key = idempotency_key.replace("/", "_").replace(".", "_")
         return f"res_{clean_key}"
 
@@ -143,7 +143,7 @@ class IdempotencyKeyManager:
         intent: IdempotencyIntent,
         now: Optional[datetime] = None,
     ) -> IdempotencyReservationOutcome:
-        """Atomically reserve or check an idempotency key."""
+        """Atomically reserve or check an idempotency key with strict conflict detection."""
         if now is None:
             now = datetime.now(timezone.utc)
 
@@ -155,11 +155,22 @@ class IdempotencyKeyManager:
         existing = repo.get_idempotency_reservation(tid, cid, res_id)
 
         if existing is not None:
-            # Check for semantic collision
-            # If payload_digest differs or action_type differs -> conflict!
-            if existing.result_digest and existing.status == IdempotencyReservationStatus.COMMITTED:
-                # Already committed: verify if caller provided same payload
-                # In committed state, this is an EXACT_REPLAY
+            # Semantic conflict check: compare payload digest and action type
+            if (
+                existing.payload_digest != intent.payload_digest
+                or existing.action_type != intent.action_type
+            ):
+                raise IdempotencyConflictError(
+                    f"Idempotency conflict for key {idem_key!r}: "
+                    f"stored payload digest {existing.payload_digest!r} != "
+                    f"incoming payload digest {intent.payload_digest!r}",
+                    idempotency_key=idem_key,
+                    existing_digest=existing.payload_digest,
+                    incoming_digest=intent.payload_digest,
+                )
+
+            # Committed state -> EXACT_REPLAY
+            if existing.status == IdempotencyReservationStatus.COMMITTED:
                 return IdempotencyReservationOutcome(
                     status=IdempotencyReservationOutcomeStatus.EXACT_REPLAY,
                     reservation=existing,
@@ -167,22 +178,22 @@ class IdempotencyKeyManager:
                     cached_receipt_status=existing.receipt_status,
                 )
 
-            # Check if lease has expired
+            # Active lease in-progress
             if existing.status == IdempotencyReservationStatus.RESERVED:
                 if existing.expires_at > now:
-                    # Still active lease in-progress
                     return IdempotencyReservationOutcome(
                         status=IdempotencyReservationOutcomeStatus.IN_PROGRESS,
                         reservation=existing,
                     )
                 else:
-                    # Lease expired! Re-acquire lease
+                    # Lease expired: re-acquire lease
                     expires_at = now + timedelta(seconds=intent.lease_duration_seconds)
                     re_acquired = existing.model_copy(
                         update={
                             "reserved_at": now,
                             "expires_at": expires_at,
                             "status": IdempotencyReservationStatus.RESERVED,
+                            "payload_digest": intent.payload_digest,
                         }
                     )
                     saved = repo.update_idempotency_reservation(
@@ -193,7 +204,7 @@ class IdempotencyKeyManager:
                         reservation=saved,
                     )
 
-            # If released, can re-reserve
+            # Released state -> re-reserve
             if existing.status == IdempotencyReservationStatus.RELEASED:
                 expires_at = now + timedelta(seconds=intent.lease_duration_seconds)
                 re_reserved = existing.model_copy(
@@ -201,6 +212,7 @@ class IdempotencyKeyManager:
                         "reserved_at": now,
                         "expires_at": expires_at,
                         "status": IdempotencyReservationStatus.RESERVED,
+                        "payload_digest": intent.payload_digest,
                         "result_digest": None,
                         "receipt_status": None,
                     }
@@ -221,16 +233,25 @@ class IdempotencyKeyManager:
             reservation_id=res_id,
             idempotency_key=idem_key,
             action_type=intent.action_type,
+            payload_digest=intent.payload_digest,
+            target_system=intent.target_system,
+            scope=intent.scope.value,
+            caller_revision=intent.caller_revision,
             status=IdempotencyReservationStatus.RESERVED,
             reserved_at=now,
             expires_at=expires_at,
             version=1,
         )
-        saved = repo.create_idempotency_reservation(tid, cid, new_record)
-        return IdempotencyReservationOutcome(
-            status=IdempotencyReservationOutcomeStatus.GRANTED,
-            reservation=saved,
-        )
+        try:
+            saved = repo.create_idempotency_reservation(tid, cid, new_record)
+            return IdempotencyReservationOutcome(
+                status=IdempotencyReservationOutcomeStatus.GRANTED,
+                reservation=saved,
+            )
+        except PersistenceSchemaError:
+            # Race condition: another process created the reservation concurrently.
+            # Re-read and re-evaluate to maintain strict consistency.
+            return cls.reserve_intent(repo, intent, now=now)
 
     @classmethod
     def commit_intent(
@@ -254,7 +275,6 @@ class IdempotencyKeyManager:
             raise ValueError(f"Reservation {reservation_id!r} not found for commit")
 
         if existing.status == IdempotencyReservationStatus.COMMITTED:
-            # Already committed
             return existing
 
         now = datetime.now(timezone.utc)
@@ -289,7 +309,6 @@ class IdempotencyKeyManager:
             raise ValueError(f"Reservation {reservation_id!r} not found for release")
 
         if existing.status == IdempotencyReservationStatus.COMMITTED:
-            # Cannot release an already committed reservation
             return existing
 
         released = existing.model_copy(

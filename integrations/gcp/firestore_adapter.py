@@ -20,6 +20,7 @@ from src.orchestrator.state_repository import (
     CheckpointRecord,
     DocumentNotFoundError,
     EvidenceRefRecord,
+    IdempotencyReservationRecord,
     OptimisticConcurrencyError,
     PassportRecord,
     PersistenceSchemaError,
@@ -100,6 +101,98 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
 
     def _now(self) -> datetime:
         return datetime.now(timezone.utc)
+
+    def _atomic_cas_update(
+        self,
+        doc_ref: Any,
+        expected_version: int,
+        candidate_dict: Dict[str, Any],
+        document_path: str,
+        record_class: Any,
+    ) -> Any:
+        """Perform atomic read-and-CAS update using Firestore transaction semantics."""
+        now = self._now()
+
+        def _step(txn: Any) -> Dict[str, Any]:
+            if hasattr(doc_ref, "get"):
+                try:
+                    snapshot = doc_ref.get(transaction=txn)
+                except TypeError:
+                    snapshot = doc_ref.get()
+            elif hasattr(txn, "get"):
+                snapshot = txn.get(doc_ref)
+            else:
+                raise RuntimeError("Invalid Firestore transaction/doc_ref interface")
+
+            if not snapshot.exists:
+                raise DocumentNotFoundError(
+                    f"Document at {document_path} not found",
+                    document_path=document_path,
+                )
+
+            current_data = snapshot.to_dict() or {}
+            actual_version = current_data.get("version", 0)
+            if actual_version != expected_version:
+                raise OptimisticConcurrencyError(
+                    f"Version conflict on {document_path}: "
+                    f"expected {expected_version}, found {actual_version}",
+                    document_path=document_path,
+                    expected_version=expected_version,
+                    actual_version=actual_version,
+                )
+
+            new_version = actual_version + 1
+            updated_dict = dict(candidate_dict)
+            updated_dict["version"] = new_version
+            if "updated_at" in updated_dict:
+                updated_dict["updated_at"] = now
+
+            fs_data = _to_firestore_dict(updated_dict)
+            if hasattr(txn, "set"):
+                txn.set(doc_ref, fs_data)
+            elif hasattr(doc_ref, "set"):
+                doc_ref.set(fs_data)
+            return updated_dict
+
+        if hasattr(self._db, "transaction"):
+            transaction = self._db.transaction()
+            try:
+                from google.cloud import firestore as gcp_firestore  # type: ignore[import-untyped]
+
+                @gcp_firestore.transactional
+                def _runner(txn: Any) -> Dict[str, Any]:
+                    return _step(txn)
+
+                result_dict = _runner(transaction)
+            except Exception:
+                result_dict = _step(transaction)
+                if hasattr(transaction, "commit"):
+                    transaction.commit()
+        else:
+            doc = doc_ref.get()
+            if not doc.exists:
+                raise DocumentNotFoundError(
+                    f"Document at {document_path} not found",
+                    document_path=document_path,
+                )
+            current_data = doc.to_dict() or {}
+            actual_version = current_data.get("version", 0)
+            if actual_version != expected_version:
+                raise OptimisticConcurrencyError(
+                    f"Version conflict on {document_path}: "
+                    f"expected {expected_version}, found {actual_version}",
+                    document_path=document_path,
+                    expected_version=expected_version,
+                    actual_version=actual_version,
+                )
+            new_version = actual_version + 1
+            result_dict = dict(candidate_dict)
+            result_dict["version"] = new_version
+            if "updated_at" in result_dict:
+                result_dict["updated_at"] = now
+            doc_ref.set(_to_firestore_dict(result_dict))
+
+        return record_class(**_from_firestore_dict(result_dict))
 
     # ------------------------------------------------------------------------
     # Tenant Operations
@@ -182,25 +275,14 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
             .collection("changes")
             .document(change.change_id)
         )
-        doc = doc_ref.get()
-        if not doc.exists:
-            raise DocumentNotFoundError(
-                f"Change {change.change_id!r} not found",
-                document_path=f"/tenants/{tid}/changes/{change.change_id}",
-            )
-        current_data = doc.to_dict()
-        actual_version = current_data.get("version", 0)
-        if actual_version != expected_version:
-            raise OptimisticConcurrencyError(
-                f"Version conflict on change {change.change_id!r}: expected {expected_version}, found {actual_version}",
-                document_path=f"/tenants/{tid}/changes/{change.change_id}",
-                expected_version=expected_version,
-                actual_version=actual_version,
-            )
-        new_version = actual_version + 1
-        updated = change.model_copy(update={"version": new_version, "updated_at": self._now()})
-        doc_ref.set(_to_firestore_dict(updated.model_dump()))
-        return updated
+        doc_path = f"/tenants/{tid}/changes/{change.change_id}"
+        return self._atomic_cas_update(
+            doc_ref=doc_ref,
+            expected_version=expected_version,
+            candidate_dict=change.model_dump(),
+            document_path=doc_path,
+            record_class=ChangeRecord,
+        )
 
     def list_changes(
         self, tenant_id: str, state: Optional[ChangeState] = None
@@ -287,22 +369,14 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
             .collection("tasks")
             .document(task.task_id)
         )
-        doc = doc_ref.get()
-        if not doc.exists:
-            raise DocumentNotFoundError(f"Task {task.task_id!r} not found")
-        doc_data = doc.to_dict() or {}
-        actual_version = doc_data.get("version", 0)
-        if actual_version != expected_version:
-            raise OptimisticConcurrencyError(
-                f"Version conflict on task {task.task_id!r}: expected {expected_version}, found {actual_version}",
-                document_path=f"/tenants/{tid}/changes/{change_id}/tasks/{task.task_id}",
-                expected_version=expected_version,
-                actual_version=actual_version,
-            )
-        new_version = actual_version + 1
-        updated = task.model_copy(update={"version": new_version, "updated_at": self._now()})
-        doc_ref.set(_to_firestore_dict(updated.model_dump()))
-        return updated
+        doc_path = f"/tenants/{tid}/changes/{change_id}/tasks/{task.task_id}"
+        return self._atomic_cas_update(
+            doc_ref=doc_ref,
+            expected_version=expected_version,
+            candidate_dict=task.model_dump(),
+            document_path=doc_path,
+            record_class=TaskRecord,
+        )
 
     # ------------------------------------------------------------------------
     # Checkpoint Operations
@@ -510,22 +584,14 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
             .collection("approvals")
             .document(approval.card_id)
         )
-        doc = doc_ref.get()
-        if not doc.exists:
-            raise DocumentNotFoundError(f"Approval card {approval.card_id!r} not found")
-        doc_data = doc.to_dict() or {}
-        actual_version = doc_data.get("version", 0)
-        if actual_version != expected_version:
-            raise OptimisticConcurrencyError(
-                f"Version conflict on approval {approval.card_id!r}: expected {expected_version}, found {actual_version}",
-                document_path=f"/tenants/{tid}/changes/{change_id}/approvals/{approval.card_id}",
-                expected_version=expected_version,
-                actual_version=actual_version,
-            )
-        new_version = actual_version + 1
-        updated = approval.model_copy(update={"version": new_version, "updated_at": self._now()})
-        doc_ref.set(_to_firestore_dict(updated.model_dump()))
-        return updated
+        doc_path = f"/tenants/{tid}/changes/{change_id}/approvals/{approval.card_id}"
+        return self._atomic_cas_update(
+            doc_ref=doc_ref,
+            expected_version=expected_version,
+            candidate_dict=approval.model_dump(),
+            document_path=doc_path,
+            record_class=ApprovalRecord,
+        )
 
     # ------------------------------------------------------------------------
     # Capability Passport Operations
@@ -595,19 +661,137 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
             .collection("passports")
             .document(passport.passport_id)
         )
-        doc = doc_ref.get()
-        if not doc.exists:
-            raise DocumentNotFoundError(f"Passport {passport.passport_id!r} not found")
-        doc_data = doc.to_dict() or {}
-        actual_version = doc_data.get("version", 0)
-        if actual_version != expected_version:
-            raise OptimisticConcurrencyError(
-                f"Version conflict on passport {passport.passport_id!r}: expected {expected_version}, found {actual_version}",
-                document_path=f"/tenants/{tid}/passports/{passport.passport_id}",
-                expected_version=expected_version,
-                actual_version=actual_version,
+        doc_path = f"/tenants/{tid}/passports/{passport.passport_id}"
+        return self._atomic_cas_update(
+            doc_ref=doc_ref,
+            expected_version=expected_version,
+            candidate_dict=passport.model_dump(),
+            document_path=doc_path,
+            record_class=PassportRecord,
+        )
+
+    # ------------------------------------------------------------------------
+    # Idempotency Reservation Operations (P-10.03)
+    # ------------------------------------------------------------------------
+
+    def create_idempotency_reservation(
+        self, tenant_id: str, change_id: str, reservation: IdempotencyReservationRecord
+    ) -> IdempotencyReservationRecord:
+        tid = validate_tenant_id(tenant_id)
+        if reservation.tenant_id != tid or reservation.change_id != change_id:
+            raise TenantIsolationError(
+                "Reservation tenant_id or change_id mismatch with operation path"
             )
-        new_version = actual_version + 1
-        updated = passport.model_copy(update={"version": new_version, "updated_at": self._now()})
-        doc_ref.set(_to_firestore_dict(updated.model_dump()))
-        return updated
+        scan_for_secrets(reservation.model_dump())
+        if not self.get_change(tid, change_id):
+            raise DocumentNotFoundError(f"Parent change {change_id!r} not found in tenant {tid!r}")
+
+        doc_ref = (
+            self._db.collection("tenants")
+            .document(tid)
+            .collection("changes")
+            .document(change_id)
+            .collection("idempotency_reservations")
+            .document(reservation.reservation_id)
+        )
+        if doc_ref.get().exists:
+            raise PersistenceSchemaError(
+                f"Reservation {reservation.reservation_id!r} already exists"
+            )
+        doc_ref.set(_to_firestore_dict(reservation.model_dump()))
+        return reservation
+
+    def get_idempotency_reservation(
+        self, tenant_id: str, change_id: str, reservation_id: str
+    ) -> Optional[IdempotencyReservationRecord]:
+        tid = validate_tenant_id(tenant_id)
+        doc = (
+            self._db.collection("tenants")
+            .document(tid)
+            .collection("changes")
+            .document(change_id)
+            .collection("idempotency_reservations")
+            .document(reservation_id)
+            .get()
+        )
+        if not doc.exists:
+            return None
+        return IdempotencyReservationRecord(**_from_firestore_dict(doc.to_dict()))
+
+    def update_idempotency_reservation(
+        self,
+        tenant_id: str,
+        change_id: str,
+        reservation: IdempotencyReservationRecord,
+        expected_version: int,
+    ) -> IdempotencyReservationRecord:
+        tid = validate_tenant_id(tenant_id)
+        if reservation.tenant_id != tid or reservation.change_id != change_id:
+            raise TenantIsolationError(
+                "Reservation tenant_id or change_id mismatch with operation path"
+            )
+        scan_for_secrets(reservation.model_dump())
+
+        doc_ref = (
+            self._db.collection("tenants")
+            .document(tid)
+            .collection("changes")
+            .document(change_id)
+            .collection("idempotency_reservations")
+            .document(reservation.reservation_id)
+        )
+        doc_path = (
+            f"/tenants/{tid}/changes/{change_id}/idempotency_reservations/"
+            f"{reservation.reservation_id}"
+        )
+        return self._atomic_cas_update(
+            doc_ref=doc_ref,
+            expected_version=expected_version,
+            candidate_dict=reservation.model_dump(),
+            document_path=doc_path,
+            record_class=IdempotencyReservationRecord,
+        )
+
+    # ------------------------------------------------------------------------
+    # Teardown / Cascading Deletion (P-10.05)
+    # ------------------------------------------------------------------------
+
+    def delete_change_cascade(self, tenant_id: str, change_id: str) -> int:
+        """Explicitly recursively delete a change document and all child subcollections."""
+        tid = validate_tenant_id(tenant_id)
+        change_ref = (
+            self._db.collection("tenants").document(tid).collection("changes").document(change_id)
+        )
+        count = 0
+        for subcol_name in [
+            "tasks",
+            "checkpoints",
+            "idempotency_reservations",
+            "evidence_refs",
+            "approvals",
+        ]:
+            sub_docs = change_ref.collection(subcol_name).stream()
+            for doc in sub_docs:
+                doc.reference.delete()
+                count += 1
+        if change_ref.get().exists:
+            change_ref.delete()
+            count += 1
+        return count
+
+    def delete_tenant_cascade(self, tenant_id: str) -> int:
+        """Explicitly recursively delete all documents under /tenants/{tenant_id}."""
+        tid = validate_tenant_id(tenant_id)
+        tenant_ref = self._db.collection("tenants").document(tid)
+        count = 0
+        changes = tenant_ref.collection("changes").stream()
+        for chg in changes:
+            count += self.delete_change_cascade(tid, chg.id)
+        passports = tenant_ref.collection("passports").stream()
+        for p in passports:
+            p.reference.delete()
+            count += 1
+        if tenant_ref.get().exists:
+            tenant_ref.delete()
+            count += 1
+        return count

@@ -1,7 +1,9 @@
-"""ChangeMesh cryptographic approval token generator and verifier.
+"""ChangeMesh cryptographic approval token verification boundary.
 
-P-14.03: Generates HMAC-SHA256 signed approval tokens cryptographically bound
-to the exact change plan hash, enforcing single-use idempotency and stale-plan rejection.
+P-14.05: Evaluates HMAC-SHA256 signed approval tokens cryptographically bound
+to the exact change plan hash, scope, and authority slot.
+Enforces single-use idempotency, expiration checks, and stale-plan rejection.
+Application code cannot self-mint human authority; secrets are strictly injected.
 """
 
 from __future__ import annotations
@@ -9,8 +11,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import threading
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional, Set
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -21,7 +22,7 @@ CANONICAL_SCHEMA_VERSION = "1.0.0"
 
 
 class SignedApprovalToken(BaseModel):
-    """Cryptographic approval token signed by an authorized human authority."""
+    """Cryptographic approval token signed by an authorized external human authority."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -30,6 +31,7 @@ class SignedApprovalToken(BaseModel):
     plan_hash: str
     approver_id: str
     authority_slot_ref: str
+    action_scope: str = ""
     issued_at: UtcDateTime
     expires_at: UtcDateTime
     nonce: str
@@ -51,16 +53,19 @@ class ApprovalValidationResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     is_valid: bool
-    status: (
-        str  # "VALID", "INVALID_SIGNATURE", "STALE_PLAN_HASH", "EXPIRED", "TOKEN_ALREADY_CONSUMED"
-    )
+    status: str
     failure_reason: Optional[str] = None
 
 
-class ApprovalTokenManager:
-    """Issues and verifies cryptographic HMAC approval tokens with single-use tracking."""
+class TrustedAuthorityDecisionVerifier:
+    """Verifies cryptographic HMAC approval tokens with single-use tracking and injected secret."""
 
-    def __init__(self) -> None:
+    def __init__(self, verification_secret: str) -> None:
+        if not verification_secret or not verification_secret.strip():
+            raise ValueError(
+                "verification_secret must be explicitly provided (no defaults allowed)"
+            )
+        self._verification_secret = verification_secret
         self._lock = threading.RLock()
         self._consumed_token_ids: Set[str] = set()
 
@@ -70,6 +75,7 @@ class ApprovalTokenManager:
         plan_hash: str,
         approver_id: str,
         authority_slot_ref: str,
+        action_scope: str,
         issued_at: datetime,
         expires_at: datetime,
         nonce: str,
@@ -78,68 +84,33 @@ class ApprovalTokenManager:
         """Compute deterministic HMAC-SHA256 signature."""
         msg = (
             f"token_id={token_id}:plan_hash={plan_hash}:approver={approver_id}:"
-            f"slot={authority_slot_ref}:issued={issued_at.isoformat()}:"
-            f"expires={expires_at.isoformat()}:nonce={nonce}"
+            f"slot={authority_slot_ref}:scope={action_scope}:"
+            f"issued={issued_at.isoformat()}:expires={expires_at.isoformat()}:nonce={nonce}"
         )
         return hmac.new(secret_key.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
-
-    def issue_token(
-        self,
-        plan_hash: str,
-        approver_id: str,
-        authority_slot_ref: str = "slot:lead_dba",
-        secret_key: str = "demo-signing-secret-key-32chars!!",
-        validity_seconds: int = 3600,
-        now: Optional[datetime] = None,
-    ) -> SignedApprovalToken:
-        """Issue a new signed approval token."""
-        if now is None:
-            now = datetime.now(timezone.utc)
-
-        token_id = f"tok-{uuid.uuid4().hex[:12]}"
-        nonce = uuid.uuid4().hex
-        expires_at = now + timedelta(seconds=validity_seconds)
-
-        sig = self.compute_token_signature(
-            token_id=token_id,
-            plan_hash=plan_hash,
-            approver_id=approver_id,
-            authority_slot_ref=authority_slot_ref,
-            issued_at=now,
-            expires_at=expires_at,
-            nonce=nonce,
-            secret_key=secret_key,
-        )
-
-        return SignedApprovalToken(
-            token_id=token_id,
-            plan_hash=plan_hash,
-            approver_id=approver_id,
-            authority_slot_ref=authority_slot_ref,
-            issued_at=now,
-            expires_at=expires_at,
-            nonce=nonce,
-            signature=sig,
-        )
 
     def verify_and_consume(
         self,
         token: SignedApprovalToken,
         expected_plan_hash: str,
-        secret_key: str = "demo-signing-secret-key-32chars!!",
+        expected_slot_ref: Optional[str] = None,
+        expected_scope: Optional[str] = None,
         now: Optional[datetime] = None,
     ) -> ApprovalValidationResult:
-        """Verify token cryptographic signature, freshness, plan hash, and consume it once."""
+        """Verify token signature, freshness, plan hash, scope, and consume it once."""
         if now is None:
             now = datetime.now(timezone.utc)
 
         with self._lock:
-            # 1. Single-use consumption check
+            # 1. Single-use consumption check (Idempotency)
             if token.token_id in self._consumed_token_ids:
                 return ApprovalValidationResult(
                     is_valid=False,
                     status="TOKEN_ALREADY_CONSUMED",
-                    failure_reason=f"Approval token {token.token_id} has already been consumed (idempotency violation)",
+                    failure_reason=(
+                        f"Approval token {token.token_id} has already been consumed "
+                        f"(replay prevention violation)"
+                    ),
                 )
 
             # 2. Expiration check
@@ -150,24 +121,39 @@ class ApprovalTokenManager:
                     failure_reason=f"Approval token expired at {token.expires_at.isoformat()}",
                 )
 
-            # 3. Plan Hash Matching (Stale Plan Check)
+            # 3. Slot match check
+            if expected_slot_ref and token.authority_slot_ref != expected_slot_ref:
+                return ApprovalValidationResult(
+                    is_valid=False,
+                    status="SCOPE_MISMATCH",
+                    failure_reason=(
+                        f"Token authority slot {token.authority_slot_ref!r} "
+                        f"does not match required slot {expected_slot_ref!r}"
+                    ),
+                )
+
+            # 4. Plan Hash Matching (Stale Plan Check)
             if not hmac.compare_digest(token.plan_hash, expected_plan_hash):
                 return ApprovalValidationResult(
                     is_valid=False,
                     status="STALE_PLAN_HASH",
-                    failure_reason=f"Token plan hash {token.plan_hash!r} does not match active plan hash {expected_plan_hash!r}",
+                    failure_reason=(
+                        f"Token plan hash {token.plan_hash!r} "
+                        f"does not match active plan hash {expected_plan_hash!r}"
+                    ),
                 )
 
-            # 4. Cryptographic Signature Check
+            # 5. Cryptographic Signature Check
             expected_sig = self.compute_token_signature(
                 token_id=token.token_id,
                 plan_hash=token.plan_hash,
                 approver_id=token.approver_id,
                 authority_slot_ref=token.authority_slot_ref,
+                action_scope=token.action_scope,
                 issued_at=token.issued_at,
                 expires_at=token.expires_at,
                 nonce=token.nonce,
-                secret_key=secret_key,
+                secret_key=self._verification_secret,
             )
 
             if not hmac.compare_digest(token.signature, expected_sig):

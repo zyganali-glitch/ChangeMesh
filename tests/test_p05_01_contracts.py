@@ -617,7 +617,8 @@ class TestCONTRACT020:
         actual_surface = set(contracts.__all__)
 
         assert required_p05_01_surface.issubset(actual_surface), (
-            f"Public surface area missing P-05.01 contracts. Expected at least {required_p05_01_surface}, got {actual_surface}"
+            f"Missing P-05.01 contracts. Expected at least {required_p05_01_surface}, "
+            f"got {actual_surface}"
         )
 
         # Verify no old "DataClassification" exists in __all__

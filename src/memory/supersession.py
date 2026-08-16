@@ -97,7 +97,7 @@ class MemorySupersessionManager:
                 has_conflict=True,
                 conflicting_record_ids=tuple(conflicts),
                 is_ambiguous=True,
-                resolution_rationale="Ambiguous semantic conflict detected between active memory records",
+                resolution_rationale="Semantic conflict detected between active memory records",
             )
 
         if superseded:
@@ -105,7 +105,9 @@ class MemorySupersessionManager:
                 has_conflict=True,
                 superseded_record_ids=tuple(superseded),
                 is_ambiguous=False,
-                resolution_rationale=f"Candidate supersedes {len(superseded)} historical memory record(s)",
+                resolution_rationale=(
+                    f"Candidate supersedes {len(superseded)} historical memory record(s)"
+                ),
             )
 
         return ContradictionDetectionResult(has_conflict=False)

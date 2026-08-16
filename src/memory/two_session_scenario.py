@@ -111,5 +111,8 @@ class TwoSessionResumeScenario:
             session2_retrieved_pg_version="PostgreSQL 15.4+",
             hostile_attempt_quarantined=hostile_quarantined,
             re_discovery_avoided=True,
-            details="Session 2 safely resumed with verified Session 1 memory; hostile prompt injection was quarantined.",
+            details=(
+                "Session 2 resumed with verified Session 1 memory; "
+                "hostile prompt injection was quarantined."
+            ),
         )

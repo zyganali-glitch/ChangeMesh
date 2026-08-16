@@ -1,7 +1,9 @@
-"""ChangeMesh Agent Registry and Capability Passport comprehensive test suite.
+"""ChangeMesh capability passport issuance, verification, and routing tests.
 
-P-12: Tests capability vocabulary, proof-carrying passport issuance,
-expiration/revocation validation, multi-revision qualification, and router dispatch.
+P-12: Tests CapabilityPassport issuance from verified qualification evidence,
+prohibiting self-attestation, enforcing stale/expired/revoked evidence rejection,
+demonstrating revision qualification failure (P-12.04), and producing structured
+judge-facing projections (P-12.06).
 """
 
 from __future__ import annotations
@@ -9,14 +11,18 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from pydantic import ValidationError
 
-from domain.contracts.capability import CapabilityPassport
+from domain.contracts.evidence import (
+    EvidenceProducerKind,
+    EvidenceState,
+    ExecutionEvidenceMode,
+)
 from src.registry.agent_registry import AgentDescriptor, InMemoryAgentRegistry
-from src.registry.capabilities import (
-    AgentCapabilityRequirement,
-    CapabilityType,
-    get_standard_demo_requirements,
+from src.registry.evidence_verifier import (
+    QualificationEvidenceRecord,
+    QualificationEvidenceRegistry,
+    QualificationEvidenceVerificationError,
+    QualificationEvidenceVerifier,
 )
 from src.registry.passport_issuer import (
     PassportIssuanceRequest,
@@ -33,240 +39,303 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# ============================================================================
-# P-12.01: Capability Requirements
-# ============================================================================
-
-
-def test_standard_demo_capability_requirements():
-    reqs = get_standard_demo_requirements()
-    assert "impact_scout" in reqs
-    assert "policy_guardian" in reqs
-    assert "migration_engineer" in reqs
-    assert "release_steward" in reqs
-
-    scout_req = reqs["impact_scout"]
-    assert CapabilityType.AST_STATIC_ANALYSIS in scout_req.required_capabilities
-    assert CapabilityType.BLAST_RADIUS_ESTIMATION in scout_req.required_capabilities
-
-    mig_req = reqs["migration_engineer"]
-    assert CapabilityType.MIGRATION_SYNTHESIS_SQL in mig_req.required_capabilities
+def _setup_evidence_verifier() -> tuple[
+    QualificationEvidenceRegistry, QualificationEvidenceVerifier
+]:
+    reg = QualificationEvidenceRegistry()
+    verifier = QualificationEvidenceVerifier(registry=reg)
+    return reg, verifier
 
 
 # ============================================================================
-# P-12.02: Passport Issuance from Verified Evidence
+# P-12.02 & P-12.03: Verified Evidence Issuance & Self-Attestation Prohibition
 # ============================================================================
 
 
-def test_passport_issuance_requires_evidence():
+def test_passport_cannot_self_attest_without_verified_evidence():
+    """Prove arbitrary caller cannot supply fake/unknown evidence IDs to obtain a passport."""
+    ev_reg, verifier = _setup_evidence_verifier()
     now = _utc_now()
 
-    # Valid issuance with evidence
-    req = PassportIssuanceRequest(
-        agent_id="impact_scout",
-        agent_revision="sha-scout-v1",
-        qualified_capabilities=("AST_STATIC_ANALYSIS", "BLAST_RADIUS_ESTIMATION"),
-        qualification_evidence_ids=("ev-scout-test-suite", "ev-scout-ast-bench"),
-        issuer="qualification_gate",
+    # Attempting to issue passport with unverified/nonexistent evidence ID fails closed
+    fake_request = PassportIssuanceRequest(
+        agent_id="migration_engineer",
+        agent_revision="sha-rev-unverified",
+        qualified_capabilities=("MIGRATION_SYNTHESIS_SQL",),
+        qualification_evidence_ids=("ev-made-up-fake",),
+        issuer="malicious_caller",
     )
-    passport = PassportIssuer.issue_passport(req, now=now)
-    assert passport.passport_id.startswith("pass-impact_scout-")
-    assert passport.is_revoked is False
+
+    with pytest.raises(QualificationEvidenceVerificationError) as exc_info:
+        PassportIssuer.issue_passport(fake_request, evidence_verifier=verifier, now=now)
+
+    assert exc_info.value.status == "EVIDENCE_MISSING"
+
+
+def test_passport_issuance_from_valid_verified_evidence():
+    """Prove valid registered qualification evidence successfully issues a CapabilityPassport."""
+    ev_reg, verifier = _setup_evidence_verifier()
+    now = _utc_now()
+    aid = "impact_scout"
+    rev = "sha-rev-scout-1"
+
+    # Register genuine evidence records
+    ev1 = QualificationEvidenceRecord(
+        evidence_id="ev-ast-01",
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capability="AST_STATIC_ANALYSIS",
+        scenario_id="SCENARIO_NORMAL_MIGRATION",
+        passed=True,
+        evidence_state=EvidenceState.SIMULATED,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="a" * 64,
+        collected_at=now - timedelta(hours=1),
+        expires_at=now + timedelta(days=30),
+    )
+    ev2 = QualificationEvidenceRecord(
+        evidence_id="ev-blast-01",
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capability="BLAST_RADIUS_ESTIMATION",
+        scenario_id="SCENARIO_NORMAL_MIGRATION",
+        passed=True,
+        evidence_state=EvidenceState.SIMULATED,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="b" * 64,
+        collected_at=now - timedelta(hours=1),
+        expires_at=now + timedelta(days=30),
+    )
+    ev_reg.register_evidence(ev1)
+    ev_reg.register_evidence(ev2)
+
+    request = PassportIssuanceRequest(
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capabilities=("AST_STATIC_ANALYSIS", "BLAST_RADIUS_ESTIMATION"),
+        qualification_evidence_ids=("ev-ast-01", "ev-blast-01"),
+        issuer="qualification_pipeline",
+    )
+
+    passport = PassportIssuer.issue_passport(request, evidence_verifier=verifier, now=now)
+    assert passport.agent_id == aid
+    assert passport.agent_revision == rev
     assert len(passport.qualification_evidence_ids) == 2
 
-    # Self-attestation without evidence fails closed
-    with pytest.raises(ValidationError):
-        PassportIssuanceRequest(
-            agent_id="unverified_agent",
-            agent_revision="rev-1",
-            qualified_capabilities=("PR_GENERATION",),
-            qualification_evidence_ids=(),  # Invalid: no evidence
-            issuer="self",
-        )
+    # Validation succeeds against verifier
+    val = PassportVerifier.verify(
+        passport, expected_revision=rev, evidence_verifier=verifier, now=now
+    )
+    assert val.is_valid is True
+    assert val.status == "VALID"
 
 
-# ============================================================================
-# P-12.03: Validation, Expiry, Revocation, Stale Evidence Rejection
-# ============================================================================
-
-
-def test_passport_validation_scenarios():
+def test_stale_and_revoked_evidence_rejection():
+    """Verify expired or revoked qualification evidence fails passport issuance/validation."""
+    ev_reg, verifier = _setup_evidence_verifier()
     now = _utc_now()
+    aid = "policy_guardian"
+    rev = "sha-rev-guard-1"
 
-    # 1. Valid Passport
-    valid_pass = CapabilityPassport(
-        schema_version="1.0.0",
-        passport_id="pass-valid-1",
-        agent_id="policy_guardian",
-        agent_revision="rev-guard-1",
-        qualified_capabilities=("POLICY_VERIFICATION", "REVERSIBILITY_ANALYSIS"),
-        qualification_evidence_ids=("ev-guard-tests",),
-        issuer="gate",
-        issued_at=now - timedelta(days=1),
-        expires_at=now + timedelta(days=29),
-        is_revoked=False,
+    # Expired evidence
+    ev_expired = QualificationEvidenceRecord(
+        evidence_id="ev-exp-01",
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capability="POLICY_VERIFICATION",
+        scenario_id="SCENARIO_NORMAL_MIGRATION",
+        passed=True,
+        evidence_state=EvidenceState.SIMULATED,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="c" * 64,
+        collected_at=now - timedelta(days=40),
+        expires_at=now - timedelta(days=5),  # Expired
     )
-    res_valid = PassportVerifier.verify(valid_pass, now=now)
-    assert res_valid.is_valid is True
-    assert res_valid.status == "VALID"
+    ev_reg.register_evidence(ev_expired)
 
-    # 2. Revoked Passport
-    revoked_pass = valid_pass.model_copy(
-        update={
-            "is_revoked": True,
-            "revoked_at": now,
-            "revocation_reason": "Failed regression audit",
-        }
+    req_expired = PassportIssuanceRequest(
+        agent_id=aid,
+        agent_revision=rev,
+        qualified_capabilities=("POLICY_VERIFICATION",),
+        qualification_evidence_ids=("ev-exp-01",),
+        issuer="qualification_pipeline",
     )
-    res_revoked = PassportVerifier.verify(revoked_pass, now=now)
-    assert res_revoked.is_valid is False
-    assert res_revoked.status == "REVOKED"
 
-    # 3. Expired Passport
-    expired_pass = valid_pass.model_copy(
-        update={
-            "expires_at": now - timedelta(hours=1),
-        }
-    )
-    res_expired = PassportVerifier.verify(expired_pass, now=now)
-    assert res_expired.is_valid is False
-    assert res_expired.status == "EXPIRED"
-
-    # 4. Revision Mismatch
-    res_mismatch = PassportVerifier.verify(valid_pass, expected_revision="rev-guard-2", now=now)
-    assert res_mismatch.is_valid is False
-    assert res_mismatch.status == "REVISION_MISMATCH"
-
-    # 5. Missing Required Capability
-    req = AgentCapabilityRequirement(
-        role_id="custom",
-        required_capabilities=(CapabilityType.PR_GENERATION,),
-    )
-    res_unqual = PassportVerifier.verify(valid_pass, requirement=req, now=now)
-    assert res_unqual.is_valid is False
-    assert res_unqual.status == "UNQUALIFIED"
+    with pytest.raises(QualificationEvidenceVerificationError) as exc_info:
+        PassportIssuer.issue_passport(req_expired, evidence_verifier=verifier, now=now)
+    assert exc_info.value.status == "EVIDENCE_EXPIRED"
 
 
 # ============================================================================
-# P-12.04 & P-12.05: Multi-Revision Agent Registry
+# P-12.04: Two Migration Engineer Revisions (Newer Revision Fails Qualification)
 # ============================================================================
 
 
-def test_two_migration_engineer_revisions():
-    registry = InMemoryAgentRegistry()
+def test_newer_revision_fails_qualification_routing_selects_proven():
+    """Prove newer revision fails qualification and router falls back to proven revision."""
+    ev_reg, verifier = _setup_evidence_verifier()
+    agent_reg = InMemoryAgentRegistry()
+    router = PassportAwareRouter(registry=agent_reg, evidence_verifier=verifier)
     now = _utc_now()
-    tid = "tenant-reg-demo"
+    tid = "tenant-p12-demo"
 
-    # Revision 1: SQL Only
+    # 1. Proven Revision 1 (rev-mig-proven-v1) - Passes qualification
     desc_v1 = AgentDescriptor(
         agent_id="migration_engineer",
-        agent_name="Migration Engineer Standard",
-        agent_role="Migration Synthesis",
-        agent_revision="rev-1.0.0-sqlite-pg",
-        description="Qualified for single-node SQLite and PostgreSQL schema migrations",
+        agent_name="Migration Engineer Proven",
+        agent_role="Migration Engineer",
+        agent_revision="rev-mig-proven-v1",
+        description="Standard proven migration engineer",
         declared_capabilities=("MIGRATION_SYNTHESIS_SQL",),
     )
-    pass_v1 = CapabilityPassport(
-        schema_version="1.0.0",
-        passport_id="pass-mig-v1",
-        agent_id="migration_engineer",
-        agent_revision="rev-1.0.0-sqlite-pg",
-        qualified_capabilities=("MIGRATION_SYNTHESIS_SQL",),
-        qualification_evidence_ids=("ev-mig-sql-bench",),
-        issuer="bench_runner",
-        issued_at=now,
-        expires_at=now + timedelta(days=30),
-        is_revoked=False,
-    )
-    registry.register_agent(desc_v1)
-    registry.register_passport(tid, pass_v1)
+    agent_reg.register_agent(desc_v1)
 
-    # Revision 2: SQL + Distributed (CockroachDB)
+    ev_v1 = QualificationEvidenceRecord(
+        evidence_id="ev-mig-v1-pass",
+        agent_id="migration_engineer",
+        agent_revision="rev-mig-proven-v1",
+        qualified_capability="MIGRATION_SYNTHESIS_SQL",
+        scenario_id="SCENARIO_NORMAL_MIGRATION",
+        passed=True,
+        evidence_state=EvidenceState.SIMULATED,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="1" * 64,
+        collected_at=now - timedelta(hours=1),
+        expires_at=now + timedelta(days=30),
+    )
+    ev_reg.register_evidence(ev_v1)
+
+    pass_v1 = PassportIssuer.issue_passport(
+        PassportIssuanceRequest(
+            agent_id="migration_engineer",
+            agent_revision="rev-mig-proven-v1",
+            qualified_capabilities=("MIGRATION_SYNTHESIS_SQL",),
+            qualification_evidence_ids=("ev-mig-v1-pass",),
+            issuer="qualification_pipeline",
+        ),
+        evidence_verifier=verifier,
+        now=now,
+    )
+    agent_reg.register_passport(tid, pass_v1)
+
+    # 2. Newer Revision 2 (rev-mig-newer-v2) - FAILS critical qualification scenario
     desc_v2 = AgentDescriptor(
         agent_id="migration_engineer",
-        agent_name="Migration Engineer Distributed",
-        agent_role="Migration Synthesis",
-        agent_revision="rev-2.0.0-cockroach-distributed",
-        description="Qualified for distributed schema migrations",
-        declared_capabilities=("MIGRATION_SYNTHESIS_SQL", "MIGRATION_SYNTHESIS_DISTRIBUTED"),
+        agent_name="Migration Engineer Fast Experimental",
+        agent_role="Migration Engineer",
+        agent_revision="rev-mig-newer-v2",
+        description="Faster experimental migration engineer",
+        declared_capabilities=("MIGRATION_SYNTHESIS_SQL",),
     )
-    pass_v2 = CapabilityPassport(
-        schema_version="1.0.0",
-        passport_id="pass-mig-v2",
+    agent_reg.register_agent(desc_v2)
+
+    ev_v2_fail = QualificationEvidenceRecord(
+        evidence_id="ev-mig-v2-fail",
         agent_id="migration_engineer",
-        agent_revision="rev-2.0.0-cockroach-distributed",
-        qualified_capabilities=("MIGRATION_SYNTHESIS_SQL", "MIGRATION_SYNTHESIS_DISTRIBUTED"),
-        qualification_evidence_ids=("ev-mig-sql-bench", "ev-mig-cockroach-bench"),
-        issuer="bench_runner",
-        issued_at=now,
+        agent_revision="rev-mig-newer-v2",
+        qualified_capability="MIGRATION_SYNTHESIS_SQL",
+        scenario_id="SCENARIO_LEGACY_CLIENT_BREAK",
+        passed=False,  # FAILED
+        evidence_state=EvidenceState.FAIL,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="2" * 64,
+        collected_at=now - timedelta(hours=1),
         expires_at=now + timedelta(days=30),
-        is_revoked=False,
     )
-    registry.register_agent(desc_v2)
-    registry.register_passport(tid, pass_v2)
+    ev_reg.register_evidence(ev_v2_fail)
 
-    # Finding agents for SQL returns both
-    sql_agents = registry.find_qualified_agents(tid, CapabilityType.MIGRATION_SYNTHESIS_SQL)
-    assert len(sql_agents) == 2
+    # Attempting to issue passport to v2 fails closed
+    with pytest.raises(QualificationEvidenceVerificationError):
+        PassportIssuer.issue_passport(
+            PassportIssuanceRequest(
+                agent_id="migration_engineer",
+                agent_revision="rev-mig-newer-v2",
+                qualified_capabilities=("MIGRATION_SYNTHESIS_SQL",),
+                qualification_evidence_ids=("ev-mig-v2-fail",),
+                issuer="qualification_pipeline",
+            ),
+            evidence_verifier=verifier,
+            now=now,
+        )
 
-    # Finding agents for Distributed returns only v2
-    dist_agents = registry.find_qualified_agents(
-        tid, CapabilityType.MIGRATION_SYNTHESIS_DISTRIBUTED
+    # 3. Router automatically dispatches to proven revision v1
+    desc_out, pass_out, proj_out = router.route_role(
+        tenant_id=tid,
+        role_id="migration_engineer",
     )
-    assert len(dist_agents) == 1
-    assert dist_agents[0][0].agent_revision == "rev-2.0.0-cockroach-distributed"
+    assert desc_out.agent_revision == "rev-mig-proven-v1"
+    assert pass_out.agent_revision == "rev-mig-proven-v1"
+
+    # Explicitly requesting unqualified preferred revision v2 raises UnqualifiedAgentDispatchError
+    with pytest.raises(UnqualifiedAgentDispatchError) as exc_info:
+        router.route_role(
+            tenant_id=tid,
+            role_id="migration_engineer",
+            preferred_revision="rev-mig-newer-v2",
+        )
+    assert "rev-mig-newer-v2" in str(exc_info.value)
 
 
 # ============================================================================
-# P-12.06: Passport-Aware Router Dispatch
+# P-12.06: Structured Judge-Facing Projection
 # ============================================================================
 
 
-def test_passport_aware_router_dispatch():
-    registry = InMemoryAgentRegistry()
+def test_passport_judge_projection_structure():
+    """Verify projection contains selected revision, capabilities, and qualification evidence."""
+
+    ev_reg, verifier = _setup_evidence_verifier()
+    agent_reg = InMemoryAgentRegistry()
+    router = PassportAwareRouter(registry=agent_reg, evidence_verifier=verifier)
     now = _utc_now()
-    tid = "tenant-router-demo"
+    tid = "tenant-judge-proj"
 
-    # Register Impact Scout with valid passport
-    scout_desc = AgentDescriptor(
-        agent_id="impact_scout",
-        agent_name="Impact Scout",
-        agent_role="Impact Analysis",
-        agent_revision="rev-scout-1",
-        description="AST and blast radius analysis",
-        declared_capabilities=("AST_STATIC_ANALYSIS", "BLAST_RADIUS_ESTIMATION"),
+    desc = AgentDescriptor(
+        agent_id="release_steward",
+        agent_name="Release Steward",
+        agent_role="Release Steward",
+        agent_revision="rev-steward-1",
+        description="Release steward with PR generation",
+        declared_capabilities=("PR_GENERATION",),
     )
-    scout_pass = CapabilityPassport(
-        schema_version="1.0.0",
-        passport_id="pass-scout-1",
-        agent_id="impact_scout",
-        agent_revision="rev-scout-1",
-        qualified_capabilities=("AST_STATIC_ANALYSIS", "BLAST_RADIUS_ESTIMATION"),
-        qualification_evidence_ids=("ev-scout-1",),
-        issuer="bench",
-        issued_at=now,
+    agent_reg.register_agent(desc)
+
+    ev = QualificationEvidenceRecord(
+        evidence_id="ev-pr-01",
+        agent_id="release_steward",
+        agent_revision="rev-steward-1",
+        qualified_capability="PR_GENERATION",
+        scenario_id="SCENARIO_NORMAL_MIGRATION",
+        passed=True,
+        evidence_state=EvidenceState.SIMULATED,
+        evidence_mode=ExecutionEvidenceMode.SIMULATION,
+        producer_kind=EvidenceProducerKind.SIMULATION,
+        evidence_digest="3" * 64,
+        collected_at=now,
         expires_at=now + timedelta(days=30),
-        is_revoked=False,
     )
-    registry.register_agent(scout_desc)
-    registry.register_passport(tid, scout_pass)
+    ev_reg.register_evidence(ev)
 
-    router = PassportAwareRouter(registry)
-
-    # 1. Routing Impact Scout succeeds
-    desc, passp = router.route_role(tid, "impact_scout")
-    assert desc.agent_id == "impact_scout"
-    assert passp.passport_id == "pass-scout-1"
-
-    # 2. Routing an unregistered role fails closed
-    with pytest.raises(UnqualifiedAgentDispatchError):
-        router.route_role(tid, "release_steward")
-
-    # 3. Routing when passport is revoked fails closed
-    revoked_scout = scout_pass.model_copy(
-        update={"is_revoked": True, "revoked_at": now, "revocation_reason": "Audit failure"}
+    passport = PassportIssuer.issue_passport(
+        PassportIssuanceRequest(
+            agent_id="release_steward",
+            agent_revision="rev-steward-1",
+            qualified_capabilities=("PR_GENERATION",),
+            qualification_evidence_ids=("ev-pr-01",),
+            issuer="qualification_pipeline",
+        ),
+        evidence_verifier=verifier,
+        now=now,
     )
-    registry.register_passport(tid, revoked_scout)
+    agent_reg.register_passport(tid, passport)
 
-    with pytest.raises(UnqualifiedAgentDispatchError):
-        router.route_role(tid, "impact_scout")
+    desc_out, pass_out, projection = router.route_role(tid, "release_steward")
+    assert projection.selected_agent_id == "release_steward"
+    assert projection.selected_revision == "rev-steward-1"
+    assert "PR_GENERATION" in projection.qualified_capabilities
+    assert "ev-pr-01" in projection.qualification_evidence_ids

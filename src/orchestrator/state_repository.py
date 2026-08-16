@@ -83,8 +83,10 @@ def scan_for_secrets(data: Any, path: str = "") -> None:
             k_lower = str(k).lower()
             if any(pattern in k_lower for pattern in SECRET_KEY_PATTERNS):
                 raise PersistenceSchemaError(
-                    f"Prohibited secret field {k!r} detected at {path or 'root'}; credentials must never be persisted."
+                    f"Prohibited secret field {k!r} at {path or 'root'}; "
+                    f"credentials must never be persisted."
                 )
+
             scan_for_secrets(v, f"{path}.{k}" if path else str(k))
     elif isinstance(data, (list, tuple)):
         for i, item in enumerate(data):
@@ -285,6 +287,10 @@ class IdempotencyReservationRecord(BaseModel):
     reservation_id: str
     idempotency_key: str
     action_type: str
+    payload_digest: str
+    target_system: Optional[str] = None
+    scope: Optional[str] = None
+    caller_revision: Optional[str] = None
     status: IdempotencyReservationStatus = IdempotencyReservationStatus.RESERVED
     reserved_at: UtcDateTime
     expires_at: UtcDateTime
@@ -298,11 +304,26 @@ class IdempotencyReservationRecord(BaseModel):
     def _validate_tid(cls, v: str) -> str:
         return validate_tenant_id(v)
 
-    @field_validator("change_id", "reservation_id", "idempotency_key", "action_type")
+    @field_validator(
+        "change_id",
+        "reservation_id",
+        "idempotency_key",
+        "action_type",
+        "payload_digest",
+    )
     @classmethod
     def _not_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
             raise ValueError(f"{info.field_name} must not be blank")
+        return v
+
+    @field_validator("payload_digest")
+    @classmethod
+    def _validate_payload_digest(cls, v: str) -> str:
+        if not is_valid_sha256_digest(v):
+            raise ValueError(
+                f"payload_digest must be a valid 64-char hex SHA-256 digest, got {v!r}"
+            )
         return v
 
 
@@ -610,7 +631,7 @@ class SagaStateRepository(ABC):
     def create_idempotency_reservation(
         self, tenant_id: str, change_id: str, reservation: IdempotencyReservationRecord
     ) -> IdempotencyReservationRecord:
-        """Persist an idempotency reservation under /tenants/{tenant_id}/changes/{change_id}/idempotency_reservations."""
+        """Persist an idempotency reservation under idempotency subcollection."""
         pass
 
     @abstractmethod

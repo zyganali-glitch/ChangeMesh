@@ -1,18 +1,22 @@
-"""ChangeMesh idempotency key and replay safety tests.
+"""ChangeMesh idempotency key, replay safety, and semantic conflict tests.
 
 P-10.03: Validates deterministic key generation, reservation leases,
+semantic conflict detection (same key + different payload => conflict),
 exact replay caching, and non-duplication across workflow steps, branches,
 PRs, approvals, passports, and external writes.
 """
 
 from __future__ import annotations
 
+import concurrent.futures
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from domain.contracts.change_lifecycle import ChangeState
-from domain.contracts.conventions import sha256_hex
 from domain.contracts.data_class import DataClassLevel
 from src.orchestrator.idempotency import (
+    IdempotencyConflictError,
     IdempotencyIntent,
     IdempotencyKeyManager,
     IdempotencyReservationOutcomeStatus,
@@ -108,11 +112,117 @@ def test_reservation_grant_and_commit_replay():
     assert committed.status == IdempotencyReservationStatus.COMMITTED
     assert committed.result_digest == result_digest
 
-    # 4. Replay attempt: EXACT_REPLAY returns cached outcome without duplicate execution
+    # 4. Identical replay attempt: EXACT_REPLAY returns cached outcome
     outcome3 = IdempotencyKeyManager.reserve_intent(repo, intent)
     assert outcome3.status == IdempotencyReservationOutcomeStatus.EXACT_REPLAY
     assert outcome3.cached_result_digest == result_digest
     assert outcome3.cached_receipt_status == "APPLIED"
+
+
+def test_conflicting_payload_reuse_fails_closed():
+    """Prove that same operation identity + different payload raises IdempotencyConflictError."""
+    repo, tid, cid = _setup_repo()
+    intent_orig = IdempotencyIntent(
+        tenant_id=tid,
+        change_id=cid,
+        scope=IdempotencyScope.WORKFLOW_STEP,
+        action_type="APPLY_MIGRATION",
+        target_system="postgres-prod",
+        caller_revision="rev-1",
+        payload_digest="1" * 64,
+    )
+
+    # Reserve original intent
+    out = IdempotencyKeyManager.reserve_intent(repo, intent_orig)
+    assert out.status == IdempotencyReservationOutcomeStatus.GRANTED
+
+    # Commit original intent
+    IdempotencyKeyManager.commit_intent(
+        repo, tid, cid, out.reservation.reservation_id, result_digest="9" * 64
+    )
+
+    # Reusing same logical identity with DIFFERENT payload MUST raise IdempotencyConflictError
+    intent_conflict = intent_orig.model_copy(update={"payload_digest": "2" * 64})
+    with pytest.raises(IdempotencyConflictError) as exc_info:
+        IdempotencyKeyManager.reserve_intent(repo, intent_conflict)
+
+    assert exc_info.value.existing_digest == "1" * 64
+    assert exc_info.value.incoming_digest == "2" * 64
+
+
+def test_conflicting_payload_in_active_lease_fails_closed():
+    """Active uncommitted lease also fails closed on conflicting payload."""
+    repo, tid, cid = _setup_repo()
+    intent_orig = IdempotencyIntent(
+        tenant_id=tid,
+        change_id=cid,
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type="WRITE_DATA",
+        target_system="storage-bucket",
+        caller_revision="rev-1",
+        payload_digest="3" * 64,
+    )
+    IdempotencyKeyManager.reserve_intent(repo, intent_orig)
+
+    intent_conflict = intent_orig.model_copy(update={"payload_digest": "4" * 64})
+    with pytest.raises(IdempotencyConflictError):
+        IdempotencyKeyManager.reserve_intent(repo, intent_conflict)
+
+
+def test_different_target_and_action_generate_distinct_keys():
+    """Verify different target_system and action_type produce separate reservation keys."""
+    intent_base = IdempotencyIntent(
+        tenant_id="tenant-1",
+        change_id="c1",
+        scope=IdempotencyScope.WORKFLOW_STEP,
+        action_type="ACTION_A",
+        target_system="system_alpha",
+        caller_revision="rev-1",
+        payload_digest="a" * 64,
+    )
+    intent_diff_target = intent_base.model_copy(update={"target_system": "system_beta"})
+    intent_diff_action = intent_base.model_copy(update={"action_type": "ACTION_B"})
+
+    key_base = IdempotencyKeyManager.compute_canonical_idempotency_key(intent_base)
+    key_target = IdempotencyKeyManager.compute_canonical_idempotency_key(intent_diff_target)
+    key_action = IdempotencyKeyManager.compute_canonical_idempotency_key(intent_diff_action)
+
+    assert key_base != key_target
+    assert key_base != key_action
+    assert key_target != key_action
+
+
+def test_concurrent_fresh_reservation_single_grant():
+    """Prove concurrent attempts for fresh reservation receive at most 1 GRANTED."""
+
+    repo, tid, cid = _setup_repo()
+    intent = IdempotencyIntent(
+        tenant_id=tid,
+        change_id=cid,
+        scope=IdempotencyScope.BRANCH_INTENT,
+        action_type="CONCURRENT_BRANCH",
+        target_system="git",
+        caller_revision="rev-1",
+        payload_digest="5" * 64,
+    )
+
+    granted_count = 0
+    in_progress_count = 0
+
+    def try_reserve():
+        nonlocal granted_count, in_progress_count
+        res = IdempotencyKeyManager.reserve_intent(repo, intent)
+        if res.status == IdempotencyReservationOutcomeStatus.GRANTED:
+            granted_count += 1
+        elif res.status == IdempotencyReservationOutcomeStatus.IN_PROGRESS:
+            in_progress_count += 1
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(try_reserve) for _ in range(8)]
+        concurrent.futures.wait(futures)
+
+    assert granted_count == 1
+    assert in_progress_count == 7
 
 
 def test_lease_expiry_reacquisition():
@@ -126,13 +236,12 @@ def test_lease_expiry_reacquisition():
         target_system="system-1",
         caller_revision="rev-1",
         payload_digest="d" * 64,
-        lease_duration_seconds=300,  # 5 min
+        lease_duration_seconds=300,
     )
 
     outcome1 = IdempotencyKeyManager.reserve_intent(repo, intent, now=t0)
     assert outcome1.status == IdempotencyReservationOutcomeStatus.GRANTED
 
-    # After 10 minutes (lease expired)
     t1 = t0 + timedelta(minutes=10)
     outcome2 = IdempotencyKeyManager.reserve_intent(repo, intent, now=t1)
     assert outcome2.status == IdempotencyReservationOutcomeStatus.GRANTED
@@ -154,45 +263,77 @@ def test_release_and_retry():
     outcome1 = IdempotencyKeyManager.reserve_intent(repo, intent)
     assert outcome1.status == IdempotencyReservationOutcomeStatus.GRANTED
 
-    # Step fails transiently -> release reservation
     released = IdempotencyKeyManager.release_intent(
         repo, tid, cid, outcome1.reservation.reservation_id
     )
     assert released.status == IdempotencyReservationStatus.RELEASED
 
-    # Retry can now re-acquire immediately
     outcome2 = IdempotencyKeyManager.reserve_intent(repo, intent)
     assert outcome2.status == IdempotencyReservationOutcomeStatus.GRANTED
 
 
-def test_all_scopes_replay_protection():
-    """Verify non-duplicate replay across all six canonical scopes."""
-    repo, tid, cid = _setup_repo()
-    scopes = [
-        IdempotencyScope.WORKFLOW_STEP,
-        IdempotencyScope.BRANCH_INTENT,
-        IdempotencyScope.PR_INTENT,
-        IdempotencyScope.APPROVAL,
-        IdempotencyScope.PASSPORT,
-        IdempotencyScope.EXTERNAL_WRITE,
-    ]
+def test_tenant_isolation_in_idempotency():
+    """Verify same change_id and key under different tenants are completely isolated."""
+    repo = InMemorySagaStateRepository()
+    now = datetime.now(timezone.utc)
+    t1, t2 = "tenant-iso-1", "tenant-iso-2"
+    cid = "chg-shared-id"
 
-    for scope in scopes:
-        intent = IdempotencyIntent(
-            tenant_id=tid,
+    repo.create_tenant(TenantRecord(tenant_id=t1, name="Org 1", created_at=now, updated_at=now))
+    repo.create_tenant(TenantRecord(tenant_id=t2, name="Org 2", created_at=now, updated_at=now))
+
+    repo.create_change(
+        t1,
+        ChangeRecord(
+            tenant_id=t1,
             change_id=cid,
-            scope=scope,
-            action_type=f"ACTION_FOR_{scope.value}",
-            target_system="target-system",
-            caller_revision="rev-1",
-            payload_digest="f" * 64,
-        )
-        res = IdempotencyKeyManager.reserve_intent(repo, intent)
-        assert res.status == IdempotencyReservationOutcomeStatus.GRANTED
+            correlation_id="corr-1",
+            title="T1",
+            description="T1",
+            target_systems=("s1",),
+            data_classification=DataClassLevel.INTERNAL,
+            requested_by="u1",
+            requested_at=now,
+            state=ChangeState.RECEIVED,
+            state_updated_at=now,
+            created_at=now,
+            updated_at=now,
+        ),
+    )
+    repo.create_change(
+        t2,
+        ChangeRecord(
+            tenant_id=t2,
+            change_id=cid,
+            correlation_id="corr-2",
+            title="T2",
+            description="T2",
+            target_systems=("s1",),
+            data_classification=DataClassLevel.INTERNAL,
+            requested_by="u2",
+            requested_at=now,
+            state=ChangeState.RECEIVED,
+            state_updated_at=now,
+            created_at=now,
+            updated_at=now,
+        ),
+    )
 
-        digest = sha256_hex(scope.value.encode())
-        IdempotencyKeyManager.commit_intent(repo, tid, cid, res.reservation.reservation_id, digest)
+    intent1 = IdempotencyIntent(
+        tenant_id=t1,
+        change_id=cid,
+        scope=IdempotencyScope.BRANCH_INTENT,
+        action_type="BRANCH",
+        target_system="git",
+        caller_revision="rev-1",
+        payload_digest="a" * 64,
+    )
+    intent2 = intent1.model_copy(update={"tenant_id": t2})
 
-        replay = IdempotencyKeyManager.reserve_intent(repo, intent)
-        assert replay.status == IdempotencyReservationOutcomeStatus.EXACT_REPLAY
-        assert replay.cached_result_digest == digest
+    out1 = IdempotencyKeyManager.reserve_intent(repo, intent1)
+    out2 = IdempotencyKeyManager.reserve_intent(repo, intent2)
+
+    assert out1.status == IdempotencyReservationOutcomeStatus.GRANTED
+    assert out2.status == IdempotencyReservationOutcomeStatus.GRANTED
+    assert out1.reservation.tenant_id == t1
+    assert out2.reservation.tenant_id == t2

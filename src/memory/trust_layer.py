@@ -60,6 +60,7 @@ class MemoryTrustEvaluator:
 
         # 1. Quarantined Check (Fail Closed Highest Priority)
         if record.is_quarantined or record.trust_status == MemoryTrustStatus.QUARANTINED:
+            reason = record.quarantine_reason or "unspecified reason"
             return EpistemicTrustEvaluation(
                 memory_id=record.memory_id,
                 trust_class=EpistemicTrustClass.QUARANTINED,
@@ -67,7 +68,7 @@ class MemoryTrustEvaluator:
                 is_authoritative=False,
                 freshness_score=0.0,
                 retrieval_relevance_score=retrieval_relevance,
-                evaluation_reason=f"Memory is quarantined: {record.quarantine_reason or 'unspecified reason'}",
+                evaluation_reason=f"Memory is quarantined: {reason}",
                 evaluated_at=now,
             )
 
@@ -93,7 +94,9 @@ class MemoryTrustEvaluator:
                 is_authoritative=False,
                 freshness_score=0.0,
                 retrieval_relevance_score=retrieval_relevance,
-                evaluation_reason=f"Memory has {len(record.contradiction_ids)} unresolved contradiction references",
+                evaluation_reason=(
+                    f"Memory has {len(record.contradiction_ids)} contradiction reference(s)"
+                ),
                 evaluated_at=now,
             )
 
@@ -114,7 +117,9 @@ class MemoryTrustEvaluator:
                 is_authoritative=False,  # Memory provides context, not machine authority
                 freshness_score=round(freshness, 4),
                 retrieval_relevance_score=retrieval_relevance,
-                evaluation_reason=f"Verified with {len(record.trust_evidence_ids)} deterministic trust evidence ref(s)",
+                evaluation_reason=(
+                    f"Verified with {len(record.trust_evidence_ids)} trust evidence ref(s)"
+                ),
                 evaluated_at=now,
             )
 
@@ -122,7 +127,7 @@ class MemoryTrustEvaluator:
         return EpistemicTrustEvaluation(
             memory_id=record.memory_id,
             trust_class=EpistemicTrustClass.UNTRUSTED_CONTEXT,
-            is_usable_as_context=True,  # Usable as advisory context only with explicit untrusted tag
+            is_usable_as_context=True,  # Usable as advisory context only
             is_authoritative=False,
             freshness_score=round(freshness, 4),
             retrieval_relevance_score=retrieval_relevance,

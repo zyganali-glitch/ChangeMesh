@@ -201,8 +201,9 @@ def test_no_suspicious_secret_patterns_in_template():
 
     for pattern in SUSPICIOUS_SECRET_PATTERNS:
         match = pattern.search(content)
+        matched_text = match.group(0) if match else ""
         assert match is None, (
-            f"Suspicious secret pattern '{pattern.pattern}' found in .env.example: '{match.group(0) if match else ''}'"
+            f"Suspicious pattern '{pattern.pattern}' in .env.example: '{matched_text}'"
         )
 
 
@@ -273,7 +274,7 @@ def test_gitignore_ignores_real_env_files():
     )
     if example_result.returncode == 0:
         assert "!" in example_result.stdout, (
-            f".env.example must not be ignored (should match negative pattern): {example_result.stdout}"
+            f".env.example must not be ignored: {example_result.stdout}"
         )
 
 
@@ -362,7 +363,7 @@ def test_domain_contracts_contain_no_credentials():
                     if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
                         field_name = item.target.id.lower()
                         assert field_name not in credential_field_names, (
-                            f"Prohibited credential field '{field_name}' in contract model '{node.name}' "
+                            f"Prohibited field '{field_name}' in contract '{node.name}' "
                             f"in file {py_file.name}"
                         )
 

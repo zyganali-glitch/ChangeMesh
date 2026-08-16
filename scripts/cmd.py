@@ -27,7 +27,8 @@ def lint_cmd(args=None):
 
 def typecheck_cmd(args=None):
     print("Running type-checker (mypy)...")
-    return run_command(["uv", "run", "mypy", "domain", "tests"])
+    return run_command(["uv", "run", "mypy", "domain", "src", "integrations", "tests"])
+
 
 
 def unit_cmd(args=None):

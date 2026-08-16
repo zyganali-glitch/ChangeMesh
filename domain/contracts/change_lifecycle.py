@@ -231,6 +231,7 @@ def require_transition(
     if not can_transition(current, target, retry_origin=retry_origin):
         if current == ChangeState.RETRY_SCHEDULED and isinstance(retry_origin, ChangeState):
             raise IllegalTransitionError(
-                f"Illegal transition from {current.value} to {target.value} with retry_origin={retry_origin.value}"
+                f"Illegal transition from {current.value} to {target.value} "
+                f"with retry_origin={retry_origin.value}"
             )
         raise IllegalTransitionError(f"Illegal transition from {current.value} to {target.value}")

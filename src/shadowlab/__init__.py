@@ -1,10 +1,18 @@
 """ChangeMesh ShadowLab Rehearsal Twin package.
 
 P-13: Synthetic twin execution sandbox, deterministic fault injection,
-simulation-labeled evidence generation, and bounded re-rehearsal plan correction.
+simulation-labeled evidence generation, authorization binding, and bounded plan correction.
 """
 
-from src.shadowlab.runner import ShadowLabRunner
+from src.shadowlab.runner import (
+    AuthorizationEligibility,
+    AuthorizationEligibilityEvaluator,
+    MigrationPlan,
+    PlanCorrectionEngine,
+    PlanCorrectionResult,
+    PlanStep,
+    ShadowLabRunner,
+)
 from src.shadowlab.scenarios import (
     FaultType,
     InjectedFault,
@@ -28,4 +36,10 @@ __all__ = [
     "SimulatedApiClient",
     "SimulatedGitClient",
     "ShadowLabRunner",
+    "AuthorizationEligibility",
+    "AuthorizationEligibilityEvaluator",
+    "MigrationPlan",
+    "PlanStep",
+    "PlanCorrectionResult",
+    "PlanCorrectionEngine",
 ]

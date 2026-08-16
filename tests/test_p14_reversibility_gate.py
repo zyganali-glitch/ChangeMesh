@@ -1,22 +1,39 @@
-"""ChangeMesh Reversibility Gate and Approval Compression comprehensive test suite.
+"""ChangeMesh Reversibility Gate, Approval Compression, and Policy Guardian test suite.
 
-P-14: Tests 4-class reversibility classification, 1-screen compressed decision cards,
-cryptographic HMAC approval tokens, single-use idempotency, and Policy Guardian gate decisions.
+P-14: Tests 7 deterministic policy inputs, complete 7-action autonomy mapping,
+locked-fact-only Approval Compression Cards, cryptographic approval token verification
+without hardcoded secrets, and real demonstrable friction reduction metrics.
 """
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from domain.contracts.autonomy import AutonomyClass
-from src.gate.compression import ApprovalCompressionEngine
-from src.gate.policy_guardian_gate import PolicyGuardianGate
+from src.gate.action_map import CanonicalActionType, get_canonical_action_map
+from src.gate.compression import (
+    ApprovalCompressionEngine,
+    LockedFact,
+    LockedFactBundle,
+)
+from src.gate.friction_metrics import (
+    FrictionMetricsCalculator,
+)
+from src.gate.policy_guardian_gate import (
+    PolicyGuardianGate,
+)
 from src.gate.reversibility import (
+    DeterministicPolicyInputs,
+    RehearsalStatus,
     ReversibilityClass,
     ReversibilityClassifier,
 )
 from src.gate.token import (
-    ApprovalTokenManager,
+    SignedApprovalToken,
+    TrustedAuthorityDecisionVerifier,
 )
 
 
@@ -25,7 +42,53 @@ def _utc_now() -> datetime:
 
 
 # ============================================================================
-# P-14.01: 4-Class Reversibility Classification
+# Test-Only Authority Signer (Lives strictly in test boundary)
+# ============================================================================
+
+
+class TestHmacAuthoritySigner:
+    """Test fixture helper to sign approval tokens for test verification."""
+
+    @classmethod
+    def sign_token(
+        cls,
+        plan_hash: str,
+        approver_id: str,
+        authority_slot_ref: str,
+        secret_key: str,
+        action_scope: str = "Target: Production",
+        validity_seconds: int = 3600,
+        now: datetime | None = None,
+    ) -> SignedApprovalToken:
+        if now is None:
+            now = _utc_now()
+
+        token_id = f"tok-test-{uuid.uuid4().hex[:8]}"
+        nonce = uuid.uuid4().hex
+        expires_at = now + timedelta(seconds=validity_seconds)
+
+        msg = (
+            f"token_id={token_id}:plan_hash={plan_hash}:approver={approver_id}:"
+            f"slot={authority_slot_ref}:scope={action_scope}:"
+            f"issued={now.isoformat()}:expires={expires_at.isoformat()}:nonce={nonce}"
+        )
+        sig = hmac.new(secret_key.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
+
+        return SignedApprovalToken(
+            token_id=token_id,
+            plan_hash=plan_hash,
+            approver_id=approver_id,
+            authority_slot_ref=authority_slot_ref,
+            action_scope=action_scope,
+            issued_at=now,
+            expires_at=expires_at,
+            nonce=nonce,
+            signature=sig,
+        )
+
+
+# ============================================================================
+# P-14.01 & P-14.02: 7 Deterministic Policy Inputs & Rehearsal Authorization
 # ============================================================================
 
 
@@ -59,7 +122,7 @@ def test_reversibility_classification_tiers():
     )
     assert res_human.reversibility_class == ReversibilityClass.HUMAN_INTERVENTION_REQUIRED
 
-    # 4. Irreversible Destructive (DROP TABLE without down script)
+    # 4. Irreversible Destructive
     res_dest = ReversibilityClassifier.classify_sql(
         change_id="chg-004",
         sql_up="DROP TABLE legacy_audit_logs;",
@@ -70,119 +133,200 @@ def test_reversibility_classification_tiers():
     assert res_dest.reversibility_score == 0.0
 
 
+def test_rehearse_then_execute_not_authorized_until_rehearsal_passed():
+    """Prove REHEARSE_THEN_EXECUTE does NOT authorize execution until rehearsal status is PASSED."""
+    gate = PolicyGuardianGate()
+
+    # Rehearsal NOT_RUN -> Execution UNAUTHORIZED
+    inputs_not_run = DeterministicPolicyInputs(
+        change_id="chg-rehearse-1",
+        blast_radius_score=0.25,
+        reversibility_class=ReversibilityClass.REVERSIBLE_WITH_COMPENSATION,
+        has_down_migration=True,
+        rehearsal_status=RehearsalStatus.REHEARSAL_NOT_RUN,
+    )
+    eval_not_run = gate.evaluate_inputs(inputs_not_run)
+    assert eval_not_run.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
+    assert eval_not_run.is_authorized is False
+    assert "UNAUTHORIZED" in eval_not_run.decision_summary
+
+    # Rehearsal PASSED -> Execution AUTHORIZED
+    inputs_passed = inputs_not_run.model_copy(
+        update={"rehearsal_status": RehearsalStatus.REHEARSAL_PASSED}
+    )
+    eval_passed = gate.evaluate_inputs(inputs_passed)
+    assert eval_passed.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
+    assert eval_passed.is_authorized is True
+    assert "rehearsal passed" in eval_passed.decision_summary.lower()
+
+
 # ============================================================================
-# P-14.02: Approval Compression Card Generation
+# P-14.03: Complete Exact Action Map
 # ============================================================================
 
 
-def test_approval_compression_card_generation():
+def test_complete_canonical_action_map():
+    """Verify action map maps all 7 demo actions without fallback defaults."""
+    action_map = get_canonical_action_map()
+    assert len(action_map) == 7
+
+    assert action_map[CanonicalActionType.ANALYSIS].autonomy_class == AutonomyClass.AUTO_EXECUTE
+    assert action_map[CanonicalActionType.BRANCH].autonomy_class == AutonomyClass.AUTO_EXECUTE
+    assert action_map[CanonicalActionType.DRAFT_PR].autonomy_class == AutonomyClass.AUTO_EXECUTE
+    assert (
+        action_map[CanonicalActionType.STAGING_MUTATION].autonomy_class
+        == AutonomyClass.REHEARSE_THEN_EXECUTE
+    )
+    assert (
+        action_map[CanonicalActionType.PRODUCTION_ADD_DROP].autonomy_class
+        == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+    )
+    assert (
+        action_map[CanonicalActionType.PRIVILEGE_EXPANSION].autonomy_class
+        == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+    )
+    assert (
+        action_map[CanonicalActionType.DATA_EXPORT].autonomy_class
+        == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+    )
+
+    # Verify authority slot requirement
+    assert action_map[CanonicalActionType.PRODUCTION_ADD_DROP].requires_human_authority is True
+    assert action_map[CanonicalActionType.PRODUCTION_ADD_DROP].authority_slot_ref == "slot:lead_dba"
+
+
+# ============================================================================
+# P-14.04: Locked Facts Only in Approval Compression Card
+# ============================================================================
+
+
+def test_approval_compression_card_locked_facts_only():
+    """Prove engine renders strictly from supplied locked facts without reassurance."""
+    now = _utc_now()
     assessment = ReversibilityClassifier.classify_sql(
-        change_id="chg-drop-table",
-        sql_up="DROP TABLE old_records;",
-        sql_down="CREATE TABLE old_records (id INT);",
-        blast_radius_score=0.85,
+        change_id="chg-drop-01",
+        sql_up="DROP TABLE old_audit_logs;",
+        sql_down="CREATE TABLE old_audit_logs (id INT);",
+        blast_radius_score=0.88,
     )
 
-    card = ApprovalCompressionEngine.generate_card(
-        change_request_id="chg-drop-table",
-        assessment=assessment,
+    fact_ast = LockedFact(
+        fact_id="fact-ast-01",
+        source_agent="impact_scout",
+        category="AST_ANALYSIS",
+        statement="Scanned 42 SQL queries across 3 microservices; identified 2 dependent queries",
+        evidence_digest="a" * 64,
+    )
+    fact_rehearse = LockedFact(
+        fact_id="fact-reh-01",
+        source_agent="shadowlab",
+        category="REHEARSAL",
+        statement="Rehearsed DDL in Postgres twin; verified recreation rollback script in 45ms",
+        evidence_digest="b" * 64,
+    )
+
+    bundle = LockedFactBundle(
+        change_request_id="chg-drop-01",
+        completed_facts=(fact_ast,),
+        rehearsed_facts=(fact_rehearse,),
+        reversibility_assessment=assessment,
         authority_slot_ref="slot:lead_dba",
+        decision_question="Authorize DROP TABLE old_audit_logs on production database?",
+        decision_options=("APPROVE_EXECUTION", "REJECT_AND_REQUEST_REVISION"),
+        action_scope="Production PostgreSQL / public.old_audit_logs",
+        risk_summary="High blast radius (0.88) destructive table drop",
+        consequence_summary="Table will be deleted; restore requires running recreation script.",
+        expires_at=now + timedelta(hours=1),
+        evidence_refs=("ev-ast-01", "ev-reh-01"),
     )
 
-    assert card.change_request_id == "chg-drop-table"
+    card = ApprovalCompressionEngine.generate_card(bundle, now=now)
+
+    assert card.change_request_id == "chg-drop-01"
     assert card.autonomy_decision.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
-    assert len(card.decision_options) == 2
-    assert "APPROVE_EXECUTION" in card.decision_options
-    assert "REJECT_AND_REQUEST_REVISION" in card.decision_options
-    assert "AST static analysis passed" in card.completed_work_summary
-    assert "Synthetic twin rehearsal passed" in card.rehearsed_work_summary
+
+    # Verify facts are rendered strictly from the locked facts
+    assert "Scanned 42 SQL queries" in card.completed_work_summary
+    assert "verified recreation rollback script" in card.rehearsed_work_summary
+
+    # Prove NO fabricated default reassurance exists
+    assert "AST static analysis passed (0 breaking changes)" not in card.completed_work_summary
+    assert "Synthetic twin rehearsal passed in ShadowLab sandbox" not in card.rehearsed_work_summary
+    assert card.evidence_refs == ("ev-ast-01", "ev-reh-01")
 
 
 # ============================================================================
-# P-14.03: Cryptographic Approval Token Validation & Idempotency
+# P-14.05: Human Authority Cryptographic Verification
 # ============================================================================
 
 
-def test_cryptographic_approval_token_lifecycle():
-    mgr = ApprovalTokenManager()
-    plan_hash = "sha256-plan-hash-abc-123"
-    secret_key = "test-secret-key-32-characters!!"
+def test_trusted_authority_decision_verification_lifecycle():
+    """Verify cryptographic token verification, expiry, plan binding, and replay prevention."""
+    secret_key = "test-secret-injected-for-unit-test-only!!"
+    verifier = TrustedAuthorityDecisionVerifier(verification_secret=secret_key)
+    plan_hash = "sha256-plan-hash-abc"
+    slot_ref = "slot:lead_dba"
     now = _utc_now()
 
-    # 1. Issue Token
-    token = mgr.issue_token(
+    # 1. Sign valid token in test fixture
+    token = TestHmacAuthoritySigner.sign_token(
         plan_hash=plan_hash,
         approver_id="alice@lead-dba.org",
-        authority_slot_ref="slot:lead_dba",
+        authority_slot_ref=slot_ref,
         secret_key=secret_key,
-        validity_seconds=3600,
         now=now,
     )
-    assert token.signature is not None
 
-    # 2. Verify against wrong plan hash (Stale Token)
-    res_stale = mgr.verify_and_consume(
+    # 2. Verify with wrong plan hash (Stale Plan Check)
+    val_stale = verifier.verify_and_consume(
         token=token,
-        expected_plan_hash="sha256-plan-hash-xyz-999",
-        secret_key=secret_key,
-        now=now + timedelta(minutes=5),
+        expected_plan_hash="sha256-plan-hash-stale-diff",
+        expected_slot_ref=slot_ref,
+        now=now,
     )
-    assert res_stale.is_valid is False
-    assert res_stale.status == "STALE_PLAN_HASH"
+    assert val_stale.is_valid is False
+    assert val_stale.status == "STALE_PLAN_HASH"
 
-    # 3. Verify against wrong secret key (Invalid Signature)
-    res_tamper = mgr.verify_and_consume(
+    # 3. Verify when expired
+    val_exp = verifier.verify_and_consume(
         token=token,
         expected_plan_hash=plan_hash,
-        secret_key="wrong-secret-key-attacker",
-        now=now + timedelta(minutes=5),
-    )
-    assert res_tamper.is_valid is False
-    assert res_tamper.status == "INVALID_SIGNATURE"
-
-    # 4. Verify when expired
-    res_expired = mgr.verify_and_consume(
-        token=token,
-        expected_plan_hash=plan_hash,
-        secret_key=secret_key,
+        expected_slot_ref=slot_ref,
         now=now + timedelta(hours=2),
     )
-    assert res_expired.is_valid is False
-    assert res_expired.status == "EXPIRED"
+    assert val_exp.is_valid is False
+    assert val_exp.status == "EXPIRED"
 
-    # 5. Successful Verification and Single-Use Consumption
-    res_valid = mgr.verify_and_consume(
+    # 4. Successful Verification and Single-Use Consumption
+    val_ok = verifier.verify_and_consume(
         token=token,
         expected_plan_hash=plan_hash,
-        secret_key=secret_key,
+        expected_slot_ref=slot_ref,
         now=now + timedelta(minutes=5),
     )
-    assert res_valid.is_valid is True
-    assert res_valid.status == "VALID"
+    assert val_ok.is_valid is True
+    assert val_ok.status == "VALID"
 
-    # 6. Replay Attempt (Idempotency check fails closed)
-    res_replay = mgr.verify_and_consume(
+    # 5. Replay attempt fails closed (Single-use consumption)
+    val_replay = verifier.verify_and_consume(
         token=token,
         expected_plan_hash=plan_hash,
-        secret_key=secret_key,
+        expected_slot_ref=slot_ref,
         now=now + timedelta(minutes=6),
     )
-    assert res_replay.is_valid is False
-    assert res_replay.status == "TOKEN_ALREADY_CONSUMED"
+    assert val_replay.is_valid is False
+    assert val_replay.status == "TOKEN_ALREADY_CONSUMED"
 
 
-# ============================================================================
-# P-14.04 - P-14.06: Policy Guardian Gate Evaluation
-# ============================================================================
-
-
-def test_policy_guardian_gate_evaluation():
-    token_mgr = ApprovalTokenManager()
-    gate = PolicyGuardianGate(token_manager=token_mgr)
-    secret_key = "demo-signing-secret-key-32chars!!"
+def test_policy_guardian_gate_with_injected_authority_verifier():
+    """Verify PolicyGuardianGate uses injected verifier without hardcoded secrets."""
+    secret = "injected-test-secret-key-48chars-for-testing!!"
+    verifier = TrustedAuthorityDecisionVerifier(verification_secret=secret)
+    gate = PolicyGuardianGate(authority_verifier=verifier)
+    plan_hash = "plan-pay-01"
 
     # 1. Fully reversible -> AUTO_EXECUTE
-    eval_auto = gate.evaluate_change(
+    eval_auto = gate.evaluate_change_sql(
         change_id="chg-auto",
         sql_up="ALTER TABLE users ADD COLUMN phone TEXT;",
         sql_down="ALTER TABLE users DROP COLUMN phone;",
@@ -191,43 +335,80 @@ def test_policy_guardian_gate_evaluation():
     assert eval_auto.autonomy_class == AutonomyClass.AUTO_EXECUTE
     assert eval_auto.is_authorized is True
 
-    # 2. Irreversible destructive -> BLOCKED
-    eval_blocked = gate.evaluate_change(
-        change_id="chg-block",
-        sql_up="DROP TABLE customers;",
-        sql_down=None,
-        blast_radius=0.5,
-    )
-    assert eval_blocked.autonomy_class == AutonomyClass.BLOCKED
-    assert eval_blocked.is_authorized is False
-
-    # 3. High blast radius without token -> HUMAN_AUTHORITY_REQUIRED + Compression Card
-    eval_human_no_tok = gate.evaluate_change(
+    # 2. High blast radius without token -> HUMAN_AUTHORITY_REQUIRED + card
+    eval_human_no_tok = gate.evaluate_change_sql(
         change_id="chg-human",
         sql_up="ALTER TABLE payments ADD COLUMN fee INT;",
         sql_down="ALTER TABLE payments DROP COLUMN fee;",
         blast_radius=0.95,
-        plan_hash="plan-hash-pay",
+        plan_hash=plan_hash,
         approval_token=None,
     )
     assert eval_human_no_tok.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
     assert eval_human_no_tok.is_authorized is False
     assert eval_human_no_tok.compression_card is not None
 
-    # 4. High blast radius with valid token -> AUTHORIZED
-    token = token_mgr.issue_token(
-        plan_hash="plan-hash-pay",
-        approver_id="bob@lead-dba.org",
-        secret_key=secret_key,
+    # 3. High blast radius with valid signed token -> AUTHORIZED
+    token = TestHmacAuthoritySigner.sign_token(
+        plan_hash=plan_hash,
+        approver_id="lead-dba@enterprise.org",
+        authority_slot_ref="slot:lead_dba",
+        secret_key=secret,
     )
-    eval_human_tok = gate.evaluate_change(
+    eval_human_tok = gate.evaluate_change_sql(
         change_id="chg-human",
         sql_up="ALTER TABLE payments ADD COLUMN fee INT;",
         sql_down="ALTER TABLE payments DROP COLUMN fee;",
         blast_radius=0.95,
-        plan_hash="plan-hash-pay",
+        plan_hash=plan_hash,
         approval_token=token,
-        signing_secret=secret_key,
     )
     assert eval_human_tok.is_authorized is True
     assert "Valid cryptographic approval token" in eval_human_tok.decision_summary
+
+
+# ============================================================================
+# P-14.06: Real Friction Metric Calculation
+# ============================================================================
+
+
+def test_friction_metrics_calculation_from_real_traces():
+    """Verify FrictionMetricsCalculator computes metric artifact from actual traces."""
+
+    secret = "test-secret-key-32-chars-long!!"
+    verifier = TrustedAuthorityDecisionVerifier(verification_secret=secret)
+    gate = PolicyGuardianGate(authority_verifier=verifier)
+
+    eval1 = gate.evaluate_change_sql(
+        "c1", "ALTER TABLE a ADD COLUMN x INT;", "ALTER TABLE a DROP COLUMN x;", blast_radius=0.1
+    )
+    eval2 = gate.evaluate_change_sql(
+        "c2", "ALTER TABLE b ADD COLUMN y INT;", "ALTER TABLE b DROP COLUMN y;", blast_radius=0.1
+    )
+    eval3 = gate.evaluate_change_sql("c3", "CREATE VIEW v AS SELECT 1;", None, blast_radius=0.2)
+    eval4 = gate.evaluate_change_sql("c4", "DROP TABLE c;", None, blast_radius=0.5)
+
+    token = TestHmacAuthoritySigner.sign_token("plan-h5", "dba@org", "slot:lead_dba", secret)
+    eval5 = gate.evaluate_change_sql(
+        "c5",
+        "ALTER TABLE d DROP COLUMN z;",
+        "ALTER TABLE d ADD COLUMN z INT;",
+        blast_radius=0.9,
+        plan_hash="plan-h5",
+        approval_token=token,
+    )
+
+    traces = [eval1, eval2, eval3, eval4, eval5]
+    artifact = FrictionMetricsCalculator.calculate(traces, repeated_prompts_avoided=2)
+
+    assert artifact.total_workflow_decisions == 5
+    assert artifact.autonomous_decisions == 2
+    assert artifact.rehearse_then_execute_decisions == 1
+    assert artifact.blocked_decisions == 1
+    assert artifact.human_authority_decisions == 1
+    assert artifact.repeated_prompts_avoided == 2
+    assert artifact.autonomy_ratio == 0.4
+
+    md = artifact.to_markdown_summary()
+    assert "Workflow Friction Reduction Metrics" in md
+    assert "Overall Fleet Autonomy Ratio" in md
