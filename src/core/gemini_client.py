@@ -1,16 +1,19 @@
 """ChangeMesh Canonical Bounded Gemini Model Client.
 
 Single bounded model client boundary for all ChangeMesh runtime Gemini invocations.
-Enforces exact model (gemini-3.6-flash), positive finite timeouts, bounded retries,
-token output caps, immutable safety settings, non-secret telemetry, and fail-closed error handling.
+Enforces exact model (gemini-3.6-flash), pinned API version (v1beta1), positive finite timeouts,
+bounded retries (wrapper-only authority), token output caps, immutable safety settings,
+non-secret telemetry with safe correlation identifiers, and fail-closed error handling.
 """
 
 from __future__ import annotations
 
 import datetime
+import hashlib
 import logging
 import math
 import os
+import re
 import time
 import uuid
 from dataclasses import dataclass
@@ -24,9 +27,13 @@ logger = logging.getLogger(__name__)
 
 # --- Frozen Model Authority & Configuration Constants ---
 CANONICAL_MODEL_ID: Final[str] = "gemini-3.6-flash"
+CANONICAL_API_VERSION: Final[str] = "v1beta1"
 CANONICAL_PROVIDER: Final[str] = "vertexai"
 CANONICAL_LOCATION: Final[str] = "global"
 DEFAULT_PROJECT_ID: Final[str] = "project-af5e1c99-3bc4-424f-b53"
+
+# --- Explicit SDK Retry Setting ---
+SDK_RETRY_ATTEMPTS_DISABLED: Final[int] = 1
 
 # --- Frozen Policy Bounds ---
 DEFAULT_TIMEOUT_SECONDS: Final[float] = 30.0
@@ -47,29 +54,86 @@ DEFAULT_MAX_RETRY_DELAY_SECONDS: Final[float] = 2.0
 
 RETRYABLE_STATUS_CODES: Final[frozenset[int]] = frozenset({429, 502, 503, 504})
 
+
 # --- Immutable Canonical Safety Configuration ---
-CANONICAL_SAFETY_SETTINGS: Final[tuple[types.SafetySetting, ...]] = (
-    types.SafetySetting(
+# Active, supported text harm categories for Vertex AI / gemini-3.6-flash in google-genai 2.18.1.
+# Note: HARM_CATEGORY_CIVIC_INTEGRITY is officially deprecated in SDK 2.18.1
+# ("Election filter is no longer supported") and is excluded from active canonical safety policy.
+@dataclass(frozen=True)
+class CanonicalSafetyPolicyItem:
+    """Immutable ChangeMesh canonical safety policy item."""
+
+    category: types.HarmCategory
+    threshold: types.HarmBlockThreshold
+    method: types.HarmBlockMethod = types.HarmBlockMethod.SEVERITY
+
+
+CANONICAL_SAFETY_POLICY: Final[tuple[CanonicalSafetyPolicyItem, ...]] = (
+    CanonicalSafetyPolicyItem(
         category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
         threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
     ),
-    types.SafetySetting(
+    CanonicalSafetyPolicyItem(
         category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
         threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
     ),
-    types.SafetySetting(
+    CanonicalSafetyPolicyItem(
         category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
         threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
     ),
-    types.SafetySetting(
+    CanonicalSafetyPolicyItem(
         category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
         threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
     ),
-    types.SafetySetting(
-        category=types.HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
-        threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-    ),
 )
+
+
+def get_canonical_safety_settings() -> list[types.SafetySetting]:
+    """Construct fresh SDK SafetySetting objects from the immutable canonical policy."""
+    return [
+        types.SafetySetting(
+            category=item.category,
+            threshold=item.threshold,
+            method=item.method,
+        )
+        for item in CANONICAL_SAFETY_POLICY
+    ]
+
+
+# --- Telemetry Identifier & Secret Isolation Patterns ---
+_PROJECT_ID_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9-]{4,28}[a-z0-9]$")
+_LOCATION_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9-]{2,30}$")
+_SAFE_CALL_ID_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+_SUSPICIOUS_SECRET_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
+    re.compile(r"(?i)(?:key|token|secret|password|bearer|auth|credential)"),
+    re.compile(r"(?i)(?:AIza[0-9A-Za-z-_]{35})"),
+    re.compile(r"(?i)(?:sk-[a-zA-Z0-9]{20,})"),
+    re.compile(r"(?i)(?:ghp_[a-zA-Z0-9]{36})"),
+    re.compile(r"(?i)(?:ey[a-zA-Z0-9_-]{20,}\.ey[a-zA-Z0-9_-]{20,})"),
+)
+
+
+def sanitize_telemetry_call_id(raw_call_id: Optional[str]) -> str:
+    """Sanitize or transform caller-provided correlation ID for safe telemetry.
+
+    Ensures no secret-bearing, malformed, or unbounded strings appear verbatim
+    in telemetry records. Safe correlation IDs are preserved, while secret-looking
+    or malformed strings are safely transformed into non-reversible opaque digests.
+    """
+    if not raw_call_id or not isinstance(raw_call_id, str) or not raw_call_id.strip():
+        return uuid.uuid4().hex
+
+    stripped = raw_call_id.strip()
+
+    is_format_safe = bool(_SAFE_CALL_ID_PATTERN.match(stripped))
+    has_suspicious_pattern = any(p.search(stripped) for p in _SUSPICIOUS_SECRET_PATTERNS)
+
+    if is_format_safe and not has_suspicious_pattern:
+        return stripped
+
+    # Transform unsafe or secret-bearing identifier into non-reversible opaque hash digest
+    digest = hashlib.sha256(stripped.encode("utf-8")).hexdigest()[:16]
+    return f"call_opaque_{digest}"
 
 
 # --- Exception Hierarchy ---
@@ -142,11 +206,12 @@ class ModelCallTelemetry:
     provider: str
     project: Optional[str]
     location: Optional[str]
+    api_version: str
     start_time_iso: str
     end_time_iso: str
     duration_ms: float
     attempts: int
-    final_outcome: str  # "SUCCESS", "TIMEOUT", "RETRY_EXHAUSTED", "API_ERROR", etc.
+    final_outcome: str  # e.g. "SUCCESS", "TIMEOUT", "RETRY_EXHAUSTED", "SAFETY_BLOCKED"
     error_class: Optional[str] = None
     error_status_code: Optional[int] = None
     prompt_token_count: Optional[int] = None
@@ -173,11 +238,12 @@ class BoundedGeminiClient:
 
     Guarantees:
     - Exactly one canonical model: 'gemini-3.6-flash'.
+    - Pinned API version: 'v1beta1'.
     - Provider path: Vertex AI / Google GenAI SDK.
     - Explicit positive finite timeouts (1.0s to 60.0s, default 30.0s).
-    - Explicit bounded retries (max 3 attempts, backoff, retryable codes {429, 502, 503, 504}).
+    - Explicit bounded retries (wrapper is sole retry authority, max 3; SDK retry disabled).
     - Strict output token caps (1 to 8192, default 4096).
-    - Strict immutable enterprise safety settings across all harm categories.
+    - Strict immutable enterprise safety settings across all supported harm categories.
     - Zero secret/credential/prompt/response content leakage into telemetry.
     - Fail-closed semantics with zero silent fallback.
     - Private underlying SDK client, never exposed to callers.
@@ -211,7 +277,7 @@ class BoundedGeminiClient:
             )
         self._model_id: str = CANONICAL_MODEL_ID
 
-        # 2. Project Resolution
+        # 2. Project Resolution and Format Validation
         resolved_project = project or os.environ.get("GOOGLE_CLOUD_PROJECT") or DEFAULT_PROJECT_ID
         if (
             not resolved_project
@@ -219,9 +285,16 @@ class BoundedGeminiClient:
             or not resolved_project.strip()
         ):
             raise ModelConfigurationError("Project ID cannot be empty.")
-        self._project: str = resolved_project.strip()
+        clean_project = resolved_project.strip()
+        if not _PROJECT_ID_PATTERN.match(clean_project) or any(
+            p.search(clean_project) for p in _SUSPICIOUS_SECRET_PATTERNS
+        ):
+            raise ModelConfigurationError(
+                f"Invalid Google Cloud project ID format '{clean_project}'."
+            )
+        self._project: str = clean_project
 
-        # 3. Location Resolution
+        # 3. Location Resolution and Format Validation
         resolved_location = (
             location or os.environ.get("GOOGLE_CLOUD_LOCATION") or CANONICAL_LOCATION
         )
@@ -231,7 +304,12 @@ class BoundedGeminiClient:
             or not resolved_location.strip()
         ):
             raise ModelConfigurationError("Location cannot be empty.")
-        self._location: str = resolved_location.strip()
+        clean_location = resolved_location.strip()
+        if not _LOCATION_PATTERN.match(clean_location) or any(
+            p.search(clean_location) for p in _SUSPICIOUS_SECRET_PATTERNS
+        ):
+            raise ModelConfigurationError(f"Invalid Vertex AI location format '{clean_location}'.")
+        self._location: str = clean_location
 
         # 4. Timeout Validation
         if timeout_seconds is None:
@@ -298,6 +376,10 @@ class BoundedGeminiClient:
                     vertexai=True,
                     project=self._project,
                     location=self._location,
+                    http_options=types.HttpOptions(
+                        api_version=CANONICAL_API_VERSION,
+                        retry_options=types.HttpRetryOptions(attempts=SDK_RETRY_ATTEMPTS_DISABLED),
+                    ),
                 )
             except Exception as exc:
                 raise ModelInitializationError(
@@ -309,6 +391,11 @@ class BoundedGeminiClient:
     def model_id(self) -> str:
         """Canonical model ID."""
         return self._model_id
+
+    @property
+    def api_version(self) -> str:
+        """Pinned canonical API version."""
+        return CANONICAL_API_VERSION
 
     @property
     def provider(self) -> str:
@@ -422,11 +509,7 @@ class BoundedGeminiClient:
                 )
             effective_timeout = float(timeout_seconds)
 
-        effective_call_id = (
-            call_id
-            if (call_id and isinstance(call_id, str) and call_id.strip())
-            else uuid.uuid4().hex
-        )
+        effective_call_id = sanitize_telemetry_call_id(call_id)
 
         start_time = datetime.datetime.now(datetime.timezone.utc)
         start_monotonic = time.monotonic()
@@ -435,11 +518,16 @@ class BoundedGeminiClient:
         while attempt < self._max_attempts:
             attempt += 1
             try:
+                # Fresh safety settings constructed internally per request from immutable policy
                 config = types.GenerateContentConfig(
                     max_output_tokens=effective_max_tokens,
-                    safety_settings=list(CANONICAL_SAFETY_SETTINGS),
+                    safety_settings=get_canonical_safety_settings(),
                     system_instruction=system_instruction if system_instruction else None,
-                    http_options=types.HttpOptions(timeout=int(effective_timeout * 1000)),
+                    http_options=types.HttpOptions(
+                        api_version=CANONICAL_API_VERSION,
+                        timeout=int(effective_timeout * 1000),
+                        retry_options=types.HttpRetryOptions(attempts=SDK_RETRY_ATTEMPTS_DISABLED),
+                    ),
                 )
 
                 response = self._client.models.generate_content(
@@ -455,6 +543,15 @@ class BoundedGeminiClient:
                 if hasattr(response, "prompt_feedback") and response.prompt_feedback:
                     block_reason = getattr(response.prompt_feedback, "block_reason", None)
                     if block_reason:
+                        block_reason_str = (
+                            str(
+                                block_reason.value
+                                if hasattr(block_reason, "value")
+                                else block_reason
+                            )
+                            if block_reason
+                            else "SAFETY"
+                        )
                         end_time = datetime.datetime.now(datetime.timezone.utc)
                         duration_ms = (time.monotonic() - start_monotonic) * 1000.0
                         self._record_telemetry(
@@ -465,11 +562,11 @@ class BoundedGeminiClient:
                             attempts=attempt,
                             final_outcome="SAFETY_BLOCKED",
                             error_class="ModelSafetyBlockedError",
-                            finish_reason=str(block_reason),
+                            finish_reason=block_reason_str,
                         )
                         raise ModelSafetyBlockedError(
-                            f"Model prompt blocked by safety filter: {block_reason}",
-                            block_reason=str(block_reason),
+                            f"Model prompt blocked by safety filter: {block_reason_str}",
+                            block_reason=block_reason_str,
                             safety_ratings=getattr(
                                 response.prompt_feedback, "safety_ratings", None
                             ),
@@ -757,6 +854,7 @@ class BoundedGeminiClient:
             provider=CANONICAL_PROVIDER,
             project=self._project,
             location=self._location,
+            api_version=CANONICAL_API_VERSION,
             start_time_iso=start_time.isoformat(),
             end_time_iso=end_time.isoformat(),
             duration_ms=round(duration_ms, 2),
@@ -774,7 +872,7 @@ class BoundedGeminiClient:
             try:
                 self._telemetry_sink(record)
             except Exception as sink_err:
-                logger.warning(f"Telemetry sink failed: {sink_err}")
+                logger.warning("Telemetry sink failed with exception %s", type(sink_err).__name__)
         return record
 
     # --- Lifecycle Management ---
@@ -786,7 +884,9 @@ class BoundedGeminiClient:
                 try:
                     self._client.close()
                 except Exception as exc:
-                    logger.warning(f"Error while closing google.genai.Client: {exc}")
+                    logger.warning(
+                        "Error while closing google.genai.Client: %s", type(exc).__name__
+                    )
 
     def __enter__(self) -> BoundedGeminiClient:
         """Enter context manager."""

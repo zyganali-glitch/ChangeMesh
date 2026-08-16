@@ -4,10 +4,11 @@ Contains core components including the canonical BoundedGeminiClient.
 """
 
 from src.core.gemini_client import (
+    CANONICAL_API_VERSION,
     CANONICAL_LOCATION,
     CANONICAL_MODEL_ID,
     CANONICAL_PROVIDER,
-    CANONICAL_SAFETY_SETTINGS,
+    CANONICAL_SAFETY_POLICY,
     DEFAULT_BACKOFF_MULTIPLIER,
     DEFAULT_INITIAL_RETRY_DELAY_SECONDS,
     DEFAULT_MAX_ATTEMPTS,
@@ -22,7 +23,9 @@ from src.core.gemini_client import (
     MIN_TIMEOUT_SECONDS,
     MIN_TOKEN_FLOOR,
     RETRYABLE_STATUS_CODES,
+    SDK_RETRY_ATTEMPTS_DISABLED,
     BoundedGeminiClient,
+    CanonicalSafetyPolicyItem,
     ModelAPIError,
     ModelCallTelemetry,
     ModelClientError,
@@ -33,6 +36,8 @@ from src.core.gemini_client import (
     ModelRetryExhaustedError,
     ModelSafetyBlockedError,
     ModelTimeoutError,
+    get_canonical_safety_settings,
+    sanitize_telemetry_call_id,
 )
 
 __all__ = [
@@ -40,9 +45,11 @@ __all__ = [
     "BoundedGeminiClient",
     # Constants & Bounds
     "CANONICAL_MODEL_ID",
+    "CANONICAL_API_VERSION",
     "CANONICAL_PROVIDER",
     "CANONICAL_LOCATION",
     "DEFAULT_PROJECT_ID",
+    "SDK_RETRY_ATTEMPTS_DISABLED",
     "DEFAULT_TIMEOUT_SECONDS",
     "MIN_TIMEOUT_SECONDS",
     "MAX_TIMEOUT_SECONDS",
@@ -56,7 +63,10 @@ __all__ = [
     "DEFAULT_BACKOFF_MULTIPLIER",
     "DEFAULT_MAX_RETRY_DELAY_SECONDS",
     "RETRYABLE_STATUS_CODES",
-    "CANONICAL_SAFETY_SETTINGS",
+    "CANONICAL_SAFETY_POLICY",
+    "CanonicalSafetyPolicyItem",
+    "get_canonical_safety_settings",
+    "sanitize_telemetry_call_id",
     # Telemetry & Response Models
     "ModelCallTelemetry",
     "ModelResponse",

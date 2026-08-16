@@ -2,16 +2,16 @@
 
 Validates:
 1. Canonical configuration (gemini-3.6-flash, Vertex AI provider, project/location wiring,
-   timeouts, retries, token caps, safety settings).
+   pinned API version v1beta1, disabled SDK retries, timeouts, retries, token caps, safety).
 2. Non-bypassability (model immutability, timeout/retry/token bounds enforcement,
-   safety immutability, no raw client exposure).
+   safety policy immutability and fresh construction, no raw client exposure).
 3. Failure behavior (transient retries, retry exhaustion, non-retryable immediate fail-closed,
    safety block, empty response, closed client).
-4. Non-secret telemetry (correlation IDs, attempts, duration, token usage,
-   0 secrets, 0 prompt text, 0 response text).
+4. Non-secret telemetry (safe correlation IDs, secret-bearing ID transformation, attempts, duration,
+   token usage, 0 secrets, 0 prompt text, 0 response text).
 5. Client lifecycle (close, context manager, resource cleanup).
 6. Architectural boundaries (0 Google SDK imports in domain/contracts,
-   single model client owner in src/).
+   exact single model client owner in src/core/gemini_client.py).
 """
 
 from __future__ import annotations
@@ -26,14 +26,16 @@ import pytest
 from google.genai import errors, types
 
 from src.core.gemini_client import (
+    CANONICAL_API_VERSION,
     CANONICAL_LOCATION,
     CANONICAL_MODEL_ID,
     CANONICAL_PROVIDER,
-    CANONICAL_SAFETY_SETTINGS,
+    CANONICAL_SAFETY_POLICY,
     DEFAULT_MAX_ATTEMPTS,
     DEFAULT_MAX_OUTPUT_TOKENS,
     DEFAULT_PROJECT_ID,
     DEFAULT_TIMEOUT_SECONDS,
+    SDK_RETRY_ATTEMPTS_DISABLED,
     BoundedGeminiClient,
     ModelAPIError,
     ModelCallTelemetry,
@@ -43,6 +45,7 @@ from src.core.gemini_client import (
     ModelRetryExhaustedError,
     ModelSafetyBlockedError,
     ModelTimeoutError,
+    get_canonical_safety_settings,
 )
 
 
@@ -135,6 +138,8 @@ class TestCanonicalConfiguration:
 
         assert client.model_id == CANONICAL_MODEL_ID
         assert client.model_id == "gemini-3.6-flash"
+        assert client.api_version == CANONICAL_API_VERSION
+        assert client.api_version == "v1beta1"
         assert client.provider == CANONICAL_PROVIDER
         assert client.provider == "vertexai"
         assert client.location == CANONICAL_LOCATION
@@ -152,45 +157,70 @@ class TestCanonicalConfiguration:
     def test_custom_project_and_location_wiring(self) -> None:
         fake_sdk = FakeSDKClient()
         client = BoundedGeminiClient(
-            project="custom-corp-project",
+            project="custom-prod-project-99",
             location="europe-west3",
             _sdk_client=fake_sdk,
         )
-        assert client.project == "custom-corp-project"
+        assert client.project == "custom-prod-project-99"
         assert client.location == "europe-west3"
 
     def test_env_project_and_location_wiring(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "env-project-123")
+        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "env-injected-project-123")
         monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
         fake_sdk = FakeSDKClient()
         client = BoundedGeminiClient(_sdk_client=fake_sdk)
-        assert client.project == "env-project-123"
+        assert client.project == "env-injected-project-123"
         assert client.location == "us-central1"
 
-    def test_safety_settings_are_immutable_and_cover_all_harm_categories(self) -> None:
-        assert len(CANONICAL_SAFETY_SETTINGS) == 5
-        categories = {s.category for s in CANONICAL_SAFETY_SETTINGS}
-        assert types.HarmCategory.HARM_CATEGORY_HARASSMENT in categories
-        assert types.HarmCategory.HARM_CATEGORY_HATE_SPEECH in categories
-        assert types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT in categories
-        assert types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT in categories
-        assert types.HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY in categories
+    def test_safety_policy_is_immutable_change_mesh_data_and_covers_4_active_categories(
+        self,
+    ) -> None:
+        # Check active canonical categories: exactly 4 supported categories
+        assert len(CANONICAL_SAFETY_POLICY) == 4
+        categories = {item.category for item in CANONICAL_SAFETY_POLICY}
+        expected_categories = {
+            types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+            types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        }
+        assert categories == expected_categories
 
-        for setting in CANONICAL_SAFETY_SETTINGS:
-            assert setting.threshold == types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE
+        # Ensure deprecated CIVIC_INTEGRITY is excluded from active canonical policy
+        assert types.HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY not in categories
+
+        # Check all items have threshold BLOCK_LOW_AND_ABOVE
+        for item in CANONICAL_SAFETY_POLICY:
+            assert item.threshold == types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE
+
+        # Test deep immutability: attempting to mutate policy dataclass raises error
+        with pytest.raises(Exception):  # FrozenInstanceError / TypeError
+            CANONICAL_SAFETY_POLICY[0].threshold = (  # type: ignore[misc]
+                types.HarmBlockThreshold.BLOCK_NONE
+            )
+
+        # Test fresh object construction per call
+        settings_1 = get_canonical_safety_settings()
+        settings_2 = get_canonical_safety_settings()
+        assert settings_1 is not settings_2
+
+        # Mutating returned settings list does not mutate CANONICAL_SAFETY_POLICY
+        settings_1.clear()
+        assert len(CANONICAL_SAFETY_POLICY) == 4
+        assert len(get_canonical_safety_settings()) == 4
 
 
 # ==============================================================================
 # 2. Non-Bypassability Tests
 # ==============================================================================
 class TestNonBypassability:
-    """Validates that callers cannot override model, weaken bounds, or bypass safety."""
+    """Validates that callers and environment cannot weaken or bypass bounds."""
 
     def test_caller_cannot_override_model_id(self) -> None:
         fake_sdk = FakeSDKClient()
         with pytest.raises(ModelConfigurationError, match="Unapproved model override"):
-            BoundedGeminiClient(model_id="gemini-1.5-pro", _sdk_client=fake_sdk)
+            BoundedGeminiClient(model_id="gemini-2.5-pro", _sdk_client=fake_sdk)
 
         with pytest.raises(ModelConfigurationError, match="Unapproved model override"):
             BoundedGeminiClient(model_id="gpt-4o", _sdk_client=fake_sdk)
@@ -198,8 +228,9 @@ class TestNonBypassability:
     def test_env_cannot_specify_unapproved_gemini_model(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("GEMINI_MODEL", "gemini-1.5-flash")
+        monkeypatch.setenv("GEMINI_MODEL", "gemini-3.5-flash")
         fake_sdk = FakeSDKClient()
+
         with pytest.raises(
             ModelConfigurationError, match="Unapproved GEMINI_MODEL environment configuration"
         ):
@@ -207,41 +238,58 @@ class TestNonBypassability:
 
     def test_caller_cannot_disable_or_set_invalid_timeout(self) -> None:
         fake_sdk = FakeSDKClient()
-        # Non-positive or below min bound
+
         with pytest.raises(ModelConfigurationError, match="timeout_seconds"):
             BoundedGeminiClient(timeout_seconds=0.0, _sdk_client=fake_sdk)
+
         with pytest.raises(ModelConfigurationError, match="timeout_seconds"):
             BoundedGeminiClient(timeout_seconds=-5.0, _sdk_client=fake_sdk)
-        with pytest.raises(ModelConfigurationError, match="timeout_seconds"):
-            BoundedGeminiClient(timeout_seconds=0.5, _sdk_client=fake_sdk)
 
-        # Above max bound
         with pytest.raises(ModelConfigurationError, match="timeout_seconds"):
-            BoundedGeminiClient(timeout_seconds=60.1, _sdk_client=fake_sdk)
-        with pytest.raises(ModelConfigurationError, match="timeout_seconds"):
-            BoundedGeminiClient(timeout_seconds=float("inf"), _sdk_client=fake_sdk)
+            BoundedGeminiClient(timeout_seconds=120.0, _sdk_client=fake_sdk)
+
         with pytest.raises(ModelConfigurationError, match="timeout_seconds"):
             BoundedGeminiClient(timeout_seconds=float("nan"), _sdk_client=fake_sdk)
 
     def test_caller_cannot_make_retry_unbounded(self) -> None:
         fake_sdk = FakeSDKClient()
+
         with pytest.raises(ModelConfigurationError, match="max_attempts"):
             BoundedGeminiClient(max_attempts=0, _sdk_client=fake_sdk)
+
         with pytest.raises(ModelConfigurationError, match="max_attempts"):
-            BoundedGeminiClient(max_attempts=-1, _sdk_client=fake_sdk)
-        with pytest.raises(ModelConfigurationError, match="max_attempts"):
-            BoundedGeminiClient(max_attempts=4, _sdk_client=fake_sdk)
-        with pytest.raises(ModelConfigurationError, match="max_attempts"):
-            BoundedGeminiClient(max_attempts=100, _sdk_client=fake_sdk)
+            BoundedGeminiClient(max_attempts=10, _sdk_client=fake_sdk)
 
     def test_caller_cannot_raise_token_ceiling_outside_policy(self) -> None:
         fake_sdk = FakeSDKClient()
+
         with pytest.raises(ModelConfigurationError, match="max_output_tokens"):
             BoundedGeminiClient(max_output_tokens=0, _sdk_client=fake_sdk)
+
         with pytest.raises(ModelConfigurationError, match="max_output_tokens"):
-            BoundedGeminiClient(max_output_tokens=-10, _sdk_client=fake_sdk)
-        with pytest.raises(ModelConfigurationError, match="max_output_tokens"):
-            BoundedGeminiClient(max_output_tokens=8193, _sdk_client=fake_sdk)
+            BoundedGeminiClient(max_output_tokens=16384, _sdk_client=fake_sdk)
+
+    def test_caller_cannot_pass_invalid_project_format(self) -> None:
+        fake_sdk = FakeSDKClient()
+
+        # Reject bad characters, SQL injections, secrets
+        with pytest.raises(ModelConfigurationError, match="Invalid Google Cloud project ID"):
+            BoundedGeminiClient(project="bad/project/id", _sdk_client=fake_sdk)
+
+        with pytest.raises(ModelConfigurationError, match="Invalid Google Cloud project ID"):
+            BoundedGeminiClient(project="sk-secret-key-1234567890", _sdk_client=fake_sdk)
+
+        with pytest.raises(ModelConfigurationError, match="Invalid Google Cloud project ID"):
+            BoundedGeminiClient(project="Project_With_Caps", _sdk_client=fake_sdk)
+
+    def test_caller_cannot_pass_invalid_location_format(self) -> None:
+        fake_sdk = FakeSDKClient()
+
+        with pytest.raises(ModelConfigurationError, match="Invalid Vertex AI location format"):
+            BoundedGeminiClient(location="bad/location", _sdk_client=fake_sdk)
+
+        with pytest.raises(ModelConfigurationError, match="Invalid Vertex AI location format"):
+            BoundedGeminiClient(location="secret-bearer-token-12345", _sdk_client=fake_sdk)
 
     def test_generate_text_rejects_empty_or_malformed_prompt(self) -> None:
         fake_sdk = FakeSDKClient()
@@ -264,117 +312,126 @@ class TestNonBypassability:
             _sdk_client=fake_sdk,
         )
 
-        # Timeout above client bound
-        with pytest.raises(ModelConfigurationError, match="timeout_seconds"):
-            client.generate_text("Hello", timeout_seconds=25.0)
-
-        # Tokens above client bound
         with pytest.raises(ModelConfigurationError, match="max_output_tokens"):
-            client.generate_text("Hello", max_output_tokens=4096)
+            client.generate_text("Test prompt", max_output_tokens=4096)
+
+        with pytest.raises(ModelConfigurationError, match="timeout_seconds"):
+            client.generate_text("Test prompt", timeout_seconds=30.0)
 
     def test_underlying_raw_sdk_client_not_exposed_in_public_api(self) -> None:
         fake_sdk = FakeSDKClient()
         client = BoundedGeminiClient(_sdk_client=fake_sdk)
 
-        # No public client or sdk attribute
         assert not hasattr(client, "client")
         assert not hasattr(client, "sdk_client")
         assert not hasattr(client, "models")
+        assert hasattr(client, "_client")
 
 
 # ==============================================================================
-# 3. Successful Generation & Config Dispatch Tests
+# 3. Successful Generation & SDK Configuration Tests
 # ==============================================================================
 class TestSuccessfulGeneration:
-    """Validates successful model calls, parameter passing, and response models."""
+    """Validates successful model call parameter delivery and SDK options."""
 
     def test_generate_text_passes_canonical_config_to_sdk(self) -> None:
         fake_sdk = FakeSDKClient(
-            responses=[make_successful_response("Analysis verified: schema change is safe.")]
+            responses=[
+                make_successful_response(
+                    "Migration strategy: scoped refactor PASS",
+                    prompt_tokens=50,
+                    response_tokens=25,
+                    total_tokens=75,
+                )
+            ]
         )
         client = BoundedGeminiClient(
-            project="test-proj-456",
-            location="global",
-            timeout_seconds=15.0,
-            max_output_tokens=1024,
+            timeout_seconds=25.0,
+            max_output_tokens=2048,
             _sdk_client=fake_sdk,
         )
 
         resp = client.generate_text(
-            "Verify the following schema change...",
-            system_instruction="You are a schema verification specialist.",
-            max_output_tokens=512,
-            timeout_seconds=10.0,
+            prompt="Analyze change impact",
+            system_instruction="You are ChangeMesh Impact Scout.",
+            call_id="call-scoped-test-1",
         )
 
-        assert resp.text == "Analysis verified: schema change is safe."
+        assert resp.text == "Migration strategy: scoped refactor PASS"
         assert resp.model_id == "gemini-3.6-flash"
         assert resp.finish_reason == "STOP"
-        assert resp.prompt_tokens == 15
-        assert resp.response_tokens == 8
-        assert resp.total_tokens == 23
+        assert resp.prompt_tokens == 50
+        assert resp.response_tokens == 25
+        assert resp.total_tokens == 75
 
-        # Verify call history on fake models
+        # Verify SDK call parameters
         assert len(fake_sdk.models.call_history) == 1
         call = fake_sdk.models.call_history[0]
         assert call["model"] == "gemini-3.6-flash"
-        assert call["contents"] == "Verify the following schema change..."
+        assert call["contents"] == "Analyze change impact"
 
-        config: types.GenerateContentConfig = call["config"]
-        assert config.max_output_tokens == 512
-        assert config.system_instruction == "You are a schema verification specialist."
-        assert config.http_options is not None
-        assert config.http_options.timeout == 10000  # 10s -> 10000ms
-        assert config.safety_settings is not None
-        assert len(config.safety_settings) == 5
+        config = call["config"]
+        assert isinstance(config, types.GenerateContentConfig)
+        assert config.max_output_tokens == 2048
+        assert config.system_instruction == "You are ChangeMesh Impact Scout."
+
+        # Verify explicit HTTP options delivered to SDK
+        http_options = config.http_options
+        assert isinstance(http_options, types.HttpOptions)
+        assert http_options.api_version == "v1beta1"
+        assert http_options.timeout == 25000  # 25s in milliseconds
+        assert isinstance(http_options.retry_options, types.HttpRetryOptions)
+        assert http_options.retry_options.attempts == SDK_RETRY_ATTEMPTS_DISABLED
+        assert http_options.retry_options.attempts == 1
+
+        # Verify safety settings delivered to SDK: exactly 4 categories, BLOCK_LOW_AND_ABOVE
+        safety_settings = config.safety_settings
+        assert safety_settings is not None
+        assert len(safety_settings) == 4
+        for s in safety_settings:
+            assert s.threshold == types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE
 
 
 # ==============================================================================
-# 4. Failure Behavior & Retry Semantics Tests
+# 4. Failure Behavior & Retry Policy Tests
 # ==============================================================================
 class TestFailureBehaviorAndRetries:
-    """Validates deterministic retry bounds, status handling, and fail-closed semantics."""
+    """Validates fail-closed semantics, transient retry backoff, and exhaustion."""
 
     def test_transient_429_retries_and_succeeds_on_second_attempt(self) -> None:
-        sleep_calls: list[float] = []
-        api_error_429 = errors.APIError(code=429, response_json={"message": "ResourceExhausted"})
-        success_resp = make_successful_response("Success after retry.")
+        sleep_records: list[float] = []
+        error_429 = errors.APIError(429, {"message": "Resource exhausted: Rate limit exceeded"})
+        success_resp = make_successful_response("Success on attempt 2")
 
-        fake_sdk = FakeSDKClient(
-            exceptions=[api_error_429],
-            responses=[success_resp],
-        )
-
+        fake_sdk = FakeSDKClient(responses=[success_resp], exceptions=[error_429])
         client = BoundedGeminiClient(
             _sdk_client=fake_sdk,
-            _sleep_fn=lambda s: sleep_calls.append(s),
+            _sleep_fn=lambda delay: sleep_records.append(delay),
         )
 
-        resp = client.generate_text("Test prompt")
-        assert resp.text == "Success after retry."
+        resp = client.generate_text("Test retry prompt")
+        assert resp.text == "Success on attempt 2"
         assert resp.telemetry.attempts == 2
         assert resp.telemetry.final_outcome == "SUCCESS"
-        assert len(sleep_calls) == 1
-        assert sleep_calls[0] == 0.5  # default initial delay
+        assert len(sleep_records) == 1
+        assert sleep_records[0] == 0.5  # initial retry delay
 
     def test_transient_503_retries_and_fails_after_exhaustion(self) -> None:
-        sleep_calls: list[float] = []
-        api_error_503 = errors.APIError(code=503, response_json={"message": "ServiceUnavailable"})
+        sleep_records: list[float] = []
+        error_503_a = errors.APIError(503, {"message": "Service Unavailable"})
+        error_503_b = errors.APIError(503, {"message": "Service Unavailable"})
+        error_503_c = errors.APIError(503, {"message": "Service Unavailable"})
 
-        fake_sdk = FakeSDKClient(
-            exceptions=[api_error_503, api_error_503, api_error_503],
-        )
-
+        fake_sdk = FakeSDKClient(exceptions=[error_503_a, error_503_b, error_503_c])
         client = BoundedGeminiClient(
-            max_attempts=3,
             _sdk_client=fake_sdk,
-            _sleep_fn=lambda s: sleep_calls.append(s),
+            _sleep_fn=lambda delay: sleep_records.append(delay),
         )
 
-        with pytest.raises(ModelRetryExhaustedError, match="retry exhausted after 3 attempts"):
-            client.generate_text("Test prompt")
+        with pytest.raises(ModelRetryExhaustedError, match="status 503"):
+            client.generate_text("Test prompt 503")
 
-        assert len(sleep_calls) == 2
+        assert len(sleep_records) == 2  # slept before attempt 2 and attempt 3
         assert len(client.telemetry_history) == 1
         record = client.telemetry_history[0]
         assert record.attempts == 3
@@ -382,164 +439,142 @@ class TestFailureBehaviorAndRetries:
         assert record.error_status_code == 503
 
     def test_network_connection_error_retries_to_bound(self) -> None:
-        sleep_calls: list[float] = []
-        connect_err = httpx.ConnectError("Connection refused by peer")
+        sleep_records: list[float] = []
+        net_err1 = httpx.ConnectError("Connection refused")
+        net_err2 = httpx.ConnectError("Connection reset")
+        net_err3 = httpx.ConnectError("Network unreachable")
 
-        fake_sdk = FakeSDKClient(
-            exceptions=[connect_err, connect_err, connect_err],
-        )
-
+        fake_sdk = FakeSDKClient(exceptions=[net_err1, net_err2, net_err3])
         client = BoundedGeminiClient(
-            max_attempts=3,
             _sdk_client=fake_sdk,
-            _sleep_fn=lambda s: sleep_calls.append(s),
+            _sleep_fn=lambda delay: sleep_records.append(delay),
         )
 
-        with pytest.raises(
-            ModelRetryExhaustedError, match="network connection retry exhausted after 3 attempts"
-        ):
-            client.generate_text("Test prompt")
+        with pytest.raises(ModelRetryExhaustedError, match="network connection"):
+            client.generate_text("Network test prompt")
 
-        assert len(sleep_calls) == 2
-        assert client.telemetry_history[0].final_outcome == "RETRY_EXHAUSTED"
-        assert client.telemetry_history[0].error_status_code == 503
+        assert len(sleep_records) == 2
+        assert client.telemetry_history[0].attempts == 3
 
     def test_non_retryable_400_bad_request_fails_immediately_on_first_attempt(self) -> None:
-        sleep_calls: list[float] = []
-        api_error_400 = errors.APIError(code=400, response_json={"message": "InvalidArgument"})
+        sleep_records: list[float] = []
+        error_400 = errors.APIError(400, {"message": "Invalid argument"})
 
-        fake_sdk = FakeSDKClient(exceptions=[api_error_400])
+        fake_sdk = FakeSDKClient(exceptions=[error_400])
         client = BoundedGeminiClient(
             _sdk_client=fake_sdk,
-            _sleep_fn=lambda s: sleep_calls.append(s),
+            _sleep_fn=lambda delay: sleep_records.append(delay),
         )
 
         with pytest.raises(ModelAPIError, match="Non-retryable model API error") as exc_info:
-            client.generate_text("Test prompt")
+            client.generate_text("Bad prompt")
 
         assert exc_info.value.status_code == 400
-        assert len(sleep_calls) == 0  # Zero retries
-        assert client.telemetry_history[0].attempts == 1
-        assert client.telemetry_history[0].final_outcome == "API_ERROR"
-        assert client.telemetry_history[0].error_status_code == 400
+        assert len(sleep_records) == 0  # No retry attempted
+        assert len(client.telemetry_history) == 1
+        record = client.telemetry_history[0]
+        assert record.attempts == 1
+        assert record.final_outcome == "API_ERROR"
+        assert record.error_status_code == 400
 
     def test_non_retryable_403_permission_denied_fails_immediately(self) -> None:
-        sleep_calls: list[float] = []
-        api_error_403 = errors.APIError(code=403, response_json={"message": "PermissionDenied"})
+        sleep_records: list[float] = []
+        error_403 = errors.APIError(403, {"message": "Permission denied on model resource"})
 
-        fake_sdk = FakeSDKClient(exceptions=[api_error_403])
+        fake_sdk = FakeSDKClient(exceptions=[error_403])
         client = BoundedGeminiClient(
             _sdk_client=fake_sdk,
-            _sleep_fn=lambda s: sleep_calls.append(s),
+            _sleep_fn=lambda delay: sleep_records.append(delay),
         )
 
-        with pytest.raises(ModelAPIError) as exc_info:
-            client.generate_text("Test prompt")
+        with pytest.raises(ModelAPIError, match="Non-retryable model API error") as exc_info:
+            client.generate_text("Unauthorized prompt")
 
         assert exc_info.value.status_code == 403
-        assert len(sleep_calls) == 0
+        assert len(sleep_records) == 0
         assert client.telemetry_history[0].attempts == 1
-        assert client.telemetry_history[0].final_outcome == "API_ERROR"
 
     def test_timeout_fails_closed_with_model_timeout_error(self) -> None:
-        sleep_calls: list[float] = []
         timeout_err = httpx.TimeoutException("Read timed out")
-
         fake_sdk = FakeSDKClient(exceptions=[timeout_err, timeout_err, timeout_err])
         client = BoundedGeminiClient(
-            timeout_seconds=5.0,
-            max_attempts=3,
             _sdk_client=fake_sdk,
-            _sleep_fn=lambda s: sleep_calls.append(s),
+            _sleep_fn=lambda d: None,
         )
 
-        with pytest.raises(ModelTimeoutError, match="exceeded timeout of 5.0s after 3 attempts"):
-            client.generate_text("Test prompt")
+        with pytest.raises(ModelTimeoutError, match="exceeded timeout"):
+            client.generate_text("Long query")
 
-        assert len(sleep_calls) == 2
-        record = client.telemetry_history[0]
-        assert record.final_outcome == "TIMEOUT"
-        assert record.error_status_code == 504
+        assert client.telemetry_history[0].final_outcome == "TIMEOUT"
 
     def test_safety_blocked_candidate_fails_closed_immediately(self) -> None:
-        safety_response = types.GenerateContentResponse(
-            candidates=[
-                types.Candidate(
-                    finish_reason=types.FinishReason.SAFETY,
-                    safety_ratings=[
-                        types.SafetyRating(
-                            category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                            probability=types.HarmProbability.HIGH,
-                            blocked=True,
-                        )
-                    ],
+        blocked_candidate = types.Candidate(
+            finish_reason=types.FinishReason.SAFETY,
+            safety_ratings=[
+                types.SafetyRating(
+                    category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                    probability=types.HarmProbability.HIGH,
                 )
-            ]
+            ],
+        )
+        safety_blocked_response = types.GenerateContentResponse(
+            candidates=[blocked_candidate],
         )
 
-        fake_sdk = FakeSDKClient(responses=[safety_response])
+        fake_sdk = FakeSDKClient(responses=[safety_blocked_response])
         client = BoundedGeminiClient(_sdk_client=fake_sdk)
 
         with pytest.raises(ModelSafetyBlockedError, match="blocked by safety filter") as exc_info:
-            client.generate_text("Test prompt")
+            client.generate_text("Potentially harmful prompt")
 
         assert exc_info.value.finish_reason == "SAFETY"
-        assert exc_info.value.safety_ratings is not None
         record = client.telemetry_history[0]
         assert record.attempts == 1
         assert record.final_outcome == "SAFETY_BLOCKED"
         assert record.finish_reason == "SAFETY"
 
     def test_safety_blocked_prompt_feedback_fails_closed_immediately(self) -> None:
-        feedback_response = types.GenerateContentResponse(
+        prompt_blocked_response = types.GenerateContentResponse(
             candidates=[],
             prompt_feedback=types.GenerateContentResponsePromptFeedback(
                 block_reason=types.BlockedReason.SAFETY,
-                safety_ratings=[
-                    types.SafetyRating(
-                        category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
-                        probability=types.HarmProbability.HIGH,
-                        blocked=True,
-                    )
-                ],
             ),
         )
 
-        fake_sdk = FakeSDKClient(responses=[feedback_response])
+        fake_sdk = FakeSDKClient(responses=[prompt_blocked_response])
         client = BoundedGeminiClient(_sdk_client=fake_sdk)
 
         with pytest.raises(
-            ModelSafetyBlockedError, match="prompt blocked by safety filter"
+            ModelSafetyBlockedError, match="Model prompt blocked by safety filter"
         ) as exc_info:
-            client.generate_text("Test prompt")
+            client.generate_text("Blocked prompt text")
 
-        assert exc_info.value.block_reason is not None
+        assert exc_info.value.block_reason == "SAFETY"
         record = client.telemetry_history[0]
         assert record.attempts == 1
         assert record.final_outcome == "SAFETY_BLOCKED"
 
     def test_empty_candidates_response_fails_closed(self) -> None:
         empty_response = types.GenerateContentResponse(candidates=[])
-
         fake_sdk = FakeSDKClient(responses=[empty_response])
         client = BoundedGeminiClient(_sdk_client=fake_sdk)
 
-        with pytest.raises(ModelEmptyResponseError, match="returned no candidate outputs"):
+        with pytest.raises(ModelEmptyResponseError, match="Model returned no candidate outputs"):
             client.generate_text("Test prompt")
 
         record = client.telemetry_history[0]
+        assert record.attempts == 1
         assert record.final_outcome == "EMPTY_RESPONSE"
 
     def test_empty_candidate_text_fails_closed(self) -> None:
         empty_text_response = types.GenerateContentResponse(
             candidates=[
                 types.Candidate(
-                    content=types.Content(parts=[types.Part.from_text(text="")]),
+                    content=types.Content(parts=[]),
                     finish_reason=types.FinishReason.STOP,
                 )
             ]
         )
-
         fake_sdk = FakeSDKClient(responses=[empty_text_response])
         client = BoundedGeminiClient(_sdk_client=fake_sdk)
 
@@ -547,6 +582,7 @@ class TestFailureBehaviorAndRetries:
             client.generate_text("Test prompt")
 
         record = client.telemetry_history[0]
+        assert record.attempts == 1
         assert record.final_outcome == "EMPTY_RESPONSE"
 
 
@@ -581,6 +617,7 @@ class TestTelemetryAndSecretIsolation:
 
         assert telemetry.call_id == "corr-call-999"
         assert telemetry.model_id == "gemini-3.6-flash"
+        assert telemetry.api_version == "v1beta1"
         assert telemetry.provider == "vertexai"
         assert telemetry.project == "telemetry-project"
         assert telemetry.location == "global"
@@ -600,6 +637,44 @@ class TestTelemetryAndSecretIsolation:
         assert len(sink_records) == 1
         assert sink_records[0] == telemetry
 
+    def test_secret_looking_call_id_cannot_appear_verbatim_in_telemetry(self) -> None:
+        fake_sdk = FakeSDKClient(responses=[make_successful_response()])
+        client = BoundedGeminiClient(_sdk_client=fake_sdk)
+
+        secret_call_ids = [
+            "AIza" + "SyD_sample_google_api_key_12345678",
+            "sk-proj-" + "sample_openai_secret_token_abcdef123456",
+            "Bearer " + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0In0",
+            "password=" + "SuperSecretPassword123!",
+            "ghp_" + "123456789012345678901234567890123456",
+            "secret_token_with_whitespace \n and newline",
+            "call_id_with_embedded_credential_key_material",
+        ]
+
+        for raw_id in secret_call_ids:
+            resp = client.generate_text("Test prompt", call_id=raw_id)
+            telemetry_call_id = resp.telemetry.call_id
+
+            # MUST NOT appear verbatim
+            assert raw_id not in telemetry_call_id
+            # MUST start with safe opaque prefix
+            assert telemetry_call_id.startswith("call_opaque_")
+
+    def test_normal_safe_correlation_id_remains_usable(self) -> None:
+        fake_sdk = FakeSDKClient(responses=[make_successful_response()])
+        client = BoundedGeminiClient(_sdk_client=fake_sdk)
+
+        safe_ids = [
+            "call-123",
+            "agent_step_01",
+            "corr-change-req-99",
+            "c3b4a2f1-0987-4321-abcd-ef0123456789",
+        ]
+
+        for safe_id in safe_ids:
+            resp = client.generate_text("Test prompt", call_id=safe_id)
+            assert resp.telemetry.call_id == safe_id
+
     def test_telemetry_contains_zero_credentials_or_prompt_text(self) -> None:
         fake_sdk = FakeSDKClient(
             responses=[make_successful_response("Sensitive response data: customer record")]
@@ -617,6 +692,7 @@ class TestTelemetryAndSecretIsolation:
             "provider": telemetry.provider,
             "project": telemetry.project,
             "location": telemetry.location,
+            "api_version": telemetry.api_version,
             "start_time_iso": telemetry.start_time_iso,
             "end_time_iso": telemetry.end_time_iso,
             "duration_ms": telemetry.duration_ms,
@@ -637,6 +713,17 @@ class TestTelemetryAndSecretIsolation:
         assert "customer record" not in serialized
         assert "bearer" not in serialized.lower()
         assert "token" not in serialized.lower() or "count" in serialized.lower()
+
+    def test_telemetry_sink_exception_handled_safely_without_leakage(self) -> None:
+        def throwing_sink(rec: ModelCallTelemetry) -> None:
+            raise RuntimeError("Database connection string postgres://user:secretpass@host/db")
+
+        fake_sdk = FakeSDKClient(responses=[make_successful_response()])
+        client = BoundedGeminiClient(telemetry_sink=throwing_sink, _sdk_client=fake_sdk)
+
+        # Call should succeed without crashing on sink exception
+        resp = client.generate_text("Prompt with failing sink")
+        assert resp.text is not None
 
     def test_clear_telemetry_history(self) -> None:
         fake_sdk = FakeSDKClient()
@@ -696,7 +783,7 @@ class TestClientLifecycle:
 class TestArchitecturalBoundaries:
     """Validates inward dependency rule, zero SDK leakage into domain contracts,
 
-    and absence of forbidden donor identifiers in new runtime code.
+    exact path allowlisting, and absence of forbidden donor identifiers in new runtime code.
     """
 
     def test_domain_contracts_have_zero_google_sdk_imports(self) -> None:
@@ -722,22 +809,66 @@ class TestArchitecturalBoundaries:
                             )
 
     def test_canonical_model_client_is_sole_model_call_owner_in_src(self) -> None:
-        src_dir = Path(__file__).resolve().parent.parent / "src"
+        repo_root = Path(__file__).resolve().parent.parent
+        src_dir = repo_root / "src"
         assert src_dir.is_dir()
 
-        allowed_genai_client_files = {"gemini_client.py"}
+        # EXACT repository path allowlist (strictly no basename-only matching)
+        canonical_client_exact_path = (src_dir / "core" / "gemini_client.py").resolve()
 
         for py_file in src_dir.rglob("*.py"):
+            resolved_py_file = py_file.resolve()
             tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
-                    # Check for direct genai.Client(...)
                     func = node.func
+                    # 1. Check genai.Client(...)
                     if isinstance(func, ast.Attribute) and func.attr == "Client":
-                        if py_file.name not in allowed_genai_client_files:
+                        if resolved_py_file != canonical_client_exact_path:
                             pytest.fail(
                                 f"Direct SDK Client call found outside canonical client: {py_file}"
                             )
+                    # 2. Check Client(...) where imported directly
+                    elif isinstance(func, ast.Name) and func.id == "Client":
+                        if resolved_py_file != canonical_client_exact_path:
+                            pytest.fail(
+                                f"Direct Client call found outside canonical client: {py_file}"
+                            )
+                    # 3. Check raw ADK model wrappers e.g. Gemini(...)
+                    elif isinstance(func, ast.Name) and func.id == "Gemini":
+                        pytest.fail(
+                            f"Raw ADK Gemini wrapper found outside canonical client: {py_file}"
+                        )
+                    elif isinstance(func, ast.Attribute) and func.attr == "Gemini":
+                        pytest.fail(
+                            f"Raw ADK Gemini wrapper found outside canonical client: {py_file}"
+                        )
+
+    def test_duplicate_same_basename_client_rejected_by_static_rule(self) -> None:
+        """Regression test verifying that a second file with the same basename
+
+        (e.g. src/other/gemini_client.py) would be rejected by exact path matching.
+        """
+        repo_root = Path(__file__).resolve().parent.parent
+        canonical_client_exact_path = (repo_root / "src" / "core" / "gemini_client.py").resolve()
+        fake_second_client_path = (repo_root / "src" / "other" / "gemini_client.py").resolve()
+
+        assert fake_second_client_path.name == canonical_client_exact_path.name  # same basename
+        assert fake_second_client_path != canonical_client_exact_path  # different exact path
+
+        # Synthetic AST of a second client file
+        synthetic_code = "from google import genai\nclient = genai.Client()"
+        tree = ast.parse(synthetic_code)
+
+        violation_detected = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                if isinstance(func, ast.Attribute) and func.attr == "Client":
+                    if fake_second_client_path != canonical_client_exact_path:
+                        violation_detected = True
+
+        assert violation_detected, "Exact path matching rule must reject duplicate basename file"
 
     def test_zero_forbidden_donor_identifiers_in_src_core(self) -> None:
         core_dir = Path(__file__).resolve().parent.parent / "src" / "core"

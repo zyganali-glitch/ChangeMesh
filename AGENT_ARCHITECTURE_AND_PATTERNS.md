@@ -118,11 +118,11 @@ ChangeMesh enforces strict zero-trust boundary rules:
 ### 5.10 Bounded Gemini Model Client Invariants (P-08.01)
 
 *   **Single Model Authority Boundary**: All runtime Gemini invocations must flow through `BoundedGeminiClient` (`src/core/gemini_client.py`). No ad hoc SDK clients in application code.
-*   **Exact Canonical Model**: Strict binding to `gemini-3.6-flash`. Unapproved model overrides or ambient environment configurations fail closed with `ModelConfigurationError`.
-*   **Single Retry Authority**: ChangeMesh wrapper owns retry explicitly (max 3 attempts with exponential backoff on retryable status codes {429, 502, 503, 504} and network disconnects). Non-retryable errors (400, 401, 403, 404, safety blocks) fail immediately on attempt 1.
+*   **Exact Canonical Model & Pinned API Version**: Strict binding to model `gemini-3.6-flash` and API version `v1beta1` (`CANONICAL_API_VERSION = "v1beta1"`). Unapproved model overrides or ambient environment configurations fail closed with `ModelConfigurationError`.
+*   **Single Retry Authority**: ChangeMesh wrapper owns retry explicitly (max 3 attempts with exponential backoff on retryable status codes {429, 502, 503, 504} and network disconnects). SDK-level retries are explicitly disabled (`types.HttpRetryOptions(attempts=1)`). Non-retryable errors (400, 401, 403, 404, safety blocks) fail immediately on attempt 1.
 *   **Explicit Positive Finite Bounds**: Timeout is bounded [1.0s, 60.0s] (default 30.0s). Max output tokens is bounded [1, 8192] (default 4096).
-*   **Immutable Enterprise Safety**: All 5 harm categories are strictly configured to `HarmBlockThreshold.BLOCK_LOW_AND_ABOVE`. Blocked responses raise `ModelSafetyBlockedError` and fail closed.
-*   **Non-Secret Operational Telemetry**: Typed `ModelCallTelemetry` records operational metrics while strictly forbidding credential material, prompt contents, and response text.
+*   **Immutable Enterprise Safety Policy**: Immutable ChangeMesh dataclass policy (`CANONICAL_SAFETY_POLICY`) covering the 4 active, supported harm categories (`HARASSMENT`, `HATE_SPEECH`, `SEXUALLY_EXPLICIT`, `DANGEROUS_CONTENT`) configured to `HarmBlockThreshold.BLOCK_LOW_AND_ABOVE`. Fresh SDK `SafetySetting` objects are constructed internally per request. `HARM_CATEGORY_CIVIC_INTEGRITY` is officially deprecated in SDK 2.18.1 and excluded. Blocked responses raise `ModelSafetyBlockedError` and fail closed.
+*   **Non-Secret Operational Telemetry**: Typed `ModelCallTelemetry` records operational metrics while strictly forbidding credential material, prompt contents, and response text. Caller-supplied correlation IDs are sanitized and transformed into non-reversible opaque digests (`call_opaque_<sha256[:16]>`) if secret-bearing or malformed.
 *   **Zero Silent Fallback**: Zero fallback to other models, preview versions, other providers, cached answers, or fake PASS sentinels.
 
 ## 6. State labels
