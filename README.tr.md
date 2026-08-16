@@ -54,7 +54,7 @@ Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yenid
    ```bash
    uv run python scripts/cmd.py unit
    ```
-   *(P-05 kontratları, P-06 kontrolleri, P-07 ajan filosu/koordinasyonu, P-08 Gemini entegrasyonu ve P-09 Pub/Sub backbone testleri dahil 1106 testi 0 çıkış koduyla çalıştırır; bir ADK kullanımdan kaldırma uyarısı kaydedilir).*
+   *(P-05 kontratları, P-06 kontrolleri, P-07 ajan filosu/koordinasyonu, P-08 Gemini entegrasyonu ve P-09 Pub/Sub backbone testleri dahil 1109 testi 0 çıkış koduyla çalıştırır; bir ADK kullanımdan kaldırma uyarısı kaydedilir).*
 
 ### Yapılandırma ve Kimlik Doğrulama Sınırı
 
@@ -67,7 +67,7 @@ Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yenid
 
 | Komut | Eylem | Denetim Semantiği | Temel Hat Sonucu |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Birim testleri çalıştır | Yerel deterministik test çalıştırma | `PASS` (1106 geçti, 1 uyarı) |
+| `uv run python scripts/cmd.py unit` | Birim testleri çalıştır | Yerel deterministik test çalıştırma | `PASS` (1109 geçti, 1 uyarı) |
 | `uv run python scripts/cmd.py format` | Format denetimi | Değişiklik yapmayan (`ruff format --check .`) | `FAIL` (tarihsel format borcu) |
 | `uv run python scripts/cmd.py lint` | Lint denetimi | Değişiklik yapmayan (`ruff check .`, sıfır `--fix`) | `FAIL` (tarihsel lint borcu) |
 | `uv run python scripts/cmd.py type-check` | Tip denetimi | Değişiklik yapmayan (`mypy domain tests src`) | `FAIL` (`test_gcp_access.py` tarihsel tip borcu) |

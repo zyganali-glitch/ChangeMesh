@@ -331,3 +331,92 @@ def test_terminal_failure_replay_idempotency():
     assert dl2.dead_letter_id != dl1.dead_letter_id
     assert dl2.handoff.human_authority_required is False
     assert local_state.total_records == 2
+
+
+def test_bounded_replay_state_capacity_and_fifo_eviction():
+    """Verify ProcessLocalDeadLetterState strictly bounds capacity and evicts via FIFO."""
+    from datetime import datetime, timezone
+
+    import pytest
+
+    from events.dead_letter import ProcessLocalDeadLetterState, compute_dead_letter_id
+    from events.retry import FailureClassification
+
+    # Invalid max_records (< 1) must fail closed
+    with pytest.raises(ValueError, match="max_records must be strictly positive"):
+        ProcessLocalDeadLetterState(max_records=0)
+
+    with pytest.raises(ValueError, match="max_records must be strictly positive"):
+        ProcessLocalDeadLetterState(max_records=-5)
+
+    # Bounded capacity window of exactly 1
+    state = ProcessLocalDeadLetterState(max_records=1)
+    assert state.max_records == 1
+    assert state.total_records == 0
+
+    now = datetime.now(timezone.utc)
+
+    # 1. Insert first event
+    rec1, is_new1 = state.get_or_create(
+        dead_letter_id=compute_dead_letter_id("chg-1", "evt-1"),
+        original_event_id="evt-1",
+        change_id="chg-1",
+        correlation_id="corr-1",
+        original_topic_id="changemesh-lifecycle-v1",
+        failure_classification=FailureClassification.TERMINAL_EXHAUSTED,
+        raw_error="err-1",
+        attempts_made=3,
+        timestamp=now,
+    )
+    assert is_new1 is True
+    assert state.total_records == 1
+
+    # 2. Replay evt-1 within retained bounded window -> returns same existing record
+    rec1_replay, is_new1_replay = state.get_or_create(
+        dead_letter_id=compute_dead_letter_id("chg-1", "evt-1"),
+        original_event_id="evt-1",
+        change_id="chg-1",
+        correlation_id="corr-1",
+        original_topic_id="changemesh-lifecycle-v1",
+        failure_classification=FailureClassification.TERMINAL_EXHAUSTED,
+        raw_error="err-1-dup",
+        attempts_made=3,
+        timestamp=now,
+    )
+    assert is_new1_replay is False
+    assert rec1_replay.dead_letter_id == rec1.dead_letter_id
+    assert rec1_replay.handoff.timestamp == rec1.handoff.timestamp
+    assert state.total_records == 1
+
+    # 3. Insert second event -> evicts evt-1 (oldest) and stores evt-2
+    rec2, is_new2 = state.get_or_create(
+        dead_letter_id=compute_dead_letter_id("chg-1", "evt-2"),
+        original_event_id="evt-2",
+        change_id="chg-1",
+        correlation_id="corr-1",
+        original_topic_id="changemesh-lifecycle-v1",
+        failure_classification=FailureClassification.TERMINAL_EXHAUSTED,
+        raw_error="err-2",
+        attempts_made=3,
+        timestamp=now,
+    )
+    assert is_new2 is True
+    assert state.total_records == 1
+    assert state.get_record("chg-1", "evt-1") is None  # Evicted
+    assert state.get_record("chg-1", "evt-2") is not None
+
+    # 4. Replay evt-2 -> returns same existing record
+    rec2_replay, is_new2_replay = state.get_or_create(
+        dead_letter_id=compute_dead_letter_id("chg-1", "evt-2"),
+        original_event_id="evt-2",
+        change_id="chg-1",
+        correlation_id="corr-1",
+        original_topic_id="changemesh-lifecycle-v1",
+        failure_classification=FailureClassification.TERMINAL_EXHAUSTED,
+        raw_error="err-2-dup",
+        attempts_made=3,
+        timestamp=now,
+    )
+    assert is_new2_replay is False
+    assert rec2_replay.dead_letter_id == rec2.dead_letter_id
+    assert state.total_records == 1

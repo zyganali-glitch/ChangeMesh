@@ -624,7 +624,7 @@ def test_gcp_dead_letter_consumer_processing_and_handoff():
 
 
 def test_gcp_dead_letter_consumer_unparseable_payload_fallback():
-    """Verify dead-letter consumer falls back to attributes for unparseable raw bytes."""
+    """Verify dead-letter consumer falls back to complete attributes for unparseable raw bytes."""
     from integrations.gcp.pubsub_adapter import GooglePubSubDeadLetterConsumer
 
     dl_consumer = GooglePubSubDeadLetterConsumer(
@@ -654,6 +654,139 @@ def test_gcp_dead_letter_consumer_unparseable_payload_fallback():
     assert record.original_topic_id == "changemesh-agent-work-v1"
     assert record.attempts_made == 7
     assert record.handoff.human_authority_required is False
+
+
+def test_gcp_dead_letter_consumer_rejection_missing_identity_fields():
+    """Verify dead-letter consumer fails closed when identity fields cannot be reconstructed."""
+    from integrations.gcp.pubsub_adapter import GooglePubSubDeadLetterConsumer
+
+    dl_consumer = GooglePubSubDeadLetterConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-dead-letter-sub-v1",
+    )
+
+    raw_bad_data = b"UNPARSEABLE_DATA"
+
+    # Missing event_id
+    with pytest.raises(ValueError, match="missing required identity fields.*event_id"):
+        dl_consumer.process_dead_letter_delivery(
+            raw_data=raw_bad_data,
+            attributes={
+                "change_id": "chg-1",
+                "correlation_id": "corr-1",
+                "topic_id": "changemesh-lifecycle-v1",
+            },
+            message_id="msg-missing-evt",
+        )
+
+    # Missing change_id
+    with pytest.raises(ValueError, match="missing required identity fields.*change_id"):
+        dl_consumer.process_dead_letter_delivery(
+            raw_data=raw_bad_data,
+            attributes={
+                "event_id": "evt-1",
+                "correlation_id": "corr-1",
+                "topic_id": "changemesh-lifecycle-v1",
+            },
+            message_id="msg-missing-chg",
+        )
+
+    # Missing correlation_id
+    with pytest.raises(ValueError, match="missing required identity fields.*correlation_id"):
+        dl_consumer.process_dead_letter_delivery(
+            raw_data=raw_bad_data,
+            attributes={
+                "event_id": "evt-1",
+                "change_id": "chg-1",
+                "topic_id": "changemesh-lifecycle-v1",
+            },
+            message_id="msg-missing-corr",
+        )
+
+    # Missing topic_id
+    with pytest.raises(ValueError, match="missing required identity fields.*topic_id"):
+        dl_consumer.process_dead_letter_delivery(
+            raw_data=raw_bad_data,
+            attributes={
+                "event_id": "evt-1",
+                "change_id": "chg-1",
+                "correlation_id": "corr-1",
+            },
+            message_id="msg-missing-top",
+        )
+
+    # Completely empty attributes and corrupt wire
+    with pytest.raises(ValueError, match="Cannot reconstruct canonical dead-letter event identity"):
+        dl_consumer.process_dead_letter_delivery(
+            raw_data=raw_bad_data,
+            attributes={},
+            message_id="msg-empty-all",
+        )
+
+
+def test_gcp_dead_letter_consumer_delivery_attempt_semantics():
+    """Verify provider delivery attempts are approximate and absent count never fabricates 5."""
+    from events.topology import get_canonical_topology
+    from integrations.gcp.pubsub_adapter import GooglePubSubDeadLetterConsumer
+
+    dl_consumer = GooglePubSubDeadLetterConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-dead-letter-sub-v1",
+    )
+
+    envelope_7 = _make_envelope(
+        event_id="evt-attempts-7",
+        change_id="chg-attempts-7",
+        correlation_id="corr-attempts-7",
+    )
+    wire_msg_7 = EventWireMessage(
+        topic_id="changemesh-lifecycle-v1",
+        envelope=envelope_7,
+    )
+    raw_data_7 = wire_msg_7.to_bytes()
+
+    # Case 1: Provider reports delivery_attempt=7
+    rec_7 = dl_consumer.process_dead_letter_delivery(
+        raw_data=raw_data_7,
+        attributes=wire_msg_7.get_transport_attributes(),
+        message_id="msg-attempt-7",
+        delivery_attempt=7,
+    )
+    assert rec_7.attempts_made == 7
+    assert "approximate provider attempts: 7" in rec_7.sanitized_failure_reason
+
+    # Case 2: Provider delivery_attempt is None -> NO fabricated 5
+    envelope_none = _make_envelope(
+        event_id="evt-attempts-none",
+        change_id="chg-attempts-none",
+        correlation_id="corr-attempts-none",
+    )
+    wire_msg_none = EventWireMessage(
+        topic_id="changemesh-lifecycle-v1",
+        envelope=envelope_none,
+    )
+    raw_data_none = wire_msg_none.to_bytes()
+
+    rec_none = dl_consumer.process_dead_letter_delivery(
+        raw_data=raw_data_none,
+        attributes=wire_msg_none.get_transport_attributes(),
+        message_id="msg-attempt-none",
+        delivery_attempt=None,
+    )
+    assert rec_none.attempts_made == 0
+    assert "provider attempt count unavailable" in rec_none.sanitized_failure_reason
+    assert "5" not in rec_none.sanitized_failure_reason
+
+    # Case 3: Configured topology max delivery attempts remains 5
+    topo = get_canonical_topology()
+    lifecycle_sub = topo.get_subscription("changemesh-lifecycle-sub-v1")
+    assert lifecycle_sub is not None
+    assert lifecycle_sub.dead_letter_policy is not None
+    assert lifecycle_sub.dead_letter_policy.max_delivery_attempts == 5
+
+    # Case 4: Configured max (5) and observed/reported attempt (0 or 7) remain distinct
+    assert lifecycle_sub.dead_letter_policy.max_delivery_attempts != rec_none.attempts_made
+    assert lifecycle_sub.dead_letter_policy.max_delivery_attempts != rec_7.attempts_made
 
 
 def test_gcp_dead_letter_consumer_replay_idempotency():

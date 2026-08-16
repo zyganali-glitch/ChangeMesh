@@ -170,16 +170,16 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 | Unit tests (P-08.04 Blind Audit) | `python -m pytest tests/test_p08_04_blind_audit.py -v --tb=short` | `VERIFIED` | `PASS` (18 tests) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-08.05 Metrics) | `python -m pytest tests/test_p08_05_metrics.py -v --tb=short` | `VERIFIED` | `PASS` (13 tests) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-09.01 Topology) | `python -m pytest tests/test_p09_01_topology.py -v --tb=short` | `VERIFIED` | `PASS` (18 passed) | Local non-mutating test | 2026-08-16 |
-| Unit tests (P-09.02 Adapters & DLQ) | `python -m pytest tests/test_p09_02_pubsub_adapters.py -v --tb=short` | `VERIFIED` | `PASS` (21 passed) | Local non-mutating test | 2026-08-16 |
-| Unit tests (P-09.03 Retry & Dead Letter) | `python -m pytest tests/test_p09_03_retry_dead_letter.py -v --tb=short` | `VERIFIED` | `PASS` (9 passed) | Local non-mutating test | 2026-08-16 |
+| Unit tests (P-09.02 Adapters & DLQ) | `python -m pytest tests/test_p09_02_pubsub_adapters.py -v --tb=short` | `VERIFIED` | `PASS` (23 passed) | Local non-mutating test | 2026-08-16 |
+| Unit tests (P-09.03 Retry & Dead Letter) | `python -m pytest tests/test_p09_03_retry_dead_letter.py -v --tb=short` | `VERIFIED` | `PASS` (10 passed) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-09.04 Local Event Bus) | `python -m pytest tests/test_p09_04_local_event_bus.py -v --tb=short` | `VERIFIED` | `PASS` (14 passed) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-09.05 Causal Timeline) | `python -m pytest tests/test_p09_05_pubsub_timeline.py -v --tb=short` | `VERIFIED` | `PASS` (14 passed) | Local non-mutating test | 2026-08-16 |
-| Unit tests (Combined P-09) | `python -m pytest tests/test_p09_01_topology.py tests/test_p09_02_pubsub_adapters.py tests/test_p09_03_retry_dead_letter.py tests/test_p09_04_local_event_bus.py tests/test_p09_05_pubsub_timeline.py -v --tb=short` | `VERIFIED` | `PASS` (76 passed) | Local non-mutating test | 2026-08-16 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (1106 passed, 1 warning, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-16 |
+| Unit tests (Combined P-09) | `python -m pytest tests/test_p09_01_topology.py tests/test_p09_02_pubsub_adapters.py tests/test_p09_03_retry_dead_letter.py tests/test_p09_04_local_event_bus.py tests/test_p09_05_pubsub_timeline.py -v --tb=short` | `VERIFIED` | `PASS` (79 passed) | Local non-mutating test | 2026-08-16 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (1109 passed, 1 warning, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-16 |
 | Format | `uv run python scripts/cmd.py format` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports unformatted historical files) | Non-mutating (`ruff format --check .`) | 2026-08-15 |
 | Lint | `uv run python scripts/cmd.py lint` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports historical lint debt) | Non-mutating (`ruff check .`, no `--fix`) | 2026-08-15 |
 | Type-check | `uv run python scripts/cmd.py type-check` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports 2 errors in `test_gcp_access.py`) | Non-mutating (`mypy domain tests src`) | 2026-08-15 |
-| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` | `PASS` (1106 passed, 1 warning) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-16 |
+| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` | `PASS` (1109 passed, 1 warning) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-16 |
 | Integration | `uv run python scripts/cmd.py integration` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL_CLOSED` (Exit 1, zero cloud access without `--live-write-danger`) | Guarded live writes (`tests/test_gcp_access.py`) | 2026-08-15 |
 | E2E | `uv run python scripts/cmd.py e2e` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24/P-25 pending) | Deferred workflow | 2026-08-15 |
 | Demo | `uv run python scripts/cmd.py demo` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24 pending) | Deferred demo | 2026-08-15 |

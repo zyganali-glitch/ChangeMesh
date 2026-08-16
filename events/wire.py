@@ -114,6 +114,7 @@ class EventWireMessage(BaseModel):
         attrs: dict[str, str] = {
             "wire_version": self.wire_version,
             "schema_version": self.envelope.schema_version,
+            "topic_id": self.topic_id,
             "event_id": self.envelope.event_id,
             "change_id": self.envelope.change_id,
             "correlation_id": self.envelope.correlation_id,

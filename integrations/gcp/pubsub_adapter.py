@@ -278,35 +278,89 @@ class GooglePubSubDeadLetterConsumer:
     ) -> DeadLetterEventRecord:
         """Process a message from the dead-letter queue into a DeadLetterEventRecord.
 
-        Attempts count: Uses delivery_attempt if supplied by provider metadata,
-        or topology default of 5 attempts. Delivery attempt is not overstated as
-        perfectly deterministic since provider delivery counts are best-effort.
+        Reconstructs canonical event identity:
+        1. Preferred: deserialize EventWireMessage from raw_data.
+        2. Fallback: extract required identity fields (event_id, change_id,
+           correlation_id, topic_id) from trusted transport attributes.
+        3. If canonical identity cannot be reconstructed: FAIL CLOSED (raises ValueError).
+           Zero placeholder identity is ever fabricated.
+
+        Delivery attempt handling:
+        - If delivery_attempt is provided and positive: preserved as approximate
+          provider attempt count.
+        - If delivery_attempt is absent/None/<=0: set to 0 (indicating provider count unavailable).
+          Never fabricates a configured policy maximum (e.g. 5) as an observed execution fact.
         """
-        original_event_id = "unknown-event"
-        change_id = "unknown-change"
-        correlation_id = "unknown-correlation"
-        original_topic_id = "changemesh-lifecycle-v1"
+        original_event_id: Optional[str] = None
+        change_id: Optional[str] = None
+        correlation_id: Optional[str] = None
+        original_topic_id: Optional[str] = None
 
-        try:
-            wire_msg = EventWireMessage.from_bytes(raw_data)
-            original_event_id = wire_msg.envelope.event_id
-            change_id = wire_msg.envelope.change_id
-            correlation_id = wire_msg.envelope.correlation_id
-            original_topic_id = wire_msg.topic_id
-        except Exception:
-            # Fallback to attributes if wire payload is unparseable
-            original_event_id = attributes.get("event_id", original_event_id)
-            change_id = attributes.get("change_id", change_id)
-            correlation_id = attributes.get("correlation_id", correlation_id)
-            original_topic_id = attributes.get("topic_id", original_topic_id)
+        # A. Preferred path: Parse EventWireMessage from raw bytes
+        if raw_data:
+            try:
+                wire_msg = EventWireMessage.from_bytes(raw_data)
+                original_event_id = wire_msg.envelope.event_id
+                change_id = wire_msg.envelope.change_id
+                correlation_id = wire_msg.envelope.correlation_id
+                original_topic_id = wire_msg.topic_id
+            except Exception:
+                pass
 
-        attempts_made = (
-            delivery_attempt if (delivery_attempt is not None and delivery_attempt > 0) else 5
-        )
-        raw_err = (
-            failure_reason
-            or f"Exceeded maximum delivery attempts ({attempts_made}) on Google Pub/Sub"
-        )
+        # B. Fallback path: Recover from trusted transport attributes if unparsed
+        if not (original_event_id and change_id and correlation_id and original_topic_id):
+            attr_event_id = attributes.get("event_id")
+            attr_change_id = attributes.get("change_id")
+            attr_correlation_id = attributes.get("correlation_id")
+            attr_topic_id = attributes.get("topic_id")
+
+            if (
+                attr_event_id
+                and attr_event_id.strip()
+                and attr_change_id
+                and attr_change_id.strip()
+                and attr_correlation_id
+                and attr_correlation_id.strip()
+                and attr_topic_id
+                and attr_topic_id.strip()
+            ):
+                original_event_id = attr_event_id.strip()
+                change_id = attr_change_id.strip()
+                correlation_id = attr_correlation_id.strip()
+                original_topic_id = attr_topic_id.strip()
+
+        # C. If canonical identity cannot be reconstructed: FAIL CLOSED
+        if not (original_event_id and change_id and correlation_id and original_topic_id):
+            missing_fields: list[str] = []
+            if not original_event_id:
+                missing_fields.append("event_id")
+            if not change_id:
+                missing_fields.append("change_id")
+            if not correlation_id:
+                missing_fields.append("correlation_id")
+            if not original_topic_id:
+                missing_fields.append("topic_id")
+            raise ValueError(
+                "Cannot reconstruct canonical dead-letter event identity: "
+                f"missing required identity fields {missing_fields}. "
+                "Identity facts must never be fabricated."
+            )
+
+        # Handle delivery attempt without false precision
+        if delivery_attempt is not None and delivery_attempt > 0:
+            attempts_made = delivery_attempt
+            default_err = (
+                f"Terminal delivery received from Google Pub/Sub DLQ "
+                f"(approximate provider attempts: {delivery_attempt})"
+            )
+        else:
+            attempts_made = 0
+            default_err = (
+                "Terminal delivery received from Google Pub/Sub DLQ "
+                "(provider attempt count unavailable)"
+            )
+
+        raw_err = failure_reason or default_err
         clean_err = sanitize_error_message(str(raw_err))
 
         dl_id = compute_dead_letter_id(change_id, original_event_id)

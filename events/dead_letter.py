@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from collections import OrderedDict
 from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -150,17 +151,28 @@ def build_dead_letter_record(
 class ProcessLocalDeadLetterState:
     """Bounded in-memory tracking for process-local terminal handoff idempotency.
 
-    Guarantees that replaying the same terminal event identity within the current
-    process runtime returns the existing logical DeadLetterEventRecord without
-    manufacturing duplicate handoffs.
+    Guarantees that replaying the same terminal event identity within the retained
+    capacity window of the current process runtime returns the existing logical
+    DeadLetterEventRecord without manufacturing duplicate handoffs.
 
-    This is process-local and in-memory only (not durable P-10 Firestore persistence).
+    Bounded FIFO capacity eviction:
+    - max_records must be explicitly valid and strictly positive (>= 1).
+    - When capacity is reached, the oldest record is evicted to retain at most
+      max_records entries in memory.
+    - Replay idempotency is strictly guaranteed within the retained bounded window.
+    - This is process-local and in-memory only (not durable P-10 Firestore persistence).
     """
 
     def __init__(self, max_records: int = 1000) -> None:
+        if max_records < 1:
+            raise ValueError("max_records must be strictly positive (>= 1)")
         self._lock = threading.Lock()
-        self._records: dict[tuple[str, str], DeadLetterEventRecord] = {}
+        self._records: OrderedDict[tuple[str, str], DeadLetterEventRecord] = OrderedDict()
         self._max_records = max_records
+
+    @property
+    def max_records(self) -> int:
+        return self._max_records
 
     @property
     def total_records(self) -> int:
@@ -183,7 +195,7 @@ class ProcessLocalDeadLetterState:
         attempts_made: int,
         timestamp: UtcDateTime,
     ) -> Tuple[DeadLetterEventRecord, bool]:
-        """Get existing record or create and store a new one.
+        """Get existing record or create and store a new one in the bounded window.
 
         Returns (record, is_new).
         """
@@ -203,8 +215,10 @@ class ProcessLocalDeadLetterState:
                 attempts_made=attempts_made,
                 timestamp=timestamp,
             )
-            if len(self._records) < self._max_records:
-                self._records[key] = record
+            # Evict oldest entry when capacity is reached
+            while len(self._records) >= self._max_records:
+                self._records.popitem(last=False)
+            self._records[key] = record
             return record, True
 
     def clear(self) -> None:
