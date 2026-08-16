@@ -47,16 +47,27 @@
 - P-09
 - P-10.00
 - P-10.01
+- P-10.02
+- P-10.03
+- P-10.04
+- P-10.05
+- P-10
 
 **Active Phase:**
-P-10 (IN_PROGRESS / ACTIVE)
+P-11 (PENDING / NEXT)
 
 **Next Exact Task:**
-P-10.02 — Implement state repository with optimistic concurrency/version checks
+P-11.00 — Memory Trust donor preflight
 
-## Current P-10.01 State
+## Current P-10 State (Phase Complete)
 
-P-10.01 is `DONE`. Designed canonical Google Cloud Firestore persistence data model in [`docs/P-10.01_FIRESTORE_DATA_MODEL.md`](P-10.01_FIRESTORE_DATA_MODEL.md). Derived 11-pattern query/access matrix (Q01–Q11). Established hierarchical tenant-partitioned subcollection topology (`/tenants/{tenant_id}/changes/{change_id}` with child subcollections `/tasks`, `/checkpoints`, `/idempotency_reservations`, `/evidence_refs`, `/approvals` and tenant-level `/passports`). Enforced strict fail-closed tenancy requiring mandatory `tenant_id` on all repository interfaces and prohibiting collection group queries. Specified field-level document schemas for all 8 entity types with immutable/mutable separation, ISO-8601 UTC timestamps (`UtcDateTime`), monotonic `version` counters, and `extra="forbid"` schema validation. Defined compare-and-set (CAS) optimistic concurrency control (OCC) semantics with `OptimisticConcurrencyError` and P-09 `execute_with_retry()` delegation. Specified exactly three required composite indexes (`(state ASC, updated_at DESC)`, `(agent_id ASC, agent_revision ASC, is_revoked ASC)`, `(resolution_status ASC, card_created_at DESC)`) while deliberately omitting collection group and speculative indexes. Defined category-by-category operational retention policies and native Firestore TTL field bindings on `ttl_expires_at` (30 days post-terminal in production, 24 hours in demo), strictly preserving the invariant that operational TTL deletion never deletes records from the long-term immutable Evidence Ledger (P-22). Enforced 256 KiB ChangeMesh document-size safety ceiling (25% of Firestore 1 MiB hard limit) with SHA-256 artifact hash offloading for payloads > 16 KiB. Completed adversarial data-model review resolving all 7 challenges. Synchronized `docs/ARCHITECTURE.md`, `AGENT_ENVIRONMENT_AND_API.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md`. Zero domain contract modifications or provider SDK leaks. P-10.02 remains `PENDING`.
+Phase P-10 is `DONE`.
+- **P-10.01 (Hardened):** Applied 5 design fixes (Server Firestore security enforced at backend repository boundary; OCC error ownership isolated from P-09 retry; idempotency key design finalized in P-10.03; native TTL & recursive descendant teardown semantics; large artifact safety boundary).
+- **P-10.02:** Implemented canonical state repository contracts and models in `src/orchestrator/state_repository.py`, thread-safe in-memory double in `src/orchestrator/in_memory_repository.py`, and Google Cloud Firestore adapter in `integrations/gcp/firestore_adapter.py`. Enforces monotonic version tokens and CAS updates raising `OptimisticConcurrencyError`.
+- **P-10.03:** Implemented `IdempotencyKeyManager` and `IdempotencyIntent` in `src/orchestrator/idempotency.py` across all 6 scopes (`WORKFLOW_STEP`, `BRANCH_INTENT`, `PR_INTENT`, `APPROVAL`, `PASSPORT`, `EXTERNAL_WRITE`), lease reservation with timeout, and exact replay deduplication returning cached execution results without duplicate write emission.
+- **P-10.04:** Implemented `SagaCheckpointManager` and `SagaResumeContext` in `src/orchestrator/saga_checkpoint.py` with SHA-256 state digest integrity verification (`compute_checkpoint_digest`), completed task extraction to prevent duplicate execution, pending task sequencing, and next safe action identification.
+- **P-10.05:** Implemented `PersistencePrivacyGuard` and `FixtureTeardownManager` in `src/orchestrator/teardown.py` with strict fail-closed rejection of credential field names and free-text secrets, and explicit recursive descendant document teardown verifying zero residual fixture state (`TeardownReport(residual_document_count=0, success=True)`).
+- **Evidence:** Dedicated P-10 test suites (`tests/test_p10_02_state_repository.py`, `tests/test_p10_03_idempotency.py`, `tests/test_p10_04_saga_checkpoint.py`, `tests/test_p10_05_teardown_privacy.py`) pass 19 tests. Canonical unit test suite passes 1128 tests (1 warning). Zero domain contract mutations or Google SDK leaks. P-11.00 is next.
 
 ## Current P-10.00 State
 

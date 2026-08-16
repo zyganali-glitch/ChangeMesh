@@ -123,7 +123,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-07` | Google ADK Agent Skeleton | `DONE` | `P-06` |
 | `P-08` | Gemini Integration and Structured Reasoning Boundary | `DONE` | `P-07` |
 | `P-09` | Pub/Sub Event Backbone | `DONE` | `P-08` |
-| `P-10` | Firestore State, Idempotency, and Saga Persistence | `IN_PROGRESS` | `P-09` |
+| `P-10` | Firestore State, Idempotency, and Saga Persistence | `DONE` | `P-09` |
 | `P-11` | Memory Trust Layer | `PENDING` | `P-10` |
 | `P-12` | Agent Registry and Capability Passport | `PENDING` | `P-11` |
 | `P-13` | ShadowLab Rehearsal Twin | `PENDING` | `P-12` |
@@ -925,7 +925,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-10 — Firestore State, Idempotency, and Saga Persistence
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-10.01 — Design Firestore collections, indexes, tenancy boundary, retention, document-size limits
 
@@ -940,41 +940,45 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-10.02 — Implement state repository with optimistic concurrency/version checks
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement state repository with optimistic concurrency/version checks.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Concurrent updates do not silently overwrite.
 - **Required evidence:** Concurrency tests.
+- **Evidence:** Implemented canonical state repository contracts and models in `src/orchestrator/state_repository.py` and thread-safe in-memory double in `src/orchestrator/in_memory_repository.py`. Implemented Google Cloud Firestore provider adapter in `integrations/gcp/firestore_adapter.py`. Enforces strict fail-closed tenant validation, immutable field protection, schema validation with `extra="forbid"`, secret scanning, monotonic `version` counters, and Compare-And-Set (CAS) updates raising `OptimisticConcurrencyError` on version mismatch without hidden application-level retries or P-09 dead-letter emission. `tests/test_p10_02_state_repository.py` passes 8 dedicated tests including real multi-threaded concurrent CAS race condition tests.
 - **Mandatory documentation sync:** Architecture.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-10.03 — Implement idempotency keys for every external write/workflow step
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement idempotency keys for every external write/workflow step.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Replay cannot duplicate branches, PRs, approvals, or passports.
 - **Required evidence:** Replay tests.
+- **Evidence:** Implemented canonical `IdempotencyKeyManager` and `IdempotencyIntent` in `src/orchestrator/idempotency.py`. Enforces deterministic SHA-256 compound key generation across all 6 canonical scopes (`WORKFLOW_STEP`, `BRANCH_INTENT`, `PR_INTENT`, `APPROVAL`, `PASSPORT`, `EXTERNAL_WRITE`), lease reservation with timeout/expiration, atomic commit with receipt and result digests, release on failure, and exact replay deduplication returning cached execution results without duplicate write emission. `tests/test_p10_03_idempotency.py` passes 5 dedicated replay and non-duplication tests.
 - **Mandatory documentation sync:** Evidence boundary.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-10.04 — Implement saga checkpoint and resume
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement saga checkpoint and resume.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Process resumes from last committed state without unsafe repetition.
 - **Required evidence:** Restart integration test.
+- **Evidence:** Implemented canonical `SagaCheckpointManager` and `SagaResumeContext` in `src/orchestrator/saga_checkpoint.py`. Enforces SHA-256 state digest integrity verification (`compute_checkpoint_digest`), parent change active checkpoint linkage, foreign tenant rejection, completed task extraction to prevent duplicate execution, pending task sequencing, and next safe action identification. `tests/test_p10_04_saga_checkpoint.py` passes 3 dedicated tests covering multi-phase progression, digest corruption fail-closed rejection, and intermediate resumption.
 - **Mandatory documentation sync:** README, demo script.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-10.05 — Implement retention/redaction rules and safe fixture teardown
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement retention/redaction rules and safe fixture teardown.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Demo state deletable; sensitive fields never persisted.
 - **Required evidence:** Teardown/privacy tests.
+- **Evidence:** Implemented `PersistencePrivacyGuard` and `FixtureTeardownManager` in `src/orchestrator/teardown.py`. Enforces strict fail-closed rejection of credential field names and embedded free-text tokens (private keys, GitHub tokens, Bearer headers, JWTs), and implements explicit recursive descendant document teardown across tenant root and all subcollections (`changes`, `tasks`, `checkpoints`, `idempotency_reservations`, `evidence_refs`, `approvals`, `passports`), verifying zero residual fixture state (`TeardownReport(residual_document_count=0, success=True)`). `tests/test_p10_05_teardown_privacy.py` passes 3 dedicated tests. Complete P-10 suite passes 19 tests. Canonical unit suite passes 1128 tests (1 warning).
 - **Mandatory documentation sync:** Environment, threat model.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

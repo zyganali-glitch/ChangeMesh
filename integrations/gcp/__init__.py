@@ -8,8 +8,12 @@ from integrations.gcp.pubsub_adapter import (
     GooglePubSubConsumer,
     GooglePubSubPublisher,
 )
+from integrations.gcp.firestore_adapter import (
+    GoogleFirestoreSagaRepository,
+)
 
 __all__ = [
     "GooglePubSubConsumer",
     "GooglePubSubPublisher",
+    "GoogleFirestoreSagaRepository",
 ]
