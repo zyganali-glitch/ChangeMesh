@@ -148,10 +148,14 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Canonical Metrics Artifact**: Deterministic `build_model_metrics_artifact()` and `export_metrics_artifact_json()` provide non-secret execution artifacts with strict secrecy guarantees (zero prompt, response, or credential text).
 *   **Single Reliability Authority**: Retry measurement observes the existing wrapper-owned retry loop and does not add another retry mechanism.
 
-### 5.14 Causal Event Timeline Invariants (P-09.05 / CCT-FLIGHT-001)
+### 5.14 Event Backbone, Retry, and Causal Timeline Invariants (P-09 / CCT-FLIGHT-001)
 
-*   **Causal DAG Overrules Clock Skew**: Event timeline sequencing is determined strictly by topological graph traversal across `causation_id` links. Parent events are guaranteed to precede child events regardless of network arrival sequence or wall-clock timestamp jitter. Concurrent independent events are ordered deterministically by `(timestamp, event_id)`.
-*   **Structural Secrecy Redaction**: Payload summaries are sanitized on ingest via `redact_mapping`, replacing sensitive key values with `"[REDACTED]"`.
+*   **Single Local Retry Authority**: `execute_with_retry()` is the single canonical local retry owner in `LocalEventBus` and `LocalEventConsumer`. Zero nested/stacked retry loops exist. Sibling subscriber handlers are isolated (handler 1 success is not replayed if handler 2 retries).
+*   **Observable Terminal Dead-Letter Handoff**: Terminal failures on local bus and consumer expose canonical `DeadLetterEventRecord` and `TerminalFailureHandoff` on `EventPublishResult` and `EventConsumeResult` with caller-visible metadata (`event_id`, `change_id`, `correlation_id`, `topic_id`, attempts made, failure classification, `human_authority_required=False`, and sanitized diagnostics).
+*   **Process-Local Replay Idempotency**: `ProcessLocalDeadLetterState` stores terminal records under thread safety, guaranteeing that replaying the exact same terminal event returns the identical logical handoff without duplicate emission.
+*   **Google Pub/Sub DLQ Boundary**: `GooglePubSubConsumer` re-raises transient errors so Google transport owns redelivery; `GooglePubSubDeadLetterConsumer` converts dead-letter subscription deliveries into canonical handoffs with process-local replay idempotency.
+*   **Secret Ingestion Reject != Redact Truth**: Secret-bearing payloads strictly fail closed and are rejected on ingest via `scan_payload_for_secrets`; `redact_mapping` applies structural field masking with `"[REDACTED]"` only as defense-in-depth on accepted payloads.
+*   **Causal DAG Overrules Clock Skew**: Ingestion permits child/grandchild arrival before parent without premature rejection. Event timeline sequencing is determined strictly by topological Kahn DAG traversal across `causation_id` links, failing closed on unresolved predecessors, cycles, self-causation, or parent-child correlation ID mismatch. Causally unlinked concurrent events are tie-broken deterministically by `(timestamp, event_id)`.
 *   **Tamper-Protected Timeline Digest**: Deterministic SHA-256 digest is computed over canonical JSON bytes of ordered entries, providing an immutable audit digest for Change Passport seal and dashboard rendering.
 *   **Zero Forbidden Carry-Over**: Timeline models enforce clean-room boundaries with zero Codex event names, UI styles, or provider SDK types in domain/evidence layers.
 

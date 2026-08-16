@@ -9,13 +9,17 @@ Google SDK types and imports are strictly confined to this module.
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Optional
 
 from domain.contracts.event_envelope import EventDeliveryDisposition
 from events.consumer import EventConsumer, EventConsumeResult
-from events.dead_letter import build_dead_letter_record
+from events.dead_letter import (
+    DeadLetterEventRecord,
+    ProcessLocalDeadLetterState,
+    compute_dead_letter_id,
+    get_default_dead_letter_state,
+)
 from events.delivery_state import InMemoryDeliveryState
 from events.publisher import EventPublisher, EventPublishResult
 from events.retry import FailureClassification, classify_failure, sanitize_error_message
@@ -82,6 +86,7 @@ class GooglePubSubConsumer(EventConsumer):
         subscription_id: str,
         subscriber_client: Optional[Any] = None,
         delivery_state: Optional[InMemoryDeliveryState] = None,
+        dead_letter_state: Optional[ProcessLocalDeadLetterState] = None,
     ) -> None:
         if not project_id or not project_id.strip():
             raise ValueError("project_id must not be blank")
@@ -91,6 +96,9 @@ class GooglePubSubConsumer(EventConsumer):
         self.project_id = project_id.strip()
         self.subscription_id = subscription_id.strip()
         self.delivery_state = delivery_state
+        self._dead_letter_state = (
+            dead_letter_state if dead_letter_state is not None else get_default_dead_letter_state()
+        )
 
         if subscriber_client is None:
             from google.cloud import pubsub_v1  # type: ignore[import-untyped,attr-defined]
@@ -171,8 +179,9 @@ class GooglePubSubConsumer(EventConsumer):
                     event_id,
                     clean_err,
                 )
-                dl_record = build_dead_letter_record(
-                    dead_letter_id=f"dl-{uuid.uuid4().hex[:8]}",
+                dl_id = compute_dead_letter_id(wire_msg.envelope.change_id, event_id)
+                dl_record, _ = self._dead_letter_state.get_or_create(
+                    dead_letter_id=dl_id,
                     original_event_id=event_id,
                     change_id=wire_msg.envelope.change_id,
                     correlation_id=wire_msg.envelope.correlation_id,
@@ -226,3 +235,91 @@ class GooglePubSubConsumer(EventConsumer):
                 callback_invoked=False,
                 error_message="Event conflicts with observed state or idempotency key",
             )
+
+
+class GooglePubSubDeadLetterConsumer:
+    """Consumer for Google Cloud Pub/Sub dead-letter subscription.
+
+    Converts messages delivered to the Google Pub/Sub dead-letter queue
+    (changemesh-dead-letter-sub-v1) into canonical DeadLetterEventRecord and
+    TerminalFailureHandoff artifacts.
+
+    Preserves authority invariant (human_authority_required=False) and secrecy.
+    Supports process-local replay idempotency so replayed messages do not
+    manufacture duplicate handoffs.
+    """
+
+    def __init__(
+        self,
+        project_id: str,
+        subscription_id: str = "changemesh-dead-letter-sub-v1",
+        subscriber_client: Optional[Any] = None,
+        dead_letter_state: Optional[ProcessLocalDeadLetterState] = None,
+    ) -> None:
+        if not project_id or not project_id.strip():
+            raise ValueError("project_id must not be blank")
+        if not subscription_id or not subscription_id.strip():
+            raise ValueError("subscription_id must not be blank")
+
+        self.project_id = project_id.strip()
+        self.subscription_id = subscription_id.strip()
+        self._client = subscriber_client
+        self._dead_letter_state = (
+            dead_letter_state if dead_letter_state is not None else get_default_dead_letter_state()
+        )
+
+    def process_dead_letter_delivery(
+        self,
+        raw_data: bytes,
+        attributes: Mapping[str, str],
+        message_id: str,
+        delivery_attempt: Optional[int] = None,
+        failure_reason: Optional[str] = None,
+    ) -> DeadLetterEventRecord:
+        """Process a message from the dead-letter queue into a DeadLetterEventRecord.
+
+        Attempts count: Uses delivery_attempt if supplied by provider metadata,
+        or topology default of 5 attempts. Delivery attempt is not overstated as
+        perfectly deterministic since provider delivery counts are best-effort.
+        """
+        original_event_id = "unknown-event"
+        change_id = "unknown-change"
+        correlation_id = "unknown-correlation"
+        original_topic_id = "changemesh-lifecycle-v1"
+
+        try:
+            wire_msg = EventWireMessage.from_bytes(raw_data)
+            original_event_id = wire_msg.envelope.event_id
+            change_id = wire_msg.envelope.change_id
+            correlation_id = wire_msg.envelope.correlation_id
+            original_topic_id = wire_msg.topic_id
+        except Exception:
+            # Fallback to attributes if wire payload is unparseable
+            original_event_id = attributes.get("event_id", original_event_id)
+            change_id = attributes.get("change_id", change_id)
+            correlation_id = attributes.get("correlation_id", correlation_id)
+            original_topic_id = attributes.get("topic_id", original_topic_id)
+
+        attempts_made = (
+            delivery_attempt if (delivery_attempt is not None and delivery_attempt > 0) else 5
+        )
+        raw_err = (
+            failure_reason
+            or f"Exceeded maximum delivery attempts ({attempts_made}) on Google Pub/Sub"
+        )
+        clean_err = sanitize_error_message(str(raw_err))
+
+        dl_id = compute_dead_letter_id(change_id, original_event_id)
+
+        rec, _ = self._dead_letter_state.get_or_create(
+            dead_letter_id=dl_id,
+            original_event_id=original_event_id,
+            change_id=change_id,
+            correlation_id=correlation_id,
+            original_topic_id=original_topic_id,
+            failure_classification=FailureClassification.TERMINAL_EXHAUSTED,
+            raw_error=clean_err,
+            attempts_made=attempts_made,
+            timestamp=datetime.now(timezone.utc),
+        )
+        return rec

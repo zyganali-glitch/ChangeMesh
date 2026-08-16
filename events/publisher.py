@@ -10,6 +10,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from events.dead_letter import DeadLetterEventRecord
 from events.wire import EventWireMessage
 
 
@@ -24,6 +25,7 @@ class EventPublishResult(BaseModel):
     event_id: str
     transport: str  # "GOOGLE_PUBSUB" or "LOCAL"
     error_message: Optional[str] = None
+    dead_letter_record: Optional[DeadLetterEventRecord] = None
 
     @field_validator("status", "message_id", "topic_id", "event_id", "transport")
     @classmethod

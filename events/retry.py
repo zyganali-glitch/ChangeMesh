@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import math
 import re
-import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Mapping, Optional, Sequence
@@ -146,6 +145,7 @@ def execute_with_retry(
     policy: Optional[EventRetryPolicy] = None,
     sleep_fn: Optional[Callable[[float], None]] = None,
     dead_letter_context: Optional[Mapping[str, Any]] = None,
+    dead_letter_state: Optional[Any] = None,
 ) -> RetryExecutionResult:
     """Execute a callable with deterministic bounded retries (local/test retry engine).
 
@@ -157,11 +157,19 @@ def execute_with_retry(
     Transient retryable errors retry up to policy.max_attempts.
     When execution terminates in failure (either DETERMINISTIC_INVALID or TERMINAL_EXHAUSTED),
     exactly one sanitized DeadLetterEventRecord and TerminalFailureHandoff is constructed.
+    Replaying the same terminal event identity within process runtime returns the same
+    existing logical handoff idempotently without duplicate emission.
     """
-    from events.dead_letter import build_dead_letter_record
+    from events.dead_letter import (
+        compute_dead_letter_id,
+        get_default_dead_letter_state,
+    )
 
     pol = policy or EventRetryPolicy()
     attempt_records: list[RetryAttemptRecord] = []
+    dl_state = (
+        dead_letter_state if dead_letter_state is not None else get_default_dead_letter_state()
+    )
 
     def _build_dl(
         classification: FailureClassification,
@@ -169,17 +177,24 @@ def execute_with_retry(
         attempts: int,
     ) -> Any:
         ctx = dead_letter_context or {}
-        return build_dead_letter_record(
-            dead_letter_id=str(ctx.get("dead_letter_id") or f"dl-{uuid.uuid4().hex[:8]}"),
-            original_event_id=str(ctx.get("event_id") or "evt-local-retry"),
-            change_id=str(ctx.get("change_id") or "chg-local-retry"),
-            correlation_id=str(ctx.get("correlation_id") or "corr-local-retry"),
-            original_topic_id=str(ctx.get("topic_id") or "changemesh-retry-v1"),
+        chg_id = str(ctx.get("change_id") or "chg-local-retry")
+        evt_id = str(ctx.get("event_id") or "evt-local-retry")
+        corr_id = str(ctx.get("correlation_id") or "corr-local-retry")
+        top_id = str(ctx.get("topic_id") or "changemesh-retry-v1")
+        dl_id = str(ctx.get("dead_letter_id") or compute_dead_letter_id(chg_id, evt_id))
+
+        rec, _ = dl_state.get_or_create(
+            dead_letter_id=dl_id,
+            original_event_id=evt_id,
+            change_id=chg_id,
+            correlation_id=corr_id,
+            original_topic_id=top_id,
             failure_classification=classification,
             raw_error=raw_err,
             attempts_made=attempts,
             timestamp=datetime.now(timezone.utc),
         )
+        return rec
 
     for attempt_idx in range(pol.max_attempts):
         attempt_num = attempt_idx + 1

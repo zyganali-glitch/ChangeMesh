@@ -1,13 +1,13 @@
 # ChangeMesh Judging Map
 
-Status: `IN_PROGRESS (P-08 Phase Closure Repaired & Verified)`
+Status: `IN_PROGRESS (P-09 Phase Closure Repaired & Verified)`
 
 | Requirement / concern | Planned evidence | Current state |
 |---|---|---|
 | Gemini 3.5+ | exact model config and sanitized trace | `LOCAL_BOUNDED_CLIENT_VERIFIED` (`BoundedGeminiClient` in `src/core/gemini_client.py` with `gemini-3.6-flash`, timeouts, retries, safety settings, non-secret telemetry, budget evaluation) |
 | Google agent framework | ADK source/runtime trace | `LOCAL_ADK_VERIFIED` (P-07.01/P-07.02 local ADK agent fleet definitions and in-memory Runner execution verified; cloud deployment `NOT_RUN`) |
-| Google Cloud | Cloud Run + Firestore + Pub/Sub | `NOT_RUN` (Local ADC and managed service availability verified in P-02; runtime integration in P-09/P-10/P-28) |
-| Autonomous background work | async event timeline and recovery | `NOT_RUN` (Owning phase P-09 Pub/Sub backbone pending) |
+| Google Cloud | Cloud Run + Firestore + Pub/Sub | `LOCAL_PUBSUB_TOPOLOGY_AND_ADAPTERS_VERIFIED / CLOUD_NOT_RUN` (Local topic/subscription topology manifest, wire serialization, bounded retry engine, dead-letter handoff, local event bus, and clean-room causal event timeline verified; live cloud Pub/Sub deployment and writes remain `NOT_RUN`) |
+| Autonomous background work | async event timeline and recovery | `LOCAL_EVENT_BACKBONE_AND_TIMELINE_VERIFIED / SAGA_RECOVERY_NOT_RUN` (P-09 local event bus, causal timeline ordering DAG via CCT-FLIGHT-001, bounded retry, and terminal dead-letter handoff verified; end-to-end autonomous saga recovery belongs to P-10/P-20 and remains `NOT_RUN`) |
 | Complex workflow | end-to-end schema-change saga | `NOT_RUN` (Owning phase P-20 saga execution pending) |
 | Cross-session context | trusted memory resume | `NOT_RUN` (Owning phase P-11 memory trust layer pending) |
 | Agent discovery | registry/capability selection | `NOT_RUN` (Owning phase P-12 capability passport runtime pending) |

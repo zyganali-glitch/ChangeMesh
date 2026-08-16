@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from domain.contracts.event_envelope import EventDeliveryDisposition
@@ -26,26 +24,39 @@ from domain.contracts.evidence import (
     Provenance,
 )
 from events.consumer import EventConsumer, EventConsumeResult
-from events.dead_letter import build_dead_letter_record
+from events.dead_letter import ProcessLocalDeadLetterState
 from events.delivery_state import InMemoryDeliveryState
 from events.publisher import EventPublisher, EventPublishResult
-from events.retry import FailureClassification, classify_failure, sanitize_error_message
+from events.retry import (
+    EventRetryPolicy,
+    execute_with_retry,
+    sanitize_error_message,
+)
 from events.wire import EventWireMessage
 
 logger = logging.getLogger(__name__)
 
 
 class LocalEventBus:
-    """Thread-safe in-memory event bus with subscriber routing and delivery classification."""
+    """Thread-safe in-memory event bus with subscriber routing and delivery classification.
+
+    Acts as the local in-memory event transport fan-out and retry owner for local dispatch.
+    """
 
     def __init__(
         self,
         delivery_state: Optional[InMemoryDeliveryState] = None,
+        retry_policy: Optional[EventRetryPolicy] = None,
+        sleep_fn: Optional[Callable[[float], None]] = None,
+        dead_letter_state: Optional[ProcessLocalDeadLetterState] = None,
     ) -> None:
         self._lock = threading.Lock()
         self._subscribers: Dict[str, List[Callable[[EventWireMessage], Any]]] = {}
         self._published_history: List[EventWireMessage] = []
         self._delivery_state = delivery_state or InMemoryDeliveryState()
+        self._retry_policy = retry_policy or EventRetryPolicy()
+        self._sleep_fn = sleep_fn
+        self._dead_letter_state = dead_letter_state
         self._message_counter = 0
 
     @property
@@ -65,7 +76,7 @@ class LocalEventBus:
             self._subscribers[topic_id].append(handler)
 
     def publish_message(self, message: EventWireMessage) -> EventPublishResult:
-        """Publish message across local subscribers, enforcing validation and dedup."""
+        """Publish message across local subscribers with validation, dedup, and bounded retry."""
         # 1. Validate wire serialization and secret scanning
         raw_bytes = message.to_bytes()
         _ = EventWireMessage.from_bytes(raw_bytes)
@@ -80,32 +91,30 @@ class LocalEventBus:
         disposition = self._delivery_state.classify(message.envelope)
 
         if disposition == EventDeliveryDisposition.ACCEPT:
-            # Invoke handlers
+            dead_letter_ctx = {
+                "change_id": message.envelope.change_id,
+                "correlation_id": message.envelope.correlation_id,
+                "event_id": message.envelope.event_id,
+                "topic_id": message.topic_id,
+            }
+            # Invoke each handler through canonical bounded retry engine
             for handler in handlers:
-                try:
-                    handler(message)
-                except Exception as e:
-                    classification = classify_failure(e)
-                    clean_err = sanitize_error_message(str(e))
+                res = execute_with_retry(
+                    lambda: handler(message),
+                    policy=self._retry_policy,
+                    sleep_fn=self._sleep_fn,
+                    dead_letter_context=dead_letter_ctx,
+                    dead_letter_state=self._dead_letter_state,
+                )
+                if not res.succeeded:
+                    clean_err = sanitize_error_message(str(res.terminal_error))
                     logger.error(
                         "Handler error on local topic %s (event %s): %s",
                         message.topic_id,
                         message.envelope.event_id,
                         clean_err,
                     )
-                    # Transient or deterministic failure must NOT be recorded as accepted
-                    if classification == FailureClassification.DETERMINISTIC_INVALID:
-                        _ = build_dead_letter_record(
-                            dead_letter_id=f"dl-{uuid.uuid4().hex[:8]}",
-                            original_event_id=message.envelope.event_id,
-                            change_id=message.envelope.change_id,
-                            correlation_id=message.envelope.correlation_id,
-                            original_topic_id=message.topic_id,
-                            failure_classification=classification,
-                            raw_error=e,
-                            attempts_made=1,
-                            timestamp=datetime.now(timezone.utc),
-                        )
+                    # Transient exhaustion or deterministic failure must NOT be recorded accepted
                     return EventPublishResult(
                         status="FAILED",
                         message_id=msg_id,
@@ -113,6 +122,7 @@ class LocalEventBus:
                         event_id=message.envelope.event_id,
                         transport="LOCAL",
                         error_message=clean_err,
+                        dead_letter_record=res.dead_letter_record,
                     )
 
             # All handlers succeeded -> record accepted
@@ -203,11 +213,17 @@ class LocalEventConsumer(EventConsumer):
         self,
         bus: LocalEventBus,
         subscription_id: str,
+        retry_policy: Optional[EventRetryPolicy] = None,
+        sleep_fn: Optional[Callable[[float], None]] = None,
+        dead_letter_state: Optional[ProcessLocalDeadLetterState] = None,
     ) -> None:
         if not subscription_id or not subscription_id.strip():
             raise ValueError("subscription_id must not be blank")
         self._bus = bus
         self.subscription_id = subscription_id.strip()
+        self._retry_policy = retry_policy or EventRetryPolicy()
+        self._sleep_fn = sleep_fn
+        self._dead_letter_state = dead_letter_state
 
     def process_raw_message(
         self,
@@ -216,7 +232,7 @@ class LocalEventConsumer(EventConsumer):
         message_id: str,
         callback: Callable[[EventWireMessage], Any],
     ) -> EventConsumeResult:
-        """Validate, classify, and dispatch a raw local message payload."""
+        """Validate, classify, and dispatch a raw local message payload with bounded retry."""
         # 1. Schema & wire deserialization
         try:
             wire_msg = EventWireMessage.from_bytes(raw_data)
@@ -238,8 +254,20 @@ class LocalEventConsumer(EventConsumer):
 
         # 3. Handle according to disposition
         if disposition == EventDeliveryDisposition.ACCEPT:
-            try:
-                callback(wire_msg)
+            dead_letter_ctx = {
+                "change_id": wire_msg.envelope.change_id,
+                "correlation_id": wire_msg.envelope.correlation_id,
+                "event_id": event_id,
+                "topic_id": wire_msg.topic_id,
+            }
+            res = execute_with_retry(
+                lambda: callback(wire_msg),
+                policy=self._retry_policy,
+                sleep_fn=self._sleep_fn,
+                dead_letter_context=dead_letter_ctx,
+                dead_letter_state=self._dead_letter_state,
+            )
+            if res.succeeded:
                 self._bus.delivery_state.record_if_accepted(wire_msg.envelope)
                 return EventConsumeResult(
                     disposition=EventDeliveryDisposition.ACCEPT,
@@ -248,35 +276,13 @@ class LocalEventConsumer(EventConsumer):
                     transport="LOCAL",
                     callback_invoked=True,
                 )
-            except Exception as e:
-                classification = classify_failure(e)
-                clean_err = sanitize_error_message(str(e))
-                if classification == FailureClassification.TRANSIENT_RETRYABLE:
-                    logger.warning(
-                        "Transient failure in local callback for message %s (event %s); "
-                        "raising to NACK transport: %s",
-                        message_id,
-                        event_id,
-                        clean_err,
-                    )
-                    raise e
-
+            else:
+                clean_err = sanitize_error_message(str(res.terminal_error))
                 logger.error(
-                    "Local callback failed with deterministic error for message %s (event %s): %s",
+                    "Local callback failed for message %s (event %s): %s",
                     message_id,
                     event_id,
                     clean_err,
-                )
-                dl_record = build_dead_letter_record(
-                    dead_letter_id=f"dl-{uuid.uuid4().hex[:8]}",
-                    original_event_id=event_id,
-                    change_id=wire_msg.envelope.change_id,
-                    correlation_id=wire_msg.envelope.correlation_id,
-                    original_topic_id=wire_msg.topic_id,
-                    failure_classification=classification,
-                    raw_error=e,
-                    attempts_made=1,
-                    timestamp=datetime.now(timezone.utc),
                 )
                 return EventConsumeResult(
                     disposition=EventDeliveryDisposition.ACCEPT,
@@ -284,8 +290,10 @@ class LocalEventConsumer(EventConsumer):
                     message_id=message_id,
                     transport="LOCAL",
                     callback_invoked=True,
-                    error_message=sanitize_error_message(f"Callback execution failure: {e}"),
-                    dead_letter_record=dl_record,
+                    error_message=sanitize_error_message(
+                        f"Callback execution failure: {res.terminal_error}"
+                    ),
+                    dead_letter_record=res.dead_letter_record,
                 )
 
         elif disposition == EventDeliveryDisposition.DUPLICATE:

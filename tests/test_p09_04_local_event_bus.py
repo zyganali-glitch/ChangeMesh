@@ -204,29 +204,109 @@ def test_no_google_sdk_imports_in_local_bus():
         assert "google.cloud" not in type_str.lower(), f"Leaked SDK import {key}"
 
 
-def test_local_bus_handler_transient_failure_not_recorded_accepted():
-    """Verify transient handler error does not record event as accepted in delivery state."""
-    bus = LocalEventBus()
+def test_local_bus_handler_transient_retry_to_success():
+    """Verify local bus handler transient error retries to success under bounded retry engine."""
+    attempts = [0]
+    sleeps: list[float] = []
+    from events.retry import EventRetryPolicy
+
+    policy = EventRetryPolicy(max_attempts=3, initial_backoff_seconds=0.5)
+    bus = LocalEventBus(retry_policy=policy, sleep_fn=sleeps.append)
     publisher = LocalEventPublisher(bus)
 
-    def failing_handler(msg: EventWireMessage) -> None:
-        raise ConnectionResetError("Transient network failure in local handler")
+    def transient_handler(msg: EventWireMessage) -> None:
+        attempts[0] += 1
+        if attempts[0] == 1:
+            raise ConnectionResetError("Temporary connection drop")
 
-    bus.subscribe("changemesh-lifecycle-v1", failing_handler)
+    bus.subscribe("changemesh-lifecycle-v1", transient_handler)
 
-    envelope = _make_envelope(event_id="evt-transient-fail")
+    envelope = _make_envelope(event_id="evt-retry-success")
+    wire_msg = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope)
+
+    res = publisher.publish(wire_msg)
+    assert res.status == "PUBLISHED"
+    assert res.transport == "LOCAL"
+    assert res.dead_letter_record is None
+    assert attempts[0] == 2
+    assert sleeps == [0.5]
+    assert "evt-retry-success" in bus.delivery_state.seen_events
+
+
+def test_local_bus_sibling_handler_isolation_no_duplicate_replay():
+    """Verify sibling handler retry does NOT re-execute already successful handler."""
+    h1_calls = [0]
+    h2_calls = [0]
+    from events.retry import EventRetryPolicy
+
+    policy = EventRetryPolicy(max_attempts=3, initial_backoff_seconds=0.1)
+    bus = LocalEventBus(retry_policy=policy, sleep_fn=lambda _: None)
+    publisher = LocalEventPublisher(bus)
+
+    def handler_1(msg: EventWireMessage) -> None:
+        h1_calls[0] += 1
+
+    def handler_2(msg: EventWireMessage) -> None:
+        h2_calls[0] += 1
+        if h2_calls[0] == 1:
+            raise TimeoutError("Transient timeout in handler 2")
+
+    bus.subscribe("changemesh-lifecycle-v1", handler_1)
+    bus.subscribe("changemesh-lifecycle-v1", handler_2)
+
+    envelope = _make_envelope(event_id="evt-sibling-isolation")
+    wire_msg = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope)
+
+    res = publisher.publish(wire_msg)
+    assert res.status == "PUBLISHED"
+    assert h1_calls[0] == 1  # Crucial: handler 1 executed ONCE, never replayed
+    assert h2_calls[0] == 2  # Handler 2 retried and succeeded
+    assert "evt-sibling-isolation" in bus.delivery_state.seen_events
+
+
+def test_local_bus_handler_transient_exhaustion_dead_letter_handoff():
+    """Verify transient exhaustion on local bus creates visible handoff and returns FAILED."""
+    from events.retry import EventRetryPolicy, FailureClassification
+
+    policy = EventRetryPolicy(max_attempts=3, initial_backoff_seconds=0.1)
+    bus = LocalEventBus(retry_policy=policy, sleep_fn=lambda _: None)
+    publisher = LocalEventPublisher(bus)
+
+    def always_failing_handler(msg: EventWireMessage) -> None:
+        raise ConnectionResetError("Persistent connection reset error")
+
+    bus.subscribe("changemesh-lifecycle-v1", always_failing_handler)
+
+    envelope = _make_envelope(event_id="evt-transient-exhaust")
     wire_msg = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope)
 
     res = publisher.publish(wire_msg)
     assert res.status == "FAILED"
-    assert "Transient network failure" in (res.error_message or "")
-    # Crucial: Event MUST NOT be recorded as accepted in delivery state
-    assert "evt-transient-fail" not in bus.delivery_state.seen_events
+    assert res.transport == "LOCAL"
+    assert "Persistent connection reset" in (res.error_message or "")
+
+    # Dead letter artifact must be visible on result
+    dl = res.dead_letter_record
+    assert dl is not None
+    assert dl.original_event_id == "evt-transient-exhaust"
+    assert dl.change_id == "chg-local-001"
+    assert dl.correlation_id == "corr-local-001"
+    assert dl.original_topic_id == "changemesh-lifecycle-v1"
+    assert dl.attempts_made == 3
+    assert dl.failure_classification == FailureClassification.TERMINAL_EXHAUSTED
+    assert dl.handoff.human_authority_required is False
+    assert dl.handoff.terminal_state == "DEAD_LETTERED"
+
+    # Must NOT be marked accepted in delivery state
+    assert "evt-transient-exhaust" not in bus.delivery_state.seen_events
 
 
 def test_local_bus_handler_deterministic_failure_not_recorded_accepted():
-    """Verify deterministic handler error returns FAILED and is not accepted in delivery state."""
-    bus = LocalEventBus()
+    """Verify deterministic handler error fails immediately with zero retry and returns handoff."""
+    from events.retry import EventRetryPolicy, FailureClassification
+
+    policy = EventRetryPolicy(max_attempts=5)
+    bus = LocalEventBus(retry_policy=policy, sleep_fn=lambda _: None)
     publisher = LocalEventPublisher(bus)
 
     def invalid_handler(msg: EventWireMessage) -> None:
@@ -241,6 +321,75 @@ def test_local_bus_handler_deterministic_failure_not_recorded_accepted():
     assert res.status == "FAILED"
     assert "Schema validation failed" in (res.error_message or "")
     assert "evt-det-fail" not in bus.delivery_state.seen_events
+
+    dl = res.dead_letter_record
+    assert dl is not None
+    assert dl.original_event_id == "evt-det-fail"
+    assert dl.attempts_made == 1
+    assert dl.failure_classification == FailureClassification.DETERMINISTIC_INVALID
+    assert dl.handoff.human_authority_required is False
+
+
+def test_local_consumer_transient_retry_to_success():
+    """Verify LocalEventConsumer retries transient callback failure to success."""
+    from events.retry import EventRetryPolicy
+
+    policy = EventRetryPolicy(max_attempts=3, initial_backoff_seconds=0.1)
+    bus = LocalEventBus()
+    consumer = LocalEventConsumer(
+        bus,
+        subscription_id="sub-retry",
+        retry_policy=policy,
+        sleep_fn=lambda _: None,
+    )
+
+    callback_attempts = [0]
+
+    def on_event(msg: EventWireMessage) -> None:
+        callback_attempts[0] += 1
+        if callback_attempts[0] == 1:
+            raise TimeoutError("Transient timeout in consumer callback")
+
+    envelope = _make_envelope(event_id="evt-cons-retry")
+    raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
+
+    res = consumer.process_raw_message(raw_data, {}, "msg-cons-retry", on_event)
+    assert res.disposition == EventDeliveryDisposition.ACCEPT
+    assert res.callback_invoked is True
+    assert res.dead_letter_record is None
+    assert callback_attempts[0] == 2
+    assert "evt-cons-retry" in bus.delivery_state.seen_events
+
+
+def test_local_consumer_transient_exhaustion_dead_letter_handoff():
+    """Verify LocalEventConsumer transient exhaustion returns dead letter handoff."""
+    from events.retry import EventRetryPolicy, FailureClassification
+
+    policy = EventRetryPolicy(max_attempts=3, initial_backoff_seconds=0.1)
+    bus = LocalEventBus()
+    consumer = LocalEventConsumer(
+        bus,
+        subscription_id="sub-exhaust",
+        retry_policy=policy,
+        sleep_fn=lambda _: None,
+    )
+
+    def failing_callback(msg: EventWireMessage) -> None:
+        raise TimeoutError("Exhausted socket timeout")
+
+    envelope = _make_envelope(event_id="evt-cons-exhaust")
+    raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
+
+    res = consumer.process_raw_message(raw_data, {}, "msg-cons-exhaust", failing_callback)
+    assert res.disposition == EventDeliveryDisposition.ACCEPT
+    assert res.callback_invoked is True
+    assert res.dead_letter_record is not None
+    dl = res.dead_letter_record
+    assert dl.original_event_id == "evt-cons-exhaust"
+    assert dl.attempts_made == 3
+    assert dl.failure_classification == FailureClassification.TERMINAL_EXHAUSTED
+    assert dl.handoff.human_authority_required is False
+    assert "evt-cons-exhaust" not in bus.delivery_state.seen_events
 
 
 def test_local_consumer_deterministic_callback_log_secrecy(caplog):
@@ -267,10 +416,14 @@ def test_local_consumer_deterministic_callback_log_secrecy(caplog):
 
 
 def test_local_consumer_transient_callback_log_secrecy(caplog):
-    """Verify transient callback failure containing Bearer token is sanitized in logs."""
+    """Verify transient callback failure with Bearer token is sanitized in logs."""
     caplog.set_level(logging.DEBUG)
     bus = LocalEventBus()
-    consumer = LocalEventConsumer(bus, subscription_id="local-lifecycle-sub")
+    consumer = LocalEventConsumer(
+        bus,
+        subscription_id="local-lifecycle-sub",
+        sleep_fn=lambda _: None,
+    )
 
     envelope = _make_envelope(event_id="evt-secret-trans")
     raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
@@ -280,8 +433,10 @@ def test_local_consumer_transient_callback_log_secrecy(caplog):
     def failing_callback(msg: EventWireMessage) -> None:
         raise ConnectionResetError(f"Connection reset while sending Bearer {secret_bearer}")
 
-    with pytest.raises(ConnectionResetError):
-        consumer.process_raw_message(raw_data, {}, "msg-secret-trans", failing_callback)
+    res = consumer.process_raw_message(raw_data, {}, "msg-secret-trans", failing_callback)
+    assert res.disposition == EventDeliveryDisposition.ACCEPT
+    assert res.dead_letter_record is not None
+    assert res.dead_letter_record.attempts_made == 3
 
     # Verify log output does not contain raw secret
     assert secret_bearer not in caplog.text

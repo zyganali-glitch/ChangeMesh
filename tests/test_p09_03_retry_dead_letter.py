@@ -245,3 +245,89 @@ def test_secrecy_invariant_error_sanitization():
     clean_key = sanitize_error_message(key_err)
     assert "MIIE" not in clean_key
     assert "[REDACTED_KEY]" in clean_key
+
+
+def test_terminal_failure_replay_idempotency():
+    """Verify terminal failure replay does not manufacture duplicate handoffs.
+
+    Semantics:
+    1. Terminal event processed once -> creates one dead-letter handoff.
+    2. Same terminal event identity replayed -> returns same existing logical handoff.
+    3. Different terminal event -> creates separate independent handoff.
+    4. human_authority_required is strictly False across all emissions.
+    """
+    from events.dead_letter import ProcessLocalDeadLetterState
+
+    local_state = ProcessLocalDeadLetterState()
+    policy = EventRetryPolicy(max_attempts=2)
+
+    def failing_op_1() -> None:
+        raise TimeoutError("Transient network timeout occurred")
+
+    def failing_op_2() -> None:
+        raise ValueError("Schema validation error: missing required envelope field")
+
+    ctx_event_1 = {
+        "change_id": "chg-replay-001",
+        "correlation_id": "corr-replay-001",
+        "event_id": "evt-terminal-replay-1",
+        "topic_id": "changemesh-retry-v1",
+    }
+
+    ctx_event_2 = {
+        "change_id": "chg-replay-001",
+        "correlation_id": "corr-replay-002",
+        "event_id": "evt-terminal-replay-2",
+        "topic_id": "changemesh-lifecycle-v1",
+    }
+
+    # Step 1: Process terminal event 1 first time
+    res1 = execute_with_retry(
+        failing_op_1,
+        policy=policy,
+        sleep_fn=lambda _: None,
+        dead_letter_context=ctx_event_1,
+        dead_letter_state=local_state,
+    )
+    assert res1.succeeded is False
+    assert res1.dead_letter_record is not None
+    dl1 = res1.dead_letter_record
+    assert dl1.original_event_id == "evt-terminal-replay-1"
+    assert dl1.change_id == "chg-replay-001"
+    assert dl1.handoff.human_authority_required is False
+    assert local_state.total_records == 1
+
+    # Step 2: Replay exact same terminal event identity
+    res1_replay = execute_with_retry(
+        failing_op_1,
+        policy=policy,
+        sleep_fn=lambda _: None,
+        dead_letter_context=ctx_event_1,
+        dead_letter_state=local_state,
+    )
+    assert res1_replay.succeeded is False
+    assert res1_replay.dead_letter_record is not None
+    dl1_replay = res1_replay.dead_letter_record
+
+    # Must be exact same logical handoff and dead letter record (no second emission)
+    assert dl1_replay.dead_letter_id == dl1.dead_letter_id
+    assert dl1_replay.original_event_id == dl1.original_event_id
+    assert dl1_replay.handoff.timestamp == dl1.handoff.timestamp
+    assert dl1_replay.handoff.human_authority_required is False
+    assert local_state.total_records == 1  # No duplicate record created
+
+    # Step 3: Process different terminal event -> separate handoff
+    res2 = execute_with_retry(
+        failing_op_2,
+        policy=policy,
+        sleep_fn=lambda _: None,
+        dead_letter_context=ctx_event_2,
+        dead_letter_state=local_state,
+    )
+    assert res2.succeeded is False
+    assert res2.dead_letter_record is not None
+    dl2 = res2.dead_letter_record
+    assert dl2.original_event_id == "evt-terminal-replay-2"
+    assert dl2.dead_letter_id != dl1.dead_letter_id
+    assert dl2.handoff.human_authority_required is False
+    assert local_state.total_records == 2

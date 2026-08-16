@@ -219,8 +219,39 @@ This is the durable minefield and lessons record, not a chronological chat log.
   2. Wrap all exception logger calls with `sanitize_error_message(str(e))`.
   3. In `LocalEventBus.publish_message()`, record accepted in `_delivery_state` only when all subscriber handlers complete successfully without exception.
 - Prevention rule: Ingest out-of-order safely, fail closed at DAG projection; sanitize all exception logs with regexes; record delivery state only upon verified handler success.
-- Tests/evidence: `tests/test_p09_05_pubsub_timeline.py` (14 passed), `tests/test_p09_04_local_event_bus.py` (10 passed), all P-09 tests (68 passed), canonical unit (1098 passed).
+- Tests/evidence: `tests/test_p09_05_pubsub_timeline.py` (14 passed), `tests/test_p09_04_local_event_bus.py` (14 passed), all P-09 tests (76 passed), canonical unit (1106 passed).
 - Affected files: `src/evidence/pubsub_timeline.py`, `events/local_bus.py`, `integrations/gcp/pubsub_adapter.py`, `events/retry.py`.
 - Reusable beyond this task: Yes (all distributed event timelines, saga event logging, and local bus dispatches).
 - Status: `ACTIVE`
+
+### LESSON-20260816-08 — Single Local Retry Owner, Observable Terminal Dead-Letter Handoffs, Process-Local Replay Idempotency, and Reject != Redact Ingestion Truth
+- Date/time: 2026-08-16
+- Active task: P-09 Final Closure Repair
+- Symptom:
+  1. Multiple uncoordinated retry loops in local bus and consumers create stacked retry delays and test flakiness.
+  2. Terminal dead-letter failures construct handoffs internally but discard them, leaving callers blind to failure diagnostics.
+  3. Replaying the same terminal failure event produces duplicate dead-letter handoff records.
+  4. Confusing secret payload rejection on ingest with structural redaction on accepted payloads obscures security boundaries.
+- Root cause:
+  1. Lack of a single designated local retry owner (`execute_with_retry()`) wired across local publishers and consumers.
+  2. `EventPublishResult` and `EventConsumeResult` lacked `dead_letter_record` fields for caller visibility.
+  3. Dead-letter construction lacked process-local identity indexing `(change_id, original_event_id) -> record`.
+  4. Describing payload masking as the primary defense rather than stating that secret payloads fail closed on ingest via `scan_payload_for_secrets` (REJECT != REDACT).
+- Incorrect approach:
+  1. Adding nested retry loops across local dispatch layers or relying on unbounded retries.
+  2. Swallowing terminal failure handoffs without attaching them to caller-visible result objects.
+  3. Re-emitting fresh dead-letter records on duplicate replayed terminal events.
+  4. Accepting secret-bearing messages and relying solely on downstream field redaction.
+- Correct approach:
+  1. Designate `execute_with_retry()` as the single local retry owner in `LocalEventBus` and `LocalEventConsumer`; isolate sibling handler retries.
+  2. Expose `dead_letter_record: Optional[DeadLetterEventRecord]` on `EventPublishResult` and `EventConsumeResult` with caller-visible metadata (`event_id`, `change_id`, `correlation_id`, `topic_id`, attempts made, failure classification, `human_authority_required=False`, and sanitized diagnostics).
+  3. Implement thread-safe `ProcessLocalDeadLetterState` with `compute_dead_letter_id`, guaranteeing that replaying the exact same terminal event returns the identical logical handoff without duplicate emission.
+  4. Strictly reject secret-bearing payloads on ingest via `scan_payload_for_secrets`, using `redact_mapping` only as structural defense-in-depth on accepted payloads.
+  5. Implement `GooglePubSubDeadLetterConsumer` to convert dead-letter subscription messages into canonical handoffs.
+- Prevention rule: Maintain exactly ONE retry authority per transport; expose terminal handoff artifacts to callers; guarantee process-local replay idempotency; reject secret payloads on ingest fail-closed.
+- Tests/evidence: `tests/test_p09_01_topology.py` (18), `tests/test_p09_02_pubsub_adapters.py` (21), `tests/test_p09_03_retry_dead_letter.py` (9), `tests/test_p09_04_local_event_bus.py` (14), `tests/test_p09_05_pubsub_timeline.py` (14) -> 76 passed in P-09 suite; canonical unit suite passes 1106 tests (1 warning).
+- Affected files: `events/dead_letter.py`, `events/retry.py`, `events/publisher.py`, `events/local_bus.py`, `integrations/gcp/pubsub_adapter.py`, `tests/test_p09_02_pubsub_adapters.py`, `tests/test_p09_03_retry_dead_letter.py`, `tests/test_p09_04_local_event_bus.py`.
+- Reusable beyond this task: Yes (all event bus routing, GCP dead-letter processing, failure handoffs, and retry orchestration).
+- Status: `ACTIVE`
+
 

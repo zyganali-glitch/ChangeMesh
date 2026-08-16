@@ -576,3 +576,117 @@ def test_gcp_consumer_transient_callback_log_secrecy(caplog):
 
     assert secret_pwd not in caplog.text
     assert "[REDACTED_SECRET]" in caplog.text
+
+
+def test_gcp_dead_letter_consumer_processing_and_handoff():
+    """Verify GooglePubSubDeadLetterConsumer processes DLQ deliveries into canonical handoffs."""
+    from events.dead_letter import ProcessLocalDeadLetterState
+    from events.retry import FailureClassification
+    from integrations.gcp.pubsub_adapter import GooglePubSubDeadLetterConsumer
+
+    dl_state = ProcessLocalDeadLetterState()
+    dl_consumer = GooglePubSubDeadLetterConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-dead-letter-sub-v1",
+        dead_letter_state=dl_state,
+    )
+
+    envelope = _make_envelope(
+        event_id="evt-dlq-001",
+        change_id="chg-dlq-001",
+        correlation_id="corr-dlq-001",
+    )
+    wire_msg = EventWireMessage(
+        topic_id="changemesh-lifecycle-v1",
+        envelope=envelope,
+        payload={"step": "verify"},
+    )
+    raw_data = wire_msg.to_bytes()
+
+    record = dl_consumer.process_dead_letter_delivery(
+        raw_data=raw_data,
+        attributes=wire_msg.get_transport_attributes(),
+        message_id="pubsub-dlq-msg-1",
+        delivery_attempt=5,
+        failure_reason="Delivery attempt exceeded subscription bound",
+    )
+
+    assert record.original_event_id == "evt-dlq-001"
+    assert record.change_id == "chg-dlq-001"
+    assert record.correlation_id == "corr-dlq-001"
+    assert record.original_topic_id == "changemesh-lifecycle-v1"
+    assert record.dead_letter_topic_id == "changemesh-dead-letter-v1"
+    assert record.attempts_made == 5
+    assert record.failure_classification == FailureClassification.TERMINAL_EXHAUSTED
+    assert record.handoff.human_authority_required is False
+    assert record.handoff.terminal_state == "DEAD_LETTERED"
+    assert record.handoff.original_event_id == "evt-dlq-001"
+
+
+def test_gcp_dead_letter_consumer_unparseable_payload_fallback():
+    """Verify dead-letter consumer falls back to attributes for unparseable raw bytes."""
+    from integrations.gcp.pubsub_adapter import GooglePubSubDeadLetterConsumer
+
+    dl_consumer = GooglePubSubDeadLetterConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-dead-letter-sub-v1",
+    )
+
+    raw_bad_data = b"NOT_VALID_JSON_OR_WIRE"
+    attributes = {
+        "event_id": "evt-unparseable",
+        "change_id": "chg-unparseable",
+        "correlation_id": "corr-unparseable",
+        "topic_id": "changemesh-agent-work-v1",
+    }
+
+    record = dl_consumer.process_dead_letter_delivery(
+        raw_data=raw_bad_data,
+        attributes=attributes,
+        message_id="pubsub-dlq-bad-msg",
+        delivery_attempt=7,
+        failure_reason="Dead letter caused by unparseable corrupt payload",
+    )
+
+    assert record.original_event_id == "evt-unparseable"
+    assert record.change_id == "chg-unparseable"
+    assert record.correlation_id == "corr-unparseable"
+    assert record.original_topic_id == "changemesh-agent-work-v1"
+    assert record.attempts_made == 7
+    assert record.handoff.human_authority_required is False
+
+
+def test_gcp_dead_letter_consumer_replay_idempotency():
+    """Verify replaying the same DLQ message returns existing logical record without duplicate."""
+    from events.dead_letter import ProcessLocalDeadLetterState
+    from integrations.gcp.pubsub_adapter import GooglePubSubDeadLetterConsumer
+
+    dl_state = ProcessLocalDeadLetterState()
+    dl_consumer = GooglePubSubDeadLetterConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-dead-letter-sub-v1",
+        dead_letter_state=dl_state,
+    )
+
+    envelope1 = _make_envelope(event_id="evt-dlq-replay-1")
+    raw1 = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope1).to_bytes()
+
+    envelope2 = _make_envelope(event_id="evt-dlq-replay-2")
+    raw2 = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope2).to_bytes()
+
+    # Step 1: Process message 1
+    rec1 = dl_consumer.process_dead_letter_delivery(raw1, {}, "msg-1", delivery_attempt=5)
+    assert dl_state.total_records == 1
+
+    # Step 2: Replay exact same message 1
+    rec1_replay = dl_consumer.process_dead_letter_delivery(
+        raw1, {}, "msg-1-dup", delivery_attempt=5
+    )
+    assert rec1_replay.dead_letter_id == rec1.dead_letter_id
+    assert rec1_replay.handoff.timestamp == rec1.handoff.timestamp
+    assert dl_state.total_records == 1  # No second emission
+
+    # Step 3: Process different message 2 -> separate handoff
+    rec2 = dl_consumer.process_dead_letter_delivery(raw2, {}, "msg-2", delivery_attempt=5)
+    assert rec2.dead_letter_id != rec1.dead_letter_id
+    assert dl_state.total_records == 2
