@@ -473,7 +473,7 @@ forbidden_carry_over:
 - school-SaaS fixture data, openai_api_key pattern naming, ZeroKit product semantics
 required_tests:
 - blocking patterns (private keys, API keys, bearer tokens, JWTs, connection strings) fail closed
-- review patterns (UUIDs, IPs, production markers) trigger review warnings
+- review patterns (UUIDs, IPs, production markers) trigger review findings in reviewItems
 - synthetic fixture domain allowlisting (example.com, example.net, example.org, example.test)
 - model prompt contains only allowlisted fields
 - no school-SaaS data or ZeroKit semantics (forbidden carry-over)
