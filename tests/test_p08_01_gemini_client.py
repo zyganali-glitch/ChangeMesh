@@ -778,8 +778,76 @@ class TestClientLifecycle:
 
 
 # ==============================================================================
-# 7. Static Architectural Boundary Tests
+# 7. Static Architectural Boundary Tests & AST Analyzer
 # ==============================================================================
+def find_model_call_violations(
+    code_or_tree: ast.AST | str,
+    *,
+    file_path: Path,
+    canonical_client_path: Path,
+) -> list[str]:
+    """Test helper: detects direct model calls or SDK client instantiations outside canonical path.
+
+    Authorized single owner: exact resolved path == canonical_client_path.
+    Any instantiation of Client(...), ADK wrapper Gemini(...), or invocation of
+    *.models.generate_content(...) / generate_content(...) outside canonical_client_path
+    is returned as a violation description.
+    """
+    resolved_file = file_path.resolve()
+    resolved_canonical = canonical_client_path.resolve()
+
+    if resolved_file == resolved_canonical:
+        return []
+
+    tree: ast.AST
+    if isinstance(code_or_tree, str):
+        tree = ast.parse(code_or_tree, filename=str(file_path))
+    else:
+        tree = code_or_tree
+
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        lineno = getattr(node, "lineno", 0)
+
+        # 1. Attribute call with attr == "Client" (e.g. genai.Client(...))
+        if isinstance(func, ast.Attribute) and func.attr == "Client":
+            violations.append(
+                f"Direct SDK Client call found outside canonical client: {file_path} (L{lineno})"
+            )
+        # 2. Name call with id == "Client" (e.g. Client(...))
+        elif isinstance(func, ast.Name) and func.id == "Client":
+            violations.append(
+                f"Direct Client call found outside canonical client: {file_path} (L{lineno})"
+            )
+        # 3. Name or Attribute call for ADK Gemini wrapper (e.g. Gemini(...), adk.Gemini(...))
+        elif isinstance(func, ast.Name) and func.id == "Gemini":
+            violations.append(
+                f"Raw ADK Gemini wrapper found outside canonical client: {file_path} (L{lineno})"
+            )
+        elif isinstance(func, ast.Attribute) and func.attr == "Gemini":
+            violations.append(
+                f"Raw ADK Gemini wrapper found outside canonical client: {file_path} (L{lineno})"
+            )
+        # 4. Attribute call with attr == "generate_content"
+        # (e.g. some_client.models.generate_content(...), models.generate_content(...))
+        elif isinstance(func, ast.Attribute) and func.attr == "generate_content":
+            violations.append(
+                f"Raw SDK generate_content call found outside canonical client: "
+                f"{file_path} (L{lineno})"
+            )
+        # 5. Name call with id == "generate_content" (e.g. generate_content(...))
+        elif isinstance(func, ast.Name) and func.id == "generate_content":
+            violations.append(
+                f"Raw direct generate_content call found outside canonical client: "
+                f"{file_path} (L{lineno})"
+            )
+
+    return violations
+
+
 class TestArchitecturalBoundaries:
     """Validates inward dependency rule, zero SDK leakage into domain contracts,
 
@@ -815,34 +883,21 @@ class TestArchitecturalBoundaries:
 
         # EXACT repository path allowlist (strictly no basename-only matching)
         canonical_client_exact_path = (src_dir / "core" / "gemini_client.py").resolve()
+        assert canonical_client_exact_path.is_file()
 
+        all_violations: list[str] = []
         for py_file in src_dir.rglob("*.py"):
-            resolved_py_file = py_file.resolve()
             tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call):
-                    func = node.func
-                    # 1. Check genai.Client(...)
-                    if isinstance(func, ast.Attribute) and func.attr == "Client":
-                        if resolved_py_file != canonical_client_exact_path:
-                            pytest.fail(
-                                f"Direct SDK Client call found outside canonical client: {py_file}"
-                            )
-                    # 2. Check Client(...) where imported directly
-                    elif isinstance(func, ast.Name) and func.id == "Client":
-                        if resolved_py_file != canonical_client_exact_path:
-                            pytest.fail(
-                                f"Direct Client call found outside canonical client: {py_file}"
-                            )
-                    # 3. Check raw ADK model wrappers e.g. Gemini(...)
-                    elif isinstance(func, ast.Name) and func.id == "Gemini":
-                        pytest.fail(
-                            f"Raw ADK Gemini wrapper found outside canonical client: {py_file}"
-                        )
-                    elif isinstance(func, ast.Attribute) and func.attr == "Gemini":
-                        pytest.fail(
-                            f"Raw ADK Gemini wrapper found outside canonical client: {py_file}"
-                        )
+            violations = find_model_call_violations(
+                tree,
+                file_path=py_file,
+                canonical_client_path=canonical_client_exact_path,
+            )
+            all_violations.extend(violations)
+
+        assert not all_violations, "Model call violations found in src/:\n" + "\n".join(
+            all_violations
+        )
 
     def test_duplicate_same_basename_client_rejected_by_static_rule(self) -> None:
         """Regression test verifying that a second file with the same basename
@@ -856,19 +911,109 @@ class TestArchitecturalBoundaries:
         assert fake_second_client_path.name == canonical_client_exact_path.name  # same basename
         assert fake_second_client_path != canonical_client_exact_path  # different exact path
 
-        # Synthetic AST of a second client file
-        synthetic_code = "from google import genai\nclient = genai.Client()"
-        tree = ast.parse(synthetic_code)
+        # Case 1: genai.Client() in duplicate basename file
+        code_attr_client = "from google import genai\nclient = genai.Client()"
+        violations_attr = find_model_call_violations(
+            code_attr_client,
+            file_path=fake_second_client_path,
+            canonical_client_path=canonical_client_exact_path,
+        )
+        assert len(violations_attr) == 1
+        assert "Direct SDK Client call found outside canonical client" in violations_attr[0]
 
-        violation_detected = False
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                func = node.func
-                if isinstance(func, ast.Attribute) and func.attr == "Client":
-                    if fake_second_client_path != canonical_client_exact_path:
-                        violation_detected = True
+        # Case 2: direct Client() import in duplicate basename file
+        code_name_client = "from google.genai import Client\nclient = Client()"
+        violations_name = find_model_call_violations(
+            code_name_client,
+            file_path=fake_second_client_path,
+            canonical_client_path=canonical_client_exact_path,
+        )
+        assert len(violations_name) == 1
+        assert "Direct Client call found outside canonical client" in violations_name[0]
 
-        assert violation_detected, "Exact path matching rule must reject duplicate basename file"
+        # Canonical file with same calls produces 0 violations
+        assert (
+            len(
+                find_model_call_violations(
+                    code_attr_client,
+                    file_path=canonical_client_exact_path,
+                    canonical_client_path=canonical_client_exact_path,
+                )
+            )
+            == 0
+        )
+
+    def test_raw_model_generate_content_bypass_rejected_by_static_rule(self) -> None:
+        """Regression test verifying that noncanonical files invoking raw generate_content
+
+        or ADK Gemini wrapper (e.g. src/other/raw_model_call.py) are detected as violations.
+        """
+        repo_root = Path(__file__).resolve().parent.parent
+        canonical_client_exact_path = (repo_root / "src" / "core" / "gemini_client.py").resolve()
+        fake_raw_call_path = (repo_root / "src" / "other" / "raw_model_call.py").resolve()
+
+        # Case 1: some_client.models.generate_content(...)
+        code_sdk_generate = (
+            'some_client.models.generate_content(model="gemini-3.6-flash", contents="x")'
+        )
+        violations_generate = find_model_call_violations(
+            code_sdk_generate,
+            file_path=fake_raw_call_path,
+            canonical_client_path=canonical_client_exact_path,
+        )
+        assert len(violations_generate) == 1
+        assert (
+            "Raw SDK generate_content call found outside canonical client" in violations_generate[0]
+        )
+
+        # Case 2: models.generate_content(...)
+        code_models_generate = 'models.generate_content(model="gemini-3.6-flash", contents="x")'
+        violations_models = find_model_call_violations(
+            code_models_generate,
+            file_path=fake_raw_call_path,
+            canonical_client_path=canonical_client_exact_path,
+        )
+        assert len(violations_models) == 1
+        assert (
+            "Raw SDK generate_content call found outside canonical client" in violations_models[0]
+        )
+
+        # Case 3: direct generate_content(...)
+        code_direct_generate = 'generate_content(model="gemini-3.6-flash", contents="x")'
+        violations_direct = find_model_call_violations(
+            code_direct_generate,
+            file_path=fake_raw_call_path,
+            canonical_client_path=canonical_client_exact_path,
+        )
+        assert len(violations_direct) == 1
+        assert (
+            "Raw direct generate_content call found outside canonical client"
+            in violations_direct[0]
+        )
+
+        # Case 4: raw ADK Gemini(...) wrapper
+        code_adk_gemini = (
+            'from google.adk.models import Gemini\nm = Gemini(model="gemini-3.6-flash")'
+        )
+        violations_adk = find_model_call_violations(
+            code_adk_gemini,
+            file_path=fake_raw_call_path,
+            canonical_client_path=canonical_client_exact_path,
+        )
+        assert len(violations_adk) == 1
+        assert "Raw ADK Gemini wrapper found outside canonical client" in violations_adk[0]
+
+        # Canonical path with raw generate_content produces 0 violations
+        assert (
+            len(
+                find_model_call_violations(
+                    code_sdk_generate,
+                    file_path=canonical_client_exact_path,
+                    canonical_client_path=canonical_client_exact_path,
+                )
+            )
+            == 0
+        )
 
     def test_zero_forbidden_donor_identifiers_in_src_core(self) -> None:
         core_dir = Path(__file__).resolve().parent.parent / "src" / "core"
