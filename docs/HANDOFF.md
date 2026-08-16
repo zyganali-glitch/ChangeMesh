@@ -57,18 +57,33 @@
 - P-11.03
 - P-11.04
 - P-11.05
-- P-11.06
 - P-11
+- P-12.00
+- P-12.01
+- P-12.02
+- P-12.03
+- P-12.04
+- P-12.05
+- P-12.06
+- P-12
 
 **Active Phase:**
-P-12 (PENDING / NEXT)
+P-13 (PENDING / NEXT)
 
 **Next Exact Task:**
-P-12.00 — Capability Passport donor preflight
+P-13.00 — ShadowLab donor preflight
 
-## Current P-11 State (Phase Complete)
+## Current P-12 State (Phase Complete)
 
-Phase P-11 is `DONE`.
+Phase P-12 is `DONE`.
+- **P-12.00:** Capability Passport donor preflight verified `CCT-PASSPORT-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `CLOVER-REG-001` (pinned at `047051df170e70ca986e30eb4a1df8350172e2cf`).
+- **P-12.01:** Defined standard demo capability vocabulary (`CapabilityType`) and role requirements (`AgentCapabilityRequirement`) for `impact_scout`, `policy_guardian`, `migration_engineer`, `release_steward` in `src/registry/capabilities.py`.
+- **P-12.02:** Implemented `PassportIssuer` and `PassportIssuanceRequest` in `src/registry/passport_issuer.py` requiring non-empty qualification evidence references and prohibiting self-attestation.
+- **P-12.03:** Implemented `PassportVerifier` and `PassportValidationResult` in `src/registry/passport_issuer.py` verifying validity, expiry, revocation, revision matching, and required capabilities.
+- **P-12.04:** Registered two `migration_engineer` revisions in `src/registry/agent_registry.py` (`rev-1.0.0-sqlite-pg` and `rev-2.0.0-cockroach-distributed`), demonstrating capability-targeted qualification resolution.
+- **P-12.05:** Implemented `AgentRegistry` interface and `InMemoryAgentRegistry` in `src/registry/agent_registry.py`.
+- **P-12.06:** Implemented `PassportAwareRouter` in `src/registry/passport_router.py` enforcing passport-aware dispatch and fail-closed `UnqualifiedAgentDispatchError`.
+- **Evidence:** `tests/test_p12_capability_passport.py` passes 5 dedicated tests. Canonical unit suite passes 1138 tests (1 warning). Zero domain contract mutations or provider SDK leaks. P-13.00 is next.
 - **P-11.00:** Memory Trust donor preflight verified `QW-MEM-001` and `QW-BUS-001` pinned at commit `a43b3411856f41a4be9424d11c01a5e637cdc410`.
 - **P-11.01:** Validated `MemoryRecord` in `domain/contracts/memory.py` with immutable fields, explicit `DataClassLevel`, and required trust evidence for `TRUSTED` status.
 - **P-11.02:** Implemented `MemoryTrustEvaluator` and `EpistemicTrustEvaluation` in `src/memory/trust_layer.py` with 5 deterministic classifications (`ACCEPTED_TRUSTED`, `UNTRUSTED_CONTEXT`, `STALE_EXPIRED`, `CONTRADICTED`, `QUARANTINED`), freshness scoring, and strict separation between retrieval relevance and epistemic authority.
