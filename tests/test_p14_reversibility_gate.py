@@ -1,20 +1,27 @@
 """ChangeMesh Reversibility Gate, Approval Compression, and Policy Guardian test suite.
 
 P-14: Tests 7 deterministic policy inputs, complete 7-action autonomy mapping,
-locked-fact-only Approval Compression Cards, cryptographic approval token verification
-without hardcoded secrets, and real demonstrable friction reduction metrics.
+locked-fact-only Approval Compression Cards, adapter-only cryptographic approval tokens,
+fail-closed public entry points, reusable verified authority, and friction reduction.
 """
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import inspect
 import uuid
 from datetime import datetime, timedelta, timezone
+
+import pytest
+from pydantic import ValidationError
 
 from domain.contracts.autonomy import AutonomyClass
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.evidence import EvidenceState
+from integrations.authority.hmac_adapter import (
+    HmacAuthorityDecisionVerifier,
+)
 from src.gate.action_map import CanonicalActionType, get_canonical_action_map
 from src.gate.compression import (
     ApprovalCompressionEngine,
@@ -36,8 +43,9 @@ from src.gate.reversibility import (
     ReversibilityClassifier,
 )
 from src.gate.token import (
-    SignedApprovalToken,
-    TrustedAuthorityDecisionVerifier,
+    InMemoryVerifiedAuthorityStore,
+    SignedAuthorityEnvelope,
+    VerifiedAuthorityDecision,
 )
 
 
@@ -51,7 +59,7 @@ def _utc_now() -> datetime:
 
 
 class TestHmacAuthoritySigner:
-    """Test fixture helper to sign approval tokens for test verification."""
+    """Test fixture helper to sign approval envelopes for test verification."""
 
     @classmethod
     def sign_token(
@@ -63,7 +71,7 @@ class TestHmacAuthoritySigner:
         action_scope: str = "Target: Production",
         validity_seconds: int = 3600,
         now: datetime | None = None,
-    ) -> SignedApprovalToken:
+    ) -> SignedAuthorityEnvelope:
         if now is None:
             now = _utc_now()
 
@@ -78,7 +86,7 @@ class TestHmacAuthoritySigner:
         )
         sig = hmac.new(secret_key.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
 
-        return SignedApprovalToken(
+        return SignedAuthorityEnvelope(
             token_id=token_id,
             plan_hash=plan_hash,
             approver_id=approver_id,
@@ -268,14 +276,14 @@ def test_approval_compression_card_locked_facts_only():
 
 
 # ============================================================================
-# P-14.05: Human Authority Cryptographic Verification
+# P-14.05: Adapter-Only Cryptographic Verification & Replay Protection
 # ============================================================================
 
 
 def test_trusted_authority_decision_verification_lifecycle():
-    """Verify cryptographic token verification, expiry, plan binding, and replay prevention."""
+    """Verify cryptographic token verification, expiry, and replay prevention in adapter."""
     secret_key = "test-secret-injected-for-unit-test-only!!"
-    verifier = TrustedAuthorityDecisionVerifier(verification_secret=secret_key)
+    verifier = HmacAuthorityDecisionVerifier(verification_secret=secret_key)
     plan_hash = "sha256-plan-hash-abc"
     slot_ref = "slot:lead_dba"
     now = _utc_now()
@@ -290,18 +298,19 @@ def test_trusted_authority_decision_verification_lifecycle():
     )
 
     # 2. Verify with wrong plan hash (Stale Plan Check)
-    val_stale = verifier.verify_and_consume(
-        token=token,
+    val_stale = verifier.verify_envelope(
+        envelope=token,
         expected_plan_hash="sha256-plan-hash-stale-diff",
         expected_slot_ref=slot_ref,
         now=now,
     )
     assert val_stale.is_valid is False
     assert val_stale.status == "STALE_PLAN_HASH"
+    assert val_stale.decision is None
 
     # 3. Verify when expired
-    val_exp = verifier.verify_and_consume(
-        token=token,
+    val_exp = verifier.verify_envelope(
+        envelope=token,
         expected_plan_hash=plan_hash,
         expected_slot_ref=slot_ref,
         now=now + timedelta(hours=2),
@@ -310,8 +319,8 @@ def test_trusted_authority_decision_verification_lifecycle():
     assert val_exp.status == "EXPIRED"
 
     # 4. Verify with wrong slot ref
-    val_wrong_slot = verifier.verify_and_consume(
-        token=token,
+    val_wrong_slot = verifier.verify_envelope(
+        envelope=token,
         expected_plan_hash=plan_hash,
         expected_slot_ref="slot:other_dba",
         now=now + timedelta(minutes=1),
@@ -320,8 +329,8 @@ def test_trusted_authority_decision_verification_lifecycle():
     assert val_wrong_slot.status == "SLOT_MISMATCH"
 
     # 5. Verify with wrong scope
-    val_wrong_scope = verifier.verify_and_consume(
-        token=token,
+    val_wrong_scope = verifier.verify_envelope(
+        envelope=token,
         expected_plan_hash=plan_hash,
         expected_slot_ref=slot_ref,
         expected_scope="Target: Staging. Change: chg-123",
@@ -330,9 +339,9 @@ def test_trusted_authority_decision_verification_lifecycle():
     assert val_wrong_scope.is_valid is False
     assert val_wrong_scope.status == "SCOPE_MISMATCH"
 
-    # 6. Successful Verification and Single-Use Consumption
-    val_ok = verifier.verify_and_consume(
-        token=token,
+    # 6. Successful Verification and Materialization of VerifiedAuthorityDecision
+    val_ok = verifier.verify_envelope(
+        envelope=token,
         expected_plan_hash=plan_hash,
         expected_slot_ref=slot_ref,
         expected_scope="Target: Production",
@@ -340,10 +349,14 @@ def test_trusted_authority_decision_verification_lifecycle():
     )
     assert val_ok.is_valid is True
     assert val_ok.status == "VALID"
+    assert val_ok.decision is not None
+    assert val_ok.decision.approver_id == "alice@lead-dba.org"
+    assert val_ok.decision.plan_hash == plan_hash
+    assert val_ok.decision.authority_slot_ref == slot_ref
 
-    # 7. Replay attempt fails closed (Single-use consumption)
-    val_replay = verifier.verify_and_consume(
-        token=token,
+    # 7. Replay attempt fails closed (Single-use envelope consumption)
+    val_replay = verifier.verify_envelope(
+        envelope=token,
         expected_plan_hash=plan_hash,
         expected_slot_ref=slot_ref,
         expected_scope="Target: Production",
@@ -354,19 +367,24 @@ def test_trusted_authority_decision_verification_lifecycle():
 
 
 def test_policy_guardian_gate_with_injected_authority_verifier():
-    """Verify PolicyGuardianGate uses injected verifier without hardcoded secrets."""
+    """Verify PolicyGuardianGate uses injected verifier and accepts explicit safe facts."""
     secret = "injected-test-secret-key-48chars-for-testing!!"
-    verifier = TrustedAuthorityDecisionVerifier(verification_secret=secret)
+    verifier = HmacAuthorityDecisionVerifier(verification_secret=secret)
     gate = PolicyGuardianGate(authority_verifier=verifier)
     plan_hash = "plan-pay-01"
 
-    # 1. Fully reversible with verified evidence -> AUTO_EXECUTE
+    # 1. Fully reversible with verified evidence and explicit safe facts -> AUTO_EXECUTE
     eval_auto = gate.evaluate_change_sql(
         change_id="chg-auto",
         sql_up="ALTER TABLE users ADD COLUMN phone TEXT;",
         sql_down="ALTER TABLE users DROP COLUMN phone;",
         blast_radius=0.1,
+        privilege_level=PrivilegeLevel.STANDARD_WRITE,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
         evidence_digests=("a" * 64,),
+        rehearsal_status=RehearsalStatus.NOT_REQUIRED,
     )
     assert eval_auto.autonomy_class == AutonomyClass.AUTO_EXECUTE
     assert eval_auto.is_authorized is True
@@ -377,6 +395,10 @@ def test_policy_guardian_gate_with_injected_authority_verifier():
         sql_up="ALTER TABLE payments ADD COLUMN fee INT;",
         sql_down="ALTER TABLE payments DROP COLUMN fee;",
         blast_radius=0.95,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
         plan_hash=plan_hash,
         approval_token=None,
         evidence_digests=("b" * 64,),
@@ -384,7 +406,6 @@ def test_policy_guardian_gate_with_injected_authority_verifier():
     assert eval_human_no_tok.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
     assert eval_human_no_tok.is_authorized is False
     assert eval_human_no_tok.compression_card is not None
-    # Verify card contains bounded future expiry in remaining decision summary
     assert "Expires At:" in eval_human_no_tok.compression_card.remaining_decision_summary
 
     # 3. High blast radius with valid signed token matching exact scope -> AUTHORIZED
@@ -400,6 +421,10 @@ def test_policy_guardian_gate_with_injected_authority_verifier():
         sql_up="ALTER TABLE payments ADD COLUMN fee INT;",
         sql_down="ALTER TABLE payments DROP COLUMN fee;",
         blast_radius=0.95,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
         plan_hash=plan_hash,
         approval_token=token,
         evidence_digests=("b" * 64,),
@@ -409,15 +434,394 @@ def test_policy_guardian_gate_with_injected_authority_verifier():
 
 
 # ============================================================================
+# P-14.05: Reusable Verified Authority & Supersession Semantics Matrix (7 tests)
+# ============================================================================
+
+
+def test_reusable_authority_same_binding_prevents_repeated_prompt():
+    """1. Same valid authority reused across operations without another human prompt."""
+    store = InMemoryVerifiedAuthorityStore()
+    gate = PolicyGuardianGate(authority_store=store)
+    plan_hash = "plan-migration-v1"
+    slot_ref = "slot:lead_dba"
+    scope = "Target: Production. Change: chg-batch-01"
+    now = _utc_now()
+
+    # Pre-populate store with verified decision
+    decision = VerifiedAuthorityDecision(
+        decision_id="auth-dec-001",
+        envelope_id="tok-env-001",
+        approver_id="alice@lead-dba.org",
+        authority_slot_ref=slot_ref,
+        plan_hash=plan_hash,
+        action_scope=scope,
+        issued_at=now,
+        expires_at=now + timedelta(hours=2),
+    )
+    store.store_decision(decision)
+
+    # First evaluation reuses prior authority without generating compression card
+    res1 = gate.evaluate_change_sql(
+        change_id="chg-batch-01",
+        sql_up="ALTER TABLE orders DROP COLUMN temp_col;",
+        sql_down="ALTER TABLE orders ADD COLUMN temp_col INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("1" * 64,),
+        plan_hash=plan_hash,
+        now=now,
+    )
+    assert res1.is_authorized is True
+    assert res1.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+    assert res1.compression_card is None
+    assert "reused without re-prompt" in res1.decision_summary
+
+    # Second evaluation in same plan/scope/slot also passes autonomously without prompt
+    res2 = gate.evaluate_change_sql(
+        change_id="chg-batch-01",
+        sql_up="ALTER TABLE orders DROP COLUMN temp_col;",
+        sql_down="ALTER TABLE orders ADD COLUMN temp_col INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("1" * 64,),
+        plan_hash=plan_hash,
+        now=now + timedelta(minutes=5),
+    )
+    assert res2.is_authorized is True
+    assert res2.compression_card is None
+
+
+def test_reusable_authority_changed_plan_invalidates_reuse():
+    """2. Changed plan invalidates reuse and requires new decision."""
+    gate = PolicyGuardianGate()
+    now = _utc_now()
+    decision = VerifiedAuthorityDecision(
+        decision_id="auth-dec-002",
+        envelope_id="tok-env-002",
+        approver_id="alice@lead-dba.org",
+        authority_slot_ref="slot:lead_dba",
+        plan_hash="plan-original-hash",
+        action_scope="Target: Production. Change: chg-002",
+        issued_at=now,
+        expires_at=now + timedelta(hours=1),
+    )
+
+    # Attempt to use authority decision with a DIFFERENT plan hash
+    res = gate.evaluate_change_sql(
+        change_id="chg-002",
+        sql_up="ALTER TABLE accounts DROP COLUMN balance_old;",
+        sql_down="ALTER TABLE accounts ADD COLUMN balance_old INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("2" * 64,),
+        plan_hash="plan-mutated-hash",
+        verified_authority=decision,
+        now=now,
+    )
+    assert res.is_authorized is False
+    assert res.autonomy_class == AutonomyClass.BLOCKED
+    assert "different plan hash" in res.decision_summary
+
+
+def test_reusable_authority_changed_scope_invalidates_reuse():
+    """3. Changed action scope invalidates reuse."""
+    gate = PolicyGuardianGate()
+    now = _utc_now()
+    decision = VerifiedAuthorityDecision(
+        decision_id="auth-dec-003",
+        envelope_id="tok-env-003",
+        approver_id="alice@lead-dba.org",
+        authority_slot_ref="slot:lead_dba",
+        plan_hash="plan-scope-v1",
+        action_scope="Target: Production. Change: chg-table-A",
+        issued_at=now,
+        expires_at=now + timedelta(hours=1),
+    )
+
+    # Evaluate for change "chg-table-B" with authority scoped for "chg-table-A"
+    res = gate.evaluate_change_sql(
+        change_id="chg-table-B",
+        sql_up="ALTER TABLE b DROP COLUMN x;",
+        sql_down="ALTER TABLE b ADD COLUMN x INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("3" * 64,),
+        plan_hash="plan-scope-v1",
+        verified_authority=decision,
+        now=now,
+    )
+    assert res.is_authorized is False
+    assert res.autonomy_class == AutonomyClass.BLOCKED
+    assert "Action scope mismatch" in res.decision_summary
+
+
+def test_reusable_authority_changed_slot_invalidates_reuse():
+    """4. Changed authority slot invalidates reuse."""
+    now = _utc_now()
+    decision = VerifiedAuthorityDecision(
+        decision_id="auth-dec-004",
+        envelope_id="tok-env-004",
+        approver_id="sec-officer@enterprise.org",
+        authority_slot_ref="slot:security_officer",
+        plan_hash="plan-slot-v1",
+        action_scope="Target: Production. Change: chg-004",
+        issued_at=now,
+        expires_at=now + timedelta(hours=1),
+    )
+    # Expected slot is slot:lead_dba
+    assert (
+        decision.is_active_for(
+            plan_hash="plan-slot-v1",
+            authority_slot_ref="slot:lead_dba",
+            action_scope="Target: Production. Change: chg-004",
+            now=now,
+        )
+        is False
+    )
+
+
+def test_reusable_authority_expiry_invalidates_reuse():
+    """5. Expired authority invalidates reuse."""
+    gate = PolicyGuardianGate()
+    now = _utc_now()
+    decision = VerifiedAuthorityDecision(
+        decision_id="auth-dec-005",
+        envelope_id="tok-env-005",
+        approver_id="alice@lead-dba.org",
+        authority_slot_ref="slot:lead_dba",
+        plan_hash="plan-exp-v1",
+        action_scope="Target: Production. Change: chg-005",
+        issued_at=now - timedelta(hours=2),
+        expires_at=now - timedelta(minutes=1),
+    )
+
+    res = gate.evaluate_change_sql(
+        change_id="chg-005",
+        sql_up="ALTER TABLE c DROP COLUMN y;",
+        sql_down="ALTER TABLE c ADD COLUMN y INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("5" * 64,),
+        plan_hash="plan-exp-v1",
+        verified_authority=decision,
+        now=now,
+    )
+    assert res.is_authorized is False
+    assert res.autonomy_class == AutonomyClass.BLOCKED
+    assert "expired" in res.decision_summary.lower()
+
+
+def test_reusable_authority_superseded_or_revoked_invalidates_reuse():
+    """6. Superseded or revoked authority invalidates reuse."""
+    store = InMemoryVerifiedAuthorityStore()
+    gate = PolicyGuardianGate(authority_store=store)
+    now = _utc_now()
+    plan_hash = "plan-revoke-v1"
+    scope = "Target: Production. Change: chg-006"
+
+    decision = VerifiedAuthorityDecision(
+        decision_id="auth-dec-006",
+        envelope_id="tok-env-006",
+        approver_id="alice@lead-dba.org",
+        authority_slot_ref="slot:lead_dba",
+        plan_hash=plan_hash,
+        action_scope=scope,
+        issued_at=now,
+        expires_at=now + timedelta(hours=1),
+    )
+    store.store_decision(decision)
+
+    # Revoke decision
+    assert store.revoke_decision("auth-dec-006") is True
+    revoked = store.get_decision("auth-dec-006")
+    assert revoked is not None and revoked.is_revoked is True
+
+    # Evaluation fails closed
+    res = gate.evaluate_change_sql(
+        change_id="chg-006",
+        sql_up="ALTER TABLE c DROP COLUMN z;",
+        sql_down="ALTER TABLE c ADD COLUMN z INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("6" * 64,),
+        plan_hash=plan_hash,
+        verified_authority=revoked,
+        now=now,
+    )
+    assert res.is_authorized is False
+    assert res.autonomy_class == AutonomyClass.BLOCKED
+    assert "revoked" in res.decision_summary.lower()
+
+    # Superseded decision also fails closed
+    decision_sup = decision.model_copy(
+        update={"is_revoked": False, "superseded_by": "auth-dec-007"}
+    )
+    res_sup = gate.evaluate_change_sql(
+        change_id="chg-006",
+        sql_up="ALTER TABLE c DROP COLUMN z;",
+        sql_down="ALTER TABLE c ADD COLUMN z INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("6" * 64,),
+        plan_hash=plan_hash,
+        verified_authority=decision_sup,
+        now=now,
+    )
+    assert res_sup.is_authorized is False
+    assert res_sup.autonomy_class == AutonomyClass.BLOCKED
+    assert "superseded" in res_sup.decision_summary.lower()
+
+
+def test_unverified_entity_cannot_become_verified_authority_decision():
+    """7. Automated agents cannot self-authorize or create VerifiedAuthorityDecision."""
+    now = _utc_now()
+    forbidden_approvers = [
+        "release_steward",
+        "release-steward",
+        "release_steward@enterprise.internal",
+        "gemini",
+        "gemini_semantic_judgment",
+        "system",
+        "orchestrator",
+        "auto",
+    ]
+    for bad_approver in forbidden_approvers:
+        with pytest.raises(ValidationError, match="violates authority separation"):
+            VerifiedAuthorityDecision(
+                decision_id="auth-dec-bad",
+                envelope_id="tok-env-bad",
+                approver_id=bad_approver,
+                authority_slot_ref="slot:lead_dba",
+                plan_hash="plan-h1",
+                action_scope="Target: Production",
+                issued_at=now,
+                expires_at=now + timedelta(hours=1),
+            )
+
+
+# ============================================================================
+# Adversarial & Static Architecture Invariants
+# ============================================================================
+
+
+def test_static_credential_boundary_core_has_no_secrets():
+    """Static test proving core gate classes and modules do not hold secret parameters/fields."""
+    # Check SignedAuthorityEnvelope
+    envelope_fields = SignedAuthorityEnvelope.model_fields.keys()
+    assert "secret" not in envelope_fields
+    assert "verification_secret" not in envelope_fields
+    assert "secret_key" not in envelope_fields
+
+    # Check VerifiedAuthorityDecision
+    decision_fields = VerifiedAuthorityDecision.model_fields.keys()
+    assert "secret" not in decision_fields
+    assert "verification_secret" not in decision_fields
+    assert "secret_key" not in decision_fields
+
+    # Check PolicyGuardianGate constructor params
+    gate_init_params = inspect.signature(PolicyGuardianGate.__init__).parameters
+    assert "secret" not in gate_init_params
+    assert "verification_secret" not in gate_init_params
+    assert "secret_key" not in gate_init_params
+
+
+def test_plan_hash_binding_invariants():
+    """Prove missing plan hash, placeholder plan hash, or mismatched plan hash cannot authorize."""
+    secret = "secret-key-32-chars-test-only!!"
+    verifier = HmacAuthorityDecisionVerifier(verification_secret=secret)
+    gate = PolicyGuardianGate(authority_verifier=verifier)
+    token = TestHmacAuthoritySigner.sign_token(
+        plan_hash="plan-real-hash-123",
+        approver_id="alice@lead-dba.org",
+        authority_slot_ref="slot:lead_dba",
+        secret_key=secret,
+        action_scope="Target: Production. Change: chg-test-plan",
+    )
+
+    # 1. Authority token + missing plan identity (None / empty) -> BLOCKED
+    res_no_plan = gate.evaluate_change_sql(
+        change_id="chg-test-plan",
+        sql_up="ALTER TABLE x DROP COLUMN y;",
+        sql_down="ALTER TABLE x ADD COLUMN y INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("1" * 64,),
+        plan_hash=None,
+        approval_token=token,
+    )
+    assert res_no_plan.is_authorized is False
+    assert res_no_plan.autonomy_class == AutonomyClass.BLOCKED
+    assert "Explicit active plan hash required" in res_no_plan.decision_summary
+
+    # 2. Authority token + wrong plan identity -> BLOCKED
+    res_wrong_plan = gate.evaluate_change_sql(
+        change_id="chg-test-plan",
+        sql_up="ALTER TABLE x DROP COLUMN y;",
+        sql_down="ALTER TABLE x ADD COLUMN y INT;",
+        blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("1" * 64,),
+        plan_hash="plan-wrong-hash-456",
+        approval_token=token,
+    )
+    assert res_wrong_plan.is_authorized is False
+    assert res_wrong_plan.autonomy_class == AutonomyClass.BLOCKED
+    assert "STALE_PLAN_HASH" in res_wrong_plan.decision_summary
+
+
+def test_adversarial_evaluate_change_sql_omitted_facts_fail_closed():
+    """Adversarial invariant: omitted facts MUST NOT obtain AUTO_EXECUTE from helper defaults."""
+    gate = PolicyGuardianGate()
+
+    # Omitted facts: blast_radius, privilege, sensitivity, novelty, evidence_state
+    # Even with syntactically valid SQL and valid SHA-256 evidence digest, it MUST fail closed.
+    res_omitted = gate.evaluate_change_sql(
+        change_id="chg-adversarial-01",
+        sql_up="ALTER TABLE users ADD COLUMN phone TEXT;",
+        sql_down="ALTER TABLE users DROP COLUMN phone;",
+        evidence_digests=("a" * 64,),
+    )
+    assert res_omitted.is_authorized is False
+    assert res_omitted.autonomy_class == AutonomyClass.BLOCKED
+    assert res_omitted.autonomy_class != AutonomyClass.AUTO_EXECUTE
+
+
+# ============================================================================
 # P-14.06: Real Friction Metric Calculation
 # ============================================================================
 
 
 def test_friction_metrics_calculation_from_real_traces():
     """Verify FrictionMetricsCalculator computes metric artifact from actual traces."""
-
     secret = "test-secret-key-32-chars-long!!"
-    verifier = TrustedAuthorityDecisionVerifier(verification_secret=secret)
+    verifier = HmacAuthorityDecisionVerifier(verification_secret=secret)
     gate = PolicyGuardianGate(authority_verifier=verifier)
 
     eval1 = gate.evaluate_change_sql(
@@ -425,28 +829,49 @@ def test_friction_metrics_calculation_from_real_traces():
         "ALTER TABLE a ADD COLUMN x INT;",
         "ALTER TABLE a DROP COLUMN x;",
         blast_radius=0.1,
+        privilege_level=PrivilegeLevel.STANDARD_WRITE,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
         evidence_digests=("1" * 64,),
+        rehearsal_status=RehearsalStatus.NOT_REQUIRED,
     )
     eval2 = gate.evaluate_change_sql(
         "c2",
         "ALTER TABLE b ADD COLUMN y INT;",
         "ALTER TABLE b DROP COLUMN y;",
         blast_radius=0.1,
+        privilege_level=PrivilegeLevel.STANDARD_WRITE,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
         evidence_digests=("2" * 64,),
+        rehearsal_status=RehearsalStatus.NOT_REQUIRED,
     )
     eval3 = gate.evaluate_change_sql(
         "c3",
         "CREATE VIEW v AS SELECT 1;",
         None,
         blast_radius=0.2,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
         evidence_digests=("3" * 64,),
+        rehearsal_status=RehearsalStatus.REHEARSAL_PASSED,
+        rehearsal_digests=("3" * 64,),
     )
     eval4 = gate.evaluate_change_sql(
         "c4",
         "DROP TABLE c;",
         None,
         blast_radius=0.5,
+        privilege_level=PrivilegeLevel.DDL_ADMIN,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
         evidence_digests=("4" * 64,),
+        rehearsal_status=RehearsalStatus.NOT_REQUIRED,
     )
 
     token = TestHmacAuthoritySigner.sign_token(
@@ -457,9 +882,14 @@ def test_friction_metrics_calculation_from_real_traces():
         "ALTER TABLE d DROP COLUMN z;",
         "ALTER TABLE d ADD COLUMN z INT;",
         blast_radius=0.9,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
         plan_hash="plan-h5",
         approval_token=token,
         evidence_digests=("5" * 64,),
+        rehearsal_status=RehearsalStatus.NOT_REQUIRED,
     )
 
     traces = [eval1, eval2, eval3, eval4, eval5]

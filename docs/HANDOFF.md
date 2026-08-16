@@ -86,19 +86,19 @@
 P-15 (PENDING / NEXT)
 
 **Next Exact Task:**
-P-15.01 — Define read-only Impact Scout tool contracts/output schema
+P-15.00 — Impact Scout donor preflight
 
 ## Current P-14 State (Phase Complete — Five-Phase Batch P-10 → P-14 Complete)
 
 Phase P-14 is `DONE`.
 - **P-14.00:** Reversibility Gate donor preflight verified `CCT-GATE-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `QW-REV-001` (pinned at `a43b3411856f41a4be9424d11c01a5e637cdc410`).
 - **P-14.01:** Implemented `ReversibilityClass` (4-class model: `FULLY_REVERSIBLE_AUTOMATED`, `REVERSIBLE_WITH_COMPENSATION`, `HUMAN_INTERVENTION_REQUIRED`, `IRREVERSIBLE_DESTRUCTIVE`), `ReversibilityAssessment`, and `ReversibilityClassifier` in `src/gate/reversibility.py`. Enforces fail-closed defaults across all `DeterministicPolicyInputs`.
-- **P-14.02:** Implemented `PolicyGuardianGate` and `PolicyGateEvaluationResult` in `src/gate/policy_guardian_gate.py` mapping reversibility classes to machine-evaluable `AutonomyClass` decisions with fail-closed non-empty evidence digest requirements.
+- **P-14.02:** Implemented `PolicyGuardianGate` and `PolicyGateEvaluationResult` in `src/gate/policy_guardian_gate.py` mapping reversibility classes to machine-evaluable `AutonomyClass` decisions with fail-closed non-empty evidence digest requirements and fail-closed `evaluate_change_sql` entry point.
 - **P-14.03:** Mapped full taxonomy of demo actions to justified autonomy levels without fallback defaults.
 - **P-14.04:** Implemented `ApprovalCompressionEngine` in `src/gate/compression.py` generating 1-screen compressed decision cards strictly from supplied locked facts.
-- **P-14.05:** Implemented `ApprovalTokenManager` and `SignedApprovalToken` in `src/gate/token.py` providing cryptographic HMAC-SHA256 tokens with plan-hash binding, signature verification, expiry, and single-use idempotency.
+- **P-14.05:** Implemented credential-free `SignedAuthorityEnvelope`, `VerifiedAuthorityDecision`, and `InMemoryVerifiedAuthorityStore` in `src/gate/token.py`, and adapter-owned `HmacAuthorityDecisionVerifier` in `integrations/authority/hmac_adapter.py`. Enforces HMAC-SHA256 signatures, single-use envelope replay prevention, exact active plan hash binding (zero placeholder hashes), and reusable verified authority decisions across unchanged bindings.
 - **P-14.06:** Measured friction reduction: `FrictionMetricsCalculator` in `src/gate/friction_metrics.py` generates immutable `FrictionMetricsArtifact` computing total decisions, autonomous executions (`AUTO_EXECUTE`), rehearsal-gated executions (`REHEARSE_THEN_EXECUTE`), human authority decisions (`HUMAN_AUTHORITY_REQUIRED`), blocked actions (`BLOCKED`), and avoided repeated prompts, reporting exact fleet autonomy ratio without ungrounded claims.
-- **Evidence:** `tests/test_p14_reversibility_gate.py` passes 9 dedicated tests (including adversarial fail-closed invariants and complete 7-dimension policy matrix). Full canonical unit suite passes 1165 tests (1 warning). Zero domain contract mutations or provider SDK leaks. All five phases (P-10, P-11, P-12, P-13, P-14) are fully implemented and verified.
+- **Evidence:** `tests/test_p14_reversibility_gate.py` passes 19 dedicated tests (including adversarial fail-closed invariants, static credential boundaries, plan hash binding, and complete 7-case reusable authority matrix). Full canonical unit suite passes 1175 tests (1 warning). Zero domain contract mutations or provider SDK leaks. All five phases (P-10, P-11, P-12, P-13, P-14) are fully implemented and verified.
 
 - **P-13.00:** ShadowLab donor preflight verified `CCT-SHADOW-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `MCP-TOOL-001` (pinned at `99824e867b7e3e7f41ba8a011ea3bfdc7863fb79`).
 - **P-13.01:** Defined `ShadowScenario`, `InjectedFault`, `FaultType`, `RehearsalOutcome`, and 7 canonical rehearsal scenarios in `src/shadowlab/scenarios.py`.

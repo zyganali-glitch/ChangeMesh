@@ -147,7 +147,7 @@ class ReversibilityClassifier:
         change_id: str,
         sql_up: str,
         sql_down: Optional[str] = None,
-        blast_radius_score: float = 0.1,
+        blast_radius_score: float = 1.0,
     ) -> ReversibilityAssessment:
         """Classify a SQL migration script."""
         up_lower = sql_up.lower()

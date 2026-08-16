@@ -31,8 +31,10 @@ from src.gate.reversibility import (
     ReversibilityClassifier,
 )
 from src.gate.token import (
-    SignedApprovalToken,
-    TrustedAuthorityDecisionVerifier,
+    AuthorityDecisionVerifier,
+    InMemoryVerifiedAuthorityStore,
+    SignedAuthorityEnvelope,
+    VerifiedAuthorityDecision,
 )
 
 CANONICAL_SCHEMA_VERSION = "1.0.0"
@@ -57,15 +59,19 @@ class PolicyGuardianGate:
     """The central Policy Guardian reversibility and authorization gate."""
 
     def __init__(
-        self, authority_verifier: Optional[TrustedAuthorityDecisionVerifier] = None
+        self,
+        authority_verifier: Optional[AuthorityDecisionVerifier] = None,
+        authority_store: Optional[InMemoryVerifiedAuthorityStore] = None,
     ) -> None:
         self._authority_verifier = authority_verifier
+        self._authority_store = authority_store
 
     def evaluate_inputs(
         self,
         inputs: DeterministicPolicyInputs,
-        plan_hash: str = "plan-hash-1",
-        approval_token: Optional[SignedApprovalToken] = None,
+        plan_hash: Optional[str] = None,
+        approval_token: Optional[SignedAuthorityEnvelope] = None,
+        verified_authority: Optional[VerifiedAuthorityDecision] = None,
         assessment: Optional[ReversibilityAssessment] = None,
         now: Optional[datetime] = None,
     ) -> PolicyGateEvaluationResult:
@@ -178,72 +184,113 @@ class PolicyGuardianGate:
         )
 
         expected_scope = f"Target: Production. Change: {inputs.change_id}"
+        expected_slot = "slot:lead_dba"
 
         if is_human_required:
-            if approval_token is None:
-                # Generate compressed decision card from verified locked facts (zero fake digests)
-                blast_stmt = (
-                    f"Blast radius estimated at {inputs.blast_radius_score:.2f} "
-                    f"({inputs.blast_radius_reason})"
-                )
-                completed_facts: tuple[LockedFact, ...] = ()
-                if inputs.evidence_digests:
-                    completed_facts = (
-                        LockedFact(
-                            fact_id=f"fact-blast-{inputs.change_id}",
-                            source_agent="impact_scout",
-                            category="BLAST_RADIUS",
-                            statement=blast_stmt,
-                            evidence_digest=inputs.evidence_digests[0],
-                            is_verified=True,
+            # Case A: Explicit VerifiedAuthorityDecision passed
+            if verified_authority is not None:
+                if not plan_hash or not plan_hash.strip():
+                    return PolicyGateEvaluationResult(
+                        change_id=inputs.change_id,
+                        autonomy_class=AutonomyClass.BLOCKED,
+                        is_authorized=False,
+                        reversibility_assessment=assessment,
+                        audit_trace_id=trace_id,
+                        decision_summary=(
+                            "BLOCKED: Explicit active plan hash required for authority evaluation"
                         ),
                     )
-
-                rehearsed_facts: tuple[LockedFact, ...] = ()
-                if (
-                    inputs.rehearsal_status == RehearsalStatus.REHEARSAL_PASSED
-                    and inputs.rehearsal_digests
-                ):
-                    rehearsed_facts = (
-                        LockedFact(
-                            fact_id=f"fact-rehearse-{inputs.change_id}",
-                            source_agent="shadowlab",
-                            category="REHEARSAL",
-                            statement=f"Rehearsal status: {inputs.rehearsal_status.value}",
-                            evidence_digest=inputs.rehearsal_digests[0],
-                            is_verified=True,
-                        ),
-                    )
-
-                bundle = LockedFactBundle(
-                    change_request_id=inputs.change_id,
-                    completed_facts=completed_facts,
-                    rehearsed_facts=rehearsed_facts,
-                    reversibility_assessment=assessment,
-                    authority_slot_ref="slot:lead_dba",
-                    decision_question=f"Authorize live execution of change {inputs.change_id}?",
-                    decision_options=("APPROVE_EXECUTION", "REJECT_AND_REQUEST_REVISION"),
+                if not verified_authority.is_active_for(
+                    plan_hash=plan_hash,
+                    authority_slot_ref=expected_slot,
                     action_scope=expected_scope,
-                    risk_summary=(
-                        f"High blast radius ({inputs.blast_radius_score:.2f}), "
-                        f"elevated privilege ({inputs.privilege_level.value}), "
-                        f"or sensitivity ({inputs.data_classification.value})"
-                    ),
-                    consequence_summary="Live execution will mutate production database state.",
-                    expires_at=now + timedelta(minutes=30),
-                    evidence_refs=inputs.rehearsal_digests + inputs.evidence_digests,
-                )
-                card = ApprovalCompressionEngine.generate_card(bundle, now=now)
+                    now=now,
+                ):
+                    if verified_authority.is_revoked:
+                        reason = "Authority decision has been revoked"
+                    elif verified_authority.superseded_by is not None:
+                        reason = (
+                            f"Authority decision has been superseded by "
+                            f"{verified_authority.superseded_by}"
+                        )
+                    elif verified_authority.expires_at <= now:
+                        reason = (
+                            f"Authority decision expired at "
+                            f"{verified_authority.expires_at.isoformat()}"
+                        )
+                    elif verified_authority.plan_hash != plan_hash:
+                        reason = (
+                            f"Authority decision bound to different plan hash "
+                            f"{verified_authority.plan_hash!r} != {plan_hash!r}"
+                        )
+                    elif verified_authority.authority_slot_ref != expected_slot:
+                        reason = (
+                            f"Authority slot mismatch: "
+                            f"{verified_authority.authority_slot_ref!r} != {expected_slot!r}"
+                        )
+                    elif verified_authority.action_scope != expected_scope:
+                        reason = (
+                            f"Action scope mismatch: "
+                            f"{verified_authority.action_scope!r} != {expected_scope!r}"
+                        )
+                    else:
+                        reason = "Authority decision inactive"
+                    return PolicyGateEvaluationResult(
+                        change_id=inputs.change_id,
+                        autonomy_class=AutonomyClass.BLOCKED,
+                        is_authorized=False,
+                        reversibility_assessment=assessment,
+                        audit_trace_id=trace_id,
+                        decision_summary=f"DENIED: {reason}",
+                    )
                 return PolicyGateEvaluationResult(
                     change_id=inputs.change_id,
                     autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
-                    is_authorized=False,
+                    is_authorized=True,
                     reversibility_assessment=assessment,
-                    compression_card=card,
                     audit_trace_id=trace_id,
-                    decision_summary="HUMAN_AUTHORITY_REQUIRED: External authority needed",
+                    decision_summary=(
+                        f"AUTHORIZED: Valid prior verified authority "
+                        f"{verified_authority.decision_id} by "
+                        f"{verified_authority.approver_id} (reused without re-prompt)"
+                    ),
                 )
-            else:
+
+            # Case B: Check authority store for active prior decision
+            if self._authority_store is not None and plan_hash and plan_hash.strip():
+                stored_dec = self._authority_store.find_active_authority(
+                    plan_hash=plan_hash,
+                    authority_slot_ref=expected_slot,
+                    action_scope=expected_scope,
+                    now=now,
+                )
+                if stored_dec is not None:
+                    return PolicyGateEvaluationResult(
+                        change_id=inputs.change_id,
+                        autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
+                        is_authorized=True,
+                        reversibility_assessment=assessment,
+                        audit_trace_id=trace_id,
+                        decision_summary=(
+                            f"AUTHORIZED: Valid prior verified authority {stored_dec.decision_id} "
+                            f"by {stored_dec.approver_id} (reused without re-prompt)"
+                        ),
+                    )
+
+            # Case C: Verification via SignedAuthorityEnvelope
+            if approval_token is not None:
+                if not plan_hash or not plan_hash.strip():
+                    return PolicyGateEvaluationResult(
+                        change_id=inputs.change_id,
+                        autonomy_class=AutonomyClass.BLOCKED,
+                        is_authorized=False,
+                        reversibility_assessment=assessment,
+                        audit_trace_id=trace_id,
+                        decision_summary=(
+                            "BLOCKED: Explicit active plan hash required for authority "
+                            "token verification"
+                        ),
+                    )
                 if self._authority_verifier is None:
                     return PolicyGateEvaluationResult(
                         change_id=inputs.change_id,
@@ -253,14 +300,16 @@ class PolicyGuardianGate:
                         audit_trace_id=trace_id,
                         decision_summary="BLOCKED: No authority verifier configured",
                     )
-                val = self._authority_verifier.verify_and_consume(
-                    token=approval_token,
+                val = self._authority_verifier.verify_envelope(
+                    envelope=approval_token,
                     expected_plan_hash=plan_hash,
-                    expected_slot_ref="slot:lead_dba",
+                    expected_slot_ref=expected_slot,
                     expected_scope=expected_scope,
                     now=now,
                 )
-                if val.is_valid:
+                if val.is_valid and val.decision is not None:
+                    if self._authority_store is not None:
+                        self._authority_store.store_decision(val.decision)
                     return PolicyGateEvaluationResult(
                         change_id=inputs.change_id,
                         autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
@@ -269,7 +318,7 @@ class PolicyGuardianGate:
                         audit_trace_id=trace_id,
                         decision_summary=(
                             f"AUTHORIZED: Valid cryptographic approval token signed by "
-                            f"{approval_token.approver_id}"
+                            f"{val.decision.approver_id}"
                         ),
                     )
                 else:
@@ -281,6 +330,69 @@ class PolicyGuardianGate:
                         audit_trace_id=trace_id,
                         decision_summary=f"DENIED: Invalid token ({val.status})",
                     )
+
+            # Case D: No token or prior decision -> Generate compressed decision card
+            blast_stmt = (
+                f"Blast radius estimated at {inputs.blast_radius_score:.2f} "
+                f"({inputs.blast_radius_reason})"
+            )
+            completed_facts: tuple[LockedFact, ...] = ()
+            if inputs.evidence_digests:
+                completed_facts = (
+                    LockedFact(
+                        fact_id=f"fact-blast-{inputs.change_id}",
+                        source_agent="impact_scout",
+                        category="BLAST_RADIUS",
+                        statement=blast_stmt,
+                        evidence_digest=inputs.evidence_digests[0],
+                        is_verified=True,
+                    ),
+                )
+
+            rehearsed_facts: tuple[LockedFact, ...] = ()
+            if (
+                inputs.rehearsal_status == RehearsalStatus.REHEARSAL_PASSED
+                and inputs.rehearsal_digests
+            ):
+                rehearsed_facts = (
+                    LockedFact(
+                        fact_id=f"fact-rehearse-{inputs.change_id}",
+                        source_agent="shadowlab",
+                        category="REHEARSAL",
+                        statement=f"Rehearsal status: {inputs.rehearsal_status.value}",
+                        evidence_digest=inputs.rehearsal_digests[0],
+                        is_verified=True,
+                    ),
+                )
+
+            bundle = LockedFactBundle(
+                change_request_id=inputs.change_id,
+                completed_facts=completed_facts,
+                rehearsed_facts=rehearsed_facts,
+                reversibility_assessment=assessment,
+                authority_slot_ref=expected_slot,
+                decision_question=f"Authorize live execution of change {inputs.change_id}?",
+                decision_options=("APPROVE_EXECUTION", "REJECT_AND_REQUEST_REVISION"),
+                action_scope=expected_scope,
+                risk_summary=(
+                    f"High blast radius ({inputs.blast_radius_score:.2f}), "
+                    f"elevated privilege ({inputs.privilege_level.value}), "
+                    f"or sensitivity ({inputs.data_classification.value})"
+                ),
+                consequence_summary="Live execution will mutate production database state.",
+                expires_at=now + timedelta(minutes=30),
+                evidence_refs=inputs.rehearsal_digests + inputs.evidence_digests,
+            )
+            card = ApprovalCompressionEngine.generate_card(bundle, now=now)
+            return PolicyGateEvaluationResult(
+                change_id=inputs.change_id,
+                autonomy_class=AutonomyClass.HUMAN_AUTHORITY_REQUIRED,
+                is_authorized=False,
+                reversibility_assessment=assessment,
+                compression_card=card,
+                audit_trace_id=trace_id,
+                decision_summary="HUMAN_AUTHORITY_REQUIRED: External authority needed",
+            )
 
         # 3. Rehearsal Requirement Triggers:
         # - Multi-Phase / Compensation
@@ -356,7 +468,7 @@ class PolicyGuardianGate:
                 decision_summary="AUTO_EXECUTE: Fully reversible with automated rollback",
             )
 
-        # 6. Moderate Routine / Extension -> AUTO_EXECUTE_AND_NOTIFY
+        # 5. Moderate Routine / Extension -> AUTO_EXECUTE_AND_NOTIFY
         return PolicyGateEvaluationResult(
             change_id=inputs.change_id,
             autonomy_class=AutonomyClass.AUTO_EXECUTE_AND_NOTIFY,
@@ -371,18 +483,20 @@ class PolicyGuardianGate:
         change_id: str,
         sql_up: str,
         sql_down: Optional[str] = None,
-        blast_radius: float = 0.1,
-        plan_hash: str = "plan-hash-1",
-        approval_token: Optional[SignedApprovalToken] = None,
-        data_classification: DataClassLevel = DataClassLevel.INTERNAL,
-        privilege_level: PrivilegeLevel = PrivilegeLevel.SCHEMA_MODIFY,
-        novelty_tier: NoveltyTier = NoveltyTier.ROUTINE_KNOWN,
-        evidence_state: EvidenceState = EvidenceState.PASS,
+        blast_radius: float = 1.0,
+        plan_hash: Optional[str] = None,
+        approval_token: Optional[SignedAuthorityEnvelope] = None,
+        verified_authority: Optional[VerifiedAuthorityDecision] = None,
+        data_classification: DataClassLevel = DataClassLevel.RESTRICTED,
+        privilege_level: PrivilegeLevel = PrivilegeLevel.DDL_ADMIN,
+        novelty_tier: NoveltyTier = NoveltyTier.ANOMALOUS,
+        evidence_state: EvidenceState = EvidenceState.NOT_RUN,
         evidence_digests: Tuple[str, ...] = (),
-        rehearsal_status: RehearsalStatus = RehearsalStatus.NOT_REQUIRED,
+        rehearsal_status: RehearsalStatus = RehearsalStatus.REHEARSAL_NOT_RUN,
         rehearsal_digests: Tuple[str, ...] = (),
+        now: Optional[datetime] = None,
     ) -> PolicyGateEvaluationResult:
-        """Convenience method to evaluate a SQL migration change."""
+        """Convenience method to evaluate a SQL migration change with fail-closed defaults."""
         assessment = ReversibilityClassifier.classify_sql(
             change_id=change_id,
             sql_up=sql_up,
@@ -407,5 +521,7 @@ class PolicyGuardianGate:
             inputs=inputs,
             plan_hash=plan_hash,
             approval_token=approval_token,
+            verified_authority=verified_authority,
             assessment=assessment,
+            now=now,
         )
