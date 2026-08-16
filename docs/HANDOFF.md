@@ -40,7 +40,7 @@ P-08.04
 P-08.05
 
 **Active Phase:**
-P-08
+P-09
 
 **Next Exact Task:**
 P-09.01 — Create topic/subscription topology for change, agent work, approvals, evidence, retries, dead letters
