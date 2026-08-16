@@ -2,7 +2,8 @@
 
 > **Scope:** P-10.00 Saga Persistence Donor Preflight Closure (D-UIPATH, D-CONTEXTSEAL, Saga Source-Target Map, 6-Layer Idempotency Separation, Future-Phase Non-Leakage)
 > **Date:** 2026-08-16
-> **Entry Remote SHA:** `ea847038c46acd6bbc2838729b968188bb852404`
+> **Evidence-Parity Repair Entry Remote SHA:** `8e56b7e68fc0d1f9897b6e0aca0be692dc140639`
+> **Historical Initial Entry Remote SHA:** `ea847038c46acd6bbc2838729b968188bb852404`
 > **Canonical Branch:** `main`
 
 ---
@@ -11,9 +12,9 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Canonical entry remote | **PASS** | `origin/main` verified as `ea847038c46acd6bbc2838729b968188bb852404` before edits. |
+| Canonical entry remote | **PASS** | `origin/main` verified as `8e56b7e68fc0d1f9897b6e0aca0be692dc140639` before evidence-parity repair edits (original P-10.00 initial entry was `ea847038c46acd6bbc2838729b968188bb852404`). |
 | Immutable Donor Pins | **PASS** | `D-UIPATH` pinned at `dc2267939c2aef0aba2737da65f53352c5cf8fb2`; `D-CONTEXTSEAL` pinned at `0dc924db9d82037d2e813548bdee27af5f180889`. |
-| P-10.00 Preflight Report | **PASS** | [`docs/P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md`](P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md) created with 13 comprehensive sections. |
+| P-10.00 Preflight Report | **PASS** | [`docs/P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md`](P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md) verified with 13 comprehensive sections and semantic design-leakage boundaries preserved. |
 | Saga Source-Target Map | **PASS** | Retained vs transformed vs excluded behaviors defined for `UIPATH-STATE-001`, `UIPATH-AUTH-001`, `CS-MIG-001`, `CS-PASS-001`, and `CS-WRITE-001`. |
 | 6-Layer Idempotency Separation | **PASS** | Clear separation across P-09 wire headers, P-09 in-memory transport delivery state, P-09 process-local dead-letter replay state, P-10 durable workflow step reservations, P-19 external write execution, and P-20 saga orchestration. Zero competing retry owners (`execute_with_retry()` sole owner). Exact durable idempotency storage key deferred to P-10.03. |
 | Compensation vs Persistence | **PASS** | Persistence of checkpoint and rollback plans owned by P-10 in Firestore; execution of compensation owned by P-17/P-20 without prescribing execution mechanisms. |
@@ -24,7 +25,7 @@
 | P-10.01 Decisions Undecided | **PASS** | Final Firestore collection names, document hierarchy, composite indexes, tenancy key/path representation, retention durations, and size ceilings intentionally deferred to P-10.01. |
 | Excluded Donor Behaviors | **PASS** | UiPath runtime, Maestro, Action Center, Data Service, Phase-0 interview, DataHub MCP tools, and automatic merge strictly excluded. |
 | Donor-Reuse Auditor Evaluation | **PASS** | Read-only adversarial audit returned 0 blocking findings and 0 warnings. |
-| Donor Manifest Lint | **PASS** | 20 components valid in `uv run python tools/governance/donor_manifest_lint.py`. |
+| Donor Manifest Lint | **PASS** | 20 components valid in `uv run python tools/governance/donor_manifest_lint.py` (SHASUM `6fff130b9e6ff413697385f1b513947aff99a7f0709bbf54e03ae8064ad2dc08`). |
 | Canonical Unit Command | **PASS** | 1109 passed, 1 warning in `uv run python scripts/cmd.py unit`. |
 | Full Repository Suite | **FAIL** | 1109 passed, 1 warning, 3 errors from missing `project` fixture in `tests/test_gcp_access.py` (`test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`). Exact state: **FAIL — known historical baseline GCP fixture debt**. |
 | Documentation Parity | **PASS** | `docs/DONOR_REUSE_MANIFEST.md`, `docs/COMPONENT_PROVENANCE.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md` synchronized. |
@@ -34,12 +35,22 @@
 
 ## 2. Validation Commands and Exact Outcomes
 
-| Command | Result |
-|---|---|
-| `uv run python tools/governance/donor_manifest_lint.py` | **PASS** — 20 components valid (SHASUM `3c8d179426f8f533bf6fefcf2a912bb0e7195c806540c7ff92d77cb36f452097`) |
-| `uv run python scripts/cmd.py unit` | **PASS** — 1109 passed, 1 warning in 6.78s |
-| `uv run python -m pytest tests/` | **FAIL** — 1109 passed, 1 warning, 3 errors in `tests/test_gcp_access.py` (missing `project` fixture) |
-| `git diff --check` | **PASS** — zero whitespace/lint errors |
+### Fresh Evidence-Parity Verification (Current Run)
+
+| Command | Exit Code | Result | Details |
+|---|---|---|---|
+| `uv run python tools/governance/donor_manifest_lint.py` | `0` | **PASS** | 20 components valid (SHASUM `6fff130b9e6ff413697385f1b513947aff99a7f0709bbf54e03ae8064ad2dc08`) |
+| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1109 passed, 1 warning in 7.07s |
+| `uv run python -m pytest tests/` | `1` | **FAIL** | 1109 passed, 1 warning, 3 errors in 7.79s (`tests/test_gcp_access.py`: missing `project` fixture for `test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`) |
+| `git diff --check` | `0` | **PASS** | Zero whitespace or lint errors |
+
+### Historical Initial Baseline (Preserved for Audit Continuity)
+
+| Metric / Command | Historical Baseline Value | Notes |
+|---|---|---|
+| Initial Entry SHA | `ea847038c46acd6bbc2838729b968188bb852404` | Remote HEAD before P-10.00 initial work |
+| Initial Manifest Lint | 20 components valid (SHASUM `3c8d179426f8f533bf6fefcf2a912bb0e7195c806540c7ff92d77cb36f452097`) | Prior manifest hash before P-10.00 donor additions |
+| Initial Unit Timing | 1109 passed, 1 warning in 6.78s | Original timing recorded at initial P-10.00 entry |
 
 ---
 
@@ -52,7 +63,7 @@
 | 3. Implementation ↔ README | **PASS** | English and Turkish READMEs document current unit test counts (1109 passed, 1 warning), P-09 phase closure, and honest `PLANNED` / `NOT_RUN` boundaries. |
 | 4. Master Plan ↔ Repository | **PASS** | P-10.00 marked `DONE` with verified evidence; P-10.01 marked `PENDING`. |
 | 5. Claims ↔ Evidence | **PASS** | Local boundaries verified; cloud deployments honestly reported as `NOT_RUN` / `BLOCKED`. |
-| 6. Local ↔ Remote Revision | **PASS** | Entry SHA verified before edits; local working tree audited and verified. |
+| 6. Local ↔ Remote Revision | **PASS** | Entry SHA (`8e56b7e68fc0d1f9897b6e0aca0be692dc140639`) verified before edits; local working tree audited and verified. |
 | 7. English ↔ Turkish Surfaces | **PASS** | `README.md` and `README.tr.md` test counts (1109 passed, 1 warning), status, and boundaries synchronized. |
 | 8. Demo ↔ Actual Runtime | **PASS** | Demo limits labeled as internal project thresholds. |
 | 9. Devpost / Judge Claims ↔ Frozen Tag | **PASS** | `docs/JUDGING_MAP.md` updated with honest local verification states and preserved `NOT_RUN` boundaries. |
