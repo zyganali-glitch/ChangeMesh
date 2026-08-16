@@ -833,7 +833,7 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-08.03 — Implement prompt/input minimization and redaction before model calls
 
-- **Status:** `IN_PROGRESS`
+- **Status:** `DONE`
 - **Required action:** Implement prompt/input minimization and redaction before model calls.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Secrets, tokens, prohibited data classes blocked/redacted.
@@ -2761,6 +2761,7 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Evidence:** Inspected four donor components across eight exact allowlisted source/test files (CCT-EVID-001: `cli/commands/evidence.js`, `tests/test_evidence_pack.js`; CCT-SEM-001: `cli/commands/codex-review.js`, `tests/test_codex_review.js`; ZK-PRIV-001: `ai-buildweek/lib/privacy-guard.mjs`, `tests/unit/privacy-guard.test.mjs`; ZK-VALID-001: `frontend/js/config-validator.js`, `tests/unit/config-validator.test.mjs`) at immutable pinned commits (`65ee1b72faf9a7202d9166eed43fb671804815a8` for D-CCT, `d663db8c706cb914e1af5caf651df08edb5c50c0` for D-ZEROKIT). Grounded behavioral invariants strictly in observable source code and test proofs. Created `docs/P-08.00_GEMINI_BOUNDARY_DONOR_PREFLIGHT.md` with entry baseline, source behavior evidence, prompt/input boundary memo (INP-01–INP-12), output boundary memo (OUT-01–OUT-10), model/fact separation matrix, 36 unique adversarial test definitions (PRIV-01–08 [8], OUT-T01–09 [9], AUDIT-01–07 [7], AUTH-T01–05 [5], CARRY-01–07 [7]), future-phase ownership map (`DEFINED != EXECUTED`), and Section 10 structured read-only donor-reuse auditor findings (0 BLOCKED, 0 WARN, overall PASS). Clarified P-DΩ Preflight Applicability Rule in Master Plan Section 12/P-DΩ and verified via plan-challenger (PASS). Updated 4 manifest entries in `docs/DONOR_REUSE_MANIFEST.md` and validated via `python tools/governance/donor_manifest_lint.py` (20 components, exit code 0). Validated `git diff --check` (exit code 0). Executed unit tests via `uv run python scripts/cmd.py unit` (910 passed, 1 warning in 6.28s, exit code 0). Itemized P-DΩ.01–08 and complete P-Ω.12 9-surface audit completed in `docs/P-OMEGA_AUDIT_REPORT.md` while preserving historical test debt evidence. Zero product runtime code created. P-08.01 remains PENDING.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+- **Historical evidence note:** The P-08.00 evidence paragraph records the P-08.00 entry-time baseline (`910` unit tests and P-08.01 `PENDING`); subsequent P-08.01, P-08.02, and P-08.03 closures supersede those entry-time values. Current P-08.03 evidence is recorded under the active task above.
 ## P-10.00 — Saga persistence donor preflight
 
 - **Status:** `PENDING`

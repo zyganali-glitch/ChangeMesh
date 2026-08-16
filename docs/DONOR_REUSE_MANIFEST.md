@@ -454,7 +454,7 @@ last_reviewed: '2026-08-09T10:20:00Z'
 
 ```yaml
 component_id: ZK-PRIV-001
-status: IMPLEMENTED_PENDING_PARITY
+status: VERIFIED
 donor_id: D-ZEROKIT
 repository: zyganali-glitch/zerokit-ai-control-plane
 source_commit: d663db8c706cb914e1af5caf651df08edb5c50c0
@@ -479,13 +479,13 @@ required_tests:
 - unknown top-level/nested fields and mode/provenance mismatches fail before prompt materialization
 - blocked prompt/system input produces zero SDK model invocations
 - no school-SaaS data or ZeroKit semantics (forbidden carry-over)
-competition_introduction_commit: PENDING
+competition_introduction_commit: 4501c01ad4212a8ddd05024f99b5baab34b585de
 evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
 - P-08.00 Gemini boundary donor preflight PASS
-- P-08.03 dedicated privacy suite PASS; final provenance parity pending immutable introduction commit and closure audit
+- P-08.03 dedicated privacy suite PASS; P-DΩ.01–08 and P-Ω.12 final closure evidence recorded in `docs/P-OMEGA_AUDIT_REPORT.md`
 reviewer: primary agent + donor-reuse-auditor
 last_reviewed: '2026-08-16T16:00:00Z'
 ```

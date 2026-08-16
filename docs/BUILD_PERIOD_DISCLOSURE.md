@@ -23,7 +23,7 @@ All components derived from earlier repositories are declared in [`docs/DONOR_RE
 - **License / Ownership:** MIT License / Owner-authored
 - **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
 - **ChangeMesh Target Path:** `src/agents/policy_guardian.py`
-- **Competition Introduction Commit:** `PENDING` until the immutable implementation commit is created
+- **Competition Introduction Commit:** `4501c01ad4212a8ddd05024f99b5baab34b585de`
 - **Test Evidence:** `tests/test_p08_03_input_privacy.py` (PRIV-01 through PRIV-08 plus zero SDK invocation and system-instruction boundary tests)
 - **Materially New Competition Work:**
   - Python-native canonical Policy Guardian implementation with one category-only detector table and no matched secret excerpts in findings, telemetry, or exceptions.

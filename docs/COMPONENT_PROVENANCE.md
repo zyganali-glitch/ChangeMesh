@@ -31,14 +31,14 @@ ChangeMesh is a new product/repository. Design benefits from ideas in owner's ea
 - **Materially New Contribution:** Reimplemented in Python using strict Pydantic v2 domain schemas (`extra="forbid"`, `frozen=True`, `StrictStr`, `StrictInt`), 3 semantic surfaces (Goal Decomposition, Policy Explanation, Independent Semantic Audit), exact canonical `schema_version` validation, deterministic path traversal and unsafe endpoint validators, authority lane boundary (`GEMINI_SEMANTIC_JUDGMENT`), and zero default injection. Zero ZeroKit product semantics or frontend global variables carry over.
 
 ### ZK-PRIV-001 — Input Privacy and Prompt Minimization Boundary
-- **Status:** `IMPLEMENTED_PENDING_PARITY`
+- **Status:** `VERIFIED`
 - **Donor ID:** `D-ZEROKIT` (`zyganali-glitch/zerokit-ai-control-plane`)
 - **Immutable Donor SHA:** `d663db8c706cb914e1af5caf651df08edb5c50c0`
 - **Source Paths:** `ai-buildweek/lib/privacy-guard.mjs`, `tests/unit/privacy-guard.test.mjs`
 - **License State:** `VERIFIED_COMPATIBLE` (owner-authored)
 - **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
 - **ChangeMesh Target:** `src/agents/policy_guardian.py`
-- **Competition Introduction Commit:** `PENDING` until the immutable implementation commit is created
+- **Competition Introduction Commit:** `4501c01ad4212a8ddd05024f99b5baab34b585de`
 - **Test Evidence:** `tests/test_p08_03_input_privacy.py` (PRIV-01 through PRIV-08, review-deny policy, system-instruction bypass, and zero fake-SDK invocation)
 - **Materially New Contribution:** Python-native Policy Guardian ownership, one category-only detector table with no matched-content retention, strict allowlists for all three P-08.02 prompt surfaces, explicit execution-mode provenance matching, and non-bypassable integration from `BoundedGeminiClient` before SDK request construction. Secrets and real PII fail closed; review findings are also denied rather than escalated. No ZeroKit product semantics, donor fixture identities, or provider-specific runtime assumptions carry over.
 

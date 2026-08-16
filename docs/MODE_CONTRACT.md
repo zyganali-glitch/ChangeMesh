@@ -1,8 +1,8 @@
 # ChangeMesh Execution and Evidence Mode Contract
 
-> **Status:** `P-04.04 COMPLETED — PRE-IMPLEMENTATION`
+> **Status:** `P-04.04 COMPLETED; P-08.03 INPUT PROVENANCE CHECK IMPLEMENTED`
 > **Date:** 2026-08-09
-> **Implementation state:** This contract defines architecture boundaries. The schemas, adapter interfaces, and runtime logic are deferred to P-05 and later phases. No concrete implementation exists yet.
+> **Implementation state:** The provider-neutral mode/evidence schemas and this mode contract are implemented. P-08.03 additionally enforces matching `collection_mode` and `declared_mode` values before the Gemini prompt boundary. Full external adapter mode execution, receipts, and cloud integrations remain owned by later phases; this document is not proof of live execution.
 
 ## 1. Purpose and Scope
 
@@ -107,7 +107,7 @@ For the ChangeMesh four-minute demo:
 
 ## 10. Claim Honesty Test Cases
 
-*These are `PLANNED / NOT_EXECUTED` until schema validation is implemented in P-05+.*
+*These adapter-wide scenarios remain `PLANNED / NOT_EXECUTED` until their owning adapter phases implement them. P-08.03 currently executes the prompt-boundary mode-mismatch case as PRIV-04.*
 
 *   **MODE-001:** Fixture success presented as live proof. → **Expected: REJECT**
 *   **MODE-002:** Simulation success presented without SIMULATION label. → **Expected: REJECT**
@@ -151,4 +151,5 @@ For the ChangeMesh four-minute demo:
 *   [x] managed-service status not inflated.
 *   [x] credentials remain adapter-only.
 *   [x] no production auto-merge/deploy introduced.
-*   [x] product code unchanged.
+*   [x] P-08.03 prompt-boundary mode/provenance mismatch is rejected.
+*   [ ] Full external adapter mode runtime and receipt matrix (future owning phases).
