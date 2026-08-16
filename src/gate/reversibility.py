@@ -79,46 +79,49 @@ class ReversibilityAssessment(BaseModel):
 
 
 class DeterministicPolicyInputs(BaseModel):
-    """The 7 canonical deterministic policy inputs required for autonomy decisions."""
+    """The 7 canonical deterministic policy inputs required for autonomy decisions.
+
+    Fail-closed by default: omitted or unknown deterministic facts cannot authorize execution.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: str = CANONICAL_SCHEMA_VERSION
     change_id: str
 
-    # 1. Blast Radius
-    blast_radius_score: float = 0.1
-    blast_radius_source: str = "impact_scout:ast_graph"
-    blast_radius_reason: str = "Estimated from dependent symbol and endpoint count"
+    # 1. Blast Radius (fail-closed: maximum risk default)
+    blast_radius_score: float = 1.0
+    blast_radius_source: str = "unknown:unverified"
+    blast_radius_reason: str = "Unspecified blast radius assessment (fail-closed)"
 
-    # 2. Reversibility
-    reversibility_class: ReversibilityClass = ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED
-    has_down_migration: bool = True
-    rollback_summary: str = "Automated down migration available"
-    reversibility_source: str = "policy_guardian:ddl_classifier"
+    # 2. Reversibility (fail-closed: destructive without down migration)
+    reversibility_class: ReversibilityClass = ReversibilityClass.IRREVERSIBLE_DESTRUCTIVE
+    has_down_migration: bool = False
+    rollback_summary: str = "No verified down migration plan (fail-closed)"
+    reversibility_source: str = "unknown:unverified"
 
-    # 3. Privilege
-    privilege_level: PrivilegeLevel = PrivilegeLevel.SCHEMA_MODIFY
-    privilege_source: str = "iam_authorizer:role_binding"
+    # 3. Privilege (fail-closed: elevated administrative privilege)
+    privilege_level: PrivilegeLevel = PrivilegeLevel.DDL_ADMIN
+    privilege_source: str = "unknown:unverified"
 
-    # 4. Sensitivity
-    data_classification: DataClassLevel = DataClassLevel.INTERNAL
-    sensitivity_source: str = "data_governance:classification_scan"
+    # 4. Sensitivity (fail-closed: restricted data classification)
+    data_classification: DataClassLevel = DataClassLevel.RESTRICTED
+    sensitivity_source: str = "unknown:unverified"
 
-    # 5. Evidence
-    evidence_state: EvidenceState = EvidenceState.SIMULATED
+    # 5. Evidence (fail-closed: unexecuted / missing evidence)
+    evidence_state: EvidenceState = EvidenceState.NOT_RUN
     evidence_mode: ExecutionEvidenceMode = ExecutionEvidenceMode.SIMULATION
     evidence_digests: Tuple[str, ...] = ()
-    evidence_source: str = "evidence_auditor:ledger"
+    evidence_source: str = "unknown:unverified"
 
-    # 6. Novelty
-    novelty_tier: NoveltyTier = NoveltyTier.ROUTINE_KNOWN
-    novelty_source: str = "memory_trust_layer:history"
+    # 6. Novelty (fail-closed: anomalous intent)
+    novelty_tier: NoveltyTier = NoveltyTier.ANOMALOUS
+    novelty_source: str = "unknown:unverified"
 
-    # 7. Rehearsal
-    rehearsal_status: RehearsalStatus = RehearsalStatus.NOT_REQUIRED
+    # 7. Rehearsal (fail-closed: unexecuted rehearsal)
+    rehearsal_status: RehearsalStatus = RehearsalStatus.REHEARSAL_NOT_RUN
     rehearsal_digests: Tuple[str, ...] = ()
-    rehearsal_source: str = "shadowlab:synthetic_twin"
+    rehearsal_source: str = "unknown:unverified"
 
     @field_validator("change_id")
     @classmethod

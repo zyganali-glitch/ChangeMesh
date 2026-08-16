@@ -92,13 +92,13 @@ P-15.01 — Define read-only Impact Scout tool contracts/output schema
 
 Phase P-14 is `DONE`.
 - **P-14.00:** Reversibility Gate donor preflight verified `CCT-GATE-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `QW-REV-001` (pinned at `a43b3411856f41a4be9424d11c01a5e637cdc410`).
-- **P-14.01:** Implemented `ReversibilityClass` (4-class model: `FULLY_REVERSIBLE_AUTOMATED`, `REVERSIBLE_WITH_COMPENSATION`, `HUMAN_INTERVENTION_REQUIRED`, `IRREVERSIBLE_DESTRUCTIVE`), `ReversibilityAssessment`, and `ReversibilityClassifier` in `src/gate/reversibility.py`.
-- **P-14.02:** Implemented `PolicyGuardianGate` and `PolicyGateEvaluationResult` in `src/gate/policy_guardian_gate.py` mapping reversibility classes to machine-evaluable `AutonomyClass` decisions.
-- **P-14.03:** Mapped full taxonomy of demo actions to justified autonomy levels.
-- **P-14.04:** Implemented `ApprovalCompressionEngine` in `src/gate/compression.py` generating 1-screen compressed decision cards for human authority slots.
+- **P-14.01:** Implemented `ReversibilityClass` (4-class model: `FULLY_REVERSIBLE_AUTOMATED`, `REVERSIBLE_WITH_COMPENSATION`, `HUMAN_INTERVENTION_REQUIRED`, `IRREVERSIBLE_DESTRUCTIVE`), `ReversibilityAssessment`, and `ReversibilityClassifier` in `src/gate/reversibility.py`. Enforces fail-closed defaults across all `DeterministicPolicyInputs`.
+- **P-14.02:** Implemented `PolicyGuardianGate` and `PolicyGateEvaluationResult` in `src/gate/policy_guardian_gate.py` mapping reversibility classes to machine-evaluable `AutonomyClass` decisions with fail-closed non-empty evidence digest requirements.
+- **P-14.03:** Mapped full taxonomy of demo actions to justified autonomy levels without fallback defaults.
+- **P-14.04:** Implemented `ApprovalCompressionEngine` in `src/gate/compression.py` generating 1-screen compressed decision cards strictly from supplied locked facts.
 - **P-14.05:** Implemented `ApprovalTokenManager` and `SignedApprovalToken` in `src/gate/token.py` providing cryptographic HMAC-SHA256 tokens with plan-hash binding, signature verification, expiry, and single-use idempotency.
-- **P-14.06:** Measured friction reduction: autonomous-by-default execution handles 100% of reversible changes without human interruption, compressing complex reviews into 1-screen actionable decision cards only when irreducible human authority is required.
-- **Evidence:** `tests/test_p14_reversibility_gate.py` passes 7 dedicated tests. Full canonical unit suite passes 1158 tests (1 warning). Zero domain contract mutations or provider SDK leaks. All five phases (P-10, P-11, P-12, P-13, P-14) are fully implemented and verified.
+- **P-14.06:** Measured friction reduction: `FrictionMetricsCalculator` in `src/gate/friction_metrics.py` generates immutable `FrictionMetricsArtifact` computing total decisions, autonomous executions (`AUTO_EXECUTE`), rehearsal-gated executions (`REHEARSE_THEN_EXECUTE`), human authority decisions (`HUMAN_AUTHORITY_REQUIRED`), blocked actions (`BLOCKED`), and avoided repeated prompts, reporting exact fleet autonomy ratio without ungrounded claims.
+- **Evidence:** `tests/test_p14_reversibility_gate.py` passes 9 dedicated tests (including adversarial fail-closed invariants and complete 7-dimension policy matrix). Full canonical unit suite passes 1165 tests (1 warning). Zero domain contract mutations or provider SDK leaks. All five phases (P-10, P-11, P-12, P-13, P-14) are fully implemented and verified.
 
 - **P-13.00:** ShadowLab donor preflight verified `CCT-SHADOW-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `MCP-TOOL-001` (pinned at `99824e867b7e3e7f41ba8a011ea3bfdc7863fb79`).
 - **P-13.01:** Defined `ShadowScenario`, `InjectedFault`, `FaultType`, `RehearsalOutcome`, and 7 canonical rehearsal scenarios in `src/shadowlab/scenarios.py`.
@@ -108,7 +108,7 @@ Phase P-14 is `DONE`.
 - **P-13.05:** Implemented stale approval rejection and untrusted prompt-injection quarantine rehearsal scenarios.
 - **P-13.06:** Implemented simulation evidence digest computation (`compute_simulation_digest`) binding rehearsal outcomes to execution authorization.
 - **P-13.07:** Implemented automatic plan correction loops for missing rollbacks and breaking legacy client changes.
-- **Evidence:** `tests/test_p13_shadowlab.py` passes 11 dedicated tests. Canonical unit suite passes 1149 tests (1 warning). Zero domain contract mutations or provider SDK leaks. P-14.00 is next.
+- **Evidence:** `tests/test_p13_shadowlab.py` passes 11 dedicated tests. Canonical unit suite passes 1165 tests (1 warning). Zero domain contract mutations or provider SDK leaks.
 - **P-12.00:** Capability Passport donor preflight verified `CCT-PASSPORT-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `CLOVER-REG-001` (pinned at `047051df170e70ca986e30eb4a1df8350172e2cf`).
 - **P-12.01:** Defined standard demo capability vocabulary (`CapabilityType`) and role requirements (`AgentCapabilityRequirement`) for `impact_scout`, `policy_guardian`, `migration_engineer`, `release_steward` in `src/registry/capabilities.py`.
 - **P-12.02:** Implemented `PassportIssuer` and `PassportIssuanceRequest` in `src/registry/passport_issuer.py` requiring non-empty qualification evidence references and prohibiting self-attestation.
@@ -116,7 +116,7 @@ Phase P-14 is `DONE`.
 - **P-12.04:** Registered two `migration_engineer` revisions in `src/registry/agent_registry.py` (`rev-1.0.0-sqlite-pg` and `rev-2.0.0-cockroach-distributed`), demonstrating capability-targeted qualification resolution.
 - **P-12.05:** Implemented `AgentRegistry` interface and `InMemoryAgentRegistry` in `src/registry/agent_registry.py`.
 - **P-12.06:** Implemented `PassportAwareRouter` in `src/registry/passport_router.py` enforcing passport-aware dispatch and fail-closed `UnqualifiedAgentDispatchError`.
-- **Evidence:** `tests/test_p12_capability_passport.py` passes 5 dedicated tests. Canonical unit suite passes 1138 tests (1 warning). Zero domain contract mutations or provider SDK leaks. P-13.00 is next.
+- **Evidence:** `tests/test_p12_capability_passport.py` passes 5 dedicated tests. Canonical unit suite passes 1165 tests (1 warning). Zero domain contract mutations or provider SDK leaks.
 - **P-11.00:** Memory Trust donor preflight verified `QW-MEM-001` and `QW-BUS-001` pinned at commit `a43b3411856f41a4be9424d11c01a5e637cdc410`.
 - **P-11.01:** Validated `MemoryRecord` in `domain/contracts/memory.py` with immutable fields, explicit `DataClassLevel`, and required trust evidence for `TRUSTED` status.
 - **P-11.02:** Implemented `MemoryTrustEvaluator` and `EpistemicTrustEvaluation` in `src/memory/trust_layer.py` with 5 deterministic classifications (`ACCEPTED_TRUSTED`, `UNTRUSTED_CONTEXT`, `STALE_EXPIRED`, `CONTRADICTED`, `QUARANTINED`), freshness scoring, and strict separation between retrieval relevance and epistemic authority.
@@ -124,13 +124,13 @@ Phase P-14 is `DONE`.
 - **P-11.04:** Implemented `MemoryQuarantineEngine` in `src/memory/quarantine.py` detecting 5 adversarial prompt-injection vectors and quarantining hostile inputs.
 - **P-11.05:** Implemented `MemoryBank` abstract interface and `InMemoryMemoryBank` local adapter in `src/memory/memory_bank.py`.
 - **P-11.06:** Implemented `TwoSessionResumeScenario` in `src/memory/two_session_scenario.py` validating cross-session discovery preservation and automatic prompt-injection quarantine.
-- **Evidence:** `tests/test_p11_memory_trust.py` passes 5 dedicated tests. Canonical unit test suite passes 1133 tests (1 warning). Zero domain contract mutations or provider SDK leaks. P-12.00 is next.
+- **Evidence:** `tests/test_p11_memory_trust.py` passes 5 dedicated tests. Canonical unit test suite passes 1165 tests (1 warning). Zero domain contract mutations or provider SDK leaks.
 - **P-10.01 (Hardened):** Applied 5 design fixes (Server Firestore security enforced at backend repository boundary; OCC error ownership isolated from P-09 retry; idempotency key design finalized in P-10.03; native TTL & recursive descendant teardown semantics; large artifact safety boundary).
-- **P-10.02:** Implemented canonical state repository contracts and models in `src/orchestrator/state_repository.py`, thread-safe in-memory double in `src/orchestrator/in_memory_repository.py`, and Google Cloud Firestore adapter in `integrations/gcp/firestore_adapter.py`. Enforces monotonic version tokens and CAS updates raising `OptimisticConcurrencyError`.
+- **P-10.02:** Implemented canonical state repository contracts and models in `src/orchestrator/state_repository.py`, thread-safe in-memory double in `src/orchestrator/in_memory_repository.py`, and Google Cloud Firestore adapter in `integrations/gcp/firestore_adapter.py`. Enforces monotonic version tokens and CAS updates raising `OptimisticConcurrencyError` with strict transactional fail-closed semantics (no non-atomic fallback).
 - **P-10.03:** Implemented `IdempotencyKeyManager` and `IdempotencyIntent` in `src/orchestrator/idempotency.py` across all 6 scopes (`WORKFLOW_STEP`, `BRANCH_INTENT`, `PR_INTENT`, `APPROVAL`, `PASSPORT`, `EXTERNAL_WRITE`), lease reservation with timeout, and exact replay deduplication returning cached execution results without duplicate write emission.
 - **P-10.04:** Implemented `SagaCheckpointManager` and `SagaResumeContext` in `src/orchestrator/saga_checkpoint.py` with SHA-256 state digest integrity verification (`compute_checkpoint_digest`), completed task extraction to prevent duplicate execution, pending task sequencing, and next safe action identification.
 - **P-10.05:** Implemented `PersistencePrivacyGuard` and `FixtureTeardownManager` in `src/orchestrator/teardown.py` with strict fail-closed rejection of credential field names and free-text secrets, and explicit recursive descendant document teardown verifying zero residual fixture state (`TeardownReport(residual_document_count=0, success=True)`).
-- **Evidence:** Dedicated P-10 test suites (`tests/test_p10_02_state_repository.py`, `tests/test_p10_03_idempotency.py`, `tests/test_p10_04_saga_checkpoint.py`, `tests/test_p10_05_teardown_privacy.py`) pass 19 tests. Canonical unit test suite passes 1128 tests (1 warning). Zero domain contract mutations or Google SDK leaks. P-11.00 is next.
+- **Evidence:** Dedicated P-10 test suites (`tests/test_p10_02_state_repository.py`, `tests/test_p10_03_idempotency.py`, `tests/test_p10_04_saga_checkpoint.py`, `tests/test_p10_05_teardown_privacy.py`) pass 28 tests. Canonical unit test suite passes 1165 tests (1 warning). Zero domain contract mutations or Google SDK leaks.
 
 ## Current P-10.00 State
 

@@ -636,6 +636,205 @@ def test_firestore_adapter_atomic_cas_fails_closed_without_transaction():
         repo._atomic_cas_update(None, 1, {}, "path", TenantRecord)
 
 
+def test_firestore_transaction_adversarial_fail_closed_semantics():
+    """Adversarial suite proving fail-closed transaction semantics:
+    A. client has transaction() but doc get does NOT support transaction-scoped read -> RuntimeError
+    B. transaction object lacks atomic set -> RuntimeError
+    C. transaction object lacks usable commit semantics -> RuntimeError
+    D. no document mutation occurred after each failure
+    E. reservation creation also fails closed with no residual reservation record
+    """
+    now = _utc_now()
+    tid = "tenant-adv-tx"
+    cid = "chg-adv-tx-01"
+    rid = "res-adv-01"
+
+    def _create_base_repo(client):
+        repo = GoogleFirestoreSagaRepository(project_id="test-adv-proj", firestore_client=client)
+        repo.create_tenant(
+            TenantRecord(tenant_id=tid, name="Adv Org", created_at=now, updated_at=now)
+        )
+        repo.create_change(
+            tid,
+            ChangeRecord(
+                tenant_id=tid,
+                change_id=cid,
+                correlation_id="corr-adv",
+                title="Initial Title",
+                description="Initial",
+                target_systems=("sys",),
+                data_classification=DataClassLevel.INTERNAL,
+                requested_by="dba",
+                requested_at=now,
+                state=ChangeState.RECEIVED,
+                state_updated_at=now,
+                created_at=now,
+                updated_at=now,
+            ),
+        )
+        return repo
+
+    sample_res = IdempotencyReservationRecord(
+        tenant_id=tid,
+        change_id=cid,
+        reservation_id=rid,
+        idempotency_key="key-adv-1",
+        action_type="POSTGRES_SCHEMA_MIGRATE",
+        payload_digest="f" * 64,
+        status=IdempotencyReservationStatus.RESERVED,
+        reserved_at=now,
+        expires_at=now + timedelta(seconds=60),
+    )
+
+    # A. Document get does not accept transaction parameter & transaction has no get
+    class NonTransactionalDocRef:
+        def __init__(self, path, doc_id, store):
+            self._key = f"{path}/{doc_id}"
+            self._store = store
+            self.id = doc_id
+            self.collection_path = path
+
+        def get(self):  # TypeError when called as get(transaction=txn)
+            if self._key in self._store:
+                return FakeFirestoreSnapshot(True, dict(self._store[self._key]))
+            return FakeFirestoreSnapshot(False)
+
+        def set(self, data):
+            self._store[self._key] = dict(data)
+
+        def collection(self, name):
+            return NonTransactionalCollection(f"{self._key}/{name}", self._store)
+
+    class NonTransactionalCollection:
+        def __init__(self, path, store):
+            self.path = path
+            self.store = store
+
+        def document(self, doc_id):
+            return NonTransactionalDocRef(self.path, doc_id, self.store)
+
+    class BadReadTxn:
+        def __init__(self, store):
+            self._store = store
+
+        def set(self, doc_ref, data):
+            pass
+
+        def commit(self):
+            pass
+
+    class BadReadClient:
+        def __init__(self):
+            self._store: dict[str, Any] = {}
+
+        def collection(self, name):
+            return NonTransactionalCollection(name, self._store)
+
+        def transaction(self):
+            return BadReadTxn(self._store)
+
+    client_a = BadReadClient()
+    repo_a = _create_base_repo(client_a)
+    orig_chg = repo_a.get_change(tid, cid)
+    assert orig_chg is not None
+    assert orig_chg.title == "Initial Title"
+
+    with pytest.raises(RuntimeError, match="transaction-scoped read"):
+        repo_a.update_change(
+            tid, orig_chg.model_copy(update={"title": "Mutated"}), expected_version=1
+        )
+
+    # D. Assert no document mutation occurred
+    after_a = repo_a.get_change(tid, cid)
+    assert after_a is not None
+    assert after_a.title == "Initial Title"
+    assert after_a.version == 1
+
+    with pytest.raises(RuntimeError, match="transaction-scoped read"):
+        repo_a.create_idempotency_reservation(tid, cid, sample_res)
+    assert repo_a.get_idempotency_reservation(tid, cid, rid) is None
+
+    # B. Transaction lacks atomic set
+    class BadWriteTxn:
+        def __init__(self, store):
+            self._store = store
+
+        def get(self, doc_ref):
+            key = doc_ref._key
+            if key in self._store:
+                return FakeFirestoreSnapshot(True, dict(self._store[key]))
+            return FakeFirestoreSnapshot(False)
+
+        # Lacks set()
+
+        def commit(self):
+            pass
+
+    class BadWriteClient(FakeFirestoreClient):
+        def transaction(self):
+            return BadWriteTxn(self._store)
+
+    client_b = BadWriteClient()
+    repo_b = _create_base_repo(client_b)
+    orig_b = repo_b.get_change(tid, cid)
+    assert orig_b is not None
+
+    with pytest.raises(RuntimeError, match="atomic write"):
+        repo_b.update_change(
+            tid, orig_b.model_copy(update={"title": "Mutated"}), expected_version=1
+        )
+
+    # D. Assert no document mutation occurred
+    after_b = repo_b.get_change(tid, cid)
+    assert after_b is not None
+    assert after_b.title == "Initial Title"
+    assert after_b.version == 1
+
+    with pytest.raises(RuntimeError, match="atomic write"):
+        repo_b.create_idempotency_reservation(tid, cid, sample_res)
+    assert repo_b.get_idempotency_reservation(tid, cid, rid) is None
+
+    # C. Transaction lacks usable commit semantics
+    class BadCommitTxn:
+        def __init__(self, store):
+            self._store = store
+
+        def get(self, doc_ref):
+            key = doc_ref._key
+            if key in self._store:
+                return FakeFirestoreSnapshot(True, dict(self._store[key]))
+            return FakeFirestoreSnapshot(False)
+
+        def set(self, doc_ref, data):
+            pass
+
+        # Lacks commit() and _commit()
+
+    class BadCommitClient(FakeFirestoreClient):
+        def transaction(self):
+            return BadCommitTxn(self._store)
+
+    client_c = BadCommitClient()
+    repo_c = _create_base_repo(client_c)
+    orig_c = repo_c.get_change(tid, cid)
+    assert orig_c is not None
+
+    with pytest.raises(RuntimeError, match="commit semantics"):
+        repo_c.update_change(
+            tid, orig_c.model_copy(update={"title": "Mutated"}), expected_version=1
+        )
+
+    # D. Assert no document mutation occurred
+    after_c = repo_c.get_change(tid, cid)
+    assert after_c is not None
+    assert after_c.title == "Initial Title"
+    assert after_c.version == 1
+
+    with pytest.raises(RuntimeError, match="commit semantics"):
+        repo_c.create_idempotency_reservation(tid, cid, sample_res)
+    assert repo_c.get_idempotency_reservation(tid, cid, rid) is None
+
+
 # ============================================================================
 # Child Documents & Zero Secret Tests
 # ============================================================================

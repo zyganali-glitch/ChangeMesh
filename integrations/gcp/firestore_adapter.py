@@ -114,15 +114,22 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
         now = self._now()
 
         def _step(txn: Any) -> Dict[str, Any]:
-            if hasattr(doc_ref, "get"):
+            if hasattr(txn, "get") and callable(txn.get):
+                snapshot = txn.get(doc_ref)
+            elif hasattr(doc_ref, "get") and callable(doc_ref.get):
                 try:
                     snapshot = doc_ref.get(transaction=txn)
-                except TypeError:
-                    snapshot = doc_ref.get()
-            elif hasattr(txn, "get"):
-                snapshot = txn.get(doc_ref)
+                except TypeError as exc:
+                    raise RuntimeError(
+                        "Document reference get() does not support transaction-scoped read "
+                        "(fail-closed: non-transactional read is strictly prohibited)"
+                    ) from exc
             else:
-                raise RuntimeError("Invalid Firestore transaction/doc_ref interface")
+                raise RuntimeError(
+                    "Firestore transaction/doc_ref interface does not support "
+                    "required atomic transactional read "
+                    "(fail-closed: non-atomic read is strictly prohibited)"
+                )
 
             if not snapshot.exists:
                 raise DocumentNotFoundError(
@@ -148,10 +155,13 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
                 updated_dict["updated_at"] = now
 
             fs_data = _to_firestore_dict(updated_dict)
-            if hasattr(txn, "set"):
+            if hasattr(txn, "set") and callable(txn.set):
                 txn.set(doc_ref, fs_data)
-            elif hasattr(doc_ref, "set"):
-                doc_ref.set(fs_data)
+            else:
+                raise RuntimeError(
+                    "Firestore transaction does not support required atomic write (set) semantics "
+                    "(fail-closed: non-atomic write fallback is strictly prohibited)"
+                )
             return updated_dict
 
         if not hasattr(self._db, "transaction") or not callable(self._db.transaction):
@@ -182,8 +192,13 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
                 result_dict = _step(transaction)
                 if hasattr(transaction, "commit") and callable(transaction.commit):
                     transaction.commit()
-                elif hasattr(transaction, "_commit"):
+                elif hasattr(transaction, "_commit") and callable(transaction._commit):
                     transaction._commit()
+                else:
+                    raise RuntimeError(
+                        "Injected transaction object lacks usable commit semantics "
+                        "(fail-closed: commit is required)"
+                    )
         except (
             OptimisticConcurrencyError,
             DocumentNotFoundError,
@@ -709,15 +724,21 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
         )
 
         def _step(txn: Any) -> Dict[str, Any]:
-            if hasattr(doc_ref, "get"):
+            if hasattr(txn, "get") and callable(txn.get):
+                snapshot = txn.get(doc_ref)
+            elif hasattr(doc_ref, "get") and callable(doc_ref.get):
                 try:
                     snapshot = doc_ref.get(transaction=txn)
-                except TypeError:
-                    snapshot = doc_ref.get()
-            elif hasattr(txn, "get"):
-                snapshot = txn.get(doc_ref)
+                except TypeError as exc:
+                    raise RuntimeError(
+                        "Document reference get() does not support transaction-scoped read "
+                        "(fail-closed: non-transactional read is strictly prohibited)"
+                    ) from exc
             else:
-                raise RuntimeError("Invalid Firestore transaction/doc_ref interface")
+                raise RuntimeError(
+                    "Transaction interface does not support required atomic transactional read "
+                    "(fail-closed: non-atomic read is strictly prohibited)"
+                )
 
             if snapshot.exists:
                 raise PersistenceSchemaError(
@@ -725,10 +746,13 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
                 )
 
             data = _to_firestore_dict(reservation.model_dump())
-            if hasattr(txn, "set"):
+            if hasattr(txn, "set") and callable(txn.set):
                 txn.set(doc_ref, data)
-            elif hasattr(doc_ref, "set"):
-                doc_ref.set(data)
+            else:
+                raise RuntimeError(
+                    "Firestore transaction does not support required atomic write (set) semantics "
+                    "(fail-closed: non-atomic reservation write fallback is strictly prohibited)"
+                )
             return reservation.model_dump()
 
         if not hasattr(self._db, "transaction") or not callable(self._db.transaction):
@@ -759,8 +783,13 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
                 _step(transaction)
                 if hasattr(transaction, "commit") and callable(transaction.commit):
                     transaction.commit()
-                elif hasattr(transaction, "_commit"):
+                elif hasattr(transaction, "_commit") and callable(transaction._commit):
                     transaction._commit()
+                else:
+                    raise RuntimeError(
+                        "Injected transaction object lacks usable commit semantics "
+                        "(fail-closed: non-atomic commit fallback is strictly prohibited)"
+                    )
         except (PersistenceSchemaError, DocumentNotFoundError, TenantIsolationError):
             raise
         except Exception as exc:

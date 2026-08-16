@@ -147,6 +147,11 @@ def test_rehearse_then_execute_not_authorized_until_rehearsal_passed():
         blast_radius_score=0.25,
         reversibility_class=ReversibilityClass.REVERSIBLE_WITH_COMPENSATION,
         has_down_migration=True,
+        privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+        data_classification=DataClassLevel.INTERNAL,
+        novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+        evidence_state=EvidenceState.PASS,
+        evidence_digests=("1" * 64,),
         rehearsal_status=RehearsalStatus.REHEARSAL_NOT_RUN,
     )
     eval_not_run = gate.evaluate_inputs(inputs_not_run)
@@ -154,9 +159,12 @@ def test_rehearse_then_execute_not_authorized_until_rehearsal_passed():
     assert eval_not_run.is_authorized is False
     assert "UNAUTHORIZED" in eval_not_run.decision_summary
 
-    # Rehearsal PASSED -> Execution AUTHORIZED
+    # Rehearsal PASSED with digest -> Execution AUTHORIZED
     inputs_passed = inputs_not_run.model_copy(
-        update={"rehearsal_status": RehearsalStatus.REHEARSAL_PASSED}
+        update={
+            "rehearsal_status": RehearsalStatus.REHEARSAL_PASSED,
+            "rehearsal_digests": ("2" * 64,),
+        }
     )
     eval_passed = gate.evaluate_inputs(inputs_passed)
     assert eval_passed.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
@@ -352,12 +360,13 @@ def test_policy_guardian_gate_with_injected_authority_verifier():
     gate = PolicyGuardianGate(authority_verifier=verifier)
     plan_hash = "plan-pay-01"
 
-    # 1. Fully reversible -> AUTO_EXECUTE
+    # 1. Fully reversible with verified evidence -> AUTO_EXECUTE
     eval_auto = gate.evaluate_change_sql(
         change_id="chg-auto",
         sql_up="ALTER TABLE users ADD COLUMN phone TEXT;",
         sql_down="ALTER TABLE users DROP COLUMN phone;",
         blast_radius=0.1,
+        evidence_digests=("a" * 64,),
     )
     assert eval_auto.autonomy_class == AutonomyClass.AUTO_EXECUTE
     assert eval_auto.is_authorized is True
@@ -370,6 +379,7 @@ def test_policy_guardian_gate_with_injected_authority_verifier():
         blast_radius=0.95,
         plan_hash=plan_hash,
         approval_token=None,
+        evidence_digests=("b" * 64,),
     )
     assert eval_human_no_tok.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
     assert eval_human_no_tok.is_authorized is False
@@ -392,6 +402,7 @@ def test_policy_guardian_gate_with_injected_authority_verifier():
         blast_radius=0.95,
         plan_hash=plan_hash,
         approval_token=token,
+        evidence_digests=("b" * 64,),
     )
     assert eval_human_tok.is_authorized is True
     assert "Valid cryptographic approval token" in eval_human_tok.decision_summary
@@ -410,13 +421,33 @@ def test_friction_metrics_calculation_from_real_traces():
     gate = PolicyGuardianGate(authority_verifier=verifier)
 
     eval1 = gate.evaluate_change_sql(
-        "c1", "ALTER TABLE a ADD COLUMN x INT;", "ALTER TABLE a DROP COLUMN x;", blast_radius=0.1
+        "c1",
+        "ALTER TABLE a ADD COLUMN x INT;",
+        "ALTER TABLE a DROP COLUMN x;",
+        blast_radius=0.1,
+        evidence_digests=("1" * 64,),
     )
     eval2 = gate.evaluate_change_sql(
-        "c2", "ALTER TABLE b ADD COLUMN y INT;", "ALTER TABLE b DROP COLUMN y;", blast_radius=0.1
+        "c2",
+        "ALTER TABLE b ADD COLUMN y INT;",
+        "ALTER TABLE b DROP COLUMN y;",
+        blast_radius=0.1,
+        evidence_digests=("2" * 64,),
     )
-    eval3 = gate.evaluate_change_sql("c3", "CREATE VIEW v AS SELECT 1;", None, blast_radius=0.2)
-    eval4 = gate.evaluate_change_sql("c4", "DROP TABLE c;", None, blast_radius=0.5)
+    eval3 = gate.evaluate_change_sql(
+        "c3",
+        "CREATE VIEW v AS SELECT 1;",
+        None,
+        blast_radius=0.2,
+        evidence_digests=("3" * 64,),
+    )
+    eval4 = gate.evaluate_change_sql(
+        "c4",
+        "DROP TABLE c;",
+        None,
+        blast_radius=0.5,
+        evidence_digests=("4" * 64,),
+    )
 
     token = TestHmacAuthoritySigner.sign_token(
         "plan-h5", "dba@org", "slot:lead_dba", secret, action_scope="Target: Production. Change: c5"
@@ -428,6 +459,7 @@ def test_friction_metrics_calculation_from_real_traces():
         blast_radius=0.9,
         plan_hash="plan-h5",
         approval_token=token,
+        evidence_digests=("5" * 64,),
     )
 
     traces = [eval1, eval2, eval3, eval4, eval5]
@@ -462,6 +494,8 @@ def test_seven_deterministic_inputs_policy_matrix():
             blast_radius_score=0.1,
             reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
             novelty_tier=NoveltyTier.ANOMALOUS,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("a" * 64,),
         )
     )
     assert res_anom.autonomy_class == AutonomyClass.BLOCKED
@@ -474,6 +508,7 @@ def test_seven_deterministic_inputs_policy_matrix():
             blast_radius_score=0.1,
             reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
             evidence_state=EvidenceState.FAIL,
+            evidence_digests=("a" * 64,),
         )
     )
     assert res_ev_fail.autonomy_class == AutonomyClass.BLOCKED
@@ -486,6 +521,7 @@ def test_seven_deterministic_inputs_policy_matrix():
             blast_radius_score=0.1,
             reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
             evidence_state=EvidenceState.NOT_RUN,
+            evidence_digests=("a" * 64,),
         )
     )
     assert res_ev_not_run.autonomy_class == AutonomyClass.BLOCKED
@@ -497,7 +533,12 @@ def test_seven_deterministic_inputs_policy_matrix():
             change_id="chg-novel",
             blast_radius_score=0.2,
             reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            has_down_migration=True,
+            data_classification=DataClassLevel.INTERNAL,
+            privilege_level=PrivilegeLevel.STANDARD_WRITE,
             novelty_tier=NoveltyTier.NOVEL_UNVERIFIED,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("a" * 64,),
             rehearsal_status=RehearsalStatus.NOT_REQUIRED,
         )
     )
@@ -512,6 +553,9 @@ def test_seven_deterministic_inputs_policy_matrix():
             reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
             data_classification=DataClassLevel.RESTRICTED,
             privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+            novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("a" * 64,),
         )
     )
     assert res_restr.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
@@ -523,6 +567,12 @@ def test_seven_deterministic_inputs_policy_matrix():
             change_id="chg-reh-fail",
             blast_radius_score=0.2,
             reversibility_class=ReversibilityClass.REVERSIBLE_WITH_COMPENSATION,
+            has_down_migration=True,
+            data_classification=DataClassLevel.INTERNAL,
+            privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+            novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("a" * 64,),
             rehearsal_status=RehearsalStatus.REHEARSAL_FAILED,
         )
     )
@@ -535,8 +585,139 @@ def test_seven_deterministic_inputs_policy_matrix():
             change_id="chg-reh-pass",
             blast_radius_score=0.2,
             reversibility_class=ReversibilityClass.REVERSIBLE_WITH_COMPENSATION,
+            has_down_migration=True,
+            data_classification=DataClassLevel.INTERNAL,
+            privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+            novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("a" * 64,),
             rehearsal_status=RehearsalStatus.REHEARSAL_PASSED,
+            rehearsal_digests=("b" * 64,),
         )
     )
     assert res_reh_pass.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
     assert res_reh_pass.is_authorized is True
+
+
+def test_fail_closed_deterministic_policy_invariants():
+    """Prove the 7 core fail-closed policy invariants:
+    1. minimal DeterministicPolicyInputs cannot authorize
+    2. reversible SQL + no evidence cannot authorize
+    3. SIMULATED + empty evidence_digests cannot authorize
+    4. REHEARSAL_PASSED + empty rehearsal_digests cannot satisfy rehearsal
+    5. explicit complete safe facts can still AUTO_EXECUTE
+    6. explicit complete rehearse-required facts can still REHEARSE_THEN_EXECUTE
+    7. explicit organizational policy may still allow LIVE_WRITE without HUMAN_AUTHORITY_REQUIRED
+    """
+    gate = PolicyGuardianGate()
+
+    # 1. Minimal DeterministicPolicyInputs cannot authorize
+    minimal_inputs = DeterministicPolicyInputs(change_id="chg-minimal")
+    res_min = gate.evaluate_inputs(minimal_inputs)
+    assert res_min.is_authorized is False
+    assert res_min.autonomy_class == AutonomyClass.BLOCKED
+    assert res_min.autonomy_class != AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+
+    # 2. Reversible SQL + no evidence cannot authorize
+    res_sql_no_ev = gate.evaluate_change_sql(
+        change_id="chg-sql-no-ev",
+        sql_up="ALTER TABLE users ADD COLUMN phone TEXT;",
+        sql_down="ALTER TABLE users DROP COLUMN phone;",
+        blast_radius=0.1,
+        evidence_digests=(),
+    )
+    assert res_sql_no_ev.is_authorized is False
+    assert res_sql_no_ev.autonomy_class == AutonomyClass.BLOCKED
+
+    # 3. SIMULATED + empty evidence_digests cannot authorize
+    res_sim_empty = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-sim-empty",
+            blast_radius_score=0.1,
+            reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            has_down_migration=True,
+            data_classification=DataClassLevel.INTERNAL,
+            privilege_level=PrivilegeLevel.STANDARD_WRITE,
+            novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+            evidence_state=EvidenceState.SIMULATED,
+            evidence_digests=(),
+            rehearsal_status=RehearsalStatus.NOT_REQUIRED,
+        )
+    )
+    assert res_sim_empty.is_authorized is False
+    assert res_sim_empty.autonomy_class == AutonomyClass.BLOCKED
+
+    # 4. REHEARSAL_PASSED + empty rehearsal_digests cannot satisfy rehearsal
+    res_reh_empty = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-reh-empty",
+            blast_radius_score=0.2,
+            reversibility_class=ReversibilityClass.REVERSIBLE_WITH_COMPENSATION,
+            has_down_migration=True,
+            data_classification=DataClassLevel.INTERNAL,
+            privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+            novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("1" * 64,),
+            rehearsal_status=RehearsalStatus.REHEARSAL_PASSED,
+            rehearsal_digests=(),
+        )
+    )
+    assert res_reh_empty.is_authorized is False
+    assert res_reh_empty.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
+
+    # 5. Explicit complete safe facts can still AUTO_EXECUTE
+    res_safe_auto = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-safe-auto",
+            blast_radius_score=0.1,
+            reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            has_down_migration=True,
+            data_classification=DataClassLevel.INTERNAL,
+            privilege_level=PrivilegeLevel.STANDARD_WRITE,
+            novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("2" * 64,),
+            rehearsal_status=RehearsalStatus.NOT_REQUIRED,
+        )
+    )
+    assert res_safe_auto.is_authorized is True
+    assert res_safe_auto.autonomy_class == AutonomyClass.AUTO_EXECUTE
+
+    # 6. Explicit complete rehearse-required facts can still REHEARSE_THEN_EXECUTE
+    res_reh_ok = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-reh-ok",
+            blast_radius_score=0.2,
+            reversibility_class=ReversibilityClass.REVERSIBLE_WITH_COMPENSATION,
+            has_down_migration=True,
+            data_classification=DataClassLevel.INTERNAL,
+            privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+            novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("3" * 64,),
+            rehearsal_status=RehearsalStatus.REHEARSAL_PASSED,
+            rehearsal_digests=("4" * 64,),
+        )
+    )
+    assert res_reh_ok.is_authorized is True
+    assert res_reh_ok.autonomy_class == AutonomyClass.REHEARSE_THEN_EXECUTE
+
+    # 7. Explicit organizational policy may still allow LIVE_WRITE without HUMAN_AUTHORITY_REQUIRED
+    res_live_write = gate.evaluate_inputs(
+        DeterministicPolicyInputs(
+            change_id="chg-live-write",
+            blast_radius_score=0.15,
+            reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
+            has_down_migration=True,
+            data_classification=DataClassLevel.INTERNAL,
+            privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
+            novelty_tier=NoveltyTier.ROUTINE_KNOWN,
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=("5" * 64,),
+            rehearsal_status=RehearsalStatus.NOT_REQUIRED,
+        )
+    )
+    assert res_live_write.is_authorized is True
+    assert res_live_write.autonomy_class == AutonomyClass.AUTO_EXECUTE
+    assert res_live_write.autonomy_class != AutonomyClass.HUMAN_AUTHORITY_REQUIRED

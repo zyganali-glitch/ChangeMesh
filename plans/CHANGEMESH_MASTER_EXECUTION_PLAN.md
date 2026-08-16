@@ -986,17 +986,6 @@ Schedule is risk control, not permission to skip gates.
 
 **Phase status:** `DONE`
 
-## P-11.00 — Memory Trust donor preflight
-
-- **Status:** `DONE`
-- **Required action:** Inspect and verify donor entries `QW-MEM-001` and `QW-BUS-001` in `docs/DONOR_REUSE_MANIFEST.md` before implementation.
-- **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
-- **Acceptance criteria:** Approved reuse method `CLEAN_ROOM_REIMPLEMENTED` verified, immutable commit `a43b3411856f41a4be9424d11c01a5e637cdc410` pinned, license compatible, forbidden carry-overs (memory-as-truth, Qwen runtime, unrestricted shared mutable memory) locked out.
-- **Required evidence:** Preflight inspection log and donor manifest sync.
-- **Evidence:** Preflight audit completed. Verified `QW-MEM-001` and `QW-BUS-001` from `gitlab.com/zyganali/universal-agent-os-qwen` pinned at commit `a43b3411856f41a4be9424d11c01a5e637cdc410`. Confirmed cleanroom reimplementation strategy targeting `src/memory/`. Prohibited memory-as-truth assumption (retrieval relevance != epistemic trust), Qwen runtime, and unrestricted mutable memory.
-- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
-- **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
-
 ## P-11.01 — Implement typed memory records with provenance, scope, validity, sensitivity, evidence, supersession
 
 - **Status:** `DONE`
@@ -1067,17 +1056,6 @@ Schedule is risk control, not permission to skip gates.
 
 **Phase status:** `DONE`
 
-## P-12.00 — Capability Passport donor preflight
-
-- **Status:** `DONE`
-- **Required action:** Inspect and verify donor entries `CCT-PASSPORT-001` and `CLOVER-REG-001` in `docs/DONOR_REUSE_MANIFEST.md` before implementation.
-- **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
-- **Acceptance criteria:** Approved reuse method `CLEAN_ROOM_REIMPLEMENTED` verified, immutable commits pinned, licenses compatible, forbidden carry-overs (dynamic capability self-grant, unverified agent discovery without qualification evidence, runtime bypass) locked out.
-- **Required evidence:** Preflight inspection log and donor manifest sync.
-- **Evidence:** Preflight audit completed. Verified `CCT-PASSPORT-001` from `continuous-compliance-twin` pinned at commit `9bf86400f074d4c55da54f3be1ae753443a53bc7` (Apache 2.0) and `CLOVER-REG-001` from `clover-sdk-py` pinned at commit `047051df170e70ca986e30eb4a1df8350172e2cf` (MIT). Confirmed cleanroom reimplementation strategy targeting `src/registry/`. Prohibited dynamic capability self-grant and unverified agent discovery.
-- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
-- **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
-
 ## P-12.01 — Define capability requirements for demo workflow and exact revision identity
 
 - **Status:** `DONE`
@@ -1147,17 +1125,6 @@ Schedule is risk control, not permission to skip gates.
 # P-13 — ShadowLab Rehearsal Twin
 
 **Phase status:** `DONE`
-
-## P-13.00 — ShadowLab donor preflight
-
-- **Status:** `DONE`
-- **Required action:** Inspect and verify donor entries `CCT-SHADOW-001` and `MCP-TOOL-001` in `docs/DONOR_REUSE_MANIFEST.md` before implementation.
-- **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
-- **Acceptance criteria:** Approved reuse method `CLEAN_ROOM_REIMPLEMENTED` verified, immutable commits pinned, licenses compatible, forbidden carry-overs (unlabeled simulation as live execution, live writes in rehearsal, bypass of reversibility gate) locked out.
-- **Required evidence:** Preflight inspection log and donor manifest sync.
-- **Evidence:** Preflight audit completed. Verified `CCT-SHADOW-001` from `continuous-compliance-twin` pinned at commit `9bf86400f074d4c55da54f3be1ae753443a53bc7` (Apache 2.0) and `MCP-TOOL-001` from `mcp-agent-workbench` pinned at commit `99824e867b7e3e7f41ba8a011ea3bfdc7863fb79` (MIT). Confirmed cleanroom reimplementation strategy targeting `src/shadowlab/`. Prohibited live external mutations during rehearsal and enforced mandatory `ExecutionEvidenceMode.SIMULATION` labeling.
-- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
-- **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-13.01 — Define scenario schema with preconditions, injected fault, expected policy/evidence, retry limit, pass criteria
 
@@ -1240,17 +1207,6 @@ Schedule is risk control, not permission to skip gates.
 
 **Phase status:** `DONE`
 
-## P-14.00 — Reversibility Gate donor preflight
-
-- **Status:** `DONE`
-- **Required action:** Inspect and verify donor entries `CCT-GATE-001` and `QW-REV-001` in `docs/DONOR_REUSE_MANIFEST.md` before implementation.
-- **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
-- **Acceptance criteria:** Approved reuse method `CLEAN_ROOM_REIMPLEMENTED` verified, immutable commits pinned, licenses compatible, forbidden carry-overs (unsigned approval tokens, routing routine changes to humans, gate bypass) locked out.
-- **Required evidence:** Preflight inspection log and donor manifest sync.
-- **Evidence:** Preflight audit completed. Verified `CCT-GATE-001` from `continuous-compliance-twin` pinned at commit `9bf86400f074d4c55da54f3be1ae753443a53bc7` (Apache 2.0) and `QW-REV-001` from `universal-agent-os-qwen` pinned at commit `a43b3411856f41a4be9424d11c01a5e637cdc410` (MIT). Confirmed cleanroom reimplementation strategy targeting `src/gate/`. Prohibited unsigned approval tokens, routing routine changes to humans, and gate bypasses.
-- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
-- **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
-
 ## P-14.01 — Define deterministic policy inputs: blast radius, reversibility, privilege, sensitivity, evidence, novelty, rehearsal
 
 - **Status:** `DONE`
@@ -1313,7 +1269,7 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Report autonomous steps, human decisions, avoided repeated prompts without customer claims.
 - **Required evidence:** Metrics artifact.
-- **Evidence:** Proven across full P-10 to P-14 test suites: 100% of additive, non-breaking, and reversible tasks execute fully autonomously (reducing human prompts by >85%), while high-risk/destructive actions compress 100+ pages of analysis into 1-screen actionable decision cards.
+- **Evidence:** Calculated deterministic workflow friction metrics using `FrictionMetricsCalculator` in `src/gate/friction_metrics.py`. Generates immutable `FrictionMetricsArtifact` demonstrating total workflow decisions, fully autonomous executions (`AUTO_EXECUTE`), rehearsal-gated executions (`REHEARSE_THEN_EXECUTE`), human authority decisions (`HUMAN_AUTHORITY_REQUIRED`), blocked actions (`BLOCKED`), and avoided repeated prompts, reporting exact fleet autonomy ratio without unsupported claims. Validated in `tests/test_p14_reversibility_gate.py::test_friction_metrics_calculation_from_real_traces`.
 - **Mandatory documentation sync:** README, Devpost.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
@@ -2856,47 +2812,54 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-11.00 — Memory Trust donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-11.01` task or any implementation in this phase, run the donor-reuse preflight for D-QWEN, D-UIPATH, D-CCT. Inspect pinned memory retrieval/decay/bus paths and durable handoff patterns; separate retrieval relevance from epistemic trust.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Memory invariant matrix, exact source paths, trust-layer extensions, poisoning tests.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
-- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Evidence:** Preflight audit completed. Verified `QW-MEM-001` and `QW-BUS-001` from `gitlab.com/zyganali/universal-agent-os-qwen` pinned at commit `a43b3411856f41a4be9424d11c01a5e637cdc410`. Confirmed cleanroom reimplementation strategy targeting `src/memory/`. Prohibited memory-as-truth assumption (retrieval relevance != epistemic trust), Qwen runtime, and unrestricted mutable memory.
+- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+
 ## P-12.00 — Capability Passport donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-12.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-CONTEXTSEAL. Reuse evidence immutability/passport integrity patterns only; document that capability qualification is a new ChangeMesh layer rather than a donor claim.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Originality boundary, passport invariant map, revision/expiry/revocation tests.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
-- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Evidence:** Preflight audit completed. Verified `CCT-PASSPORT-001` from `continuous-compliance-twin` pinned at commit `9bf86400f074d4c55da54f3be1ae753443a53bc7` (Apache 2.0) and `CLOVER-REG-001` from `clover-sdk-py` pinned at commit `047051df170e70ca986e30eb4a1df8350172e2cf` (MIT). Confirmed cleanroom reimplementation strategy targeting `src/registry/`. Prohibited dynamic capability self-grant and unverified agent discovery.
+- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+
 ## P-13.00 — ShadowLab donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-13.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT, D-UIPATH. Inspect destructive preflight, validator failure paths, connector real/mock modes, and smoke/evidence checklists; transform into labeled scenario rehearsal.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Scenario-source map, simulation labeling contract, no-command-executed rules.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
-- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Evidence:** Preflight audit completed. Verified `CCT-SHADOW-001` from `continuous-compliance-twin` pinned at commit `9bf86400f074d4c55da54f3be1ae753443a53bc7` (Apache 2.0) and `MCP-TOOL-001` from `mcp-agent-workbench` pinned at commit `99824e867b7e3e7f41ba8a011ea3bfdc7863fb79` (MIT). Confirmed cleanroom reimplementation strategy targeting `src/shadowlab/`. Prohibited live external mutations during rehearsal and enforced mandatory `ExecutionEvidenceMode.SIMULATION` labeling.
+- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
+
 ## P-14.00 — Autonomy and approval donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-14.01` task or any implementation in this phase, run the donor-reuse preflight for D-UIPATH, D-CCT, D-CONTEXTSEAL. Inspect independent approval verification, destructive preflight, risk/policy rules; redesign as autonomous-by-default Reversibility Gate and Approval Compression.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Authority/reversibility map and explicit rejection of routine approval carry-over.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
-- **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
+- **Evidence:** Preflight audit completed. Verified `CCT-GATE-001` from `continuous-compliance-twin` pinned at commit `9bf86400f074d4c55da54f3be1ae753443a53bc7` (Apache 2.0) and `QW-REV-001` from `universal-agent-os-qwen` pinned at commit `a43b3411856f41a4be9424d11c01a5e637cdc410` (MIT). Confirmed cleanroom reimplementation strategy targeting `src/gate/`. Prohibited unsigned approval tokens, routing routine changes to humans, and gate bypasses.
+- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-15.00 — Impact Scout donor preflight
 

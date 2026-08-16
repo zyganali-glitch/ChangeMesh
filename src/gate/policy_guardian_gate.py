@@ -119,6 +119,18 @@ class PolicyGuardianGate:
                 ),
             )
 
+        # Missing evidence or missing evidence digests fails closed
+        # (SIMULATED/PASS with zero digests cannot qualify)
+        if not inputs.evidence_digests or len(inputs.evidence_digests) == 0:
+            return PolicyGateEvaluationResult(
+                change_id=inputs.change_id,
+                autonomy_class=AutonomyClass.BLOCKED,
+                is_authorized=False,
+                reversibility_assessment=assessment,
+                audit_trace_id=trace_id,
+                decision_summary="BLOCKED: Missing qualifying evidence digests (fail closed)",
+            )
+
         if (
             inputs.reversibility_class == ReversibilityClass.IRREVERSIBLE_DESTRUCTIVE
             and not inputs.has_down_migration
@@ -288,14 +300,26 @@ class PolicyGuardianGate:
 
         if is_rehearsal_required:
             if inputs.rehearsal_status == RehearsalStatus.REHEARSAL_PASSED:
-                return PolicyGateEvaluationResult(
-                    change_id=inputs.change_id,
-                    autonomy_class=AutonomyClass.REHEARSE_THEN_EXECUTE,
-                    is_authorized=True,
-                    reversibility_assessment=assessment,
-                    audit_trace_id=trace_id,
-                    decision_summary="REHEARSE_THEN_EXECUTE: Rehearsal passed; authorized",
-                )
+                if inputs.rehearsal_digests and len(inputs.rehearsal_digests) > 0:
+                    return PolicyGateEvaluationResult(
+                        change_id=inputs.change_id,
+                        autonomy_class=AutonomyClass.REHEARSE_THEN_EXECUTE,
+                        is_authorized=True,
+                        reversibility_assessment=assessment,
+                        audit_trace_id=trace_id,
+                        decision_summary="REHEARSE_THEN_EXECUTE: Rehearsal passed; authorized",
+                    )
+                else:
+                    return PolicyGateEvaluationResult(
+                        change_id=inputs.change_id,
+                        autonomy_class=AutonomyClass.REHEARSE_THEN_EXECUTE,
+                        is_authorized=False,
+                        reversibility_assessment=assessment,
+                        audit_trace_id=trace_id,
+                        decision_summary=(
+                            "UNAUTHORIZED: Rehearsal passed claim lacks required rehearsal digest"
+                        ),
+                    )
             else:
                 return PolicyGateEvaluationResult(
                     change_id=inputs.change_id,
@@ -350,8 +374,12 @@ class PolicyGuardianGate:
         blast_radius: float = 0.1,
         plan_hash: str = "plan-hash-1",
         approval_token: Optional[SignedApprovalToken] = None,
-        rehearsal_status: RehearsalStatus = RehearsalStatus.NOT_REQUIRED,
+        data_classification: DataClassLevel = DataClassLevel.INTERNAL,
+        privilege_level: PrivilegeLevel = PrivilegeLevel.SCHEMA_MODIFY,
+        novelty_tier: NoveltyTier = NoveltyTier.ROUTINE_KNOWN,
+        evidence_state: EvidenceState = EvidenceState.PASS,
         evidence_digests: Tuple[str, ...] = (),
+        rehearsal_status: RehearsalStatus = RehearsalStatus.NOT_REQUIRED,
         rehearsal_digests: Tuple[str, ...] = (),
     ) -> PolicyGateEvaluationResult:
         """Convenience method to evaluate a SQL migration change."""
@@ -367,8 +395,12 @@ class PolicyGuardianGate:
             reversibility_class=assessment.reversibility_class,
             has_down_migration=assessment.has_down_migration,
             rollback_summary=assessment.rollback_plan_summary,
-            rehearsal_status=rehearsal_status,
+            privilege_level=privilege_level,
+            data_classification=data_classification,
+            novelty_tier=novelty_tier,
+            evidence_state=evidence_state,
             evidence_digests=evidence_digests,
+            rehearsal_status=rehearsal_status,
             rehearsal_digests=rehearsal_digests,
         )
         return self.evaluate_inputs(
