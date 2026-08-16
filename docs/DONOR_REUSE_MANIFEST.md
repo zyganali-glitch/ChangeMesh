@@ -294,8 +294,9 @@ evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
+- P-08.00 Gemini boundary donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-09T10:20:00Z'
+last_reviewed: '2026-08-16T08:27:00Z'
 ```
 
 ### CCT-FLIGHT-001
@@ -406,8 +407,9 @@ evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
+- P-08.00 Gemini boundary donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-09T10:20:00Z'
+last_reviewed: '2026-08-16T08:27:00Z'
 ```
 
 ### CCT-JUDGE-001
@@ -482,8 +484,9 @@ evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
+- P-08.00 Gemini boundary donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-09T10:20:00Z'
+last_reviewed: '2026-08-16T08:27:00Z'
 ```
 
 ### ZK-VALID-001
@@ -518,8 +521,9 @@ evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
+- P-08.00 Gemini boundary donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-09T10:20:00Z'
+last_reviewed: '2026-08-16T08:27:00Z'
 ```
 
 ### ZK-CLAIM-001

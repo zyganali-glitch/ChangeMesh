@@ -807,7 +807,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-08 — Gemini Integration and Structured Reasoning Boundary
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-08.01 — Create one bounded model client with exact model, timeout, retry, token, safety, and telemetry settings
 
@@ -2747,13 +2747,14 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-08.00 — Gemini boundary donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-08.01` task or any implementation in this phase, run the donor-reuse preflight for D-ZEROKIT, D-CCT. Inspect privacy preflight, strict validation, blind audit, and model/fact separation; translate provider-specific assumptions to Gemini/ADK.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Prompt/input/output boundary memo and adversarial test list.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Evidence:** Inspected all 4 donor source files (CCT-EVID-001, CCT-SEM-001, ZK-PRIV-001, ZK-VALID-001) at immutable pinned commits via GitHub raw URLs. Created `docs/P-08.00_GEMINI_BOUNDARY_DONOR_PREFLIGHT.md` with entry baseline, source behavior evidence, prompt/input boundary memo (INP-01–INP-12), output boundary memo (OUT-01–OUT-10), model/fact separation matrix, 31 adversarial tests (PRIV-01–08, OUT-T01–09, AUDIT-01–07, AUTH-T01–05, CARRY-01–07), and future-phase ownership map. Updated 4 manifest entries with P-08.00 evidence. Updated `docs/COMPONENT_PROVENANCE.md` and `docs/HANDOFF.md`. Donor-reuse-auditor returned PASS. `uv run python scripts/cmd.py unit` → 910 passed, 0 failures. Zero product code created. P-08.01 remains PENDING.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-10.00 — Saga persistence donor preflight
