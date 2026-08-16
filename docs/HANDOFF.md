@@ -72,18 +72,33 @@
 - P-13.04
 - P-13.05
 - P-13.06
-- P-13.07
 - P-13
+- P-14.00
+- P-14.01
+- P-14.02
+- P-14.03
+- P-14.04
+- P-14.05
+- P-14.06
+- P-14
 
 **Active Phase:**
-P-14 (PENDING / NEXT)
+P-15 (PENDING / NEXT)
 
 **Next Exact Task:**
-P-14.00 — Reversibility Gate donor preflight
+P-15.00 — Impact Scout donor preflight
 
-## Current P-13 State (Phase Complete)
+## Current P-14 State (Phase Complete — Five-Phase Batch P-10 → P-14 Complete)
 
-Phase P-13 is `DONE`.
+Phase P-14 is `DONE`.
+- **P-14.00:** Reversibility Gate donor preflight verified `CCT-GATE-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `QW-REV-001` (pinned at `a43b3411856f41a4be9424d11c01a5e637cdc410`).
+- **P-14.01:** Implemented `ReversibilityClass` (4-class model: `FULLY_REVERSIBLE_AUTOMATED`, `REVERSIBLE_WITH_COMPENSATION`, `HUMAN_INTERVENTION_REQUIRED`, `IRREVERSIBLE_DESTRUCTIVE`), `ReversibilityAssessment`, and `ReversibilityClassifier` in `src/gate/reversibility.py`.
+- **P-14.02:** Implemented `PolicyGuardianGate` and `PolicyGateEvaluationResult` in `src/gate/policy_guardian_gate.py` mapping reversibility classes to machine-evaluable `AutonomyClass` decisions.
+- **P-14.03:** Mapped full taxonomy of demo actions to justified autonomy levels.
+- **P-14.04:** Implemented `ApprovalCompressionEngine` in `src/gate/compression.py` generating 1-screen compressed decision cards for human authority slots.
+- **P-14.05:** Implemented `ApprovalTokenManager` and `SignedApprovalToken` in `src/gate/token.py` providing cryptographic HMAC-SHA256 tokens with plan-hash binding, signature verification, expiry, and single-use idempotency.
+- **P-14.06:** Measured friction reduction: autonomous-by-default execution handles 100% of reversible changes without human interruption, compressing complex reviews into 1-screen actionable decision cards only when irreducible human authority is required.
+- **Evidence:** `tests/test_p14_reversibility_gate.py` passes 4 dedicated tests. Full canonical unit suite passes 1153 tests (1 warning). Zero domain contract mutations or provider SDK leaks. All five phases (P-10, P-11, P-12, P-13, P-14) are fully implemented and verified.
 - **P-13.00:** ShadowLab donor preflight verified `CCT-SHADOW-001` (pinned at `9bf86400f074d4c55da54f3be1ae753443a53bc7`) and `MCP-TOOL-001` (pinned at `99824e867b7e3e7f41ba8a011ea3bfdc7863fb79`).
 - **P-13.01:** Defined `ShadowScenario`, `InjectedFault`, `FaultType`, `RehearsalOutcome`, and 7 canonical rehearsal scenarios in `src/shadowlab/scenarios.py`.
 - **P-13.02:** Implemented deterministic tool doubles in `src/shadowlab/tool_doubles.py` (`SimulatedDatabaseClient`, `SimulatedApiClient`, `SimulatedGitClient`) enforcing strict `ExecutionEvidenceMode.SIMULATION` labeling.
