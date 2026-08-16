@@ -515,15 +515,15 @@ required_tests:
 - path traversal and unsafe endpoint rejection (ChangeMesh intentional delta)
 - positive validation for conforming structured outputs
 - no ZeroKit product semantics (forbidden carry-over)
-competition_introduction_commit: P-08.02
+competition_introduction_commit: 27fe08c1271e4aad1527a47d35f9fefc8b361819
 evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
 - P-08.00 Gemini boundary donor preflight PASS
-- P-08.02 tests/test_p08_02_structured_output.py 36 tests PASS
+- P-08.02 tests/test_p08_02_structured_output.py 40 tests PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T13:36:00Z'
+last_reviewed: '2026-08-16T13:47:00Z'
 ```
 
 ### ZK-CLAIM-001

@@ -2,7 +2,7 @@
 
 Validates:
 1. Strict Output Validation Tests (OUT-T01 through OUT-T09):
-   - OUT-T01: Missing required field -> REJECTED
+   - OUT-T01: Missing required field -> REJECTED (Zero default injection)
    - OUT-T02: Extra field not in schema -> REJECTED (extra="forbid")
    - OUT-T03: Wrong type -> REJECTED (no silent coercion)
    - OUT-T04: Invalid enum value -> REJECTED
@@ -11,19 +11,23 @@ Validates:
    - OUT-T07: Unknown action type -> REJECTED
    - OUT-T08: Malformed JSON from model -> REJECTED, no repair
    - OUT-T09: Silent coercion attempt -> REJECTED
-2. Three Semantic Reasoning Surfaces (Positive & Boundary Tests):
+2. Schema Version Strictness & No-Default Invariant:
+   - Missing schema_version rejected across all 3 surfaces.
+   - Unsupported schema_version rejected across all 3 surfaces.
+   - Zero root or nested output fields silently supplied by defaults.
+3. Three Semantic Reasoning Surfaces (Positive & Boundary Tests):
    - Goal Decomposition (GoalDecompositionResult)
    - Policy Explanation (PolicyExplanationResult)
    - Semantic Audit (SemanticAuditResult)
-3. Structural Separation (OUT-10):
+4. Structural Separation (OUT-10):
    - Structured citations, counter-evidence, and missing-evidence distinct from prose.
-4. Authority Boundary Invariants (OUT-08):
+5. Authority Boundary Invariants (OUT-08):
    - All models belong strictly to GEMINI_SEMANTIC_JUDGMENT.
    - Attempted injection of deterministic facts or policy authority fails closed.
-5. Fail-Closed JSON Parser:
+6. Fail-Closed JSON Parser:
    - Rejects NaN/Infinity, trailing garbage, incomplete syntax, non-dict root.
    - Handles clean markdown code blocks without fuzzy repair.
-6. Architectural Integrity & Donor Compliance:
+7. Architectural Integrity & Donor Compliance:
    - 0 Google SDK imports in domain/contracts.
    - Single model client owner in src/core/gemini_client.py.
    - 0 forbidden donor identifiers (ZeroKit schema, Codex identifiers).
@@ -37,17 +41,22 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from src.core.gemini_client import BoundedGeminiClient
 from src.core.gemini_structured_output import (
     CANONICAL_AUTHORITY_LANE,
     CANONICAL_STRUCTURED_SCHEMA_VERSION,
     GoalDecompositionResult,
+    GoalDecompositionSubGoal,
     PolicyComplianceStatus,
     PolicyExplanationResult,
     PolicyImpactLevel,
+    PolicyRuleExplanation,
     SemanticAssessmentVerdict,
     SemanticAuditResult,
+    SemanticClaimAssessment,
+    SemanticEvidenceCitation,
     SemanticRiskLevel,
     StructuredOutputJSONError,
     StructuredOutputSecurityError,
@@ -60,6 +69,7 @@ from src.core.gemini_structured_output import (
     parse_semantic_audit_output,
     parse_structured_json,
     validate_action_type,
+    validate_canonical_schema_version,
     validate_safe_endpoint,
     validate_safe_relative_path,
 )
@@ -169,13 +179,19 @@ def make_valid_semantic_audit_dict() -> dict[str, Any]:
 class TestStrictOutputValidation:
     """Validates the 9 canonical output boundary tests mandated by P-08.00."""
 
-    def test_out_t01_missing_required_field_rejected(self) -> None:
-        """OUT-T01: Missing required field in model response -> REJECTED."""
+    def test_out_t01_missing_required_field_rejected_zero_default_injection(self) -> None:
+        """OUT-T01: Missing required field in model response -> REJECTED without defaults."""
         # Goal Decomposition: missing 'summary'
-        data = make_valid_goal_decomposition_dict()
-        del data["summary"]
+        data_gd = make_valid_goal_decomposition_dict()
+        del data_gd["summary"]
         with pytest.raises(StructuredOutputValidationError, match="summary"):
-            parse_goal_decomposition_output(data)
+            parse_goal_decomposition_output(data_gd)
+
+        # Goal Decomposition: missing 'schema_version' (proves NO silent default injection)
+        data_gd_no_ver = make_valid_goal_decomposition_dict()
+        del data_gd_no_ver["schema_version"]
+        with pytest.raises(StructuredOutputValidationError, match="schema_version"):
+            parse_goal_decomposition_output(data_gd_no_ver)
 
         # Policy Explanation: missing 'decision_id'
         data_policy = make_valid_policy_explanation_dict()
@@ -183,11 +199,53 @@ class TestStrictOutputValidation:
         with pytest.raises(StructuredOutputValidationError, match="decision_id"):
             parse_policy_explanation_output(data_policy)
 
+        # Policy Explanation: missing 'schema_version'
+        data_policy_no_ver = make_valid_policy_explanation_dict()
+        del data_policy_no_ver["schema_version"]
+        with pytest.raises(StructuredOutputValidationError, match="schema_version"):
+            parse_policy_explanation_output(data_policy_no_ver)
+
+        # Policy Explanation: missing 'compliance_considerations' (no default factory list)
+        data_policy_no_comp = make_valid_policy_explanation_dict()
+        del data_policy_no_comp["compliance_considerations"]
+        with pytest.raises(StructuredOutputValidationError, match="compliance_considerations"):
+            parse_policy_explanation_output(data_policy_no_comp)
+
+        # Policy Explanation: missing 'remediation_guidance' (no default factory list)
+        data_policy_no_rem = make_valid_policy_explanation_dict()
+        del data_policy_no_rem["remediation_guidance"]
+        with pytest.raises(StructuredOutputValidationError, match="remediation_guidance"):
+            parse_policy_explanation_output(data_policy_no_rem)
+
         # Semantic Audit: missing 'overall_verdict'
         data_audit = make_valid_semantic_audit_dict()
         del data_audit["overall_verdict"]
         with pytest.raises(StructuredOutputValidationError, match="overall_verdict"):
             parse_semantic_audit_output(data_audit)
+
+        # Semantic Audit: missing 'schema_version'
+        data_audit_no_ver = make_valid_semantic_audit_dict()
+        del data_audit_no_ver["schema_version"]
+        with pytest.raises(StructuredOutputValidationError, match="schema_version"):
+            parse_semantic_audit_output(data_audit_no_ver)
+
+        # Semantic Audit: missing 'evidence_citations'
+        data_audit_no_cit = make_valid_semantic_audit_dict()
+        del data_audit_no_cit["evidence_citations"]
+        with pytest.raises(StructuredOutputValidationError, match="evidence_citations"):
+            parse_semantic_audit_output(data_audit_no_cit)
+
+        # Semantic Audit: missing 'counter_evidence'
+        data_audit_no_counter = make_valid_semantic_audit_dict()
+        del data_audit_no_counter["counter_evidence"]
+        with pytest.raises(StructuredOutputValidationError, match="counter_evidence"):
+            parse_semantic_audit_output(data_audit_no_counter)
+
+        # Semantic Audit: missing 'missing_evidence'
+        data_audit_no_missing = make_valid_semantic_audit_dict()
+        del data_audit_no_missing["missing_evidence"]
+        with pytest.raises(StructuredOutputValidationError, match="missing_evidence"):
+            parse_semantic_audit_output(data_audit_no_missing)
 
     def test_out_t02_extra_field_rejected_via_strict_schema(self) -> None:
         """OUT-T02: Extra field not in schema -> REJECTED via extra='forbid'."""
@@ -314,7 +372,80 @@ class TestStrictOutputValidation:
 
 
 # ==============================================================================
-# 2. Three Semantic Reasoning Surfaces (Positive Tests)
+# 2. Schema Version Strictness & No-Default Invariant Tests
+# ==============================================================================
+class TestSchemaVersionAndNoDefaults:
+    """Validates that schema_version is required, exact, and zero fields have defaults."""
+
+    def test_validate_canonical_schema_version_direct(self) -> None:
+        assert validate_canonical_schema_version("1.0.0") == "1.0.0"
+        with pytest.raises(StructuredOutputValidationError, match="must not be blank"):
+            validate_canonical_schema_version("")
+        with pytest.raises(StructuredOutputValidationError, match="must not be blank"):
+            validate_canonical_schema_version("   ")
+        with pytest.raises(StructuredOutputValidationError, match="Unsupported schema_version"):
+            validate_canonical_schema_version("2.0.0")
+        with pytest.raises(StructuredOutputValidationError, match="Unsupported schema_version"):
+            validate_canonical_schema_version("0.9.0")
+
+    def test_unsupported_schema_version_rejected_across_all_surfaces(self) -> None:
+        # Goal Decomposition
+        data_gd = make_valid_goal_decomposition_dict()
+        data_gd["schema_version"] = "2.0.0"
+        with pytest.raises(StructuredOutputValidationError, match="Unsupported schema_version"):
+            parse_goal_decomposition_output(data_gd)
+
+        # Policy Explanation
+        data_pe = make_valid_policy_explanation_dict()
+        data_pe["schema_version"] = "9.9.9"
+        with pytest.raises(StructuredOutputValidationError, match="Unsupported schema_version"):
+            parse_policy_explanation_output(data_pe)
+
+        # Semantic Audit
+        data_sa = make_valid_semantic_audit_dict()
+        data_sa["schema_version"] = "v1"
+        with pytest.raises(StructuredOutputValidationError, match="Unsupported schema_version"):
+            parse_semantic_audit_output(data_sa)
+
+    def test_all_fields_in_all_models_have_no_default_values(self) -> None:
+        """Assert no Pydantic field in gemini_structured_output has default/default_factory."""
+        models: list[type[BaseModel]] = [
+            GoalDecompositionSubGoal,
+            GoalDecompositionResult,
+            PolicyRuleExplanation,
+            PolicyExplanationResult,
+            SemanticEvidenceCitation,
+            SemanticClaimAssessment,
+            SemanticAuditResult,
+        ]
+
+        for model_cls in models:
+            for field_name, field_info in model_cls.model_fields.items():
+                assert field_info.is_required(), (
+                    f"Model {model_cls.__name__} field '{field_name}' must be required "
+                    f"(has default={field_info.default!r}, "
+                    f"default_factory={field_info.default_factory!r})"
+                )
+
+    def test_nested_claim_assessment_missing_collection_fields_rejected(self) -> None:
+        data_sa = make_valid_semantic_audit_dict()
+        del data_sa["claim_assessments"][0]["cited_evidence_keys"]
+        with pytest.raises(StructuredOutputValidationError, match="cited_evidence_keys"):
+            parse_semantic_audit_output(data_sa)
+
+        data_sa2 = make_valid_semantic_audit_dict()
+        del data_sa2["claim_assessments"][0]["counter_evidence_points"]
+        with pytest.raises(StructuredOutputValidationError, match="counter_evidence_points"):
+            parse_semantic_audit_output(data_sa2)
+
+        data_sa3 = make_valid_semantic_audit_dict()
+        del data_sa3["claim_assessments"][0]["missing_evidence_points"]
+        with pytest.raises(StructuredOutputValidationError, match="missing_evidence_points"):
+            parse_semantic_audit_output(data_sa3)
+
+
+# ==============================================================================
+# 3. Three Semantic Reasoning Surfaces (Positive Tests)
 # ==============================================================================
 class TestSemanticSurfacesPositive:
     """Validates successful schema instantiation and parsing across all 3 surfaces."""
@@ -379,7 +510,7 @@ class TestSemanticSurfacesPositive:
 
 
 # ==============================================================================
-# 3. Structural Separation & Decisive Citation Invariants (OUT-10)
+# 4. Structural Separation & Decisive Citation Invariants (OUT-10)
 # ==============================================================================
 class TestStructuralSeparationAndAuditInvariants:
     """Validates citations & counter-evidence distinct/mandatory for decisive assessments."""
@@ -427,7 +558,7 @@ class TestStructuralSeparationAndAuditInvariants:
 
 
 # ==============================================================================
-# 4. Authority Boundary Invariants (OUT-08)
+# 5. Authority Boundary Invariants (OUT-08)
 # ==============================================================================
 class TestAuthorityBoundaryInvariants:
     """Validates that Gemini output cannot synthesize facts, policy, or approvals."""
@@ -465,7 +596,7 @@ class TestAuthorityBoundaryInvariants:
 
 
 # ==============================================================================
-# 5. JSON Parser Edge Cases & Security
+# 6. JSON Parser Edge Cases & Security
 # ==============================================================================
 class TestJSONParserEdgeCases:
     """Validates JSON parsing boundary handling and constant rejections."""
@@ -489,7 +620,7 @@ class TestJSONParserEdgeCases:
 
 
 # ==============================================================================
-# 6. Prompt Construction Tests
+# 7. Prompt Construction Tests
 # ==============================================================================
 class TestPromptConstruction:
     """Validates schema-constrained prompt generation for all 3 surfaces."""
@@ -552,7 +683,7 @@ class TestPromptConstruction:
 
 
 # ==============================================================================
-# 7. Architectural Boundary & Donor Integrity Tests
+# 8. Architectural Boundary & Donor Integrity Tests
 # ==============================================================================
 class TestArchitecturalIntegrityAndDonorCompliance:
     """Validates 0 SDK imports in domain, single model call owner, and 0 forbidden donors."""
@@ -624,7 +755,7 @@ class TestArchitecturalIntegrityAndDonorCompliance:
 
 
 # ==============================================================================
-# 8. Model Client Integration Tests (Simulated BoundedGeminiClient End-to-End)
+# 9. Model Client Integration Tests (Simulated BoundedGeminiClient End-to-End)
 # ==============================================================================
 class TestModelClientIntegration:
     """Validates end-to-end integration between BoundedGeminiClient and structured parsers."""
@@ -664,7 +795,7 @@ class TestModelClientIntegration:
 
 
 # ==============================================================================
-# 9. Additional Adversarial & Boundary Tests
+# 10. Additional Adversarial & Boundary Tests
 # ==============================================================================
 class TestAdversarialBoundaries:
     """Validates edge cases, nested attacks, and empty collection invariants."""

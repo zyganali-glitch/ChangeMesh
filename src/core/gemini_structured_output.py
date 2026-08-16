@@ -141,7 +141,23 @@ class StructuredOutputSecurityError(StructuredOutputValidationError):
     """Raised on security violations (traversal, unsafe endpoint, unknown action)."""
 
 
-# --- Deterministic Security Validators ---
+# --- Deterministic Security & Version Validators ---
+def validate_canonical_schema_version(v: str, field_name: str = "schema_version") -> str:
+    """Validate that schema_version is non-blank and exactly matches the canonical version.
+
+    Fails closed if the version is missing, blank, or unsupported.
+    """
+    if not isinstance(v, str) or not v.strip():
+        raise StructuredOutputValidationError(f"{field_name} must not be blank.")
+    cleaned = v.strip()
+    if cleaned != CANONICAL_STRUCTURED_SCHEMA_VERSION:
+        raise StructuredOutputValidationError(
+            f"Unsupported schema_version '{cleaned}'. "
+            f"Expected '{CANONICAL_STRUCTURED_SCHEMA_VERSION}'."
+        )
+    return cleaned
+
+
 def validate_safe_relative_path(path_str: str, field_name: str = "path") -> str:
     """Validate that a path string is safe, relative, and contains no traversal tokens.
 
@@ -284,7 +300,7 @@ class GoalDecompositionResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: StrictStr = CANONICAL_STRUCTURED_SCHEMA_VERSION
+    schema_version: StrictStr
     change_request_id: StrictStr
     summary: StrictStr
     sub_goals: list[GoalDecompositionSubGoal] = Field(min_length=1)
@@ -299,7 +315,12 @@ class GoalDecompositionResult(BaseModel):
         """Authority classification for this model artifact."""
         return CANONICAL_AUTHORITY_LANE
 
-    @field_validator("schema_version", "change_request_id", "summary", "rationale")
+    @field_validator("schema_version")
+    @classmethod
+    def _validate_version(cls, v: str) -> str:
+        return validate_canonical_schema_version(v, field_name="schema_version")
+
+    @field_validator("change_request_id", "summary", "rationale")
     @classmethod
     def _validate_non_blank(cls, v: str, info: Any) -> str:
         if not v or not v.strip():
@@ -374,13 +395,13 @@ class PolicyExplanationResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: StrictStr = CANONICAL_STRUCTURED_SCHEMA_VERSION
+    schema_version: StrictStr
     change_id: StrictStr
     decision_id: StrictStr
     summary_explanation: StrictStr
     rule_explanations: list[PolicyRuleExplanation] = Field(min_length=1)
-    compliance_considerations: list[StrictStr] = Field(default_factory=list)
-    remediation_guidance: list[StrictStr] = Field(default_factory=list)
+    compliance_considerations: list[StrictStr]
+    remediation_guidance: list[StrictStr]
     explanation_scope: StrictStr
 
     @property
@@ -388,8 +409,12 @@ class PolicyExplanationResult(BaseModel):
         """Authority classification for this model artifact."""
         return CANONICAL_AUTHORITY_LANE
 
+    @field_validator("schema_version")
+    @classmethod
+    def _validate_version(cls, v: str) -> str:
+        return validate_canonical_schema_version(v, field_name="schema_version")
+
     @field_validator(
-        "schema_version",
         "change_id",
         "decision_id",
         "summary_explanation",
@@ -451,9 +476,9 @@ class SemanticClaimAssessment(BaseModel):
     claim_id: StrictStr
     assessment: SemanticAssessmentVerdict
     assessment_narrative: StrictStr
-    cited_evidence_keys: list[StrictStr] = Field(default_factory=list)
-    counter_evidence_points: list[StrictStr] = Field(default_factory=list)
-    missing_evidence_points: list[StrictStr] = Field(default_factory=list)
+    cited_evidence_keys: list[StrictStr]
+    counter_evidence_points: list[StrictStr]
+    missing_evidence_points: list[StrictStr]
 
     @field_validator("claim_id", "assessment_narrative")
     @classmethod
@@ -498,22 +523,27 @@ class SemanticAuditResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: StrictStr = CANONICAL_STRUCTURED_SCHEMA_VERSION
+    schema_version: StrictStr
     audit_id: StrictStr
     change_id: StrictStr
     overall_verdict: SemanticAssessmentVerdict
     reasoning_narrative: StrictStr
     claim_assessments: list[SemanticClaimAssessment] = Field(min_length=1)
-    evidence_citations: list[SemanticEvidenceCitation] = Field(default_factory=list)
-    counter_evidence: list[StrictStr] = Field(default_factory=list)
-    missing_evidence: list[StrictStr] = Field(default_factory=list)
+    evidence_citations: list[SemanticEvidenceCitation]
+    counter_evidence: list[StrictStr]
+    missing_evidence: list[StrictStr]
 
     @property
     def authority_lane(self) -> str:
         """Authority classification for this model artifact."""
         return CANONICAL_AUTHORITY_LANE
 
-    @field_validator("schema_version", "audit_id", "change_id", "reasoning_narrative")
+    @field_validator("schema_version")
+    @classmethod
+    def _validate_version(cls, v: str) -> str:
+        return validate_canonical_schema_version(v, field_name="schema_version")
+
+    @field_validator("audit_id", "change_id", "reasoning_narrative")
     @classmethod
     def _validate_non_blank(cls, v: str, info: Any) -> str:
         if not v or not v.strip():

@@ -68,6 +68,7 @@ from src.core.gemini_structured_output import (
     parse_semantic_audit_output,
     parse_structured_json,
     validate_action_type,
+    validate_canonical_schema_version,
     validate_safe_endpoint,
     validate_safe_relative_path,
 )
@@ -137,6 +138,7 @@ __all__ = [
     "validate_safe_relative_path",
     "validate_safe_endpoint",
     "validate_action_type",
+    "validate_canonical_schema_version",
     "parse_structured_json",
     "parse_goal_decomposition_output",
     "parse_policy_explanation_output",

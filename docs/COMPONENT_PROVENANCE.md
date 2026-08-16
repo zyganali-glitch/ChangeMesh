@@ -1,6 +1,6 @@
 # ChangeMesh Component Provenance
 
-Implementation status: `PLANNED / PRE-IMPLEMENTATION`
+Implementation status: `IN_PROGRESS` (ZK-VALID-001 `VERIFIED`; other components `PLANNED` or `APPROVED_FOR_IMPLEMENTATION`)
 Architecture donor preflight gate (P-04.00): `PASS`
 Gemini boundary donor preflight gate (P-08.00): `PASS`
 
@@ -16,6 +16,20 @@ ChangeMesh is a new product/repository. Design benefits from ideas in owner's ea
 | Qwen MemoryAgent | importance, freshness, decay, shared memory | Memory Trust Layer with provenance/quarantine |
 | GitLab Edition | conflict and repository blast-radius analysis | Impact Scout with GitHub-first demo adapter |
 
+## Implemented and Verified Donor Components
+
+### ZK-VALID-001 — Config Validator / Strict Output Validation
+- **Status:** `VERIFIED`
+- **Donor ID:** `D-ZEROKIT` (`zyganali-glitch/zerokit-ai-control-plane`)
+- **Immutable Donor SHA:** `d663db8c706cb914e1af5caf651df08edb5c50c0`
+- **Source Paths:** `frontend/js/config-validator.js`, `tests/unit/config-validator.test.mjs`
+- **License State:** `VERIFIED_COMPATIBLE` (owner-authored)
+- **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
+- **ChangeMesh Target:** `src/core/gemini_structured_output.py`
+- **Competition Introduction Commit:** `27fe08c1271e4aad1527a47d35f9fefc8b361819`
+- **Test Evidence:** `tests/test_p08_02_structured_output.py` (40 dedicated unit/boundary/adversarial tests PASS)
+- **Materially New Contribution:** Reimplemented in Python using strict Pydantic v2 domain schemas (`extra="forbid"`, `frozen=True`, `StrictStr`, `StrictInt`), 3 semantic surfaces (Goal Decomposition, Policy Explanation, Independent Semantic Audit), exact canonical `schema_version` validation, deterministic path traversal and unsafe endpoint validators, authority lane boundary (`GEMINI_SEMANTIC_JUDGMENT`), and zero default injection. Zero ZeroKit product semantics or frontend global variables carry over.
+
 ## Mandatory final disclosure
 
 Record original path, license, source commit, copied/adapted/clean-room status, competition-period introduction commit, tests proving new behavior, and why ChangeMesh contribution is materially new. 
@@ -24,7 +38,6 @@ Per the official Hackathon rules, any reused components must:
 1. Comply with applicable open-source licenses.
 2. Be fully disclosed if pre-existing.
 3. Be enhanced/built upon to create materially new software during the Submission Period.
-
 
 ## Binding detailed ledger
 

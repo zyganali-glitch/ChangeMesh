@@ -64,3 +64,30 @@ These schemas guarantee deterministic fact sovereignty: neither a model's judgme
 All evidence timestamps and artifact hashes conform strictly to `docs/CONTRACT_CONVENTIONS.md` (UTC-aware `UtcDateTime`, SHA-256 64-char hex digests).
 
 The runtime Evidence Ledger service (`src/evidence/evidence_record.py`) and adapters (such as Firestore persistence or Pub/Sub timelines) are explicitly deferred and **not yet implemented**. P-05.03 only defines the immutable evidence contracts.
+
+## P-08.02 Structured Output Boundary and Model/Fact Separation
+
+Under P-08.02 (`src/core/gemini_structured_output.py`), structured model output is treated as untrusted data until strict, deterministic schema validation succeeds.
+
+1. **Implemented Semantic Surfaces:**
+   - **Goal Decomposition:** `GoalDecompositionResult` — structured breakdown of specialist tasks, target components, canonical action types, and advisory risk levels.
+   - **Policy Explanation:** `PolicyExplanationResult` — structured explanatory narrative of already supplied organizational policy decisions (does NOT author policy or alter autonomy classification).
+   - **Semantic Audit:** `SemanticAuditResult` — structured evidence citations, counter-evidence, missing-evidence, and claim assessments evaluating semantic coverage.
+
+2. **Authority Sovereignty:**
+   - Validated artifacts belong strictly to `GEMINI_SEMANTIC_JUDGMENT` (`authority_lane`).
+   - Model judgments cannot manufacture, overwrite, or promote deterministic `EvidenceState` (`PASS`, `WARN`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`), command results, exit codes, execution modes, organizational policy decisions, or human approval records.
+   - Model disagreement with deterministic facts creates an advisory conflict or requires review; it never changes the underlying deterministic fact.
+
+3. **Fail-Closed Guarantees (OUT-01 through OUT-10):**
+   - Missing required fields (including `schema_version` and collection fields) fail closed with zero default injection.
+   - Unsupported or mismatched `schema_version` fails closed.
+   - Extra fields fail closed (`extra="forbid"`).
+   - Wrong types fail closed without silent coercion (`StrictStr`, `StrictInt`).
+   - Path traversal tokens (`..`, `../`, `..\\`, `%2e%2e`) and unapproved external URLs fail closed.
+   - Decisive verdicts (`SUPPORTS`, `CONTRADICTS`, `INSUFFICIENT`) enforce structural separation (OUT-10) requiring explicit evidence citations or counter/missing-evidence points distinct from generated narrative text.
+
+4. **Deferred Phase Scope Boundary:**
+   - **P-08.03 (Input Minimization & Privacy Redaction):** `PENDING` — Secret/token/PII blocking and field-level prompt minimization before model calls are not yet implemented.
+   - **P-08.04 (Blind Audit Expected-Answer Isolation & Reconciler):** `PENDING` — Separating deterministic facts from model-visible evidence bundles and withholding expected answers from the auditor reconciler are not yet implemented.
+   - **P-08.05 (Cost & Latency Budgets):** `PENDING` — Adaptive token budget optimization is not yet implemented.
