@@ -39,12 +39,17 @@ P-08.03
 P-08.04
 P-08.05
 P-09.01
+P-09.02
 
 **Active Phase:**
 P-09
 
 **Next Exact Task:**
-P-09.02 — Implement publish/consume adapters with schema validation and correlation IDs
+P-09.03 — Implement retry schedule and dead-letter behavior
+
+## Current P-09.02 State
+
+P-09.02 is `DONE`. Implemented canonical `EventWireMessage` (`events/wire.py`), `EventPublisher`/`EventConsumer` protocols (`events/publisher.py`, `events/consumer.py`), `InMemoryDeliveryState` (`events/delivery_state.py`), and Google Pub/Sub adapters in `integrations/gcp/pubsub_adapter.py` (`GooglePubSubPublisher`, `GooglePubSubConsumer`). Pre-dispatch validation guarantees that malformed JSON, unsupported schema versions, missing/extra envelope fields, and secret-bearing payloads never reach business callbacks. Duplicate delivery safety is verified (callbacks execute at most once per accepted event; duplicate delivers return `DUPLICATE` without invoking callbacks). Zero Google SDK types leak into domain contracts. The dedicated suite `tests/test_p09_02_pubsub_adapters.py` passes 12 tests. Canonical unit passes 1059 tests (1 warning).
 
 ## Current P-09.01 State
 

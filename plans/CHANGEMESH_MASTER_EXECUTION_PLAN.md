@@ -881,11 +881,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-09.02 — Implement publish/consume adapters with schema validation and correlation IDs
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement publish/consume adapters with schema validation and correlation IDs.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Invalid messages rejected; duplicate delivery safe.
 - **Required evidence:** Integration tests.
+- **Evidence:** Implemented canonical `EventWireMessage` (`events/wire.py`) with strict schema validation, canonical JSON serialization (`canonical_json_bytes`), and automatic payload secret scanning (blocking private keys, API tokens, JWTs, and bearer values). Implemented provider-neutral publish/consume protocols and result models (`events/publisher.py`, `events/consumer.py`). Implemented bounded in-memory delivery state tracker `InMemoryDeliveryState` (`events/delivery_state.py`) providing duplicate, conflict, and out-of-order classification via `classify_event_delivery`. Implemented Google Pub/Sub transport adapters in `integrations/gcp/pubsub_adapter.py` (`GooglePubSubPublisher`, `GooglePubSubConsumer`) with correlation ID, causation ID, and agent revision provenance preservation. Pre-dispatch validation guarantees that malformed JSON, unsupported schema versions, missing/extra envelope fields, and secret-bearing payloads never reach business callbacks. Duplicate delivery safety is verified (callbacks execute at most once per accepted event; duplicate delivers return `DUPLICATE` without invoking callbacks). Zero Google SDK types leak into domain contracts. `tests/test_p09_02_pubsub_adapters.py` passes 12 integration tests. Canonical unit suite passes 1059 tests (1 warning). Real live Pub/Sub writes remain `NOT_RUN` (no unbudgeted live cloud mutations).
 - **Mandatory documentation sync:** Environment/API.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

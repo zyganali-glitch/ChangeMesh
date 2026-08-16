@@ -43,11 +43,12 @@ Record actual environment only; do not fill unknown values with guesses.
 - Every external API write defines timeout, retry, idempotency, and evidence behavior.
 - Costs and quotas are measured before final demo.
 
-### Event Envelope and Backbone Topology Boundary (P-05.05 / P-09.01)
+### Event Envelope and Backbone Topology Boundary (P-05.05 / P-09.01 / P-09.02)
 
 - **EventEnvelope** is a provider-neutral domain contract defined in `domain/contracts/event_envelope.py`. It carries event identity, change identity, causal chain, correlation, producer revision, and idempotency key.
 - **No credentials** are permitted in event metadata or payload boundary. Credential material must never enter an EventEnvelope.
 - **Backbone Topology (P-09.01 IMPLEMENTED):** Minimal, versioned (`1.0.0`) canonical topology declared in `events/topology.py` and `events/topology_manifest.json` with 6 logical topics (`changemesh-lifecycle-v1`, `changemesh-agent-work-v1`, `changemesh-approval-v1`, `changemesh-evidence-v1`, `changemesh-retry-v1`, `changemesh-dead-letter-v1`) and 6 attached subscriptions. Subscriptions route dead letters to `changemesh-dead-letter-v1` (5 attempts) with dead-letter subscription cycle prohibition. All 16 `ChangeState` values are mapped deterministically (see diagram `docs/diagrams/pubsub_topology.md`).
+- **Publish/Consume Adapters (P-09.02 IMPLEMENTED):** Provider-neutral `EventWireMessage` (`events/wire.py`), `EventPublisher`/`EventConsumer` protocols, `InMemoryDeliveryState` (`events/delivery_state.py`), and Google Pub/Sub adapters in `integrations/gcp/pubsub_adapter.py` (`GooglePubSubPublisher`, `GooglePubSubConsumer`). Pre-dispatch schema validation rejects malformed JSON, unsupported versions, extra fields (`extra='forbid'`), and secret-bearing payloads. Duplicate delivery safety is enforced before application callback invocation.
 - **P-09 owns actual publish/consume behavior**, including topic/subscription topology, publisher/consumer adapters, delivery, acknowledgements, retries, dead-letter, and infrastructure config.
 - **classify_event_delivery** is a pure function consuming abstract already-seen snapshots. It does not own persistence (P-10).
 
