@@ -1,8 +1,8 @@
 # ChangeMesh Donor Reuse Manifest
 
-> **Status:** `PRE-IMPLEMENTATION / BINDING`  
-> **Owner:** Primary ChangeMesh agent  
-> **Source policy:** Donor repositories are read-only; immutable commit and exact source paths are mandatory.  
+> **Status:** `PRE-IMPLEMENTATION / BINDING`
+> **Owner:** Primary ChangeMesh agent
+> **Source policy:** Donor repositories are read-only; immutable commit and exact source paths are mandatory.
 > **Execution gate:** No donor-derived implementation may begin until `P-02D` and the relevant `P-xx.00` preflight pass.
 
 ## 1. Purpose
@@ -274,8 +274,7 @@ source_paths:
 - tests/test_evidence_pack.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
-- named evidence states; NOT_RUN and simulation boundaries; model cannot rewrite local
-  facts
+- evidence pack generation with explicit SIMULATED vs REAL_LOCAL_SCAN boundary and NOT_RUN gate disclosure; rerun does not alter target score, risk count, or context graph
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
 - src/evidence/evidence_record.py
@@ -284,10 +283,9 @@ required_transformations:
 forbidden_carry_over:
 - Codex event assumptions, GPT-specific fields, InvoiceFlow fixture names
 required_tests:
-- model disagreement cannot change facts
-- blocked remains not-run
-- simulated remains simulated
-- tamper detection
+- evidence pack artifact generation and file completeness
+- simulated data flag and SIMULATED / NOT_RUN boundary disclosures
+- evidence rerun idempotency (score, risk count, context graph unchanged)
 - no Codex/GPT/InvoiceFlow fixtures (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
@@ -296,7 +294,7 @@ evidence:
 - donor-reuse-auditor PASS
 - P-08.00 Gemini boundary donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T08:27:00Z'
+last_reviewed: '2026-08-16T11:53:00Z'
 ```
 
 ### CCT-FLIGHT-001
@@ -387,21 +385,21 @@ source_paths:
 - tests/test_codex_review.js
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
-- independent model assesses whether evidence semantically proves mission; expected
-  result withheld; conflict triggers review but cannot overwrite facts
+- neutral claims and bounded evidence isolation; schema-constrained model assessment with mandatory citations and counter-evidence; model disagreement preserves sovereign deterministic verdict and locked NOT_RUN/FAIL/SIMULATED states
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
 - src/agents/evidence_auditor.py
 required_transformations:
-- Gemini 3.5+, ADK-compatible bounded audit bundle, citation enforcement
+- Gemini structured output, GEMINI_SEMANTIC_JUDGMENT authority class, ADK-compatible bounded audit bundle, citation and counter-evidence enforcement, provider-specific Codex CLI exclusion
 forbidden_carry_over:
-- GPT-5.6/Codex runtime, expected-answer labels, model as execution authority
+- '@openai/codex runtime, ChatGPT login check, gpt-5.6-sol model identifier, MODEL_SEMANTIC_JUDGMENT authority name, InvoiceFlow references'
 required_tests:
-- expected-label leakage scan
-- uncited decisive answer rejection
-- deterministic reconciliation
-- controlled mission gap
-- no GPT-5.6/Codex runtime (forbidden carry-over)
+- blind review prompt isolation (withheld local expected statuses)
+- schema validation and unauthorized field rejection
+- decisive assessment citation requirement
+- contradiction counter-evidence and insufficient missing-evidence enforcement
+- deterministic reconciliation and locked NOT_RUN / FAIL / SIMULATED preservation
+- no Codex runtime / ChatGPT auth / GPT model identifiers (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
 - source inspection
@@ -409,7 +407,7 @@ evidence:
 - donor-reuse-auditor PASS
 - P-08.00 Gemini boundary donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T08:27:00Z'
+last_reviewed: '2026-08-16T11:53:00Z'
 ```
 
 ### CCT-JUDGE-001
@@ -465,19 +463,19 @@ source_paths:
 - tests/unit/privacy-guard.test.mjs
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
-- prevent sensitive/real data from entering model workflow; explicitly separate synthetic
-  fixture
+- pre-send privacy scanning for private keys, API keys, bearer tokens, connection strings, JWTs, and session cookies; two-tier severity (blockers cause fail-closed rejection, review patterns flag UUIDs/IPs/production markers); synthetic fixture domain allowlisting
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
 - src/policy/policy_guardian.py
 required_transformations:
-- Gemini input minimization, Policy Guardian, demo fixture boundary
+- Gemini input minimization, Policy Guardian deterministic gate, demo fixture boundary, remove OpenAI-specific pattern names
 forbidden_carry_over:
-- school-SaaS data, Codex/GPT fields, ZeroKit product semantics
+- school-SaaS fixture data, openai_api_key pattern naming, ZeroKit product semantics
 required_tests:
-- secret/PII fixture blocked/redacted
-- synthetic mode explicit
-- model request contains only allowlisted fields
+- blocking patterns (private keys, API keys, bearer tokens, JWTs, connection strings) fail closed
+- review patterns (UUIDs, IPs, production markers) trigger review warnings
+- synthetic fixture domain allowlisting (example.com, example.net, example.org, example.test)
+- model prompt contains only allowlisted fields
 - no school-SaaS data or ZeroKit semantics (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
@@ -486,7 +484,7 @@ evidence:
 - donor-reuse-auditor PASS
 - P-08.00 Gemini boundary donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T08:27:00Z'
+last_reviewed: '2026-08-16T11:53:00Z'
 ```
 
 ### ZK-VALID-001
@@ -502,19 +500,20 @@ source_paths:
 - tests/unit/config-validator.test.mjs
 license_state: VERIFIED_COMPATIBLE
 source_behavior:
-- generated artifact must match explicit schema/allowlist and manifest; malformed/extra
-  fields fail
+- multi-section object schema validation with required registry sections; type checking with boolean flags and finite numbers; fail-closed rejection on missing sections or malformed values; non-root-relative endpoint warning
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
 - src/core/gemini_structured_output.py
 required_transformations:
-- domain contracts, Gemini structured output, migration artifacts, evidence/passport
-  validators
+- domain contracts, Gemini structured output Pydantic schemas, migration artifacts, strict extra="forbid", path traversal and action validation
 forbidden_carry_over:
-- ZeroKit configuration schema, frontend globals, GPT-specific manifest fields
+- ZeroKit configuration schema (panel_registry, rbac_registry, field_registry, endpoint_map), validateZeroKitConfig function name, school-saas/healthcare-saas fixture scenarios, frontend globals
 required_tests:
-- missing/extra/wrong-type/path traversal/unsafe endpoint/unknown action cases
-- positive validation test
+- missing required fields / missing sections fail closed
+- extra forbidden fields fail closed
+- wrong type fails closed (no silent coercion)
+- path traversal and unsafe endpoint rejection (ChangeMesh intentional delta)
+- positive validation for conforming structured outputs
 - no ZeroKit product semantics (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
@@ -523,7 +522,7 @@ evidence:
 - donor-reuse-auditor PASS
 - P-08.00 Gemini boundary donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T08:27:00Z'
+last_reviewed: '2026-08-16T11:53:00Z'
 ```
 
 ### ZK-CLAIM-001

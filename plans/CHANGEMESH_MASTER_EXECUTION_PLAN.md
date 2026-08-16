@@ -1,13 +1,13 @@
 # CHANGEMESH — MASTER ROADMAP AND EXECUTION PLAN
 
-> **Status:** `PLANNING`  
-> **Plan ID:** `CM-MASTER-2026-001`  
-> **Owner:** Mehmet Aydoğan + primary development agent  
-> **Created:** 2026-08-06 23:17 GMT+3  
-> **Competition deadline observed in owner-supplied Devpost capture:** 2026-08-31 20:00 EDT deadline  
-> **Target:** Web/API/Cloud multi-agent enterprise product  
-> **Primary category:** Fortified Enterprise Fleet  
-> **Single source of execution truth:** this file  
+> **Status:** `PLANNING`
+> **Plan ID:** `CM-MASTER-2026-001`
+> **Owner:** Mehmet Aydoğan + primary development agent
+> **Created:** 2026-08-06 23:17 GMT+3
+> **Competition deadline observed in owner-supplied Devpost capture:** 2026-08-31 20:00 EDT deadline
+> **Target:** Web/API/Cloud multi-agent enterprise product
+> **Primary category:** Fortified Enterprise Fleet
+> **Single source of execution truth:** this file
 > **Completed-plan archive:** `plans/completed/`
 
 ## 0. Frozen mutual agreement
@@ -2347,7 +2347,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-Ω — Continuous Whole-Repository Integrity and Live-Docs Sync
 
-**Status:** `ALWAYS_ACTIVE`  
+**Status:** `ALWAYS_ACTIVE`
 **This phase never closes before the final frozen release. It runs after every micro-task.**
 
 ## P-Ω.01 — Diff and scope audit
@@ -2437,10 +2437,10 @@ Competition-complete only when mandatory phases DONE; required technologies prov
 
 # 12. BINDING ADDITIVE DONOR REUSE CONTROL PLANE
 
-> **Amendment date:** 2026-08-07 GMT+3  
-> **Amendment status:** `BINDING / ADDITIVE / PRE-IMPLEMENTATION`  
-> **Preservation guarantee:** Every byte of the GitHub master plan that existed before this heading is preserved above. This amendment adds controls and tasks; it does not delete, shorten, replace, or waive any earlier phase, micro-task, gate, risk, or definition of done.  
-> **Canonical pre-amendment Git blob SHA:** `a91661a5e3e83195b70d53695e9bce3722501254`  
+> **Amendment date:** 2026-08-07 GMT+3
+> **Amendment status:** `BINDING / ADDITIVE / PRE-IMPLEMENTATION`
+> **Preservation guarantee:** Every byte of the GitHub master plan that existed before this heading is preserved above. This amendment adds controls and tasks; it does not delete, shorten, replace, or waive any earlier phase, micro-task, gate, risk, or definition of done.
+> **Canonical pre-amendment Git blob SHA:** `a91661a5e3e83195b70d53695e9bce3722501254`
 > **Conflict rule:** When this amendment is stricter than an earlier generic instruction, the stricter donor-provenance requirement applies. Earlier scope, quality, evidence, autonomy, cloud, demo, and documentation duties remain fully binding.
 
 ## 12.1 Donor Integrity Lock expansion
@@ -2514,9 +2514,9 @@ No component may change reuse method silently. A method change requires plan sta
 
 # P-02D — Donor Repository Harvest and Reuse Freeze
 
-**Phase status:** `DONE`  
-**Hard dependency:** `P-02`  
-**Hard blocks:** `P-03` onward and all donor-derived implementation  
+**Phase status:** `DONE`
+**Hard dependency:** `P-02`
+**Hard blocks:** `P-03` onward and all donor-derived implementation
 **Write scope:** ChangeMesh documentation/governance only; donor repositories remain read-only; no product implementation in this phase.
 
 ## P-02D.01 — Freeze donor governance, read-only access, and source-of-truth rules
@@ -2754,7 +2754,7 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
-- **Evidence:** Inspected all 4 donor source files (CCT-EVID-001, CCT-SEM-001, ZK-PRIV-001, ZK-VALID-001) at immutable pinned commits via GitHub raw URLs. Created `docs/P-08.00_GEMINI_BOUNDARY_DONOR_PREFLIGHT.md` with entry baseline, source behavior evidence, prompt/input boundary memo (INP-01–INP-12), output boundary memo (OUT-01–OUT-10), model/fact separation matrix, 31 adversarial tests (PRIV-01–08, OUT-T01–09, AUDIT-01–07, AUTH-T01–05, CARRY-01–07), and future-phase ownership map. Updated 4 manifest entries with P-08.00 evidence. Updated `docs/COMPONENT_PROVENANCE.md` and `docs/HANDOFF.md`. Donor-reuse-auditor returned PASS. `uv run python scripts/cmd.py unit` → 910 passed, 0 failures. Zero product code created. P-08.01 remains PENDING.
+- **Evidence:** Inspected all 4 donor source files (CCT-EVID-001, CCT-SEM-001, ZK-PRIV-001, ZK-VALID-001) at immutable pinned commits (`65ee1b72faf9a7202d9166eed43fb671804815a8` for D-CCT, `d663db8c706cb914e1af5caf651df08edb5c50c0` for D-ZEROKIT). Grounded behavioral invariants strictly in observable source code and test proofs. Created `docs/P-08.00_GEMINI_BOUNDARY_DONOR_PREFLIGHT.md` with entry baseline, source behavior evidence, prompt/input boundary memo (INP-01–INP-12), output boundary memo (OUT-01–OUT-10), model/fact separation matrix, 36 unique adversarial test definitions (PRIV-01–08 [8], OUT-T01–09 [9], AUDIT-01–07 [7], AUTH-T01–05 [5], CARRY-01–07 [7]), and future-phase ownership map (`DEFINED != EXECUTED`). Clarified P-DΩ Preflight Applicability Rule in Master Plan Section 12/P-DΩ and verified via plan-challenger (PASS). Updated 4 manifest entries in `docs/DONOR_REUSE_MANIFEST.md` and validated via `python tools/governance/donor_manifest_lint.py` (20 components, exit code 0). Validated `git diff --check` (exit code 0). Subagent donor-reuse-auditor returned structured PASS with 0 blocking findings. `uv run python scripts/cmd.py unit` passed with 910 tests (910 passed, 1 warning, 0 failures in 7.29s). Itemized P-DΩ.01–08 and P-Ω.12 audit completed in `docs/P-OMEGA_AUDIT_REPORT.md` while preserving historical test debt evidence. Zero product runtime code created. P-08.01 remains PENDING.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-10.00 — Saga persistence donor preflight
@@ -2981,7 +2981,7 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 
 # P-DΩ — Continuous Donor Provenance and Reuse Integrity
 
-**Status:** `ALWAYS_ACTIVE`  
+**Status:** `ALWAYS_ACTIVE`
 **This phase never closes before the final frozen release. It runs in addition to P-Ω.**
 
 ## P-DΩ.01 — Immutable source parity
@@ -3015,6 +3015,16 @@ Bind every implemented donor component to the ChangeMesh introduction commit and
 ## P-DΩ.08 — Donor test and security parity
 
 Run all required donor behavior-parity, intentional-delta, negative, security, and forbidden-carry-over tests. Any required `FAIL` or `NOT_RUN` blocks the donor-sensitive task from `DONE`.
+
+### Preflight Applicability Rule (P-xx.00 Tasks)
+
+For a `P-xx.00` preflight task that explicitly forbids product implementation:
+1. `P-DΩ` is still executed in full for the preflight task.
+2. `P-DΩ.01`, `P-DΩ.02`, `P-DΩ.04`, `P-DΩ.05`, and `P-DΩ.06` apply normally to the artifacts, documentation, and manifest entries currently present.
+3. `P-DΩ.03` during preflight verifies `SOURCE -> PLANNED TARGET` behavioral traceability, approved transformations, and defined future test suites. Once a donor-derived target is implemented in product code, the full "implemented and tested" invariant requirement applies and becomes closure-gating.
+4. `P-DΩ.07` during preflight verifies that no donor component is falsely represented as implemented; `competition_introduction_commit` remains `PENDING` until implementation actually occurs in an owning task.
+5. `P-DΩ.08` during preflight requires the preflight's own source-inspection, manifest-linter, auditor-review, and governance validations to pass. Future implementation parity, security, boundary, and forbidden-carry-over tests must be explicitly recorded as `DEFINED BUT NOT YET EXECUTED` and become closure-gating in their respective owning implementation tasks.
+6. This preflight applicability rule **must not** permit an implemented donor-derived target to close with required tests `FAIL` or `NOT_RUN`, **must not** convert future `NOT_RUN` tests into `PASS`, and only clarifies which validations are closure-gating for documentation-only preflight tasks versus product implementation tasks. Strict implementation gates remain fully binding.
 
 ## P-Ω.12 — Donor provenance parity
 
