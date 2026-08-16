@@ -807,7 +807,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-08 — Gemini Integration and Structured Reasoning Boundary
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-08.01 — Create one bounded model client with exact model, timeout, retry, token, safety, and telemetry settings
 
@@ -856,13 +856,13 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-08.05 — Measure model latency, token use, cost, retry behavior
 
-- **Status:** `IN_PROGRESS`
+- **Status:** `DONE`
 - **Required action:** Measure model latency, token use, cost, retry behavior.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Budget/demo latency limits documented/enforced.
 - **Required evidence:** Metrics artifact.
 - **Mandatory documentation sync:** Cost plan, environment.
-- **Evidence:** Extended the sole `ModelCallTelemetry` contract in `src/core/gemini_client.py` with `retry_count`, `estimated_cost_usd`, and `cost_status`. `duration_ms`, prompt/response/total token counts, and attempts remain measured on every model call. Added immutable `GeminiCostRateCard` validation and deterministic token-cost calculation; absent rates or incomplete token counts produce `cost_status=NOT_RUN` with no guessed cost. Existing timeout [1s, 60s], output token [1, 8192], and wrapper-owned retry bounds remain enforced. `tests/test_p08_05_metrics.py` currently passes 6 tests covering explicit cost formula, no-price `NOT_RUN`, retry measurement, invalid rate rejection, telemetry non-secret behavior, and existing bounds. Final closure gates remain pending.
+- **Evidence:** Extended the sole `ModelCallTelemetry` contract in `src/core/gemini_client.py` with `retry_count`, `estimated_cost_usd`, and `cost_status`. `duration_ms`, prompt/response/total token counts, and attempts remain measured on every model call. Added immutable `GeminiCostRateCard` validation and deterministic token-cost calculation; absent rates or incomplete token counts produce `cost_status=NOT_RUN` with no guessed cost. Existing timeout [1s, 60s], output token [1, 8192], and wrapper-owned retry bounds remain enforced. `tests/test_p08_05_metrics.py` passes 6 tests covering explicit cost formula, no-price `NOT_RUN`, retry measurement, invalid rate rejection, telemetry non-secret behavior, and existing bounds. Complete P-08 regression passes 113 tests; canonical unit passes 1023 tests with 1 warning; full suite remains **FAIL — known historical baseline GCP fixture debt** with 1023 passed, 1 warning, and 3 fixture errors. Provider pricing calibration remains explicitly `NOT_RUN`. P-Ω closure evidence is recorded in `docs/P-OMEGA_AUDIT_REPORT.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-09 — Pub/Sub Event Backbone
