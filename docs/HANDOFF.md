@@ -45,12 +45,17 @@
 - P-09.04
 - P-09.05
 - P-09
+- P-10.00
 
 **Active Phase:**
-P-10 (UNSTARTED / PENDING)
+P-10 (IN_PROGRESS / ACTIVE)
 
 **Next Exact Task:**
 P-10.01 — Design Firestore collections, indexes, tenancy boundary, retention, document-size limits (UNEXECUTED — AWAITING NEXT PHASE INSTRUCTION)
+
+## Current P-10.00 State
+
+P-10.00 is `DONE`. Completed saga persistence donor preflight in [`docs/P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md`](P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md). Inspected five donor components across nine exact allowlisted source/test files (`UIPATH-STATE-001`, `UIPATH-AUTH-001`, `CS-MIG-001`, `CS-PASS-001`, `CS-WRITE-001`) at immutable pinned commits (`dc2267939c2aef0aba2737da65f53352c5cf8fb2` for D-UIPATH, `0dc924db9d82037d2e813548bdee27af5f180889` for D-CONTEXTSEAL). Defined saga source-target mapping, 6-layer idempotency ownership map, compensation/checkpoint persistence boundaries, future-phase non-leakage matrix, provider-neutrality boundaries, security/privacy constraints, and preserved all P-09 event/delivery/retry/causal invariants. Deferred P-10.01 collection names, indexes, retention, and size ceilings as intentionally undecided. Read-only `donor-reuse-auditor` returned `PASS` with 0 blocking findings and 0 warnings. Canonical unit tests pass 1109 items (1 warning). Full suite preserves historical baseline of 1109 passed, 1 warning, 3 fixture errors in `tests/test_gcp_access.py`. Zero product runtime or test code created. P-10.01 remains `PENDING` / unexecuted.
 
 ## Current P-09.05 State
 

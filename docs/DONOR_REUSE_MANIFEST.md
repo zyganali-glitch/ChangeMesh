@@ -220,8 +220,9 @@ evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
+- P-10.00 saga persistence donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-09T10:20:00Z'
+last_reviewed: '2026-08-16T19:58:00Z'
 ```
 
 ### UIPATH-AUTH-001

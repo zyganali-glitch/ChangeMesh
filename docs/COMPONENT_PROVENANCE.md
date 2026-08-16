@@ -3,6 +3,7 @@
 Implementation status: `IN_PROGRESS` (component-level status governed by `docs/DONOR_REUSE_MANIFEST.md`; `ZK-VALID-001` in P-08.02, `ZK-PRIV-001` in P-08.03, `CCT-SEM-001` in P-08.04, `CCT-FLIGHT-001` in P-09.05)
 Architecture donor preflight gate (P-04.00): `PASS`
 Gemini boundary donor preflight gate (P-08.00): `PASS`
+Saga persistence donor preflight gate (P-10.00): `PASS`
 
 ChangeMesh is a new product/repository. Design benefits from ideas in owner's earlier repositories, but final competition implementation must document exactly what is reused, rewritten, or new.
 

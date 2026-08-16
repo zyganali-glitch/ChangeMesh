@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-09 GCP DLQ Truth-Boundary Closure
+# P-Ω Whole-Repository Integrity Audit — P-10.00 Saga Persistence Donor Preflight Closure
 
-> **Scope:** P-09 GCP DLQ Truth-Boundary Closure (Zero Fabricated DLQ Identity, Approximate Attempt Semantics, Bounded FIFO Replay Capacity)
+> **Scope:** P-10.00 Saga Persistence Donor Preflight Closure (D-UIPATH, D-CONTEXTSEAL, Saga Source-Target Map, 6-Layer Idempotency Separation, Future-Phase Non-Leakage)
 > **Date:** 2026-08-16
-> **Entry Remote SHA:** `2525572f4406f51dd02ba3f2264086d8ef6a8b98`
+> **Entry Remote SHA:** `ea847038c46acd6bbc2838729b968188bb852404`
 > **Canonical Branch:** `main`
 
 ---
@@ -11,22 +11,24 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Canonical entry remote | **PASS** | `origin/main` verified as `2525572f4406f51dd02ba3f2264086d8ef6a8b98` before repair. |
-| Topology Limits Validation | **PASS** | `max_delivery_attempts` bounds enforced at [5, 100]; zero topic cycles. |
-| Wire Message Validation | **PASS** | `EventEnvelope.schema_version` is required and enforced strictly to `1.0.0` at ingest; `topic_id` included in transport attributes via `events/wire.py`. |
-| Causal Ingestion & DAG Ordering | **PASS** | `CausalEventTimeline` allows child ingestion before parent without premature rejection, then computes complete Kahn DAG ordering failing closed on unresolved predecessors, cycles, or correlation mismatches. |
-| Timeline Delivery & Idempotency Semantics | **PASS** | Exact duplicate idempotency, event-ID conflict rejection, idempotency collision rejection, cross-change rejection, child-first correlation mismatch rejection, and 12-point strict `from_dict` validation verified. |
-| Secret Payload Reject != Redact Truth | **PASS** | Secret payloads fail closed and are rejected on ingest via `scan_payload_for_secrets`; `redact_mapping` applies structural field masking with `"[REDACTED]"` only as defense-in-depth on accepted payloads. |
-| Single Local Retry Authority | **PASS** | `execute_with_retry()` wired as sole local retry owner in `LocalEventBus` and `LocalEventConsumer`; zero nested retry loops; sibling handler isolation verified. |
-| Observable Terminal Failure Handoff | **PASS** | Terminal failures on local bus and consumer expose canonical `DeadLetterEventRecord` and `TerminalFailureHandoff` on `EventPublishResult` / `EventConsumeResult` with `human_authority_required=False` and sanitized diagnostic. |
-| Bounded Replay State & FIFO Eviction | **PASS** | `ProcessLocalDeadLetterState` validates `max_records >= 1`, evicts oldest records when capacity is reached, and guarantees replay idempotency within the retained bounded capacity window. |
-| GCP DLQ Identity Recovery & Fail Closed | **PASS** | `GooglePubSubDeadLetterConsumer` reconstructs identity from raw wire or complete trusted attributes; fails closed without fabricating `unknown-*` placeholders or default topics. |
-| Observed Attempt vs Configured Max Distinction | **PASS** | Provider delivery attempts preserved as approximate metadata when supplied; absent count recorded as 0 (unknown) with zero manufactured policy defaults; configured topology maximum remains 5. |
-| Raw Exception Log Secrecy | **PASS** | Zero raw `e` logged in `integrations/gcp/pubsub_adapter.py` and `events/local_bus.py`; all exceptions sanitized via `sanitize_error_message(str(e))` and verified with adversarial caplog tests. |
-| P-09 dedicated suite | **PASS** | 79 tests passed across all 5 P-09 test files. |
-| Canonical unit command | **PASS** | 1109 passed, 1 warning in `uv run python scripts/cmd.py unit`. |
-| Full repository suite | **FAIL** | 1109 passed, 1 warning, 3 errors from missing `project` fixture in `tests/test_gcp_access.py` (`test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`). Exact state: **FAIL — known historical baseline GCP fixture debt**. |
-| Documentation parity | **PASS** | `docs/DONOR_REUSE_MANIFEST.md` synchronized (20 components valid), `README.md`, `README.tr.md`, `docs/HANDOFF.md`, `docs/JUDGING_MAP.md`, `docs/ARCHITECTURE.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md` synchronized. |
+| Canonical entry remote | **PASS** | `origin/main` verified as `ea847038c46acd6bbc2838729b968188bb852404` before edits. |
+| Immutable Donor Pins | **PASS** | `D-UIPATH` pinned at `dc2267939c2aef0aba2737da65f53352c5cf8fb2`; `D-CONTEXTSEAL` pinned at `0dc924db9d82037d2e813548bdee27af5f180889`. |
+| P-10.00 Preflight Report | **PASS** | [`docs/P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md`](P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md) created with 13 comprehensive sections. |
+| Saga Source-Target Map | **PASS** | Retained vs transformed vs excluded behaviors defined for `UIPATH-STATE-001`, `UIPATH-AUTH-001`, `CS-MIG-001`, `CS-PASS-001`, and `CS-WRITE-001`. |
+| 6-Layer Idempotency Separation | **PASS** | Clear separation across P-09 wire headers, P-09 in-memory transport delivery state, P-09 process-local dead-letter replay state, P-10 durable workflow step reservations, P-19 external write execution, and P-20 saga orchestration. Zero competing retry owners (`execute_with_retry()` sole owner). |
+| Compensation vs Persistence | **PASS** | Persistence of checkpoint and rollback plans owned by P-10 in Firestore; execution of compensation owned by P-17/P-20. |
+| Future-Phase Non-Leakage | **PASS** | Strict non-leakage fences established for P-11 (Memory Trust), P-12 (Capability Passport), P-13 (ShadowLab), P-14 (Approval Compression), P-15 (Impact Scout), P-16 (Policy Guardian), P-17 (Migration Engineer), P-18 (Evidence Auditor), P-19 (Release Steward), P-20 (Orchestrator Saga), and P-22 (Evidence Ledger). |
+| Provider-Neutrality Boundary | **PASS** | `domain/contracts/` strictly isolated from Google Cloud Firestore, Pub/Sub, ADK, and GitHub SDKs. Firestore adapter isolated to `src/orchestrator/` and `integrations/gcp/`. |
+| Security & Privacy Constraints | **PASS** | Zero credentials in persistence, bounded references/hashes over blobs, explicit multi-tenant path isolation (`tenant_id`), strict fail-closed schema validation. |
+| P-09 Invariants Preserved | **PASS** | Causal DAG timeline, child-before-parent arrival, approximate delivery attempts, single local retry owner, and terminal failure handoff `human_authority_required=False` preserved. |
+| P-10.01 Decisions Undecided | **PASS** | Final Firestore collection names, document hierarchy, composite indexes, tenant path formatting, retention durations, and size ceilings intentionally deferred to P-10.01. |
+| Excluded Donor Behaviors | **PASS** | UiPath runtime, Maestro, Action Center, Data Service, Phase-0 interview, DataHub MCP tools, and automatic merge strictly excluded. |
+| Donor-Reuse Auditor Evaluation | **PASS** | Read-only adversarial audit returned 0 blocking findings and 0 warnings. |
+| Donor Manifest Lint | **PASS** | 20 components valid in `uv run python tools/governance/donor_manifest_lint.py`. |
+| Canonical Unit Command | **PASS** | 1109 passed, 1 warning in `uv run python scripts/cmd.py unit`. |
+| Full Repository Suite | **FAIL** | 1109 passed, 1 warning, 3 errors from missing `project` fixture in `tests/test_gcp_access.py` (`test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`). Exact state: **FAIL — known historical baseline GCP fixture debt**. |
+| Documentation Parity | **PASS** | `docs/DONOR_REUSE_MANIFEST.md`, `docs/COMPONENT_PROVENANCE.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, and `docs/P-OMEGA_AUDIT_REPORT.md` synchronized. |
+| Zero Product / Test Code Modified | **PASS** | Preflight is documentation-only; `git diff --name-only` confirms zero changes to `domain/`, `src/`, `events/`, `integrations/`, or `tests/`. |
 
 ---
 
@@ -34,10 +36,10 @@
 
 | Command | Result |
 |---|---|
-| `uv run python -m pytest tests/test_p09_01_topology.py tests/test_p09_02_pubsub_adapters.py tests/test_p09_03_retry_dead_letter.py tests/test_p09_04_local_event_bus.py tests/test_p09_05_pubsub_timeline.py -v --tb=short` | **PASS** — 79 passed in 0.55s |
-| `uv run python scripts/cmd.py unit` | **PASS** — 1109 passed, 1 warning in 9.49s |
+| `uv run python tools/governance/donor_manifest_lint.py` | **PASS** — 20 components valid (SHASUM `3c8d179426f8f533bf6fefcf2a912bb0e7195c806540c7ff92d77cb36f452097`) |
+| `uv run python scripts/cmd.py unit` | **PASS** — 1109 passed, 1 warning in 6.78s |
 | `uv run python -m pytest tests/` | **FAIL** — 1109 passed, 1 warning, 3 errors in `tests/test_gcp_access.py` (missing `project` fixture) |
-| `uv run python tools/governance/donor_manifest_lint.py` | **PASS** — 20 components valid |
+| `git diff --check` | **PASS** — zero whitespace/lint errors |
 
 ---
 
@@ -45,10 +47,10 @@
 
 | Surface | Status | Verification Summary |
 |---|---|---|
-| 1. Implementation ↔ Tests | **PASS** | 79 P-09 tests, 1109 canonical unit tests pass with zero failures. |
-| 2. Implementation ↔ Architecture | **PASS** | `docs/ARCHITECTURE.md` and `AGENT_ARCHITECTURE_AND_PATTERNS.md` accurately document component ownership, topology limits, single retry owner, bounded FIFO replay state, DLQ identity recovery, and P-09 implementation. |
-| 3. Implementation ↔ README | **PASS** | English and Turkish READMEs document current unit test counts (1109 passed, 1 warning), P-09 phase closure, and next eligible task P-10.01. |
-| 4. Master Plan ↔ Repository | **PASS** | P-09.01–P-09.05 marked `DONE` with verified evidence; P-10.01 marked `PENDING`. |
+| 1. Implementation ↔ Tests | **PASS** | 1109 canonical unit tests pass with zero failures. |
+| 2. Implementation ↔ Architecture | **PASS** | `docs/ARCHITECTURE.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, and `docs/P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md` accurately document component ownership, single retry owner, provider neutrality, and saga persistence boundaries. |
+| 3. Implementation ↔ README | **PASS** | English and Turkish READMEs document current unit test counts (1109 passed, 1 warning), P-09 phase closure, and honest `PLANNED` / `NOT_RUN` boundaries. |
+| 4. Master Plan ↔ Repository | **PASS** | P-10.00 marked `DONE` with verified evidence; P-10.01 marked `PENDING`. |
 | 5. Claims ↔ Evidence | **PASS** | Local boundaries verified; cloud deployments honestly reported as `NOT_RUN` / `BLOCKED`. |
 | 6. Local ↔ Remote Revision | **PASS** | Entry SHA verified before edits; local working tree audited and verified. |
 | 7. English ↔ Turkish Surfaces | **PASS** | `README.md` and `README.tr.md` test counts (1109 passed, 1 warning), status, and boundaries synchronized. |
@@ -60,6 +62,7 @@
 ## 4. Final Honest Phase-Closure State
 
 - **Audit Character:** P-Ω repository integrity audit (not external independent certification).
-- **Phase P-09 Status:** `DONE` (Repaired under repository integrity gate).
+- **Task P-10.00 Status:** `DONE`.
+- **Phase P-10 Status:** `IN_PROGRESS` (P-10.00 closed; P-10.01–P-10.05 PENDING).
 - **Full Suite State:** `FAIL — known historical baseline GCP fixture debt` (preserved honestly, not masked).
-- **Next Eligible Master Plan Task:** `P-10.01` — Design Firestore collections, indexes, tenancy boundary, retention, document-size limits (UNEXECUTED).
+- **Next Eligible Master Plan Task:** `P-10.01` — Design Firestore collections, indexes, tenancy boundary, retention, document-size limits (UNEXECUTED / AWAITING INSTRUCTION).
