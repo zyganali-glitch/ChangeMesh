@@ -35,9 +35,7 @@ def sanitize_error_message(msg: str) -> str:
         sanitized,
         flags=re.IGNORECASE,
     )
-    sanitized = re.sub(
-        r"-{5}BEGIN[^-]+-{5}[\s\S]+?-{5}END[^-]+-{5}", "[REDACTED_KEY]", sanitized
-    )
+    sanitized = re.sub(r"-{5}BEGIN[^-]+-{5}[\s\S]+?-{5}END[^-]+-{5}", "[REDACTED_KEY]", sanitized)
     sanitized = re.sub(
         r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}\b", "[REDACTED_TOKEN]", sanitized
     )

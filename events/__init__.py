@@ -14,6 +14,11 @@ from events.dead_letter import (
     sanitize_error_message,
 )
 from events.delivery_state import InMemoryDeliveryState
+from events.local_bus import (
+    LocalEventBus,
+    LocalEventConsumer,
+    LocalEventPublisher,
+)
 from events.publisher import EventPublisher, EventPublishResult
 from events.retry import (
     EventRetryPolicy,
@@ -47,6 +52,9 @@ __all__ = [
     "EventWireMessage",
     "FailureClassification",
     "InMemoryDeliveryState",
+    "LocalEventBus",
+    "LocalEventConsumer",
+    "LocalEventPublisher",
     "LogicalTopicKind",
     "RetryAttemptRecord",
     "RetryExecutionResult",

@@ -223,7 +223,7 @@ ChangeMesh enforces a strict boundary between execution modes and result states 
 *   **Execution Modes:** `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`. Adapters execute the explicitly selected mode or fail; there is no silent fallback. Mode labels must be visible.
 *   **Evidence States:** The result of the executed operation.
 
-Simulation and fixtures are not live proof. Recorded-cloud is a replay of an actual past execution, not a live call. Live-write performs bounded real mutation (e.g., in a demo repository). Live-write does not automatically mean human approval is required, as organizational policy determines autonomy.
+Simulation and fixtures are not live proof. Recorded-cloud is a replay of an actual past execution, not a live call. Live-write performs bounded real mutation (e.g., in a demo repository). Live-write does not automatically mean human approval is required, as organizational policy determines autonomy. The local in-memory event bus (`LocalEventBus`) carries explicit `transport="LOCAL"` and maps strictly to `SIMULATION` or `FIXTURE` mode; it cannot produce `LIVE_WRITE` or `RECORDED_CLOUD` evidence, preventing local simulation from being mistaken for Google Pub/Sub proof.
 
 | State | Meaning |
 |---|---|

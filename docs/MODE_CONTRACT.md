@@ -1,8 +1,8 @@
 # ChangeMesh Execution and Evidence Mode Contract
 
-> **Status:** `P-04.04 COMPLETED; P-08.03 INPUT PROVENANCE CHECK IMPLEMENTED`
-> **Date:** 2026-08-09
-> **Implementation state:** The provider-neutral mode/evidence schemas and this mode contract are implemented. P-08.03 additionally enforces matching `collection_mode` and `declared_mode` values before the Gemini prompt boundary. Full external adapter mode execution, receipts, and cloud integrations remain owned by later phases; this document is not proof of live execution.
+> **Status:** `P-04.04 COMPLETED; P-08.03 INPUT PROVENANCE CHECK IMPLEMENTED; P-09.04 LOCAL BUS MODE SAFETY IMPLEMENTED`
+> **Date:** 2026-08-16
+> **Implementation state:** The provider-neutral mode/evidence schemas and this mode contract are implemented. P-08.03 enforces matching `collection_mode` and `declared_mode` values before the Gemini prompt boundary. P-09.04 implements `LocalEventBus` (`events/local_bus.py`) enforcing that local in-memory event dispatch maps strictly to `ExecutionEvidenceMode.SIMULATION` or `FIXTURE` with explicit `transport="LOCAL"`. Local bus execution fails closed with ValueError if requested to emit `LIVE_WRITE` or `RECORDED_CLOUD` evidence, preventing local simulation from being mistaken for Google Pub/Sub proof.
 
 ## 1. Purpose and Scope
 

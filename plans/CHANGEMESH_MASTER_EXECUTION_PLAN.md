@@ -903,11 +903,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-09.04 — Implement local event-bus adapter with identical contracts and explicit LOCAL evidence mode
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement local event-bus adapter with identical contracts and explicit LOCAL evidence mode.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Local mode cannot be mistaken for Pub/Sub proof.
 - **Required evidence:** Parity tests.
+- **Evidence:** Implemented canonical local in-memory event bus adapter in `events/local_bus.py` (`LocalEventBus`, `LocalEventPublisher`, `LocalEventConsumer`) fulfilling identical `EventPublisher` and `EventConsumer` protocols, identical wire serialization and secret scanning, and identical duplicate delivery safety via `InMemoryDeliveryState`. Differentiates transport identity with `transport="LOCAL"`. Preserved the 4 canonical `ExecutionEvidenceMode` values (`FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`), mapping local execution strictly to `SIMULATION` or `FIXTURE` mode and failing closed with `ValueError` if requested to emit `LIVE_WRITE` or `RECORDED_CLOUD` evidence. This guarantees local simulation cannot be mistaken for Google Pub/Sub proof. Zero Google SDK dependencies exist in `events/local_bus.py`. Dedicated contract parity suite `tests/test_p09_04_local_event_bus.py` passes 5 tests. Canonical unit suite passes 1072 tests (1 warning).
 - **Mandatory documentation sync:** Evidence boundary, README.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

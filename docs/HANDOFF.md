@@ -41,12 +41,17 @@ P-08.05
 P-09.01
 P-09.02
 P-09.03
+P-09.04
 
 **Active Phase:**
 P-09
 
 **Next Exact Task:**
-P-09.04 — Implement local event-bus adapter with identical contracts and explicit LOCAL evidence mode
+P-09.05 — Record causal event timeline for dashboard/passport
+
+## Current P-09.04 State
+
+P-09.04 is `DONE`. Implemented canonical local in-memory event bus adapter in `events/local_bus.py` (`LocalEventBus`, `LocalEventPublisher`, `LocalEventConsumer`) fulfilling identical `EventPublisher` and `EventConsumer` protocols, identical wire serialization and secret scanning, and identical duplicate delivery safety via `InMemoryDeliveryState`. Differentiates transport identity with `transport="LOCAL"`. Preserved the 4 canonical `ExecutionEvidenceMode` values (`FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, `LIVE_WRITE`), mapping local execution strictly to `SIMULATION` or `FIXTURE` mode and failing closed with `ValueError` if requested to emit `LIVE_WRITE` or `RECORDED_CLOUD` evidence. This guarantees local simulation cannot be mistaken for Google Pub/Sub proof. Zero Google SDK dependencies exist in `events/local_bus.py`. Dedicated contract parity suite `tests/test_p09_04_local_event_bus.py` passes 5 tests. Canonical unit suite passes 1072 tests (1 warning).
 
 ## Current P-09.03 State
 
