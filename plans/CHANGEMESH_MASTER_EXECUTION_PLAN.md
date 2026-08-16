@@ -121,7 +121,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-05` | Domain Contracts and State Machine | `DONE` | `P-04` |
 | `P-06` | Local Development Environment and Dependency Freeze | `DONE` | `P-05` |
 | `P-07` | Google ADK Agent Skeleton | `DONE` | `P-06` |
-| `P-08` | Gemini Integration and Structured Reasoning Boundary | `IN_PROGRESS` | `P-07` |
+| `P-08` | Gemini Integration and Structured Reasoning Boundary | `DONE` | `P-07` |
 | `P-09` | Pub/Sub Event Backbone | `PENDING` | `P-08` |
 | `P-10` | Firestore State, Idempotency, and Saga Persistence | `PENDING` | `P-09` |
 | `P-11` | Memory Trust Layer | `PENDING` | `P-10` |
@@ -856,12 +856,13 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-08.05 — Measure model latency, token use, cost, retry behavior
 
-- **Status:** `PENDING`
+- **Status:** `IN_PROGRESS`
 - **Required action:** Measure model latency, token use, cost, retry behavior.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Budget/demo latency limits documented/enforced.
 - **Required evidence:** Metrics artifact.
 - **Mandatory documentation sync:** Cost plan, environment.
+- **Evidence:** Extended the sole `ModelCallTelemetry` contract in `src/core/gemini_client.py` with `retry_count`, `estimated_cost_usd`, and `cost_status`. `duration_ms`, prompt/response/total token counts, and attempts remain measured on every model call. Added immutable `GeminiCostRateCard` validation and deterministic token-cost calculation; absent rates or incomplete token counts produce `cost_status=NOT_RUN` with no guessed cost. Existing timeout [1s, 60s], output token [1, 8192], and wrapper-owned retry bounds remain enforced. `tests/test_p08_05_metrics.py` currently passes 6 tests covering explicit cost formula, no-price `NOT_RUN`, retry measurement, invalid rate rejection, telemetry non-secret behavior, and existing bounds. Final closure gates remain pending.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-09 — Pub/Sub Event Backbone

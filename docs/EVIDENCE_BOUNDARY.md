@@ -119,5 +119,10 @@ Model assessments remain `GEMINI_SEMANTIC_JUDGMENT`; reconciliation preserves
 `EvidenceState` and reports disagreement without promoting facts or creating
 authority.
 
-4. **Deferred Phase Scope Boundary:**
-    - **P-08.05 (Cost & Latency Budgets):** `PENDING` — Adaptive token budget optimization is not yet implemented.
+## P-08.05 Measurement Boundary
+
+`src/core/gemini_client.py` measures bounded latency, token counts, attempts,
+retry count, and optional deterministic cost. `GeminiCostRateCard` is explicit
+and immutable; absent provider rates produce `cost_status=NOT_RUN` rather than a
+guessed amount. This is measurement, not adaptive cost optimization or proof of
+production pricing.

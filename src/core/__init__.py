@@ -27,6 +27,7 @@ from src.core.gemini_client import (
     SDK_RETRY_ATTEMPTS_DISABLED,
     BoundedGeminiClient,
     CanonicalSafetyPolicyItem,
+    GeminiCostRateCard,
     ModelAPIError,
     ModelCallTelemetry,
     ModelClientError,
@@ -98,6 +99,7 @@ __all__ = [
     "RETRYABLE_STATUS_CODES",
     "CANONICAL_SAFETY_POLICY",
     "CanonicalSafetyPolicyItem",
+    "GeminiCostRateCard",
     "get_canonical_safety_settings",
     "sanitize_telemetry_call_id",
     # Telemetry & Response Models

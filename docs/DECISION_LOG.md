@@ -259,6 +259,15 @@
 - Consequences: Blind audits are bounded and reproducible, but a disagreement may create a review state. This review state is not an authorization or automatic human-authority grant. P-08.05 cost optimization remains separate.
 - Evidence: `tests/test_p08_04_blind_audit.py`; CCT-SEM-001 donor parity; `docs/EVIDENCE_BOUNDARY.md`; `AGENT_ARCHITECTURE_AND_PATTERNS.md`.
 
+## ADR-0020 — Explicit-rate model cost measurement without pricing guesses (P-08.05)
+- Date: 2026-08-16
+- Status: Accepted
+- Context: P-08.05 requires latency, token, retry, and cost measurement while the repository has no verified provider pricing contract for the canonical model.
+- Decision: Extend the existing canonical model telemetry with `retry_count`, `estimated_cost_usd`, and `cost_status`. Compute cost only from an explicit immutable `GeminiCostRateCard`; missing rates produce `NOT_RUN` rather than a guessed price. Existing wrapper-owned retries, timeout bounds, and token ceilings remain unchanged.
+- Alternatives: Hard-code a provider price (Rejected: unverifiable and region/contract dependent); call a pricing service during model calls (Rejected: new provider dependency, latency, and scope); omit cost fields (Rejected: fails the P-08.05 measurement contract).
+- Consequences: Local metric tests can deterministically verify cost formulas and retry/latency/token measurements. Production pricing calibration remains explicitly `NOT_RUN` until verified from an authoritative current source.
+- Evidence: `tests/test_p08_05_metrics.py`; `src/core/gemini_client.py`; `AGENT_ENVIRONMENT_AND_API.md`.
+
 ## ADR-0017 — Canonical Developer Command Interface and Non-Mutating Verification Semantics (P-06.04)
 - Date: 2026-08-15
 - Status: Accepted

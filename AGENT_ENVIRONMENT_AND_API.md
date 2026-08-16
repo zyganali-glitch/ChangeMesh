@@ -124,6 +124,13 @@ Record actual environment only; do not fill unknown values with guesses.
 - **Authority:** Model output remains `GEMINI_SEMANTIC_JUDGMENT`; `EvidenceState` facts remain sovereign. Disagreement produces a review state and cannot manufacture `HUMAN_AUTHORITY`.
 - **Runtime path:** `run_blind_semantic_audit` uses `BoundedGeminiClient`; no second SDK client or provider call exists.
 
+### Gemini Measurement Boundary (P-08.05)
+
+- **Operational metrics:** `ModelCallTelemetry` records `duration_ms`, prompt/response/total token counts, attempts, `retry_count`, and non-secret outcome metadata.
+- **Cost measurement:** `GeminiCostRateCard` computes deterministic USD estimates only when explicit input/output rates are supplied. Without a rate card, `estimated_cost_usd` is `None` and `cost_status` is `NOT_RUN`; no provider price is guessed.
+- **Bounds:** Rate values are finite and non-negative; token counts are non-negative; existing timeout [1s, 60s] and output-token [1, 8192] bounds remain active.
+- **External pricing:** No live provider pricing calibration or production cost claim is made by this local measurement implementation.
+
 ## Environment-variable registry
 
 | Variable | Purpose | Required | Secret | Safe example | Owner phase |
@@ -136,7 +143,7 @@ Record actual environment only; do not fill unknown values with guesses.
 
 ## Command registry
 
-Commands may be recorded as `VERIFIED` after the owning micro-task executes them successfully under its required validation environment. Clean-checkout reproduction from a separate directory was executed and verified under P-06.05 ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md)), establishing `CLEAN_CHECKOUT_VERIFIED` status for reproducible installation, baseline test suites, and canonical command contracts. Current underlying test counts reflect the latest local canonical P-08.01 verification.
+Commands may be recorded as `VERIFIED` after the owning micro-task executes them successfully under its required validation environment. Clean-checkout reproduction from a separate directory was executed and verified under P-06.05 ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md)), establishing `CLEAN_CHECKOUT_VERIFIED` status for reproducible installation, baseline test suites, and canonical command contracts. Current underlying test counts reflect the latest local canonical P-08.05 verification.
 
 | Purpose | Command | Interface Status | Underlying Check Status | Side-Effect Class / Scope | Last verified |
 |---|---|---|---|---|---|
@@ -157,11 +164,12 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 | Unit tests (P-08.02 Structured Output) | `python -m pytest tests/test_p08_02_structured_output.py -v --tb=short` | `VERIFIED` | `PASS` (40 passed) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-08.03 Input Privacy) | `python -m pytest tests/test_p08_03_input_privacy.py -v --tb=short` | `VERIFIED` | `PASS` (10 passed; PRIV-01–08 plus boundary regressions) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-08.04 Blind Audit) | `python -m pytest tests/test_p08_04_blind_audit.py -v --tb=short` | `VERIFIED` | `PASS` (18 tests) | Local non-mutating test | 2026-08-16 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (1017 passed, 1 warning, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-16 |
+| Unit tests (P-08.05 Metrics) | `python -m pytest tests/test_p08_05_metrics.py -v --tb=short` | `VERIFIED` | `PASS` (6 tests) | Local non-mutating test | 2026-08-16 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (1023 passed, 1 warning, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-16 |
 | Format | `uv run python scripts/cmd.py format` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports unformatted historical files) | Non-mutating (`ruff format --check .`) | 2026-08-15 |
 | Lint | `uv run python scripts/cmd.py lint` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports historical lint debt) | Non-mutating (`ruff check .`, no `--fix`) | 2026-08-15 |
 | Type-check | `uv run python scripts/cmd.py type-check` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports 2 errors in `test_gcp_access.py`) | Non-mutating (`mypy domain tests src`) | 2026-08-15 |
-| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` | `PASS` (1017 passed, 1 warning) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-16 |
+| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` | `PASS` (1023 passed, 1 warning) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-16 |
 | Integration | `uv run python scripts/cmd.py integration` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL_CLOSED` (Exit 1, zero cloud access without `--live-write-danger`) | Guarded live writes (`tests/test_gcp_access.py`) | 2026-08-15 |
 | E2E | `uv run python scripts/cmd.py e2e` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24/P-25 pending) | Deferred workflow | 2026-08-15 |
 | Demo | `uv run python scripts/cmd.py demo` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24 pending) | Deferred demo | 2026-08-15 |

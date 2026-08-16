@@ -90,6 +90,47 @@ CANONICAL_SAFETY_POLICY: Final[tuple[CanonicalSafetyPolicyItem, ...]] = (
 )
 
 
+@dataclass(frozen=True)
+class GeminiCostRateCard:
+    """Explicit caller-supplied token rates for deterministic cost estimation.
+
+    No provider pricing is guessed or silently defaulted.  A rate card is
+    required before a cost estimate can be reported as PASS.
+    """
+
+    input_usd_per_million_tokens: float
+    output_usd_per_million_tokens: float
+
+    def __post_init__(self) -> None:
+        for field_name, value in (
+            ("input_usd_per_million_tokens", self.input_usd_per_million_tokens),
+            ("output_usd_per_million_tokens", self.output_usd_per_million_tokens),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+            ):
+                raise ValueError(f"{field_name} must be a finite non-negative number.")
+
+    def estimate_usd(
+        self,
+        prompt_token_count: Optional[int],
+        response_token_count: Optional[int],
+    ) -> Optional[float]:
+        """Estimate cost only when both measured token counts are available."""
+        if prompt_token_count is None or response_token_count is None:
+            return None
+        if prompt_token_count < 0 or response_token_count < 0:
+            raise ValueError("Token counts must be non-negative.")
+        cost = (
+            prompt_token_count * self.input_usd_per_million_tokens
+            + response_token_count * self.output_usd_per_million_tokens
+        ) / 1_000_000
+        return round(cost, 8)
+
+
 def get_canonical_safety_settings() -> list[types.SafetySetting]:
     """Construct fresh SDK SafetySetting objects from the immutable canonical policy."""
     return [
@@ -213,12 +254,15 @@ class ModelCallTelemetry:
     end_time_iso: str
     duration_ms: float
     attempts: int
+    retry_count: int
     final_outcome: str  # e.g. "SUCCESS", "TIMEOUT", "RETRY_EXHAUSTED", "SAFETY_BLOCKED"
     error_class: Optional[str] = None
     error_status_code: Optional[int] = None
     prompt_token_count: Optional[int] = None
     response_token_count: Optional[int] = None
     total_token_count: Optional[int] = None
+    estimated_cost_usd: Optional[float] = None
+    cost_status: str = "NOT_RUN"
     finish_reason: Optional[str] = None
 
 
@@ -260,6 +304,7 @@ class BoundedGeminiClient:
         timeout_seconds: Optional[float] = None,
         max_attempts: Optional[int] = None,
         max_output_tokens: Optional[int] = None,
+        cost_rate_card: Optional[GeminiCostRateCard] = None,
         telemetry_sink: Optional[Callable[[ModelCallTelemetry], None]] = None,
         _sdk_client: Optional[Any] = None,
         _sleep_fn: Optional[Callable[[float], None]] = None,
@@ -365,6 +410,7 @@ class BoundedGeminiClient:
 
         # 7. Telemetry & Internal Utilities
         self._telemetry_sink: Optional[Callable[[ModelCallTelemetry], None]] = telemetry_sink
+        self._cost_rate_card = cost_rate_card
         self._sleep_fn: Callable[[float], None] = _sleep_fn or time.sleep
         self._telemetry_history: list[ModelCallTelemetry] = []
         self._closed: bool = False
@@ -428,6 +474,11 @@ class BoundedGeminiClient:
     def max_output_tokens(self) -> int:
         """Configured output token budget ceiling."""
         return self._max_output_tokens
+
+    @property
+    def cost_rate_card(self) -> Optional[GeminiCostRateCard]:
+        """Explicit token pricing used for optional deterministic cost estimates."""
+        return self._cost_rate_card
 
     @property
     def is_closed(self) -> bool:
@@ -857,6 +908,11 @@ class BoundedGeminiClient:
         total_token_count: Optional[int] = None,
         finish_reason: Optional[str] = None,
     ) -> ModelCallTelemetry:
+        estimated_cost_usd = (
+            self._cost_rate_card.estimate_usd(prompt_token_count, response_token_count)
+            if self._cost_rate_card is not None
+            else None
+        )
         record = ModelCallTelemetry(
             call_id=call_id,
             model_id=self._model_id,
@@ -868,12 +924,15 @@ class BoundedGeminiClient:
             end_time_iso=end_time.isoformat(),
             duration_ms=round(duration_ms, 2),
             attempts=attempts,
+            retry_count=max(0, attempts - 1),
             final_outcome=final_outcome,
             error_class=error_class,
             error_status_code=error_status_code,
             prompt_token_count=prompt_token_count,
             response_token_count=response_token_count,
             total_token_count=total_token_count,
+            estimated_cost_usd=estimated_cost_usd,
+            cost_status="PASS" if estimated_cost_usd is not None else "NOT_RUN",
             finish_reason=finish_reason,
         )
         self._telemetry_history.append(record)

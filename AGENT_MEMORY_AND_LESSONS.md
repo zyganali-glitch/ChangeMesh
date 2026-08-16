@@ -163,3 +163,16 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `src/agents/evidence_auditor.py`, `tests/test_p08_04_blind_audit.py`.
 - Reusable beyond this task: Yes (semantic reconciliation and evidence authority boundaries).
 - Status: `ACTIVE`
+
+### LESSON-20260816-05 — Cost telemetry must never infer provider pricing
+- Date/time: 2026-08-16
+- Active task: P-08.05
+- Symptom: Latency, token counts, and retry attempts were measured, but no verified canonical provider price was recorded for deterministic cost reporting.
+- Root cause: Provider pricing is an external, region/model/contract-dependent fact and must not be guessed inside the model client.
+- Incorrect approach: Hard-coding a plausible token price or silently treating absent rates as zero cost.
+- Correct approach: Accept an explicit immutable `GeminiCostRateCard`, calculate cost only when measured token counts and both rates exist, and report `cost_status=NOT_RUN` otherwise.
+- Prevention rule: Cost estimates require named rate provenance; missing pricing is visible `NOT_RUN`, never implicit zero or PASS.
+- Tests/evidence: `tests/test_p08_05_metrics.py` (6 passed); P-08.01 regression (39 passed).
+- Affected files: `src/core/gemini_client.py`, `src/core/__init__.py`, `tests/test_p08_05_metrics.py`.
+- Reusable beyond this task: Yes (all provider-cost and budget telemetry).
+- Status: `ACTIVE`

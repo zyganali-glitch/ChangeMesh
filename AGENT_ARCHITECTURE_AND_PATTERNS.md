@@ -143,6 +143,13 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Advisory Reconciliation**: `SemanticAuditResult` remains `GEMINI_SEMANTIC_JUDGMENT`; reconciliation can report disagreement or review state but cannot promote or rewrite `EvidenceState`, mode, approval, or authority facts.
 *   **Citation Scope**: Model citations must refer to evidence in the bounded bundle and to evidence keys assigned to the cited claim.
 
+### 5.13 Gemini Measurement Invariants (P-08.05)
+
+*   **Operational Metrics**: Each model call records bounded latency (`duration_ms`), prompt/response/total token counts, attempts, and derived `retry_count` without prompt or response text.
+*   **Explicit Cost Rates**: Cost is estimated only from an explicit immutable `GeminiCostRateCard`; missing provider pricing produces `cost_status=NOT_RUN` and no guessed amount.
+*   **Bounded Measurement Inputs**: Rate values must be finite and non-negative; token counts must be non-negative; existing timeout and output-token ceilings remain enforced.
+*   **Single Reliability Authority**: Retry measurement observes the existing wrapper-owned retry loop and does not add another retry mechanism.
+
 ## 6. State labels
 
 Evidence: `PASS|WARN|FAIL|NOT_RUN|SIMULATED|BLOCKED|QUARANTINED`

@@ -37,12 +37,13 @@ P-08.01
 P-08.02
 P-08.03
 P-08.04
+P-08.05
 
 **Active Phase:**
 P-08
 
 **Next Exact Task:**
-P-08.05 — Measure model latency, token use, cost, retry behavior
+P-09.01 — Create topic/subscription topology for change, agent work, approvals, evidence, retries, dead letters
 
 ## Current P-08.03 State
 
@@ -60,7 +61,7 @@ values. `src/core/gemini_client.py` validates both prompt and
 `system_instruction` before request construction, so blocked input produces
 zero SDK calls. Untrusted external text remains data inside fixed boundary
 markers. P-08.02 strict output parsing and P-08.01 single-call ownership remain
-intact. P-08.05 was not started.
+intact.
 
 ## Current P-08.04 State
 
@@ -71,6 +72,13 @@ citations, and reconciles advisory model assessments without rewriting facts.
 The dedicated suite has 18 passing tests. P-DΩ/P-Ω closure passed with the
 historical full-suite fixture debt preserved.
 
+## Current P-08.05 State
+
+P-08.05 is `DONE`. `ModelCallTelemetry` now records latency, token
+counts, attempts, retry count, and optional explicit-rate cost estimates.
+Missing provider pricing remains visible as `NOT_RUN`; no cost is guessed.
+The dedicated metrics suite has 6 passing tests. The P-08 phase is closed.
+
 ## Evidence
 
 - P-08.03 privacy suite: `uv run python -m pytest tests/test_p08_03_input_privacy.py -v --tb=short` -> 10 passed.
@@ -78,9 +86,11 @@ historical full-suite fixture debt preserved.
 - P-08.02 regression: `uv run python -m pytest tests/test_p08_02_structured_output.py -v --tb=short` -> 40 passed.
 - P-08.04 dedicated: `uv run python -m pytest tests/test_p08_04_blind_audit.py -v --tb=short` -> 18 passed.
 - Combined P-08.01/P-08.02/P-08.04: `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_04_blind_audit.py -q` -> 97 passed.
+- P-08.05 metrics: `uv run python -m pytest tests/test_p08_05_metrics.py -v --tb=short` -> 6 passed.
+- Complete P-08: `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_03_input_privacy.py tests/test_p08_04_blind_audit.py tests/test_p08_05_metrics.py -q` -> 113 passed.
 - Policy Guardian regression: `uv run python -m pytest tests/test_p07_02_agent_definitions.py -q` -> 59 passed, 1 warning.
-- Canonical unit: `uv run python scripts/cmd.py unit` -> 1017 passed, 1 warning.
-- Full suite: `uv run python -m pytest tests/` -> 1017 passed, 1 warning, 3 errors; **FAIL — known historical baseline GCP fixture debt** (`project` fixture in `tests/test_gcp_access.py`).
+- Canonical unit: `uv run python scripts/cmd.py unit` -> 1023 passed, 1 warning.
+- Full suite: `uv run python -m pytest tests/` -> 1023 passed, 1 warning, 3 errors; **FAIL — known historical baseline GCP fixture debt** (`project` fixture in `tests/test_gcp_access.py`).
 - Donor manifest lint: `uv run python tools/governance/donor_manifest_lint.py` -> 20 components passed.
 - Targeted Ruff, format, mypy, AST model-owner, domain import, secret scan, and `git diff --check`: `PASS`.
 
@@ -101,5 +111,5 @@ ChangeMesh competition introduction commit is
 ## Open Boundaries
 
 - Model Armor remains `PERMISSION_BLOCKED / NOT_RUN`.
-- Generic enterprise DLP, universal PII discovery, cloud proxy filtering, full external adapter mode execution, and P-08.05 cost/latency measurement remain `NOT_RUN` or `PLANNED` under their owning phases.
+- Generic enterprise DLP, universal PII discovery, cloud proxy filtering, full external adapter mode execution, and production provider-pricing calibration remain `NOT_RUN` or `PLANNED` under their owning phases.
 - Full repository test status remains the historical `FAIL` above and must not be relabeled `PASS`.
