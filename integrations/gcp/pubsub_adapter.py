@@ -61,14 +61,15 @@ class GooglePubSubPublisher(EventPublisher):
                 transport="GOOGLE_PUBSUB",
             )
         except Exception as e:
-            logger.error("Failed to publish message to topic %s: %s", topic_path, e)
+            clean_err = sanitize_error_message(str(e))
+            logger.error("Failed to publish message to topic %s: %s", topic_path, clean_err)
             return EventPublishResult(
                 status="FAILED",
                 message_id="none",
                 topic_id=message.topic_id,
                 event_id=message.envelope.event_id,
                 transport="GOOGLE_PUBSUB",
-                error_message=sanitize_error_message(str(e)),
+                error_message=clean_err,
             )
 
 
@@ -120,14 +121,15 @@ class GooglePubSubConsumer(EventConsumer):
         try:
             wire_msg = EventWireMessage.from_bytes(raw_data)
         except Exception as e:
-            logger.warning("Message %s failed schema validation: %s", message_id, e)
+            clean_err = sanitize_error_message(f"Schema validation error: {e}")
+            logger.warning("Message %s failed schema validation: %s", message_id, clean_err)
             return EventConsumeResult(
                 disposition=EventDeliveryDisposition.CONFLICT,
                 event_id="malformed",
                 message_id=message_id,
                 transport="GOOGLE_PUBSUB",
                 callback_invoked=False,
-                error_message=sanitize_error_message(f"Schema validation error: {e}"),
+                error_message=clean_err,
             )
 
         # Step 2: Delivery classification
@@ -152,13 +154,14 @@ class GooglePubSubConsumer(EventConsumer):
                 )
             except Exception as e:
                 classification = classify_failure(e)
+                clean_err = sanitize_error_message(str(e))
                 if classification == FailureClassification.TRANSIENT_RETRYABLE:
                     logger.warning(
                         "Transient failure in callback for message %s (event %s); "
                         "raising to NACK transport: %s",
                         message_id,
                         event_id,
-                        e,
+                        clean_err,
                     )
                     raise e
 
@@ -166,7 +169,7 @@ class GooglePubSubConsumer(EventConsumer):
                     "Callback failed with deterministic error for message %s (event %s): %s",
                     message_id,
                     event_id,
-                    e,
+                    clean_err,
                 )
                 dl_record = build_dead_letter_record(
                     dead_letter_id=f"dl-{uuid.uuid4().hex[:8]}",

@@ -1,14 +1,15 @@
 """ChangeMesh P-09.03 Dedicated Test Suite — Retry Schedules and Dead-Letter Handling.
 
 Validates:
-1. Transient retryable failures succeed on subsequent attempts with backoff.
-2. Repeated retryable failures terminate at exact max_attempts bound.
+1. Transient retryable failures succeed on subsequent attempts with backoff (no handoff).
+2. Repeated retryable failures terminate at exact max_attempts bound with one handoff.
 3. No further execution attempts occur after terminal bound is reached.
-4. Deterministic non-retryable errors fail immediately on attempt 1 with zero retries.
+4. Deterministic non-retryable errors fail on attempt 1 with zero retries and one handoff.
 5. Canonical DeadLetterEventRecord and TerminalFailureHandoff structure and immutability.
 6. Authority invariant: human_authority_required is strictly False on retry exhaustion.
-7. Secrecy invariant: credentials/tokens are sanitized from error messages and handoffs.
+7. Secrecy invariant: credentials/tokens/keys are sanitized from error messages and handoffs.
 8. EventRetryPolicy parameter validation and deterministic backoff computation.
+9. Terminal result replay does not manufacture duplicate handoffs.
 """
 
 from datetime import datetime, timezone
@@ -53,8 +54,8 @@ def test_retry_policy_validation_and_computation():
         EventRetryPolicy(initial_backoff_seconds=20.0, max_backoff_seconds=10.0)
 
 
-def test_transient_failure_then_success():
-    """Verify operation that fails once with transient error succeeds on attempt 2."""
+def test_transient_failure_then_success_no_handoff():
+    """Verify operation that fails once with transient error succeeds with NO handoff."""
     attempts = [0]
     sleeps: list[float] = []
 
@@ -72,31 +73,56 @@ def test_transient_failure_then_success():
     assert res.result == "success-value"
     assert len(res.attempts) == 2
     assert res.attempts[0].classification == FailureClassification.TRANSIENT_RETRYABLE
+    assert res.dead_letter_record is None  # No handoff on success
     assert sleeps == [0.5]
 
 
-def test_repeated_failure_reaches_exact_bound():
-    """Verify repeated retryable failure terminates after exact max_attempts."""
+def test_transient_exhaustion_creates_exactly_one_handoff():
+    """Verify repeated retryable failure terminates after max_attempts with ONE handoff."""
     attempts = [0]
     sleeps: list[float] = []
 
+    secret_key = "secret_token_12345678"
+
     def op() -> None:
         attempts[0] += 1
-        raise TimeoutError("PubSub deadline exceeded")
+        raise TimeoutError(f"PubSub deadline exceeded with token={secret_key}")
 
     policy = EventRetryPolicy(max_attempts=3, initial_backoff_seconds=1.0)
-    res = execute_with_retry(op, policy=policy, sleep_fn=sleeps.append)
+    ctx = {
+        "change_id": "chg-test-01",
+        "correlation_id": "corr-test-01",
+        "event_id": "evt-timeout",
+        "topic_id": "changemesh-retry-v1",
+    }
+    res = execute_with_retry(op, policy=policy, sleep_fn=sleeps.append, dead_letter_context=ctx)
 
     assert res.succeeded is False
     assert res.total_attempts == 3
     assert attempts[0] == 3
     assert res.final_classification == FailureClassification.TERMINAL_EXHAUSTED
     assert len(res.attempts) == 3
-    assert sleeps == [1.0, 2.0]  # Sleeps between attempt 1->2 and 2->3
+    assert sleeps == [1.0, 2.0]
+
+    # Exactly one dead-letter handoff created
+    dl = res.dead_letter_record
+    assert dl is not None
+    assert dl.change_id == "chg-test-01"
+    assert dl.original_event_id == "evt-timeout"
+    assert dl.attempts_made == 3
+    assert dl.failure_classification == FailureClassification.TERMINAL_EXHAUSTED
+    assert dl.handoff.human_authority_required is False
+    assert dl.handoff.terminal_state == "DEAD_LETTERED"
+
+    # Secrecy: secret_key redacted from handoff
+    assert secret_key not in dl.sanitized_failure_reason
+    assert secret_key not in dl.handoff.failure_reason
+    clean_err = dl.sanitized_failure_reason
+    assert "[REDACTED_SECRET]" in clean_err or "[REDACTED_TOKEN]" in clean_err
 
 
-def test_deterministic_error_fails_immediately():
-    """Verify deterministic errors (schema, validation, secret, conflict) fail on attempt 1."""
+def test_deterministic_error_fails_immediately_with_one_handoff():
+    """Verify deterministic errors fail on attempt 1 with zero retries and exactly ONE handoff."""
     attempts = [0]
     sleeps: list[float] = []
 
@@ -105,13 +131,26 @@ def test_deterministic_error_fails_immediately():
         raise ValueError("Schema validation error: extra inputs are not permitted")
 
     policy = EventRetryPolicy(max_attempts=5)
-    res = execute_with_retry(op, policy=policy, sleep_fn=sleeps.append)
+    ctx = {
+        "change_id": "chg-test-02",
+        "correlation_id": "corr-test-02",
+        "event_id": "evt-invalid-schema",
+    }
+    res = execute_with_retry(op, policy=policy, sleep_fn=sleeps.append, dead_letter_context=ctx)
 
     assert res.succeeded is False
     assert res.total_attempts == 1
     assert attempts[0] == 1
     assert res.final_classification == FailureClassification.DETERMINISTIC_INVALID
     assert sleeps == []  # Zero sleeps, zero retries
+
+    dl = res.dead_letter_record
+    assert dl is not None
+    assert dl.change_id == "chg-test-02"
+    assert dl.original_event_id == "evt-invalid-schema"
+    assert dl.attempts_made == 1
+    assert dl.failure_classification == FailureClassification.DETERMINISTIC_INVALID
+    assert dl.handoff.human_authority_required is False
 
 
 def test_classify_failure_markers():

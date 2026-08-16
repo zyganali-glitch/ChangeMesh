@@ -202,3 +202,25 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all queueing, event dispatch, dead-letter, and test fixture construction).
 - Status: `ACTIVE`
 
+### LESSON-20260816-07 — Out-of-order causal event arrival vs DAG projection, log secrecy, and handler failure semantics
+- Date/time: 2026-08-16
+- Active task: P-09.05 / P-09.04
+- Symptom: Distributed event delivery can deliver child/grandchild before parent; rejecting child on ingest causes distributed deadlock. Logging raw exceptions can leak credentials contained in third-party error messages. Swallowing handler errors records false delivery acceptance.
+- Root cause:
+  1. Ingestion layer receives distributed events out of wall-clock order; causal relationship must be verified at DAG projection/export rather than rejecting on ingest.
+  2. Exception strings from network libraries or auth callbacks can contain raw secrets/tokens; logger calls with raw `e` violate secrecy invariants.
+  3. LocalEventBus dispatch must not record an event as accepted in delivery state if subscriber handler raises an exception.
+- Incorrect approach:
+  1. Rejecting events during ingestion if `causation_id` is not yet known.
+  2. Formatting logger messages with raw exception `e`.
+  3. Marking delivery state accepted before or regardless of subscriber handler success.
+- Correct approach:
+  1. Store ingested events in `CausalEventTimeline`; perform DAG topological sort (Kahn's algorithm) with dynamic depth computation in `get_causally_ordered_entries()`, strictly failing closed if any predecessor is unresolved, if correlation IDs mismatch, or if a cycle exists.
+  2. Wrap all exception logger calls with `sanitize_error_message(str(e))`.
+  3. In `LocalEventBus.publish_message()`, record accepted in `_delivery_state` only when all subscriber handlers complete successfully without exception.
+- Prevention rule: Ingest out-of-order safely, fail closed at DAG projection; sanitize all exception logs with regexes; record delivery state only upon verified handler success.
+- Tests/evidence: `tests/test_p09_05_pubsub_timeline.py` (14 passed), `tests/test_p09_04_local_event_bus.py` (10 passed), all P-09 tests (68 passed), canonical unit (1098 passed).
+- Affected files: `src/evidence/pubsub_timeline.py`, `events/local_bus.py`, `integrations/gcp/pubsub_adapter.py`, `events/retry.py`.
+- Reusable beyond this task: Yes (all distributed event timelines, saga event logging, and local bus dispatches).
+- Status: `ACTIVE`
+

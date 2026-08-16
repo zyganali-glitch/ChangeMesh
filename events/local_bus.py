@@ -85,12 +85,54 @@ class LocalEventBus:
                 try:
                     handler(message)
                 except Exception as e:
+                    classification = classify_failure(e)
+                    clean_err = sanitize_error_message(str(e))
                     logger.error(
-                        "Handler error on local topic %s: %s",
+                        "Handler error on local topic %s (event %s): %s",
                         message.topic_id,
-                        e,
+                        message.envelope.event_id,
+                        clean_err,
                     )
+                    # Transient or deterministic failure must NOT be recorded as accepted
+                    if classification == FailureClassification.DETERMINISTIC_INVALID:
+                        _ = build_dead_letter_record(
+                            dead_letter_id=f"dl-{uuid.uuid4().hex[:8]}",
+                            original_event_id=message.envelope.event_id,
+                            change_id=message.envelope.change_id,
+                            correlation_id=message.envelope.correlation_id,
+                            original_topic_id=message.topic_id,
+                            failure_classification=classification,
+                            raw_error=e,
+                            attempts_made=1,
+                            timestamp=datetime.now(timezone.utc),
+                        )
+                    return EventPublishResult(
+                        status="FAILED",
+                        message_id=msg_id,
+                        topic_id=message.topic_id,
+                        event_id=message.envelope.event_id,
+                        transport="LOCAL",
+                        error_message=clean_err,
+                    )
+
+            # All handlers succeeded -> record accepted
             self._delivery_state.record_if_accepted(message.envelope)
+
+        elif disposition == EventDeliveryDisposition.DUPLICATE:
+            # Handlers are not re-invoked on duplicate
+            pass
+        elif disposition in (
+            EventDeliveryDisposition.OUT_OF_ORDER,
+            EventDeliveryDisposition.CONFLICT,
+        ):
+            return EventPublishResult(
+                status="FAILED",
+                message_id=msg_id,
+                topic_id=message.topic_id,
+                event_id=message.envelope.event_id,
+                transport="LOCAL",
+                error_message=f"Event {disposition.value}",
+            )
 
         return EventPublishResult(
             status="PUBLISHED",
@@ -179,14 +221,15 @@ class LocalEventConsumer(EventConsumer):
         try:
             wire_msg = EventWireMessage.from_bytes(raw_data)
         except Exception as e:
-            logger.warning("Local message %s failed schema validation: %s", message_id, e)
+            clean_err = sanitize_error_message(f"Schema validation error: {e}")
+            logger.warning("Local message %s failed schema validation: %s", message_id, clean_err)
             return EventConsumeResult(
                 disposition=EventDeliveryDisposition.CONFLICT,
                 event_id="malformed",
                 message_id=message_id,
                 transport="LOCAL",
                 callback_invoked=False,
-                error_message=sanitize_error_message(f"Schema validation error: {e}"),
+                error_message=clean_err,
             )
 
         # 2. Delivery classification
@@ -207,13 +250,14 @@ class LocalEventConsumer(EventConsumer):
                 )
             except Exception as e:
                 classification = classify_failure(e)
+                clean_err = sanitize_error_message(str(e))
                 if classification == FailureClassification.TRANSIENT_RETRYABLE:
                     logger.warning(
                         "Transient failure in local callback for message %s (event %s); "
                         "raising to NACK transport: %s",
                         message_id,
                         event_id,
-                        e,
+                        clean_err,
                     )
                     raise e
 
@@ -221,7 +265,7 @@ class LocalEventConsumer(EventConsumer):
                     "Local callback failed with deterministic error for message %s (event %s): %s",
                     message_id,
                     event_id,
-                    e,
+                    clean_err,
                 )
                 dl_record = build_dead_letter_record(
                     dead_letter_id=f"dl-{uuid.uuid4().hex[:8]}",

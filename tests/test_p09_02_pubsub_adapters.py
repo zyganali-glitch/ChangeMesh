@@ -18,6 +18,7 @@ Validates:
 """
 
 import json
+import logging
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -507,3 +508,71 @@ def test_no_provider_sdk_types_leak():
     for field_name, field_val in wire_msg.__dict__.items():
         type_str = str(type(field_val))
         assert "google" not in type_str.lower(), f"Leaked SDK type in wire field {field_name}"
+
+
+def test_gcp_publisher_error_log_secrecy(caplog):
+    """Verify GCP publisher error containing Bearer secret is sanitized in logs."""
+    caplog.set_level(logging.DEBUG)
+    mock_client = MagicMock()
+    secret_token = "secret_bearer_token_9876543210"
+    mock_client.publish.side_effect = RuntimeError(f"PubSub unavailable with Bearer {secret_token}")
+
+    publisher = GooglePubSubPublisher(
+        project_id="test-project",
+        publisher_client=mock_client,
+    )
+    envelope = _make_envelope()
+    wire_msg = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope)
+
+    result = publisher.publish(wire_msg)
+    assert result.status == "FAILED"
+
+    assert secret_token not in caplog.text
+    assert "[REDACTED_BEARER]" in caplog.text
+
+
+def test_gcp_consumer_deterministic_callback_log_secrecy(caplog):
+    """Verify GCP consumer deterministic callback failure with API key is sanitized."""
+    caplog.set_level(logging.DEBUG)
+    consumer = GooglePubSubConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-lifecycle-sub-v1",
+        subscriber_client=MagicMock(),
+    )
+    envelope = _make_envelope(event_id="evt-det-sec")
+    raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
+
+    secret_key = "secret_api_key_1122334455"
+
+    def failing_callback(msg: EventWireMessage) -> None:
+        raise ValueError(f"Schema validation error with api_key='{secret_key}'")
+
+    res = consumer.process_raw_message(raw_data, {}, "msg-det-sec", failing_callback)
+    assert res.disposition == EventDeliveryDisposition.ACCEPT
+    assert res.dead_letter_record is not None
+
+    assert secret_key not in caplog.text
+    assert "[REDACTED_SECRET]" in caplog.text
+
+
+def test_gcp_consumer_transient_callback_log_secrecy(caplog):
+    """Verify GCP consumer transient callback failure with secret is sanitized."""
+    caplog.set_level(logging.DEBUG)
+    consumer = GooglePubSubConsumer(
+        project_id="test-project",
+        subscription_id="changemesh-lifecycle-sub-v1",
+        subscriber_client=MagicMock(),
+    )
+    envelope = _make_envelope(event_id="evt-trans-sec")
+    raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
+
+    secret_pwd = "my_super_secret_password"
+
+    def failing_callback(msg: EventWireMessage) -> None:
+        raise TimeoutError(f"Connection timeout with password='{secret_pwd}'")
+
+    with pytest.raises(TimeoutError):
+        consumer.process_raw_message(raw_data, {}, "msg-trans-sec", failing_callback)
+
+    assert secret_pwd not in caplog.text
+    assert "[REDACTED_SECRET]" in caplog.text

@@ -9,8 +9,12 @@ Validates:
 6. Evidence mode invariant: local bus execution creates SIMULATION/FIXTURE evidence,
    and strictly fails closed if asked to produce LIVE_WRITE or RECORDED_CLOUD.
 7. Zero Google SDK imports or dependencies in local event bus.
+8. Adversarial log secrecy: exceptions containing secrets/tokens are never logged raw.
+9. Handler failure handling: transient failures are not recorded accepted.
+10. Handler deterministic failure: creates dead-letter record and is not recorded accepted.
 """
 
+import logging
 from datetime import datetime, timezone
 
 import pytest
@@ -198,3 +202,110 @@ def test_no_google_sdk_imports_in_local_bus():
     for key, val in module_dict.items():
         type_str = str(type(val))
         assert "google.cloud" not in type_str.lower(), f"Leaked SDK import {key}"
+
+
+def test_local_bus_handler_transient_failure_not_recorded_accepted():
+    """Verify transient handler error does not record event as accepted in delivery state."""
+    bus = LocalEventBus()
+    publisher = LocalEventPublisher(bus)
+
+    def failing_handler(msg: EventWireMessage) -> None:
+        raise ConnectionResetError("Transient network failure in local handler")
+
+    bus.subscribe("changemesh-lifecycle-v1", failing_handler)
+
+    envelope = _make_envelope(event_id="evt-transient-fail")
+    wire_msg = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope)
+
+    res = publisher.publish(wire_msg)
+    assert res.status == "FAILED"
+    assert "Transient network failure" in (res.error_message or "")
+    # Crucial: Event MUST NOT be recorded as accepted in delivery state
+    assert "evt-transient-fail" not in bus.delivery_state.seen_events
+
+
+def test_local_bus_handler_deterministic_failure_not_recorded_accepted():
+    """Verify deterministic handler error returns FAILED and is not accepted in delivery state."""
+    bus = LocalEventBus()
+    publisher = LocalEventPublisher(bus)
+
+    def invalid_handler(msg: EventWireMessage) -> None:
+        raise ValueError("Schema validation failed: invalid payload structure")
+
+    bus.subscribe("changemesh-lifecycle-v1", invalid_handler)
+
+    envelope = _make_envelope(event_id="evt-det-fail")
+    wire_msg = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope)
+
+    res = publisher.publish(wire_msg)
+    assert res.status == "FAILED"
+    assert "Schema validation failed" in (res.error_message or "")
+    assert "evt-det-fail" not in bus.delivery_state.seen_events
+
+
+def test_local_consumer_deterministic_callback_log_secrecy(caplog):
+    """Verify deterministic callback failure containing secrets is sanitized in logs."""
+    caplog.set_level(logging.DEBUG)
+    bus = LocalEventBus()
+    consumer = LocalEventConsumer(bus, subscription_id="local-lifecycle-sub")
+
+    envelope = _make_envelope(event_id="evt-secret-det")
+    raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
+
+    secret_val = "secret_api_key_987654321"
+
+    def failing_callback(msg: EventWireMessage) -> None:
+        raise ValueError(f"Schema validation error with api_key='{secret_val}'")
+
+    res = consumer.process_raw_message(raw_data, {}, "msg-secret-det", failing_callback)
+    assert res.disposition == EventDeliveryDisposition.ACCEPT
+    assert res.dead_letter_record is not None
+
+    # Verify log output does not contain raw secret
+    assert secret_val not in caplog.text
+    assert "[REDACTED_SECRET]" in caplog.text
+
+
+def test_local_consumer_transient_callback_log_secrecy(caplog):
+    """Verify transient callback failure containing Bearer token is sanitized in logs."""
+    caplog.set_level(logging.DEBUG)
+    bus = LocalEventBus()
+    consumer = LocalEventConsumer(bus, subscription_id="local-lifecycle-sub")
+
+    envelope = _make_envelope(event_id="evt-secret-trans")
+    raw_data = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope).to_bytes()
+
+    secret_bearer = "secret_bearer_token_xyz12345"
+
+    def failing_callback(msg: EventWireMessage) -> None:
+        raise ConnectionResetError(f"Connection reset while sending Bearer {secret_bearer}")
+
+    with pytest.raises(ConnectionResetError):
+        consumer.process_raw_message(raw_data, {}, "msg-secret-trans", failing_callback)
+
+    # Verify log output does not contain raw secret
+    assert secret_bearer not in caplog.text
+    assert "[REDACTED_BEARER]" in caplog.text
+
+
+def test_local_bus_subscriber_handler_log_secrecy(caplog):
+    """Verify LocalEventBus handler exception containing token is sanitized in logs."""
+    caplog.set_level(logging.DEBUG)
+    bus = LocalEventBus()
+    publisher = LocalEventPublisher(bus)
+
+    secret_token = "ghp_" + "1234567890abcdef1234567890abcdef1234"
+
+    def failing_handler(msg: EventWireMessage) -> None:
+        raise RuntimeError(f"Handler failed with token={secret_token}")
+
+    bus.subscribe("changemesh-lifecycle-v1", failing_handler)
+
+    envelope = _make_envelope(event_id="evt-secret-handler")
+    wire_msg = EventWireMessage(topic_id="changemesh-lifecycle-v1", envelope=envelope)
+
+    publisher.publish(wire_msg)
+
+    # Verify log output does not contain raw token
+    assert secret_token not in caplog.text
+    assert "[REDACTED_TOKEN]" in caplog.text or "[REDACTED_SECRET]" in caplog.text

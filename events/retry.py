@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import math
 import re
+import uuid
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -32,6 +34,12 @@ _DETERMINISTIC_ERROR_MARKERS = (
     "extra inputs are not permitted",
     "conflict",
     "invalid event",
+    "causal cycle",
+    "unresolved causal predecessor",
+    "correlation id mismatch",
+    "idempotency collision",
+    "event id conflict",
+    "cross-change event",
 )
 
 
@@ -46,9 +54,8 @@ def classify_failure(exc: Exception | str) -> FailureClassification:
 
 def sanitize_error_message(msg: str) -> str:
     """Sanitize error messages to ensure no tokens or passwords leak into logs/artifacts."""
-    # Redact common secret substrings if present
     sanitized = re.sub(
-        r"(?:api[_-]?key|token|secret|password)\s*[:=]\s*['\"][^'\"]+['\"]",
+        r"(?:api[_-]?key|token|secret|password|passwd|pwd)\s*[:=]\s*['\"]?[A-Za-z0-9_\-\.]{8,}['\"]?",
         "[REDACTED_SECRET]",
         msg,
         flags=re.IGNORECASE,
@@ -62,6 +69,11 @@ def sanitize_error_message(msg: str) -> str:
     sanitized = re.sub(r"-{5}BEGIN[^-]+-{5}[\s\S]+?-{5}END[^-]+-{5}", "[REDACTED_KEY]", sanitized)
     sanitized = re.sub(
         r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}\b", "[REDACTED_TOKEN]", sanitized
+    )
+    sanitized = re.sub(
+        r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b",
+        "[REDACTED_JWT]",
+        sanitized,
     )
     return sanitized
 
@@ -126,20 +138,48 @@ class RetryExecutionResult(BaseModel):
     attempts: Sequence[RetryAttemptRecord]
     result: Optional[Any] = None
     terminal_error: Optional[str] = None
+    dead_letter_record: Optional[Any] = None
 
 
 def execute_with_retry(
     fn: Callable[[], Any],
     policy: Optional[EventRetryPolicy] = None,
     sleep_fn: Optional[Callable[[float], None]] = None,
+    dead_letter_context: Optional[Mapping[str, Any]] = None,
 ) -> RetryExecutionResult:
-    """Execute a callable with deterministic bounded retries.
+    """Execute a callable with deterministic bounded retries (local/test retry engine).
+
+    Note: This is the local and test execution retry engine. Google Cloud Pub/Sub
+    transport owns its own distributed redelivery and retry runtime via subscription
+    policies and does NOT wrap message receipt in execute_with_retry.
 
     Non-retryable (DETERMINISTIC_INVALID) errors fail on attempt 1 with zero retries.
     Transient retryable errors retry up to policy.max_attempts.
+    When execution terminates in failure (either DETERMINISTIC_INVALID or TERMINAL_EXHAUSTED),
+    exactly one sanitized DeadLetterEventRecord and TerminalFailureHandoff is constructed.
     """
+    from events.dead_letter import build_dead_letter_record
+
     pol = policy or EventRetryPolicy()
     attempt_records: list[RetryAttemptRecord] = []
+
+    def _build_dl(
+        classification: FailureClassification,
+        raw_err: Exception | str,
+        attempts: int,
+    ) -> Any:
+        ctx = dead_letter_context or {}
+        return build_dead_letter_record(
+            dead_letter_id=str(ctx.get("dead_letter_id") or f"dl-{uuid.uuid4().hex[:8]}"),
+            original_event_id=str(ctx.get("event_id") or "evt-local-retry"),
+            change_id=str(ctx.get("change_id") or "chg-local-retry"),
+            correlation_id=str(ctx.get("correlation_id") or "corr-local-retry"),
+            original_topic_id=str(ctx.get("topic_id") or "changemesh-retry-v1"),
+            failure_classification=classification,
+            raw_error=raw_err,
+            attempts_made=attempts,
+            timestamp=datetime.now(timezone.utc),
+        )
 
     for attempt_idx in range(pol.max_attempts):
         attempt_num = attempt_idx + 1
@@ -158,6 +198,7 @@ def execute_with_retry(
                 total_attempts=attempt_num,
                 attempts=attempt_records,
                 result=val,
+                dead_letter_record=None,
             )
         except Exception as e:
             classification = classify_failure(e)
@@ -165,23 +206,26 @@ def execute_with_retry(
                 pol.compute_backoff_delay(attempt_idx) if attempt_num < pol.max_attempts else 0.0
             )
 
+            clean_err = sanitize_error_message(str(e))
             attempt_records.append(
                 RetryAttemptRecord(
                     attempt_number=attempt_num,
                     classification=classification,
-                    error_message=sanitize_error_message(str(e)),
+                    error_message=clean_err,
                     backoff_delay_seconds=delay,
                 )
             )
 
-            # Non-retryable fails immediately without further attempts
+            # Non-retryable fails immediately on attempt 1 with zero retries
             if classification == FailureClassification.DETERMINISTIC_INVALID:
+                dl_rec = _build_dl(FailureClassification.DETERMINISTIC_INVALID, e, attempt_num)
                 return RetryExecutionResult(
                     succeeded=False,
                     total_attempts=attempt_num,
                     final_classification=FailureClassification.DETERMINISTIC_INVALID,
                     attempts=attempt_records,
-                    terminal_error=sanitize_error_message(str(e)),
+                    terminal_error=clean_err,
+                    dead_letter_record=dl_rec,
                 )
 
             # If more attempts remain, invoke backoff sleep hook
@@ -189,18 +233,24 @@ def execute_with_retry(
                 if sleep_fn is not None:
                     sleep_fn(delay)
             else:
+                dl_rec = _build_dl(FailureClassification.TERMINAL_EXHAUSTED, e, pol.max_attempts)
                 return RetryExecutionResult(
                     succeeded=False,
                     total_attempts=pol.max_attempts,
                     final_classification=FailureClassification.TERMINAL_EXHAUSTED,
                     attempts=attempt_records,
-                    terminal_error=sanitize_error_message(str(e)),
+                    terminal_error=clean_err,
+                    dead_letter_record=dl_rec,
                 )
 
+    dl_rec = _build_dl(
+        FailureClassification.TERMINAL_EXHAUSTED, "Exceeded max attempts", pol.max_attempts
+    )
     return RetryExecutionResult(
         succeeded=False,
         total_attempts=pol.max_attempts,
         final_classification=FailureClassification.TERMINAL_EXHAUSTED,
         attempts=attempt_records,
         terminal_error="Exceeded max attempts",
+        dead_letter_record=dl_rec,
     )
