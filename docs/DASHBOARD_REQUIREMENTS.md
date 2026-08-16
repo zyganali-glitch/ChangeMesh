@@ -22,3 +22,10 @@ To prove the metrics defined in `docs/OUTCOME_CONTRACT.md` to the hackathon judg
 ## 4. The Change Evidence Passport (Evidence Completeness)
 - **Visual:** A structured JSON or markdown view of the final crypto-hashed passport.
 - **Data:** Must show links to rehearsal traces, memory references, and the human approval signature.
+
+## 5. Causal Event Timeline Integration (P-09.05 IMPLEMENTED)
+- **Contract Source:** `src/evidence/pubsub_timeline.py` (`CausalEventTimeline`, `CausalTimelineEntry`).
+- **Ordering Guarantee:** Strictly topologically ordered by causal metadata (`causation_id`), ensuring cause precedes effect regardless of wall-clock skew or arrival sequence. Concurrent independent events are tie-broken deterministically by `(timestamp, event_id)`.
+- **Integrity & Tamper Protection:** Computes deterministic SHA-256 timeline digest over canonical JSON bytes.
+- **Privacy Guarantee:** Payloads are structurally sanitized on ingest using `redact_mapping` with `"[REDACTED]"`.
+- **Export Formats:** Full JSON round-trip (`to_dict()`, `from_dict()`, `to_json()`) providing clean DAG depth, producer revision provenance, and topic routing history for dashboard renderers and passport binding.

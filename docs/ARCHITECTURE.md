@@ -459,7 +459,7 @@ See the full review in [`AUTONOMY_REVIEW.md`](AUTONOMY_REVIEW.md).
 | Sequential fallback & parallel branches | YES — implemented in P-07.04 (`src/agents/coordinator.py`, deep runtime input isolation, single-writer aggregation, non-bypassable sequential fallback) |
 | Agent revision provenance | YES — implemented in P-07.05 (`AgentRevisionProvenance`, `Provenance`, `EventEnvelope`, execution trace integration) |
 | Gemini integration & structured reasoning boundary | YES — implemented in P-08 (P-08.01–P-08.05: bounded client, structured output, input privacy, blind semantic audit, metrics & budget enforcement) |
-| Pub/Sub event backbone | IN_PROGRESS — P-09.01 topology (`events/topology.py`), P-09.02 publish/consume adapters (`events/wire.py`, `integrations/gcp/pubsub_adapter.py`), and P-09.03 retry schedules/dead-letter (`events/retry.py`, `events/dead_letter.py`) implemented |
+| Pub/Sub event backbone | YES — implemented in P-09 (P-09.01–P-09.05: topology, publish/consume adapters, retry schedules/dead-letter, local bus parity, and causal timeline) |
 | Firestore saga persistence | NO — deferred to P-10 (`PENDING`) |
 | Google Cloud deployed | NO — deferred to P-28 (`PENDING`) |
 | Full product runnable | NO — `NOT_RUN` |

@@ -122,7 +122,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-06` | Local Development Environment and Dependency Freeze | `DONE` | `P-05` |
 | `P-07` | Google ADK Agent Skeleton | `DONE` | `P-06` |
 | `P-08` | Gemini Integration and Structured Reasoning Boundary | `DONE` | `P-07` |
-| `P-09` | Pub/Sub Event Backbone | `IN_PROGRESS` | `P-08` |
+| `P-09` | Pub/Sub Event Backbone | `DONE` | `P-08` |
 | `P-10` | Firestore State, Idempotency, and Saga Persistence | `PENDING` | `P-09` |
 | `P-11` | Memory Trust Layer | `PENDING` | `P-10` |
 | `P-12` | Agent Registry and Capability Passport | `PENDING` | `P-11` |
@@ -866,7 +866,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-09 — Pub/Sub Event Backbone
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-09.01 — Create topic/subscription topology for change, agent work, approvals, evidence, retries, dead letters
 
@@ -914,11 +914,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-09.05 — Record causal event timeline for dashboard/passport
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Record causal event timeline for dashboard/passport.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Timeline ordered by causal metadata, not only clock time.
 - **Required evidence:** Event-ordering tests.
+- **Evidence:** Implemented clean-room causal event timeline in `src/evidence/pubsub_timeline.py` (`CausalEventTimeline`, `CausalTimelineEntry`) based on approved donor component `CCT-FLIGHT-001`. Guaranteed topological causal graph sequencing via Kahn's algorithm over `causation_id` links, proving parent events precede child events regardless of network arrival sequence or wall-clock timestamp skew. Causally unlinked concurrent events are deterministically tie-broken by `(timestamp, event_id)`. Implemented payload secret sanitization on ingest via `redact_mapping` with `"[REDACTED]"`. Implemented full canonical JSON round-trip serialization (`to_dict()`, `from_dict()`, `to_json()`) with restart continuity and deterministic SHA-256 timeline digest hashing (`compute_timeline_digest()`). Verified zero forbidden carry-over (no Codex events, no UI styling, no Google Cloud SDK types in `src/evidence/`). `tests/test_p09_05_pubsub_timeline.py` passes 6 dedicated tests. Complete P-09 suite passes 48 tests. Canonical unit suite passes 1078 tests (1 warning).
 - **Mandatory documentation sync:** Dashboard requirements.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

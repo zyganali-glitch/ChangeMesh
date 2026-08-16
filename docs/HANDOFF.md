@@ -42,12 +42,18 @@ P-09.01
 P-09.02
 P-09.03
 P-09.04
-
-**Active Phase:**
+P-09.05
 P-09
 
+**Active Phase:**
+P-10
+
 **Next Exact Task:**
-P-09.05 — Record causal event timeline for dashboard/passport
+P-10.01 — Design Firestore collections, indexes, tenancy boundary, retention, document-size limits
+
+## Current P-09.05 State
+
+P-09.05 is `DONE`. Implemented clean-room causal event timeline in `src/evidence/pubsub_timeline.py` (`CausalEventTimeline`, `CausalTimelineEntry`) based on approved donor component `CCT-FLIGHT-001`. Guaranteed topological causal graph sequencing via Kahn's algorithm over `causation_id` links, proving parent events precede child events regardless of network arrival sequence or wall-clock timestamp skew. Causally unlinked concurrent events are deterministically tie-broken by `(timestamp, event_id)`. Implemented payload secret sanitization on ingest via `redact_mapping` with `"[REDACTED]"`. Implemented full canonical JSON round-trip serialization (`to_dict()`, `from_dict()`, `to_json()`) with restart continuity and deterministic SHA-256 timeline digest hashing (`compute_timeline_digest()`). Verified zero forbidden carry-over (no Codex events, no UI styling, no Google Cloud SDK types in `src/evidence/`). `tests/test_p09_05_pubsub_timeline.py` passes 6 dedicated tests. Complete P-09 suite passes 48 tests. Canonical unit suite passes 1078 tests (1 warning).
 
 ## Current P-09.04 State
 

@@ -28,9 +28,6 @@ Managed-service integrations remain conditional on real access and must be label
 - `Evidence Record / Ledger` (`src/evidence/evidence_record.py`): canonical deterministic fact and evidence authority (CCT-EVID-001).
 - `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent blind semantic sufficiency review with deterministic fact isolation and reconciliation (CCT-SEM-001).
 - `Release Steward` (`src/agents/release_steward.py`): reversible handoff and enforced pipeline writebacks (CS-WRITE-001). Consumes judge format from `docs/JUDGING_MAP.md` (CCT-JUDGE-001 canonical target) but is not the canonical owner of that component.
-
-No agent receives unrestricted credentials. Every tool call is scoped by role, change ID, action class, and data class.
-Additional core targets:
 - `Bounded Gemini Model Client` (`src/core/gemini_client.py`): canonical single bounded Gemini client (P-08.01 IMPLEMENTED).
 - `Approval Compression` (`src/auth/approval_compression.py`): defines autonomous vs escalation boundaries (UIPATH-AUTH-001).
 - `ShadowLab Auth` (`src/policy/shadowlab_auth.py`): preflight validation and destructive action boundaries (CCT-PREFLIGHT-001).
@@ -38,16 +35,16 @@ Additional core targets:
 - `Firestore Saga` (`src/orchestrator/firestore_saga.py`): persistent saga state (UIPATH-STATE-001).
 - `Gemini Structured Output` (`src/core/gemini_structured_output.py`): zero trust deserialization and contract validation (ZK-VALID-001).
 - `Claim Audit` (`src/audit/claim_audit.py`): hard proof of claims and cross-document parity (ZK-CLAIM-001).
-- `PubSub Timeline` (`src/evidence/pubsub_timeline.py`): chronological execution and causal ordering (CCT-FLIGHT-001).
+- `PubSub Timeline` (`src/evidence/pubsub_timeline.py`): chronological execution and causal ordering (CCT-FLIGHT-001; P-09.05 IMPLEMENTED).
+
+No agent receives unrestricted credentials. Every tool call is scoped by role, change ID, action class, and data class.
 
 ## 4. Core modules
 
 - `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions; P-07.05 agent revision metadata IMPLEMENTED: AgentRevisionProvenance, Provenance/EventEnvelope integration)
 - `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches IMPLEMENTED; P-07.05 agent revision metadata IMPLEMENTED)
-- `src/core`: core system utilities and outer provider clients (P-08.01 `BoundedGeminiClient` and P-08.02 structured output in `src/core/` IMPLEMENTED; P-08.03 boundary enforcement is called by the client and owned by Policy Guardian)
-- `api`: API entrypoint for HTTP/REST and webhook invocations (PLANNED)
-- `orchestration`: deterministic local routing/delegation IMPLEMENTED under P-07.03; multi-agent branch coordination, parallel execution, single-writer aggregation, sequential fallback, and exact revision tracing IMPLEMENTED under P-07.04/P-07.05 via `src/agents/coordinator.py`; durable saga transitions, Firestore persistence, Pub/Sub orchestration, and recovery remain PLANNED under their later owning phases
-- `events`: Pub/Sub envelope, replay, dead-letter handling (PLANNED)
+- `src/core`: core system utilities and outer provider clients (P-08.01 `BoundedGeminiClient` and P-08.02 structured output in `src/core/` IMPLEMENTED; P-08.03 boundary enforcement is called by the client and owned by Policy Guardian; P-08.05 metrics and budget enforcement IMPLEMENTED)
+- `events`: Pub/Sub topology, wire serialization, publisher/consumer protocols, retry schedules, dead-letter routing, and local event bus (P-09.01–P-09.04 IMPLEMENTED)
 - `state`: Firestore repositories and idempotency (PLANNED)
 - `memory`: trust typing, provenance, TTL, contradiction, quarantine (PLANNED)
 - `capability`: passport generation, validation, expiry, revocation (PLANNED)
@@ -55,8 +52,8 @@ Additional core targets:
 - `policy`: reversibility and autonomy classification (PLANNED)
 - `integrations/github`: bounded GitHub adapter (PLANNED)
 - `integrations/metadata`: synthetic graph and optional DataHub adapter (PLANNED)
-- `integrations/gcp`: Google Cloud provider adapters for Firestore, Pub/Sub, Vertex AI / Gemini SDK (PLANNED)
-- `evidence`: append-only evidence ledger and passport seal (PLANNED)
+- `integrations/gcp`: Google Cloud provider adapters (Pub/Sub publisher/consumer in P-09.02 IMPLEMENTED; Firestore and Vertex AI in later phases)
+- `src/evidence`: append-only evidence ledger, causal event timeline, and passport seal (`src/evidence/pubsub_timeline.py` P-09.05 IMPLEMENTED)
 - `observability`: trace correlation and redaction (PLANNED)
 - `web`: browser-native HTML5/CSS3/JavaScript judge/operator dashboard with Node NOT_REQUIRED per ADR-0015 (PLANNED)
 
@@ -150,6 +147,13 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Project / Demo Budget Policy & Fail-Closed Aggregate**: Deterministic `ModelCallBudgetPolicy` (`DEMO_MAX_LATENCY_MS = 30000.0`, `DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()` enforce local project thresholds without claiming provider SLAs. Missing rate cards or token counts yield `overall_status="NOT_RUN"` (`overall_budget_pass=False`); `NOT_RUN` never contributes to aggregate `PASS`.
 *   **Canonical Metrics Artifact**: Deterministic `build_model_metrics_artifact()` and `export_metrics_artifact_json()` provide non-secret execution artifacts with strict secrecy guarantees (zero prompt, response, or credential text).
 *   **Single Reliability Authority**: Retry measurement observes the existing wrapper-owned retry loop and does not add another retry mechanism.
+
+### 5.14 Causal Event Timeline Invariants (P-09.05 / CCT-FLIGHT-001)
+
+*   **Causal DAG Overrules Clock Skew**: Event timeline sequencing is determined strictly by topological graph traversal across `causation_id` links. Parent events are guaranteed to precede child events regardless of network arrival sequence or wall-clock timestamp jitter. Concurrent independent events are ordered deterministically by `(timestamp, event_id)`.
+*   **Structural Secrecy Redaction**: Payload summaries are sanitized on ingest via `redact_mapping`, replacing sensitive key values with `"[REDACTED]"`.
+*   **Tamper-Protected Timeline Digest**: Deterministic SHA-256 digest is computed over canonical JSON bytes of ordered entries, providing an immutable audit digest for Change Passport seal and dashboard rendering.
+*   **Zero Forbidden Carry-Over**: Timeline models enforce clean-room boundaries with zero Codex event names, UI styles, or provider SDK types in domain/evidence layers.
 
 ## 6. State labels
 
