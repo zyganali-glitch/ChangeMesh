@@ -25,15 +25,19 @@ To satisfy Master Plan micro-task P-08.05 acceptance criteria without inventing 
 |---|---|---|---|
 | Per-Call Max Latency | `DEMO_MAX_LATENCY_MS` | `30,000.0 ms` (30.0s) | Prevents runaway model stalls during interactive demos; aligns with default call timeout. |
 | Per-Call Max Cost | `DEMO_MAX_COST_USD` | `$0.05000000 USD` | Caps single-invocation budget exposure for synthetic demo changes. |
-| Per-Call Max Total Tokens | `DEMO_MAX_TOTAL_TOKENS` | `12,288 tokens` | Enforces prompt minimization + maximum output ceiling (4,096 prompt + 8,192 response). |
+| Per-Call Max Total Tokens | `DEMO_MAX_TOTAL_TOKENS` | `12,288 tokens` | Internal total-token demonstration policy threshold (accommodates default 4,096 output cap up to 8,192 maximum configurable output ceiling plus input context; runtime enforces output bounds [1, 8192] without claiming an artificial prompt cap). |
 
 ### 2.2 Deterministic Budget Evaluation
 
-The evaluation function `evaluate_model_call_budget(telemetry, policy)` enforces these bounds deterministically:
-- **Latency Status (`PASS` / `FAIL`):** Evaluated against `policy.max_latency_ms`. Exceeding the bound fails closed (`FAIL`).
-- **Cost Status (`PASS` / `FAIL` / `NOT_RUN`):** When explicit rates and measured token counts exist, evaluated against `policy.max_cost_usd`. If no rate card was provided, cost is **NOT** guessed or treated as zero; it is recorded honestly as `NOT_RUN`.
-- **Token Status (`PASS` / `FAIL` / `NOT_RUN`):** Evaluated against `policy.max_total_tokens`.
-- **Overall Budget Pass:** `True` only when latency passes and no evaluated metric reports `FAIL`. Missing cost evaluation (`NOT_RUN`) does not manufacture a false `PASS` claim for cost.
+The evaluation function `evaluate_model_call_budget(telemetry, policy)` enforces these bounds deterministically with fail-closed aggregate semantics:
+
+- **Latency Status (`PASS` / `FAIL`):** Evaluated against `policy.max_latency_ms`. Exceeding the bound fails closed (`FAIL`). Always a required evaluation dimension.
+- **Cost Status (`PASS` / `FAIL` / `NOT_RUN`):** When explicit rates and measured token counts exist, evaluated against `policy.max_cost_usd`. If no rate card was provided or token counts are missing, cost is **NOT** guessed or treated as zero; it is recorded honestly as `NOT_RUN`.
+- **Token Status (`PASS` / `FAIL` / `NOT_RUN`):** Evaluated against `policy.max_total_tokens`. If token counts are unavailable from provider metadata, recorded as `NOT_RUN`.
+- **Aggregate Budget Status (`overall_status` & `overall_budget_pass`):**
+  - `overall_status = "PASS"` (`overall_budget_pass = True`) **ONLY** when all required configured dimensions (latency, cost, token) are evaluated and report `PASS`.
+  - `overall_status = "FAIL"` (`overall_budget_pass = False`) if **ANY** required configured dimension reports `FAIL`.
+  - `overall_status = "NOT_RUN"` (`overall_budget_pass = False`) if **ANY** required configured dimension reports `NOT_RUN` (and none `FAIL`). `NOT_RUN` strictly never contributes to an aggregate `PASS`.
 
 ---
 
@@ -55,18 +59,19 @@ $$\text{Estimated Cost (USD)} = \frac{(\text{prompt\_tokens} \times \text{input\
 
 ## 4. Rate Provenance Architecture
 
-To resolve the rule that cost estimates require named rate provenance, `GeminiCostRateCard` carries structured metadata:
+To resolve the rule that cost estimates require named rate provenance, `GeminiCostRateCard` requires explicit non-empty `rate_card_id` and explicit `provenance_kind`:
 
 | Provenance Kind | Machine Identifier | Meaning | Provider Calibrated? |
 |---|---|---|---|
 | `RateProvenanceKind.TEST_FORMULA` | `"TEST_FORMULA"` | Explicit benchmark or test formula rates provided by the test harness. | No (`NOT_RUN`) |
 | `RateProvenanceKind.CUSTOM_UNVERIFIED` | `"CUSTOM_UNVERIFIED"` | Caller-provided custom rates without verified provider calibration. | No (`NOT_RUN`) |
-| `RateProvenanceKind.PROVIDER_CALIBRATED` | `"PROVIDER_CALIBRATED"` | Officially verified Google Cloud Vertex AI / Gemini API pricing rate card. | Yes (`VERIFIED`) |
+| `RateProvenanceKind.PROVIDER_CALIBRATED` | `"PROVIDER_CALIBRATED"` | Reserved taxonomy identifier for future verified Google Cloud pricing rate cards. | No (`NOT_RUN`; caller assertion cannot manufacture verified calibration truth) |
 
 ### Provider Pricing Calibration Status: `NOT_RUN`
 Live Google Cloud provider pricing calibration is intentionally **`NOT_RUN`** for local testing. In accordance with ChangeMesh integrity rules:
 - No pricing numbers are invented or hard-coded as Google facts.
 - Uncalibrated runs produce `cost_status="NOT_RUN"` when no rate card is supplied, or `cost_status="CALCULATED"` with `provider_pricing_calibrated=False` when using test/custom rate cards.
+- Caller selection of `PROVIDER_CALIBRATED` does **not** manufacture verified provider pricing truth (`provider_pricing_calibrated` remains `False`).
 
 ---
 
@@ -107,6 +112,8 @@ The canonical P-08.05 metrics evidence artifact is constructed via `build_model_
     "provider_pricing_calibrated": false
   },
   "budget_evaluation": {
+    "overall_status": "PASS",
+    "overall_budget_pass": true,
     "latency_status": "PASS",
     "latency_ms": 124.5,
     "max_latency_ms": 30000.0,
@@ -116,8 +123,7 @@ The canonical P-08.05 metrics evidence artifact is constructed via `build_model_
     "token_status": "PASS",
     "total_tokens": 60,
     "max_total_tokens": 12288,
-    "overall_budget_pass": true,
-    "details": "latency: 124.5ms / limit 30000.0ms (PASS); cost: $0.00009750 / budget $0.05 (PASS); tokens: 60 / limit 12288 (PASS)"
+    "details": "overall: PASS; latency: 124.5ms / limit 30000.0ms (PASS); cost: $0.00009750 / budget $0.05 (PASS); tokens: 60 / limit 12288 (PASS)"
   }
 }
 ```

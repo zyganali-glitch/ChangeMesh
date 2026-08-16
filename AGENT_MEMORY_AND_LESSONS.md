@@ -167,15 +167,15 @@ This is the durable minefield and lessons record, not a chronological chat log.
 ### LESSON-20260816-05 — Cost telemetry must never infer provider pricing; project budget policy must be explicit
 - Date/time: 2026-08-16
 - Active task: P-08.05
-- Symptom: Latency, token counts, and retry attempts were measured, but no verified canonical provider price was recorded for deterministic cost reporting, and Master Plan acceptance criteria for budget/latency limits were unmapped to explicit project policy.
-- Root cause: Provider pricing is an external, region/model/contract-dependent fact and must not be guessed inside the model client, while demo latency/budget limits require explicit project-level policy distinction.
-- Incorrect approach: Hard-coding a plausible token price, silently treating absent rates as zero cost or PASS, or confusing local project/demo limits with provider SLAs.
+- Symptom: Latency, token counts, and retry attempts were measured, but missing pricing/token prerequisites could produce a false aggregate budget PASS, rate card identifiers were silently defaulted, and caller selection of PROVIDER_CALIBRATED could manufacture calibrated pricing claims.
+- Root cause: Missing cost/token checks were evaluated as `!= "FAIL"` instead of requiring that all configured dimensions actually ran and passed; rate cards had default `rate_card_id` / `provenance_kind`; and artifact generation derived calibration purely from the caller's enum.
+- Incorrect approach: Hard-coding a plausible token price, silently treating absent rates as zero cost or PASS, defaulting rate provenance, allowing caller assertions to manufacture calibration truth, or confusing local project/demo limits with provider SLAs.
 - Correct approach:
-  1. Accept an explicit immutable `GeminiCostRateCard` with structured `RateProvenanceKind` (`TEST_FORMULA`, `CUSTOM_UNVERIFIED`, `PROVIDER_CALIBRATED`). Calculate cost only when measured token counts and both rates exist, reporting `cost_status="CALCULATED"`, and report `cost_status="NOT_RUN"` otherwise without guessing.
-  2. Define deterministic `ModelCallBudgetPolicy` (`DEMO_MAX_LATENCY_MS = 30000.0`, `DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()`, explicitly labeled as internal demo policy.
-  3. Export deterministic, non-secret metrics artifacts via `build_model_metrics_artifact()` and `export_metrics_artifact_json()`.
-- Prevention rule: Cost estimates require named rate provenance; missing pricing is visible `NOT_RUN`, never implicit zero or PASS; budget policies must be deterministic and distinct from provider SLAs.
-- Tests/evidence: `tests/test_p08_05_metrics.py` (11 passed); P-08 suite (118 passed); canonical unit (1028 passed).
+  1. Accept an explicit immutable `GeminiCostRateCard` requiring non-empty `rate_card_id` and explicit structured `RateProvenanceKind` (`TEST_FORMULA`, `CUSTOM_UNVERIFIED`, `PROVIDER_CALIBRATED`). Calculate cost only when measured token counts and both rates exist, reporting `cost_status="CALCULATED"`, and report `cost_status="NOT_RUN"` otherwise without guessing.
+  2. Define deterministic `ModelCallBudgetPolicy` (`DEMO_MAX_LATENCY_MS = 30000.0`, `DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()`, enforcing fail-closed aggregate evaluation (`overall_status` = `PASS` / `FAIL` / `NOT_RUN`, where `NOT_RUN` never contributes to aggregate `PASS`).
+  3. Export deterministic, non-secret metrics artifacts via `build_model_metrics_artifact()` and `export_metrics_artifact_json()` where `provider_pricing_calibrated` is strictly `False` without verified calibration evidence.
+- Prevention rule: Cost estimates require explicit, named rate provenance; missing pricing/tokens must report `NOT_RUN` and fail closed on aggregate budget evaluation (never implicit zero or false PASS); caller assertion != verified provider truth; budget policies must be deterministic and distinct from provider SLAs.
+- Tests/evidence: `tests/test_p08_05_metrics.py` (13 passed); P-08 suite (120 passed); canonical unit (1030 passed).
 - Affected files: `src/core/gemini_client.py`, `src/core/__init__.py`, `tests/test_p08_05_metrics.py`, `docs/COST_PLAN.md`.
 - Reusable beyond this task: Yes (all provider-cost, budget telemetry, and execution evidence).
 - Status: `ACTIVE`

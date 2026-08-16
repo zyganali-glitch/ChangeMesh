@@ -105,19 +105,27 @@ class GeminiCostRateCard:
     """Explicit caller-supplied token rates for deterministic cost estimation.
 
     No provider pricing is guessed or silently defaulted. A rate card with
-    explicit rate provenance is required before a cost estimate can be computed.
-    Provider pricing calibration remains NOT_RUN unless explicitly verified.
+    explicit non-empty rate_card_id and explicit provenance_kind is required before
+    a cost estimate can be computed. Provider pricing calibration remains NOT_RUN
+    unless verified via an independently verified live provider-pricing path.
     """
 
     input_usd_per_million_tokens: float
     output_usd_per_million_tokens: float
-    rate_card_id: str = "rate-card-unspecified"
-    provenance_kind: RateProvenanceKind = RateProvenanceKind.CUSTOM_UNVERIFIED
+    rate_card_id: str
+    provenance_kind: RateProvenanceKind
     currency: str = "USD"
 
     def __post_init__(self) -> None:
-        if not isinstance(self.rate_card_id, str) or not self.rate_card_id.strip():
-            raise ValueError("rate_card_id must be a non-empty string.")
+        if (
+            not isinstance(self.rate_card_id, str)
+            or not self.rate_card_id.strip()
+            or self.rate_card_id.strip().lower()
+            in {"rate-card-unspecified", "unspecified", "unknown", "none", "default"}
+        ):
+            raise ValueError(
+                "rate_card_id must be an explicit, non-empty, non-defaulted identifier string."
+            )
         if not isinstance(self.currency, str) or not self.currency.strip():
             raise ValueError("currency must be a non-empty string.")
         if not isinstance(self.provenance_kind, RateProvenanceKind):
@@ -209,6 +217,8 @@ class ModelCallBudgetPolicy:
 class ModelCallBudgetEvaluation:
     """Deterministic evaluation of telemetry against project/demo budget policy."""
 
+    overall_status: str  # "PASS", "FAIL", "NOT_RUN"
+    overall_budget_pass: bool
     latency_status: str  # "PASS", "FAIL"
     latency_ms: float
     max_latency_ms: float
@@ -218,7 +228,6 @@ class ModelCallBudgetEvaluation:
     token_status: str  # "PASS", "FAIL", "NOT_RUN"
     total_tokens: Optional[int]
     max_total_tokens: Optional[int]
-    overall_budget_pass: bool
     details: str
 
 
@@ -230,55 +239,90 @@ def evaluate_model_call_budget(
 
     Ensures:
     - Latency within limit -> latency_status='PASS'; exceeded -> 'FAIL'.
-    - Cost within limit when calculable -> cost_status='PASS'; exceeded -> 'FAIL'.
-    - Missing cost/rate card remains cost_status='NOT_RUN' (not treated as zero or false PASS).
-    - Token count within limit when present -> token_status='PASS'; exceeded -> 'FAIL'.
-    - overall_budget_pass is True only when all applicable criteria are PASS and none FAIL.
+    - Cost within limit when calculable -> cost_status='PASS'; exceeded -> 'FAIL';
+      when prerequisites (rate card / token counts) are absent -> 'NOT_RUN'.
+    - Token count within limit when present -> token_status='PASS'; exceeded -> 'FAIL';
+      when token counts are absent -> 'NOT_RUN'.
+    - overall_status is 'PASS' ONLY when all required configured dimensions are evaluated and PASS.
+    - overall_status is 'FAIL' if ANY required configured dimension is FAIL.
+    - overall_status is 'NOT_RUN' if ANY required configured dimension is NOT_RUN (and none FAIL).
+    - overall_budget_pass is True if and only if overall_status == 'PASS'.
     """
     effective_policy = policy or ModelCallBudgetPolicy()
 
-    # Latency check
+    # Latency check (always required)
     latency_passed = telemetry.duration_ms <= effective_policy.max_latency_ms
     latency_status = "PASS" if latency_passed else "FAIL"
 
     # Cost check
-    if telemetry.estimated_cost_usd is not None and effective_policy.max_cost_usd is not None:
-        cost_passed = telemetry.estimated_cost_usd <= effective_policy.max_cost_usd
-        cost_status = "PASS" if cost_passed else "FAIL"
+    if effective_policy.max_cost_usd is not None:
+        if telemetry.estimated_cost_usd is not None:
+            cost_passed = telemetry.estimated_cost_usd <= effective_policy.max_cost_usd
+            cost_status = "PASS" if cost_passed else "FAIL"
+        else:
+            cost_status = "NOT_RUN"
     else:
-        cost_passed = True
-        cost_status = "NOT_RUN"
+        cost_status = "NOT_RUN" if telemetry.estimated_cost_usd is None else "PASS"
 
     # Token check
-    if telemetry.total_token_count is not None and effective_policy.max_total_tokens is not None:
-        token_passed = telemetry.total_token_count <= effective_policy.max_total_tokens
-        token_status = "PASS" if token_passed else "FAIL"
+    if effective_policy.max_total_tokens is not None:
+        if telemetry.total_token_count is not None:
+            token_passed = telemetry.total_token_count <= effective_policy.max_total_tokens
+            token_status = "PASS" if token_passed else "FAIL"
+        else:
+            token_status = "NOT_RUN"
     else:
-        token_passed = True
         token_status = "NOT_RUN" if telemetry.total_token_count is None else "PASS"
 
-    overall_pass = latency_passed and (cost_status != "FAIL") and (token_status != "FAIL")
+    # Aggregate status evaluation
+    required_statuses: list[str] = [latency_status]
+    if effective_policy.max_cost_usd is not None:
+        required_statuses.append(cost_status)
+    if effective_policy.max_total_tokens is not None:
+        required_statuses.append(token_status)
+
+    if any(s == "FAIL" for s in required_statuses):
+        overall_status = "FAIL"
+        overall_budget_pass = False
+    elif any(s == "NOT_RUN" for s in required_statuses):
+        overall_status = "NOT_RUN"
+        overall_budget_pass = False
+    else:
+        overall_status = "PASS"
+        overall_budget_pass = True
 
     detail_parts = [
-        f"latency: {telemetry.duration_ms}ms / limit {effective_policy.max_latency_ms}ms "
-        f"({latency_status})"
+        f"overall: {overall_status}",
+        (
+            f"latency: {telemetry.duration_ms}ms / "
+            f"limit {effective_policy.max_latency_ms}ms ({latency_status})"
+        ),
     ]
     if cost_status == "NOT_RUN":
-        detail_parts.append("cost: NOT_RUN (no rate card provided; not guessed)")
-    else:
         detail_parts.append(
-            f"cost: ${telemetry.estimated_cost_usd:.8f} / budget ${effective_policy.max_cost_usd} "
-            f"({cost_status})"
+            "cost: NOT_RUN (no rate card provided or incomplete tokens; not guessed)"
         )
+    elif effective_policy.max_cost_usd is not None:
+        detail_parts.append(
+            f"cost: ${telemetry.estimated_cost_usd:.8f} / "
+            f"budget ${effective_policy.max_cost_usd} ({cost_status})"
+        )
+    else:
+        detail_parts.append(f"cost: ${telemetry.estimated_cost_usd:.8f} (no limit configured)")
+
     if token_status == "NOT_RUN":
-        detail_parts.append("tokens: NOT_RUN")
-    else:
+        detail_parts.append("tokens: NOT_RUN (token usage unavailable)")
+    elif effective_policy.max_total_tokens is not None:
         detail_parts.append(
-            f"tokens: {telemetry.total_token_count} / limit {effective_policy.max_total_tokens} "
-            f"({token_status})"
+            f"tokens: {telemetry.total_token_count} / "
+            f"limit {effective_policy.max_total_tokens} ({token_status})"
         )
+    else:
+        detail_parts.append(f"tokens: {telemetry.total_token_count} (no limit configured)")
 
     return ModelCallBudgetEvaluation(
+        overall_status=overall_status,
+        overall_budget_pass=overall_budget_pass,
         latency_status=latency_status,
         latency_ms=telemetry.duration_ms,
         max_latency_ms=effective_policy.max_latency_ms,
@@ -288,7 +332,6 @@ def evaluate_model_call_budget(
         token_status=token_status,
         total_tokens=telemetry.total_token_count,
         max_total_tokens=effective_policy.max_total_tokens,
-        overall_budget_pass=overall_pass,
         details="; ".join(detail_parts),
     )
 
@@ -299,7 +342,6 @@ def build_model_metrics_artifact(
 ) -> dict[str, Any]:
     """Construct a canonical deterministic, non-secret metrics evidence artifact."""
     evaluation = budget_evaluation or evaluate_model_call_budget(telemetry)
-    is_calibrated = telemetry.rate_provenance == RateProvenanceKind.PROVIDER_CALIBRATED.value
     return {
         "artifact_schema_version": "1.0.0",
         "artifact_kind": "MODEL_CALL_METRICS",
@@ -328,9 +370,11 @@ def build_model_metrics_artifact(
             "cost_status": telemetry.cost_status,
             "rate_card_id": telemetry.rate_card_id,
             "rate_provenance": telemetry.rate_provenance,
-            "provider_pricing_calibrated": is_calibrated,
+            "provider_pricing_calibrated": False,
         },
         "budget_evaluation": {
+            "overall_status": evaluation.overall_status,
+            "overall_budget_pass": evaluation.overall_budget_pass,
             "latency_status": evaluation.latency_status,
             "latency_ms": evaluation.latency_ms,
             "max_latency_ms": evaluation.max_latency_ms,
@@ -340,7 +384,6 @@ def build_model_metrics_artifact(
             "token_status": evaluation.token_status,
             "total_tokens": evaluation.total_tokens,
             "max_total_tokens": evaluation.max_total_tokens,
-            "overall_budget_pass": evaluation.overall_budget_pass,
             "details": evaluation.details,
         },
     }

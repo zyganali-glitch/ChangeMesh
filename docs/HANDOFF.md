@@ -78,11 +78,12 @@ The dedicated suite has 18 passing tests.
 P-08.05 is `DONE` (Repaired). `ModelCallTelemetry` records latency, token
 counts, attempts, retry count, and formula cost estimates with structured
 `RateProvenanceKind`. Defined deterministic `ModelCallBudgetPolicy` (`DEMO_MAX_LATENCY_MS = 30000.0`,
-`DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()`,
-documented in `docs/COST_PLAN.md`. Exported canonical metrics evidence artifacts via
-`build_model_metrics_artifact()` and `export_metrics_artifact_json()`. Missing provider
-rates remain visible as `cost_status="NOT_RUN"`; provider pricing calibration is explicitly `NOT_RUN`.
-The dedicated metrics suite has 11 passing tests. The P-08 phase closure is verified.
+`DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()` with
+fail-closed aggregate semantics, documented in `docs/COST_PLAN.md`. Exported canonical metrics evidence artifacts
+via `build_model_metrics_artifact()` and `export_metrics_artifact_json()`. Missing provider
+rates remain visible as `cost_status="NOT_RUN"`; provider pricing calibration is explicitly `NOT_RUN` and caller
+selection of `PROVIDER_CALIBRATED` cannot manufacture calibration truth.
+The dedicated metrics suite has 13 passing tests. The P-08 phase closure is verified.
 
 ## Evidence
 
@@ -91,11 +92,11 @@ The dedicated metrics suite has 11 passing tests. The P-08 phase closure is veri
 - P-08.02 regression: `uv run python -m pytest tests/test_p08_02_structured_output.py -v --tb=short` -> 40 passed.
 - P-08.04 dedicated: `uv run python -m pytest tests/test_p08_04_blind_audit.py -v --tb=short` -> 18 passed.
 - Combined P-08.01/P-08.02/P-08.04: `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_04_blind_audit.py -q` -> 97 passed.
-- P-08.05 metrics: `uv run python -m pytest tests/test_p08_05_metrics.py -v --tb=short` -> 11 passed.
-- Complete P-08: `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_03_input_privacy.py tests/test_p08_04_blind_audit.py tests/test_p08_05_metrics.py -q` -> 118 passed.
+- P-08.05 metrics: `uv run python -m pytest tests/test_p08_05_metrics.py -v --tb=short` -> 13 passed.
+- Complete P-08: `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_03_input_privacy.py tests/test_p08_04_blind_audit.py tests/test_p08_05_metrics.py -q` -> 120 passed.
 - Policy Guardian regression: `uv run python -m pytest tests/test_p07_02_agent_definitions.py -q` -> 59 passed, 1 warning.
-- Canonical unit: `uv run python scripts/cmd.py unit` -> 1028 passed, 1 warning.
-- Full suite: `uv run python -m pytest tests/` -> 1028 passed, 1 warning, 3 errors; **FAIL — known historical baseline GCP fixture debt** (`project` fixture in `tests/test_gcp_access.py`).
+- Canonical unit: `uv run python scripts/cmd.py unit` -> 1030 passed, 1 warning.
+- Full suite: `uv run python -m pytest tests/` -> 1030 passed, 1 warning, 3 errors; **FAIL — known historical baseline GCP fixture debt** (`project` fixture in `tests/test_gcp_access.py`).
 - Donor manifest lint: `uv run python tools/governance/donor_manifest_lint.py` -> 20 components passed.
 - Targeted Ruff, format, mypy, AST model-owner, domain import, secret scan, and `git diff --check`: `PASS`.
 
