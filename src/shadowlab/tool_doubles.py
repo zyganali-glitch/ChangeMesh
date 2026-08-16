@@ -34,7 +34,10 @@ class SimulatedDatabaseClient:
         if self._fault and self._fault.target_step == step_name:
             if self._fault_counter < self._fault.failure_count:
                 self._fault_counter += 1
-                return False, f"Injected Fault ({self._fault.fault_type.value}): {self._fault.error_message}"
+                return (
+                    False,
+                    f"Injected Fault ({self._fault.fault_type.value}): {self._fault.error_message}",
+                )
 
         try:
             cursor = self._conn.cursor()
@@ -62,11 +65,17 @@ class SimulatedApiClient:
         self._fault_counter = 0
         self.attempts = 0
 
-    def post(self, url: str, payload: Dict[str, str], step_name: str = "step_api_call") -> Tuple[int, Dict[str, str]]:
+    def post(
+        self, url: str, payload: Dict[str, str], step_name: str = "step_api_call"
+    ) -> Tuple[int, Dict[str, str]]:
         """Simulate an HTTP POST request."""
         self.attempts += 1
 
-        if self._fault and self._fault.target_step == step_name and self._fault.fault_type == FaultType.HTTP_503_SERVICE_UNAVAILABLE:
+        if (
+            self._fault
+            and self._fault.target_step == step_name
+            and self._fault.fault_type == FaultType.HTTP_503_SERVICE_UNAVAILABLE
+        ):
             if self._fault_counter < self._fault.failure_count:
                 self._fault_counter += 1
                 return 503, {"error": self._fault.error_message, "mode": "SIMULATION"}
@@ -95,7 +104,9 @@ class SimulatedGitClient:
         self.branches[branch_name].append(commit_sha)
         return commit_sha
 
-    def create_pull_request(self, title: str, head_branch: str, base_branch: str = "main") -> Dict[str, str]:
+    def create_pull_request(
+        self, title: str, head_branch: str, base_branch: str = "main"
+    ) -> Dict[str, str]:
         pr_id = f"sim-pr-{len(self.pull_requests) + 1}"
         pr = {
             "pr_id": pr_id,

@@ -4,6 +4,7 @@ P-13: Synthetic twin execution sandbox, deterministic fault injection,
 simulation-labeled evidence generation, and bounded re-rehearsal plan correction.
 """
 
+from src.shadowlab.runner import ShadowLabRunner
 from src.shadowlab.scenarios import (
     FaultType,
     InjectedFault,
@@ -16,7 +17,6 @@ from src.shadowlab.tool_doubles import (
     SimulatedDatabaseClient,
     SimulatedGitClient,
 )
-from src.shadowlab.runner import ShadowLabRunner
 
 __all__ = [
     "FaultType",

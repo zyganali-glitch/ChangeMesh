@@ -47,6 +47,7 @@ def _utc_now() -> datetime:
 # Privacy & Secret Scanning Tests
 # ============================================================================
 
+
 def test_secret_field_name_detection():
     data = {
         "title": "Normal title",
@@ -85,6 +86,7 @@ def test_free_text_token_scanning():
 # ============================================================================
 # Fixture Teardown Tests
 # ============================================================================
+
 
 def test_explicit_recursive_fixture_teardown_zero_residual():
     repo = InMemorySagaStateRepository()
@@ -168,7 +170,9 @@ def test_explicit_recursive_fixture_teardown_zero_residual():
     )
 
     # 5. Checkpoints for Change 1
-    SagaCheckpointManager.create_checkpoint(repo, tid, cid1, ChangeState.DISCOVERING, ["t1"], ["t2"])
+    SagaCheckpointManager.create_checkpoint(
+        repo, tid, cid1, ChangeState.DISCOVERING, ["t1"], ["t2"]
+    )
 
     # 6. Evidence Refs for Change 1
     repo.create_evidence_ref(

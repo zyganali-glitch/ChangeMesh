@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from domain.contracts.autonomy import AutonomyClass
 from src.gate.compression import ApprovalCompressionEngine
 from src.gate.policy_guardian_gate import PolicyGuardianGate
@@ -19,7 +17,6 @@ from src.gate.reversibility import (
 )
 from src.gate.token import (
     ApprovalTokenManager,
-    SignedApprovalToken,
 )
 
 
@@ -30,6 +27,7 @@ def _utc_now() -> datetime:
 # ============================================================================
 # P-14.01: 4-Class Reversibility Classification
 # ============================================================================
+
 
 def test_reversibility_classification_tiers():
     # 1. Fully Reversible Automated
@@ -76,6 +74,7 @@ def test_reversibility_classification_tiers():
 # P-14.02: Approval Compression Card Generation
 # ============================================================================
 
+
 def test_approval_compression_card_generation():
     assessment = ReversibilityClassifier.classify_sql(
         change_id="chg-drop-table",
@@ -102,6 +101,7 @@ def test_approval_compression_card_generation():
 # ============================================================================
 # P-14.03: Cryptographic Approval Token Validation & Idempotency
 # ============================================================================
+
 
 def test_cryptographic_approval_token_lifecycle():
     mgr = ApprovalTokenManager()
@@ -174,6 +174,7 @@ def test_cryptographic_approval_token_lifecycle():
 # ============================================================================
 # P-14.04 - P-14.06: Policy Guardian Gate Evaluation
 # ============================================================================
+
 
 def test_policy_guardian_gate_evaluation():
     token_mgr = ApprovalTokenManager()

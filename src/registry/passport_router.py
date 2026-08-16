@@ -9,14 +9,15 @@ from __future__ import annotations
 from typing import Optional, Tuple
 
 from domain.contracts.capability import CapabilityPassport
-from src.registry.agent_registry import AgentDescriptor, AgentRegistry
-from src.registry.capabilities import AgentCapabilityRequirement, get_standard_demo_requirements
-from src.registry.passport_issuer import PassportVerifier
 from src.orchestrator.state_repository import validate_tenant_id
+from src.registry.agent_registry import AgentDescriptor, AgentRegistry
+from src.registry.capabilities import get_standard_demo_requirements
+from src.registry.passport_issuer import PassportVerifier
 
 
 class UnqualifiedAgentDispatchError(ValueError):
     """Raised when no qualified agent revision with an active passport exists for a required role."""
+
     pass
 
 
@@ -48,7 +49,9 @@ class PassportAwareRouter:
             descriptor = self._registry.get_descriptor(role_id, preferred_revision)
             passport = self._registry.get_active_passport(tid, role_id, preferred_revision)
             if descriptor and passport:
-                val = PassportVerifier.verify(passport, requirement=requirement, expected_revision=preferred_revision)
+                val = PassportVerifier.verify(
+                    passport, requirement=requirement, expected_revision=preferred_revision
+                )
                 if val.is_valid:
                     return descriptor, passport
             raise UnqualifiedAgentDispatchError(
@@ -61,7 +64,9 @@ class PassportAwareRouter:
 
         for desc, passp in candidates:
             if desc.agent_id == role_id:
-                val = PassportVerifier.verify(passp, requirement=requirement, expected_revision=desc.agent_revision)
+                val = PassportVerifier.verify(
+                    passp, requirement=requirement, expected_revision=desc.agent_revision
+                )
                 if val.is_valid:
                     return desc, passp
 

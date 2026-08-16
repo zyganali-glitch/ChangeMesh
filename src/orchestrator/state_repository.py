@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from domain.contracts.autonomy import AutonomyClass
 from domain.contracts.change_lifecycle import ChangeState
@@ -20,7 +19,6 @@ from domain.contracts.conventions import (
     SECRET_KEY_PATTERNS,
     UtcDateTime,
     is_valid_sha256_digest,
-    sha256_hex,
 )
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.evidence import (
@@ -36,7 +34,13 @@ CANONICAL_SCHEMA_VERSION = "1.0.0"
 class OptimisticConcurrencyError(Exception):
     """Raised when an update encounters a version mismatch (stale expected_version)."""
 
-    def __init__(self, message: str, document_path: str = "", expected_version: int = 0, actual_version: int = 0) -> None:
+    def __init__(
+        self,
+        message: str,
+        document_path: str = "",
+        expected_version: int = 0,
+        actual_version: int = 0,
+    ) -> None:
         super().__init__(message)
         self.document_path = document_path
         self.expected_version = expected_version
@@ -53,11 +57,13 @@ class DocumentNotFoundError(Exception):
 
 class TenantIsolationError(ValueError):
     """Raised when a cross-tenant operation or malformed tenant ID is detected."""
+
     pass
 
 
 class PersistenceSchemaError(ValueError):
     """Raised when a document violates persistence schema invariants."""
+
     pass
 
 
@@ -94,6 +100,7 @@ def scan_for_secrets(data: Any, path: str = "") -> None:
 # ============================================================================
 # Document Records
 # ============================================================================
+
 
 class TenantStatus(str, Enum):
     ACTIVE = "ACTIVE"
@@ -215,7 +222,9 @@ class TaskRecord(BaseModel):
     def _validate_tid(cls, v: str) -> str:
         return validate_tenant_id(v)
 
-    @field_validator("change_id", "task_id", "agent_id", "agent_role", "agent_revision", "action_class")
+    @field_validator(
+        "change_id", "task_id", "agent_id", "agent_role", "agent_revision", "action_class"
+    )
     @classmethod
     def _not_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
@@ -255,7 +264,9 @@ class CheckpointRecord(BaseModel):
     @classmethod
     def _validate_digest(cls, v: str) -> str:
         if not is_valid_sha256_digest(v):
-            raise ValueError(f"checkpoint_digest must be a valid 64-char hex SHA-256 digest, got {v!r}")
+            raise ValueError(
+                f"checkpoint_digest must be a valid 64-char hex SHA-256 digest, got {v!r}"
+            )
         return v
 
 
@@ -366,7 +377,14 @@ class ApprovalRecord(BaseModel):
     def _validate_tid(cls, v: str) -> str:
         return validate_tenant_id(v)
 
-    @field_validator("change_id", "card_id", "authority_slot_ref", "decision_question", "policy_reason", "action_scope")
+    @field_validator(
+        "change_id",
+        "card_id",
+        "authority_slot_ref",
+        "decision_question",
+        "policy_reason",
+        "action_scope",
+    )
     @classmethod
     def _not_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
@@ -433,6 +451,7 @@ class PassportRecord(BaseModel):
 # Repository Protocol
 # ============================================================================
 
+
 class SagaStateRepository(ABC):
     """Provider-neutral abstract repository interface for ChangeMesh durable saga state."""
 
@@ -457,12 +476,16 @@ class SagaStateRepository(ABC):
         pass
 
     @abstractmethod
-    def update_change(self, tenant_id: str, change: ChangeRecord, expected_version: int) -> ChangeRecord:
+    def update_change(
+        self, tenant_id: str, change: ChangeRecord, expected_version: int
+    ) -> ChangeRecord:
         """Update change record with atomic compare-and-set version check."""
         pass
 
     @abstractmethod
-    def list_changes(self, tenant_id: str, state: Optional[ChangeState] = None) -> List[ChangeRecord]:
+    def list_changes(
+        self, tenant_id: str, state: Optional[ChangeState] = None
+    ) -> List[ChangeRecord]:
         """List changes for a tenant, optionally filtered by state."""
         pass
 
@@ -482,17 +505,23 @@ class SagaStateRepository(ABC):
         pass
 
     @abstractmethod
-    def update_task(self, tenant_id: str, change_id: str, task: TaskRecord, expected_version: int) -> TaskRecord:
+    def update_task(
+        self, tenant_id: str, change_id: str, task: TaskRecord, expected_version: int
+    ) -> TaskRecord:
         """Update task with atomic compare-and-set version check."""
         pass
 
     @abstractmethod
-    def create_checkpoint(self, tenant_id: str, change_id: str, checkpoint: CheckpointRecord) -> CheckpointRecord:
+    def create_checkpoint(
+        self, tenant_id: str, change_id: str, checkpoint: CheckpointRecord
+    ) -> CheckpointRecord:
         """Persist a new checkpoint."""
         pass
 
     @abstractmethod
-    def get_checkpoint(self, tenant_id: str, change_id: str, checkpoint_id: str) -> Optional[CheckpointRecord]:
+    def get_checkpoint(
+        self, tenant_id: str, change_id: str, checkpoint_id: str
+    ) -> Optional[CheckpointRecord]:
         """Fetch a specific checkpoint."""
         pass
 
@@ -507,12 +536,16 @@ class SagaStateRepository(ABC):
         pass
 
     @abstractmethod
-    def create_evidence_ref(self, tenant_id: str, change_id: str, ref: EvidenceRefRecord) -> EvidenceRefRecord:
+    def create_evidence_ref(
+        self, tenant_id: str, change_id: str, ref: EvidenceRefRecord
+    ) -> EvidenceRefRecord:
         """Persist an evidence reference."""
         pass
 
     @abstractmethod
-    def get_evidence_ref(self, tenant_id: str, change_id: str, evidence_id: str) -> Optional[EvidenceRefRecord]:
+    def get_evidence_ref(
+        self, tenant_id: str, change_id: str, evidence_id: str
+    ) -> Optional[EvidenceRefRecord]:
         """Fetch an evidence reference."""
         pass
 
@@ -522,22 +555,30 @@ class SagaStateRepository(ABC):
         pass
 
     @abstractmethod
-    def create_approval(self, tenant_id: str, change_id: str, approval: ApprovalRecord) -> ApprovalRecord:
+    def create_approval(
+        self, tenant_id: str, change_id: str, approval: ApprovalRecord
+    ) -> ApprovalRecord:
         """Persist an approval metadata record."""
         pass
 
     @abstractmethod
-    def get_approval(self, tenant_id: str, change_id: str, card_id: str) -> Optional[ApprovalRecord]:
+    def get_approval(
+        self, tenant_id: str, change_id: str, card_id: str
+    ) -> Optional[ApprovalRecord]:
         """Fetch an approval metadata record."""
         pass
 
     @abstractmethod
-    def list_approvals(self, tenant_id: str, change_id: str, status: Optional[ApprovalResolutionStatus] = None) -> List[ApprovalRecord]:
+    def list_approvals(
+        self, tenant_id: str, change_id: str, status: Optional[ApprovalResolutionStatus] = None
+    ) -> List[ApprovalRecord]:
         """List approvals for a change, optionally filtered by status."""
         pass
 
     @abstractmethod
-    def update_approval(self, tenant_id: str, change_id: str, approval: ApprovalRecord, expected_version: int) -> ApprovalRecord:
+    def update_approval(
+        self, tenant_id: str, change_id: str, approval: ApprovalRecord, expected_version: int
+    ) -> ApprovalRecord:
         """Update approval with atomic compare-and-set version check."""
         pass
 
@@ -552,11 +593,40 @@ class SagaStateRepository(ABC):
         pass
 
     @abstractmethod
-    def get_active_passport(self, tenant_id: str, agent_id: str, agent_revision: str) -> Optional[PassportRecord]:
+    def get_active_passport(
+        self, tenant_id: str, agent_id: str, agent_revision: str
+    ) -> Optional[PassportRecord]:
         """Fetch active (unrevoked, non-expired) passport for exact agent revision."""
         pass
 
     @abstractmethod
-    def update_passport(self, tenant_id: str, passport: PassportRecord, expected_version: int) -> PassportRecord:
+    def update_passport(
+        self, tenant_id: str, passport: PassportRecord, expected_version: int
+    ) -> PassportRecord:
         """Update passport with atomic compare-and-set version check."""
+        pass
+
+    @abstractmethod
+    def create_idempotency_reservation(
+        self, tenant_id: str, change_id: str, reservation: IdempotencyReservationRecord
+    ) -> IdempotencyReservationRecord:
+        """Persist an idempotency reservation under /tenants/{tenant_id}/changes/{change_id}/idempotency_reservations."""
+        pass
+
+    @abstractmethod
+    def get_idempotency_reservation(
+        self, tenant_id: str, change_id: str, reservation_id: str
+    ) -> Optional[IdempotencyReservationRecord]:
+        """Fetch an idempotency reservation by ID."""
+        pass
+
+    @abstractmethod
+    def update_idempotency_reservation(
+        self,
+        tenant_id: str,
+        change_id: str,
+        reservation: IdempotencyReservationRecord,
+        expected_version: int,
+    ) -> IdempotencyReservationRecord:
+        """Update an idempotency reservation with compare-and-set version check."""
         pass

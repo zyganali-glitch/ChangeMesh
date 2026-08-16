@@ -7,27 +7,17 @@ from __future__ import annotations
 
 import concurrent.futures
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
 
 import pytest
 from pydantic import ValidationError
 
-from domain.contracts.autonomy import AutonomyClass
 from domain.contracts.change_lifecycle import ChangeState
 from domain.contracts.data_class import DataClassLevel
-from domain.contracts.evidence import (
-    EvidenceProducerKind,
-    EvidenceState,
-    ExecutionEvidenceMode,
-)
 from src.orchestrator.in_memory_repository import InMemorySagaStateRepository
 from src.orchestrator.state_repository import (
-    ApprovalRecord,
-    ApprovalResolutionStatus,
     ChangeRecord,
     CheckpointRecord,
     DocumentNotFoundError,
-    EvidenceRefRecord,
     OptimisticConcurrencyError,
     PassportRecord,
     PersistenceSchemaError,
@@ -46,6 +36,7 @@ def _utc_now() -> datetime:
 # ============================================================================
 # Tenant & Isolation Tests
 # ============================================================================
+
 
 def test_tenant_id_validation():
     assert validate_tenant_id("tenant-demo-123") == "tenant-demo-123"
@@ -127,6 +118,7 @@ def test_cross_tenant_isolation_rejected():
 # Optimistic Concurrency Control (OCC) Tests
 # ============================================================================
 
+
 def test_change_occ_cas_versioning():
     repo = InMemorySagaStateRepository()
     now = _utc_now()
@@ -154,13 +146,17 @@ def test_change_occ_cas_versioning():
     assert created.version == 1
 
     # Worker A updates with expected_version=1
-    updated_a = created.model_copy(update={"state": ChangeState.DISCOVERING, "state_updated_at": _utc_now()})
+    updated_a = created.model_copy(
+        update={"state": ChangeState.DISCOVERING, "state_updated_at": _utc_now()}
+    )
     res_a = repo.update_change("tenant-occ", updated_a, expected_version=1)
     assert res_a.version == 2
     assert res_a.state == ChangeState.DISCOVERING
 
     # Worker B tries to update using stale expected_version=1 -> OptimisticConcurrencyError
-    updated_b = created.model_copy(update={"state": ChangeState.QUALIFYING, "state_updated_at": _utc_now()})
+    updated_b = created.model_copy(
+        update={"state": ChangeState.QUALIFYING, "state_updated_at": _utc_now()}
+    )
     with pytest.raises(OptimisticConcurrencyError) as exc_info:
         repo.update_change("tenant-occ", updated_b, expected_version=1)
     assert exc_info.value.expected_version == 1
@@ -170,7 +166,9 @@ def test_change_occ_cas_versioning():
     latest = repo.get_change("tenant-occ", "chg-occ-1")
     assert latest is not None
     assert latest.version == 2
-    updated_b2 = latest.model_copy(update={"state": ChangeState.QUALIFYING, "state_updated_at": _utc_now()})
+    updated_b2 = latest.model_copy(
+        update={"state": ChangeState.QUALIFYING, "state_updated_at": _utc_now()}
+    )
     res_b2 = repo.update_change("tenant-occ", updated_b2, expected_version=2)
     assert res_b2.version == 3
     assert res_b2.state == ChangeState.QUALIFYING
@@ -210,7 +208,7 @@ def test_concurrent_multi_threaded_updates():
             # Everyone tries to advance version 1
             rec = repo.get_change("tenant-mt", "chg-mt-1")
             assert rec is not None
-            candidate = rec.model_copy(update={"title": f"Updated by thread"})
+            candidate = rec.model_copy(update={"title": "Updated by thread"})
             repo.update_change("tenant-mt", candidate, expected_version=1)
             success_count += 1
         except OptimisticConcurrencyError:
@@ -231,6 +229,7 @@ def test_concurrent_multi_threaded_updates():
 # ============================================================================
 # Child Documents & Referential Integrity Tests
 # ============================================================================
+
 
 def test_tasks_and_checkpoints_hierarchy():
     repo = InMemorySagaStateRepository()
@@ -342,6 +341,7 @@ def test_tasks_and_checkpoints_hierarchy():
 # Capability Passport Query & Revocation Tests
 # ============================================================================
 
+
 def test_passport_active_lookup_and_revocation():
     repo = InMemorySagaStateRepository()
     now = _utc_now()
@@ -387,6 +387,7 @@ def test_passport_active_lookup_and_revocation():
 # ============================================================================
 # Zero Secret Persistence Tests
 # ============================================================================
+
 
 def test_secret_persistence_rejected():
     repo = InMemorySagaStateRepository()

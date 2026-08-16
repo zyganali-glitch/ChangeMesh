@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import hashlib
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from domain.contracts.conventions import UtcDateTime
 from domain.contracts.evidence import EvidenceState, ExecutionEvidenceMode
 
 CANONICAL_SCHEMA_VERSION = "1.0.0"
@@ -64,7 +63,9 @@ class ShadowScenario(BaseModel):
     max_retry_limit: int = 3
     pass_criteria: str
 
-    @field_validator("scenario_id", "name", "description", "expected_policy_outcome", "pass_criteria")
+    @field_validator(
+        "scenario_id", "name", "description", "expected_policy_outcome", "pass_criteria"
+    )
     @classmethod
     def _not_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
@@ -95,9 +96,6 @@ def compute_simulation_digest(scenario_id: str, logs: Sequence[str]) -> str:
     """Compute deterministic SHA-256 digest over simulation logs."""
     content = f"scenario:{scenario_id}\n" + "\n".join(logs)
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-
-from typing import Sequence
 
 
 def get_standard_shadow_scenarios() -> Dict[str, ShadowScenario]:

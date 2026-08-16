@@ -101,6 +101,7 @@ def _parse_env_template(filepath: Path) -> Dict[str, str]:
 # 1. TEMPLATE EXISTENCE AND TRACKING
 # =============================================================================
 
+
 def test_env_example_exists_and_is_non_empty():
     """Verify that .env.example exists at repository root and has content."""
     template_path = REPO_ROOT / ".env.example"
@@ -122,14 +123,17 @@ def test_env_example_is_trackable_by_git():
     # or exit code 0 if ignored. If it's a negative rule, check output.
     if result.returncode == 0:
         # If exit code is 0, verify it matched a negative ignore rule (starts with '!')
-        assert "!" in result.stdout or "! .env.example" in result.stdout or "!.env.example" in result.stdout, (
-            f".env.example is ignored by git: {result.stdout}"
-        )
+        assert (
+            "!" in result.stdout
+            or "! .env.example" in result.stdout
+            or "!.env.example" in result.stdout
+        ), f".env.example is ignored by git: {result.stdout}"
 
 
 # =============================================================================
 # 2. CANONICAL VARIABLE SET AND NO DUPLICATES
 # =============================================================================
+
 
 def test_env_example_variables_match_canonical_registry():
     """Verify that .env.example defines exactly the registered canonical variables."""
@@ -161,6 +165,7 @@ def test_env_example_has_no_duplicate_keys():
 # =============================================================================
 # 3. SECRET SAFETY AND NO SECRET DEFAULTS
 # =============================================================================
+
 
 def test_secret_variables_have_no_defaults():
     """Verify that secret-bearing variables (e.g. GITHUB_TOKEN) have empty values."""
@@ -205,6 +210,7 @@ def test_no_suspicious_secret_patterns_in_template():
 # 4. AUTHENTICATION POLICY AND ADC GUIDANCE
 # =============================================================================
 
+
 def test_template_promotes_application_default_credentials():
     """Verify that .env.example explains Application Default Credentials (ADC) for local dev."""
     template_path = REPO_ROOT / ".env.example"
@@ -236,6 +242,7 @@ def test_template_does_not_distribute_service_account_keys():
 # =============================================================================
 # 5. GITIGNORE CREDENTIAL AND ARTIFACT COVERAGE
 # =============================================================================
+
 
 def test_gitignore_ignores_real_env_files():
     """Verify that .gitignore ignores .env and environment variants while keeping .env.example."""
@@ -324,6 +331,7 @@ def test_gitignore_ignores_sensitive_directories():
 # 6. DOMAIN CONTRACTS PROVIDER NEUTRALITY AND CREDENTIAL ISOLATION
 # =============================================================================
 
+
 def test_domain_contracts_contain_no_credentials():
     """Verify that domain contracts contain no credential fields or hardcoded secrets."""
     contracts_dir = REPO_ROOT / "domain" / "contracts"
@@ -363,6 +371,7 @@ def test_domain_contracts_contain_no_credentials():
 # 7. DETERMINISTIC REPOSITORY SECRET SCAN
 # =============================================================================
 
+
 def test_tracked_files_contain_no_secrets():
     """Scan all tracked files in the repository to ensure no secrets or keys are committed."""
     result = subprocess.run(
@@ -386,12 +395,15 @@ def test_tracked_files_contain_no_secrets():
     for rel_path in tracked_files:
         # Verify no tracked file matches credential file names
         lower_name = os.path.basename(rel_path).lower()
-        assert not (lower_name == ".env" or (lower_name.startswith(".env.") and lower_name != ".env.example")), (
-            f"Real .env file is tracked: {rel_path}"
-        )
-        assert not (lower_name.endswith(".key") or lower_name.endswith(".pem") or lower_name.endswith(".p12")), (
-            f"Private key file is tracked: {rel_path}"
-        )
+        assert not (
+            lower_name == ".env"
+            or (lower_name.startswith(".env.") and lower_name != ".env.example")
+        ), f"Real .env file is tracked: {rel_path}"
+        assert not (
+            lower_name.endswith(".key")
+            or lower_name.endswith(".pem")
+            or lower_name.endswith(".p12")
+        ), f"Private key file is tracked: {rel_path}"
 
         full_path = REPO_ROOT / rel_path
         if not full_path.is_file():

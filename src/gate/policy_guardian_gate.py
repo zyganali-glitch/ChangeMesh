@@ -13,9 +13,6 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 from domain.contracts.autonomy import ApprovalCompressionCard, AutonomyClass
-from domain.contracts.conventions import UtcDateTime
-
-CANONICAL_SCHEMA_VERSION = "1.0.0"
 from src.gate.compression import ApprovalCompressionEngine
 from src.gate.reversibility import (
     ReversibilityAssessment,
@@ -26,6 +23,8 @@ from src.gate.token import (
     ApprovalTokenManager,
     SignedApprovalToken,
 )
+
+CANONICAL_SCHEMA_VERSION = "1.0.0"
 
 
 class PolicyGateEvaluationResult(BaseModel):

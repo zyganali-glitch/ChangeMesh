@@ -8,11 +8,10 @@ records are rejected or quarantined.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from domain.contracts.conventions import UtcDateTime
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.memory import MemoryRecord, MemoryTrustStatus
 from src.memory.memory_bank import InMemoryMemoryBank, MemorySearchResult
@@ -85,7 +84,10 @@ class TwoSessionResumeScenario:
             trust_status=MemoryTrustStatus.UNTRUSTED,
         )
         saved_hostile = bank.store_memory(tenant_id, hostile_mem)
-        hostile_quarantined = saved_hostile.is_quarantined and saved_hostile.trust_status == MemoryTrustStatus.QUARANTINED
+        hostile_quarantined = (
+            saved_hostile.is_quarantined
+            and saved_hostile.trust_status == MemoryTrustStatus.QUARANTINED
+        )
 
         # Migration Engineer queries memory bank for database requirements
         search_results: List[MemorySearchResult] = bank.search_memories(

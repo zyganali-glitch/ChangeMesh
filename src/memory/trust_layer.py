@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 

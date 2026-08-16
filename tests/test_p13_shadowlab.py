@@ -6,14 +6,11 @@ rehearsal scenarios, simulation evidence digests, and automatic plan corrections
 
 from __future__ import annotations
 
-import pytest
-
 from domain.contracts.evidence import EvidenceState, ExecutionEvidenceMode
 from src.shadowlab.runner import ShadowLabRunner
 from src.shadowlab.scenarios import (
     FaultType,
     InjectedFault,
-    ShadowScenario,
     compute_simulation_digest,
     get_standard_shadow_scenarios,
 )
@@ -23,10 +20,10 @@ from src.shadowlab.tool_doubles import (
     SimulatedGitClient,
 )
 
-
 # ============================================================================
 # P-13.01: Scenario Schema & Injected Faults
 # ============================================================================
+
 
 def test_shadow_scenario_and_fault_schemas():
     scenarios = get_standard_shadow_scenarios()
@@ -47,6 +44,7 @@ def test_shadow_scenario_and_fault_schemas():
 # ============================================================================
 # P-13.02: Tool Doubles Isolation & Simulation Labeling
 # ============================================================================
+
 
 def test_simulated_database_client_and_faults():
     fault = InjectedFault(
@@ -107,6 +105,7 @@ def test_simulated_git_client():
 # ============================================================================
 # P-13.03 - P-13.07: Rehearsal Scenarios Execution
 # ============================================================================
+
 
 def test_scenario_normal_migration():
     scenarios = get_standard_shadow_scenarios()

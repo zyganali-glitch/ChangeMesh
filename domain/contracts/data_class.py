@@ -11,9 +11,9 @@ class DataClassLevel(str, Enum):
     Derived from the ChangeMesh threat model (§7) and trust-boundary
     architecture.  The four levels cover the operational spectrum from
     freely publishable information to regulated / secret material.
-    
-    Credentials, tokens, API keys, and reusable secret material are 
-    outside the ordinary DataClass permission surface and remain 
+
+    Credentials, tokens, API keys, and reusable secret material are
+    outside the ordinary DataClass permission surface and remain
     adapter-only regardless of DataClass level.
     """
 

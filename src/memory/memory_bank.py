@@ -8,14 +8,18 @@ from __future__ import annotations
 import threading
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from domain.contracts.memory import MemoryRecord, MemoryTrustStatus
+from domain.contracts.memory import MemoryRecord
 from src.memory.quarantine import MemoryQuarantineEngine
-from src.memory.trust_layer import EpistemicTrustClass, EpistemicTrustEvaluation, MemoryTrustEvaluator
-from src.orchestrator.state_repository import TenantIsolationError, validate_tenant_id
+from src.memory.trust_layer import (
+    EpistemicTrustClass,
+    EpistemicTrustEvaluation,
+    MemoryTrustEvaluator,
+)
+from src.orchestrator.state_repository import validate_tenant_id
 
 
 class MemorySearchResult(BaseModel):
@@ -103,13 +107,24 @@ class InMemoryMemoryBank(MemoryBank):
                 # Compute keyword match relevance
                 rel_score = 1.0
 
-                evaluation = MemoryTrustEvaluator.evaluate(record, retrieval_relevance=rel_score, now=now)
+                evaluation = MemoryTrustEvaluator.evaluate(
+                    record, retrieval_relevance=rel_score, now=now
+                )
 
-                if not include_quarantined and evaluation.trust_class == EpistemicTrustClass.QUARANTINED:
+                if (
+                    not include_quarantined
+                    and evaluation.trust_class == EpistemicTrustClass.QUARANTINED
+                ):
                     continue
 
                 results.append(MemorySearchResult(record=record, evaluation=evaluation))
 
             # Sort by freshness DESC, then relevance DESC
-            results.sort(key=lambda r: (r.evaluation.freshness_score, r.evaluation.retrieval_relevance_score), reverse=True)
+            results.sort(
+                key=lambda r: (
+                    r.evaluation.freshness_score,
+                    r.evaluation.retrieval_relevance_score,
+                ),
+                reverse=True,
+            )
             return results

@@ -7,17 +7,14 @@ concurrency control and fail-closed tenancy isolation.
 
 from __future__ import annotations
 
-import copy
 import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from domain.contracts.change_lifecycle import ChangeState
-from domain.contracts.conventions import normalize_utc_datetime
 from src.orchestrator.state_repository import (
     ApprovalRecord,
     ApprovalResolutionStatus,
-    CANONICAL_SCHEMA_VERSION,
     ChangeRecord,
     CheckpointRecord,
     DocumentNotFoundError,
@@ -44,7 +41,9 @@ class InMemorySagaStateRepository(SagaStateRepository):
         self._changes: Dict[str, Dict[str, ChangeRecord]] = {}
         self._tasks: Dict[str, Dict[str, Dict[str, TaskRecord]]] = {}
         self._checkpoints: Dict[str, Dict[str, Dict[str, CheckpointRecord]]] = {}
-        self._idempotency_reservations: Dict[str, Dict[str, Dict[str, IdempotencyReservationRecord]]] = {}
+        self._idempotency_reservations: Dict[
+            str, Dict[str, Dict[str, IdempotencyReservationRecord]]
+        ] = {}
         self._evidence_refs: Dict[str, Dict[str, Dict[str, EvidenceRefRecord]]] = {}
         self._approvals: Dict[str, Dict[str, Dict[str, ApprovalRecord]]] = {}
         self._passports: Dict[str, Dict[str, PassportRecord]] = {}
@@ -132,7 +131,9 @@ class InMemorySagaStateRepository(SagaStateRepository):
                 raise TenantIsolationError("Tenant ID mismatch in stored record")
             return record
 
-    def update_change(self, tenant_id: str, change: ChangeRecord, expected_version: int) -> ChangeRecord:
+    def update_change(
+        self, tenant_id: str, change: ChangeRecord, expected_version: int
+    ) -> ChangeRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if change.tenant_id != tid:
@@ -165,7 +166,9 @@ class InMemorySagaStateRepository(SagaStateRepository):
             self._changes[tid][change.change_id] = updated_doc
             return updated_doc
 
-    def list_changes(self, tenant_id: str, state: Optional[ChangeState] = None) -> List[ChangeRecord]:
+    def list_changes(
+        self, tenant_id: str, state: Optional[ChangeState] = None
+    ) -> List[ChangeRecord]:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             changes = list(self._changes.get(tid, {}).values())
@@ -183,10 +186,14 @@ class InMemorySagaStateRepository(SagaStateRepository):
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if task.tenant_id != tid or task.change_id != change_id:
-                raise TenantIsolationError("Task tenant_id or change_id mismatch with operation path")
+                raise TenantIsolationError(
+                    "Task tenant_id or change_id mismatch with operation path"
+                )
             scan_for_secrets(task.model_dump())
             if not self.get_change(tid, change_id):
-                raise DocumentNotFoundError(f"Parent change {change_id!r} not found in tenant {tid!r}")
+                raise DocumentNotFoundError(
+                    f"Parent change {change_id!r} not found in tenant {tid!r}"
+                )
 
             change_tasks = self._tasks[tid].setdefault(change_id, {})
             if task.task_id in change_tasks:
@@ -206,11 +213,15 @@ class InMemorySagaStateRepository(SagaStateRepository):
             tasks.sort(key=lambda t: t.sequence_number)
             return tasks
 
-    def update_task(self, tenant_id: str, change_id: str, task: TaskRecord, expected_version: int) -> TaskRecord:
+    def update_task(
+        self, tenant_id: str, change_id: str, task: TaskRecord, expected_version: int
+    ) -> TaskRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if task.tenant_id != tid or task.change_id != change_id:
-                raise TenantIsolationError("Task tenant_id or change_id mismatch with operation path")
+                raise TenantIsolationError(
+                    "Task tenant_id or change_id mismatch with operation path"
+                )
             scan_for_secrets(task.model_dump())
             current = self.get_task(tid, change_id, task.task_id)
             if current is None:
@@ -231,22 +242,32 @@ class InMemorySagaStateRepository(SagaStateRepository):
     # Checkpoint Operations
     # ------------------------------------------------------------------------
 
-    def create_checkpoint(self, tenant_id: str, change_id: str, checkpoint: CheckpointRecord) -> CheckpointRecord:
+    def create_checkpoint(
+        self, tenant_id: str, change_id: str, checkpoint: CheckpointRecord
+    ) -> CheckpointRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if checkpoint.tenant_id != tid or checkpoint.change_id != change_id:
-                raise TenantIsolationError("Checkpoint tenant_id or change_id mismatch with operation path")
+                raise TenantIsolationError(
+                    "Checkpoint tenant_id or change_id mismatch with operation path"
+                )
             scan_for_secrets(checkpoint.model_dump())
             if not self.get_change(tid, change_id):
-                raise DocumentNotFoundError(f"Parent change {change_id!r} not found in tenant {tid!r}")
+                raise DocumentNotFoundError(
+                    f"Parent change {change_id!r} not found in tenant {tid!r}"
+                )
 
             cps = self._checkpoints[tid].setdefault(change_id, {})
             if checkpoint.checkpoint_id in cps:
-                raise PersistenceSchemaError(f"Checkpoint {checkpoint.checkpoint_id!r} already exists")
+                raise PersistenceSchemaError(
+                    f"Checkpoint {checkpoint.checkpoint_id!r} already exists"
+                )
             cps[checkpoint.checkpoint_id] = checkpoint
             return checkpoint
 
-    def get_checkpoint(self, tenant_id: str, change_id: str, checkpoint_id: str) -> Optional[CheckpointRecord]:
+    def get_checkpoint(
+        self, tenant_id: str, change_id: str, checkpoint_id: str
+    ) -> Optional[CheckpointRecord]:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             return self._checkpoints.get(tid, {}).get(change_id, {}).get(checkpoint_id)
@@ -267,22 +288,32 @@ class InMemorySagaStateRepository(SagaStateRepository):
     # Evidence Reference Operations
     # ------------------------------------------------------------------------
 
-    def create_evidence_ref(self, tenant_id: str, change_id: str, ref: EvidenceRefRecord) -> EvidenceRefRecord:
+    def create_evidence_ref(
+        self, tenant_id: str, change_id: str, ref: EvidenceRefRecord
+    ) -> EvidenceRefRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if ref.tenant_id != tid or ref.change_id != change_id:
-                raise TenantIsolationError("EvidenceRef tenant_id or change_id mismatch with operation path")
+                raise TenantIsolationError(
+                    "EvidenceRef tenant_id or change_id mismatch with operation path"
+                )
             scan_for_secrets(ref.model_dump())
             if not self.get_change(tid, change_id):
-                raise DocumentNotFoundError(f"Parent change {change_id!r} not found in tenant {tid!r}")
+                raise DocumentNotFoundError(
+                    f"Parent change {change_id!r} not found in tenant {tid!r}"
+                )
 
             refs = self._evidence_refs[tid].setdefault(change_id, {})
             if ref.evidence_id in refs:
-                raise PersistenceSchemaError(f"Evidence reference {ref.evidence_id!r} already exists")
+                raise PersistenceSchemaError(
+                    f"Evidence reference {ref.evidence_id!r} already exists"
+                )
             refs[ref.evidence_id] = ref
             return ref
 
-    def get_evidence_ref(self, tenant_id: str, change_id: str, evidence_id: str) -> Optional[EvidenceRefRecord]:
+    def get_evidence_ref(
+        self, tenant_id: str, change_id: str, evidence_id: str
+    ) -> Optional[EvidenceRefRecord]:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             return self._evidence_refs.get(tid, {}).get(change_id, {}).get(evidence_id)
@@ -298,14 +329,20 @@ class InMemorySagaStateRepository(SagaStateRepository):
     # Approval Operations
     # ------------------------------------------------------------------------
 
-    def create_approval(self, tenant_id: str, change_id: str, approval: ApprovalRecord) -> ApprovalRecord:
+    def create_approval(
+        self, tenant_id: str, change_id: str, approval: ApprovalRecord
+    ) -> ApprovalRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if approval.tenant_id != tid or approval.change_id != change_id:
-                raise TenantIsolationError("Approval tenant_id or change_id mismatch with operation path")
+                raise TenantIsolationError(
+                    "Approval tenant_id or change_id mismatch with operation path"
+                )
             scan_for_secrets(approval.model_dump())
             if not self.get_change(tid, change_id):
-                raise DocumentNotFoundError(f"Parent change {change_id!r} not found in tenant {tid!r}")
+                raise DocumentNotFoundError(
+                    f"Parent change {change_id!r} not found in tenant {tid!r}"
+                )
 
             apps = self._approvals[tid].setdefault(change_id, {})
             if approval.card_id in apps:
@@ -313,12 +350,16 @@ class InMemorySagaStateRepository(SagaStateRepository):
             apps[approval.card_id] = approval
             return approval
 
-    def get_approval(self, tenant_id: str, change_id: str, card_id: str) -> Optional[ApprovalRecord]:
+    def get_approval(
+        self, tenant_id: str, change_id: str, card_id: str
+    ) -> Optional[ApprovalRecord]:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             return self._approvals.get(tid, {}).get(change_id, {}).get(card_id)
 
-    def list_approvals(self, tenant_id: str, change_id: str, status: Optional[ApprovalResolutionStatus] = None) -> List[ApprovalRecord]:
+    def list_approvals(
+        self, tenant_id: str, change_id: str, status: Optional[ApprovalResolutionStatus] = None
+    ) -> List[ApprovalRecord]:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             apps = list(self._approvals.get(tid, {}).get(change_id, {}).values())
@@ -327,11 +368,15 @@ class InMemorySagaStateRepository(SagaStateRepository):
             apps.sort(key=lambda a: a.card_created_at, reverse=True)
             return apps
 
-    def update_approval(self, tenant_id: str, change_id: str, approval: ApprovalRecord, expected_version: int) -> ApprovalRecord:
+    def update_approval(
+        self, tenant_id: str, change_id: str, approval: ApprovalRecord, expected_version: int
+    ) -> ApprovalRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if approval.tenant_id != tid or approval.change_id != change_id:
-                raise TenantIsolationError("Approval tenant_id or change_id mismatch with operation path")
+                raise TenantIsolationError(
+                    "Approval tenant_id or change_id mismatch with operation path"
+                )
             scan_for_secrets(approval.model_dump())
             current = self.get_approval(tid, change_id, approval.card_id)
             if current is None:
@@ -344,7 +389,9 @@ class InMemorySagaStateRepository(SagaStateRepository):
                     actual_version=current.version,
                 )
             new_version = current.version + 1
-            updated = approval.model_copy(update={"version": new_version, "updated_at": self._now()})
+            updated = approval.model_copy(
+                update={"version": new_version, "updated_at": self._now()}
+            )
             self._approvals[tid][change_id][approval.card_id] = updated
             return updated
 
@@ -369,7 +416,9 @@ class InMemorySagaStateRepository(SagaStateRepository):
             tid = validate_tenant_id(tenant_id)
             return self._passports.get(tid, {}).get(passport_id)
 
-    def get_active_passport(self, tenant_id: str, agent_id: str, agent_revision: str) -> Optional[PassportRecord]:
+    def get_active_passport(
+        self, tenant_id: str, agent_id: str, agent_revision: str
+    ) -> Optional[PassportRecord]:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             now = self._now()
@@ -379,7 +428,9 @@ class InMemorySagaStateRepository(SagaStateRepository):
                         return p
             return None
 
-    def update_passport(self, tenant_id: str, passport: PassportRecord, expected_version: int) -> PassportRecord:
+    def update_passport(
+        self, tenant_id: str, passport: PassportRecord, expected_version: int
+    ) -> PassportRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if passport.tenant_id != tid:
@@ -396,7 +447,9 @@ class InMemorySagaStateRepository(SagaStateRepository):
                     actual_version=current.version,
                 )
             new_version = current.version + 1
-            updated = passport.model_copy(update={"version": new_version, "updated_at": self._now()})
+            updated = passport.model_copy(
+                update={"version": new_version, "updated_at": self._now()}
+            )
             self._passports[tid][passport.passport_id] = updated
             return updated
 
@@ -404,31 +457,51 @@ class InMemorySagaStateRepository(SagaStateRepository):
     # Idempotency Reservation Operations (Used by P-10.03)
     # ------------------------------------------------------------------------
 
-    def create_idempotency_reservation(self, tenant_id: str, change_id: str, reservation: IdempotencyReservationRecord) -> IdempotencyReservationRecord:
+    def create_idempotency_reservation(
+        self, tenant_id: str, change_id: str, reservation: IdempotencyReservationRecord
+    ) -> IdempotencyReservationRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if reservation.tenant_id != tid or reservation.change_id != change_id:
-                raise TenantIsolationError("Reservation tenant_id or change_id mismatch with operation path")
+                raise TenantIsolationError(
+                    "Reservation tenant_id or change_id mismatch with operation path"
+                )
             scan_for_secrets(reservation.model_dump())
             if not self.get_change(tid, change_id):
-                raise DocumentNotFoundError(f"Parent change {change_id!r} not found in tenant {tid!r}")
+                raise DocumentNotFoundError(
+                    f"Parent change {change_id!r} not found in tenant {tid!r}"
+                )
 
             res_map = self._idempotency_reservations[tid].setdefault(change_id, {})
             if reservation.reservation_id in res_map:
-                raise PersistenceSchemaError(f"Reservation {reservation.reservation_id!r} already exists")
+                raise PersistenceSchemaError(
+                    f"Reservation {reservation.reservation_id!r} already exists"
+                )
             res_map[reservation.reservation_id] = reservation
             return reservation
 
-    def get_idempotency_reservation(self, tenant_id: str, change_id: str, reservation_id: str) -> Optional[IdempotencyReservationRecord]:
+    def get_idempotency_reservation(
+        self, tenant_id: str, change_id: str, reservation_id: str
+    ) -> Optional[IdempotencyReservationRecord]:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
-            return self._idempotency_reservations.get(tid, {}).get(change_id, {}).get(reservation_id)
+            return (
+                self._idempotency_reservations.get(tid, {}).get(change_id, {}).get(reservation_id)
+            )
 
-    def update_idempotency_reservation(self, tenant_id: str, change_id: str, reservation: IdempotencyReservationRecord, expected_version: int) -> IdempotencyReservationRecord:
+    def update_idempotency_reservation(
+        self,
+        tenant_id: str,
+        change_id: str,
+        reservation: IdempotencyReservationRecord,
+        expected_version: int,
+    ) -> IdempotencyReservationRecord:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             if reservation.tenant_id != tid or reservation.change_id != change_id:
-                raise TenantIsolationError("Reservation tenant_id or change_id mismatch with operation path")
+                raise TenantIsolationError(
+                    "Reservation tenant_id or change_id mismatch with operation path"
+                )
             scan_for_secrets(reservation.model_dump())
             current = self.get_idempotency_reservation(tid, change_id, reservation.reservation_id)
             if current is None:
@@ -463,7 +536,10 @@ class InMemorySagaStateRepository(SagaStateRepository):
             if tid in self._checkpoints and change_id in self._checkpoints[tid]:
                 count += len(self._checkpoints[tid][change_id])
                 del self._checkpoints[tid][change_id]
-            if tid in self._idempotency_reservations and change_id in self._idempotency_reservations[tid]:
+            if (
+                tid in self._idempotency_reservations
+                and change_id in self._idempotency_reservations[tid]
+            ):
                 count += len(self._idempotency_reservations[tid][change_id])
                 del self._idempotency_reservations[tid][change_id]
             if tid in self._evidence_refs and change_id in self._evidence_refs[tid]:

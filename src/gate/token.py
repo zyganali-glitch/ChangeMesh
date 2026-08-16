@@ -6,12 +6,12 @@ to the exact change plan hash, enforcing single-use idempotency and stale-plan r
 
 from __future__ import annotations
 
-import hmac
 import hashlib
+import hmac
 import threading
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Set
+from typing import Optional, Set
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -35,7 +35,9 @@ class SignedApprovalToken(BaseModel):
     nonce: str
     signature: str
 
-    @field_validator("token_id", "plan_hash", "approver_id", "authority_slot_ref", "nonce", "signature")
+    @field_validator(
+        "token_id", "plan_hash", "approver_id", "authority_slot_ref", "nonce", "signature"
+    )
     @classmethod
     def _not_blank(cls, v: str, info) -> str:
         if not v or not v.strip():
@@ -49,7 +51,9 @@ class ApprovalValidationResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     is_valid: bool
-    status: str  # "VALID", "INVALID_SIGNATURE", "STALE_PLAN_HASH", "EXPIRED", "TOKEN_ALREADY_CONSUMED"
+    status: (
+        str  # "VALID", "INVALID_SIGNATURE", "STALE_PLAN_HASH", "EXPIRED", "TOKEN_ALREADY_CONSUMED"
+    )
     failure_reason: Optional[str] = None
 
 

@@ -7,20 +7,16 @@ recursive descendant teardown of tenant fixtures with zero residual state.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.contracts.conventions import (
     SECRET_KEY_PATTERNS,
-    UtcDateTime,
-    redact_mapping,
 )
 from src.orchestrator.state_repository import (
-    CANONICAL_SCHEMA_VERSION,
     PersistenceSchemaError,
     SagaStateRepository,
-    TenantIsolationError,
     validate_tenant_id,
 )
 

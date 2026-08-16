@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.contracts.capability import CapabilityPassport
-from domain.contracts.conventions import UtcDateTime
 from domain.contracts.data_class import DataClassLevel
 from src.registry.capabilities import AgentCapabilityRequirement
 
@@ -45,7 +44,9 @@ class PassportIssuanceRequest(BaseModel):
     @classmethod
     def _must_have_evidence(cls, v: Tuple[str, ...]) -> Tuple[str, ...]:
         if not v:
-            raise ValueError("qualification_evidence_ids must not be empty (self-attestation is forbidden)")
+            raise ValueError(
+                "qualification_evidence_ids must not be empty (self-attestation is forbidden)"
+            )
         for item in v:
             if not item or not item.strip():
                 raise ValueError("evidence IDs must not be blank")
@@ -58,7 +59,9 @@ class PassportValidationResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     is_valid: bool
-    status: str  # "VALID", "REVOKED", "EXPIRED", "UNQUALIFIED", "EVIDENCE_STALE", "REVISION_MISMATCH"
+    status: (
+        str  # "VALID", "REVOKED", "EXPIRED", "UNQUALIFIED", "EVIDENCE_STALE", "REVISION_MISMATCH"
+    )
     failure_reason: Optional[str] = None
 
 

@@ -12,7 +12,6 @@ import pytest
 from pydantic import ValidationError
 
 from domain.contracts.capability import CapabilityPassport
-from domain.contracts.data_class import DataClassLevel
 from src.registry.agent_registry import AgentDescriptor, InMemoryAgentRegistry
 from src.registry.capabilities import (
     AgentCapabilityRequirement,
@@ -38,6 +37,7 @@ def _utc_now() -> datetime:
 # P-12.01: Capability Requirements
 # ============================================================================
 
+
 def test_standard_demo_capability_requirements():
     reqs = get_standard_demo_requirements()
     assert "impact_scout" in reqs
@@ -56,6 +56,7 @@ def test_standard_demo_capability_requirements():
 # ============================================================================
 # P-12.02: Passport Issuance from Verified Evidence
 # ============================================================================
+
 
 def test_passport_issuance_requires_evidence():
     now = _utc_now()
@@ -87,6 +88,7 @@ def test_passport_issuance_requires_evidence():
 # ============================================================================
 # P-12.03: Validation, Expiry, Revocation, Stale Evidence Rejection
 # ============================================================================
+
 
 def test_passport_validation_scenarios():
     now = _utc_now()
@@ -149,6 +151,7 @@ def test_passport_validation_scenarios():
 # P-12.04 & P-12.05: Multi-Revision Agent Registry
 # ============================================================================
 
+
 def test_two_migration_engineer_revisions():
     registry = InMemoryAgentRegistry()
     now = _utc_now()
@@ -207,7 +210,9 @@ def test_two_migration_engineer_revisions():
     assert len(sql_agents) == 2
 
     # Finding agents for Distributed returns only v2
-    dist_agents = registry.find_qualified_agents(tid, CapabilityType.MIGRATION_SYNTHESIS_DISTRIBUTED)
+    dist_agents = registry.find_qualified_agents(
+        tid, CapabilityType.MIGRATION_SYNTHESIS_DISTRIBUTED
+    )
     assert len(dist_agents) == 1
     assert dist_agents[0][0].agent_revision == "rev-2.0.0-cockroach-distributed"
 
@@ -215,6 +220,7 @@ def test_two_migration_engineer_revisions():
 # ============================================================================
 # P-12.06: Passport-Aware Router Dispatch
 # ============================================================================
+
 
 def test_passport_aware_router_dispatch():
     registry = InMemoryAgentRegistry()

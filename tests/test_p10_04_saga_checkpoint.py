@@ -15,13 +15,10 @@ from domain.contracts.data_class import DataClassLevel
 from src.orchestrator.in_memory_repository import InMemorySagaStateRepository
 from src.orchestrator.saga_checkpoint import (
     SagaCheckpointManager,
-    compute_checkpoint_digest,
 )
 from src.orchestrator.state_repository import (
     ChangeRecord,
-    DocumentNotFoundError,
     PersistenceSchemaError,
-    TenantIsolationError,
     TenantRecord,
 )
 
@@ -103,16 +100,31 @@ def test_multiphase_progression_and_resumption():
     repo, tid, cid = _setup_test_change()
 
     # Step 1: Impact Scout completes
-    cp1 = SagaCheckpointManager.create_checkpoint(
-        repo, tid, cid, ChangeState.DISCOVERING, completed_task_ids=["t1"], pending_task_ids=["t2", "t3"]
+    _ = SagaCheckpointManager.create_checkpoint(
+        repo,
+        tid,
+        cid,
+        ChangeState.DISCOVERING,
+        completed_task_ids=["t1"],
+        pending_task_ids=["t2", "t3"],
     )
     # Step 2: Policy Guardian completes
     cp2 = SagaCheckpointManager.create_checkpoint(
-        repo, tid, cid, ChangeState.QUALIFYING, completed_task_ids=["t1", "t2"], pending_task_ids=["t3"]
+        repo,
+        tid,
+        cid,
+        ChangeState.QUALIFYING,
+        completed_task_ids=["t1", "t2"],
+        pending_task_ids=["t3"],
     )
     # Step 3: Migration Engineer completes
     cp3 = SagaCheckpointManager.create_checkpoint(
-        repo, tid, cid, ChangeState.REHEARSING, completed_task_ids=["t1", "t2", "t3"], pending_task_ids=[]
+        repo,
+        tid,
+        cid,
+        ChangeState.REHEARSING,
+        completed_task_ids=["t1", "t2", "t3"],
+        pending_task_ids=[],
     )
 
     # Resume from latest
@@ -123,7 +135,9 @@ def test_multiphase_progression_and_resumption():
     assert len(ctx.pending_task_ids) == 0
 
     # Resume from intermediate checkpoint cp2 (e.g. simulation of mid-stream crash)
-    ctx2 = SagaCheckpointManager.resume_from_checkpoint(repo, tid, cid, checkpoint_id=cp2.checkpoint_id)
+    ctx2 = SagaCheckpointManager.resume_from_checkpoint(
+        repo, tid, cid, checkpoint_id=cp2.checkpoint_id
+    )
     assert ctx2.resumed_from_checkpoint_id == cp2.checkpoint_id
     assert ctx2.lifecycle_state == ChangeState.QUALIFYING
     assert ctx2.next_safe_action == "EXECUTE_TASK:t3"

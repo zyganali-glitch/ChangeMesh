@@ -4,7 +4,7 @@ import logging
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import firestore
-from google.cloud import pubsub_v1
+from google.cloud import pubsub_v1  # type: ignore[attr-defined]
 from google.cloud import run_v2
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -27,7 +27,7 @@ def test_firestore_access(project: str):
             sys.exit(1)
             
         data = doc.to_dict()
-        if data.get("test_id") != test_val:
+        if data and data.get("test_id") != test_val:
             logger.error("Assertion Failed: Read-back values do not match.")
             sys.exit(1)
             

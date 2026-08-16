@@ -7,7 +7,7 @@ resume without unsafe repetition of completed work.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -15,7 +15,6 @@ from domain.contracts.change_lifecycle import ChangeState
 from domain.contracts.conventions import (
     UtcDateTime,
     canonical_json_bytes,
-    is_valid_sha256_digest,
     sha256_hex,
 )
 from src.orchestrator.state_repository import (

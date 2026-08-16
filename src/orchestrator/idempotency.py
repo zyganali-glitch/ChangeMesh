@@ -7,15 +7,13 @@ and external-write intents.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.contracts.conventions import (
-    UtcDateTime,
     canonical_json_bytes,
     is_valid_sha256_digest,
     sha256_hex,
@@ -24,9 +22,7 @@ from src.orchestrator.state_repository import (
     CANONICAL_SCHEMA_VERSION,
     IdempotencyReservationRecord,
     IdempotencyReservationStatus,
-    OptimisticConcurrencyError,
     SagaStateRepository,
-    TenantIsolationError,
     validate_tenant_id,
 )
 
@@ -43,7 +39,13 @@ class IdempotencyScope(str, Enum):
 class IdempotencyConflictError(Exception):
     """Raised when an idempotency key is reused with a conflicting payload or scope."""
 
-    def __init__(self, message: str, idempotency_key: str = "", existing_digest: str = "", incoming_digest: str = "") -> None:
+    def __init__(
+        self,
+        message: str,
+        idempotency_key: str = "",
+        existing_digest: str = "",
+        incoming_digest: str = "",
+    ) -> None:
         super().__init__(message)
         self.idempotency_key = idempotency_key
         self.existing_digest = existing_digest
@@ -52,6 +54,7 @@ class IdempotencyConflictError(Exception):
 
 class IdempotencyLeaseExpiredError(Exception):
     """Raised when a commit is attempted on an expired reservation lease."""
+
     pass
 
 
@@ -92,7 +95,9 @@ class IdempotencyIntent(BaseModel):
     @classmethod
     def _validate_digest(cls, v: str) -> str:
         if not is_valid_sha256_digest(v):
-            raise ValueError(f"payload_digest must be a valid 64-char SHA-256 hex string, got {v!r}")
+            raise ValueError(
+                f"payload_digest must be a valid 64-char SHA-256 hex string, got {v!r}"
+            )
         return v
 
 
@@ -180,7 +185,9 @@ class IdempotencyKeyManager:
                             "status": IdempotencyReservationStatus.RESERVED,
                         }
                     )
-                    saved = repo.update_idempotency_reservation(tid, cid, re_acquired, expected_version=existing.version)
+                    saved = repo.update_idempotency_reservation(
+                        tid, cid, re_acquired, expected_version=existing.version
+                    )
                     return IdempotencyReservationOutcome(
                         status=IdempotencyReservationOutcomeStatus.GRANTED,
                         reservation=saved,
@@ -198,7 +205,9 @@ class IdempotencyKeyManager:
                         "receipt_status": None,
                     }
                 )
-                saved = repo.update_idempotency_reservation(tid, cid, re_reserved, expected_version=existing.version)
+                saved = repo.update_idempotency_reservation(
+                    tid, cid, re_reserved, expected_version=existing.version
+                )
                 return IdempotencyReservationOutcome(
                     status=IdempotencyReservationOutcomeStatus.GRANTED,
                     reservation=saved,
@@ -236,7 +245,9 @@ class IdempotencyKeyManager:
         """Mark reservation as COMMITTED and store deterministic result digest."""
         tid = validate_tenant_id(tenant_id)
         if not is_valid_sha256_digest(result_digest):
-            raise ValueError(f"result_digest must be a valid 64-char SHA-256 hex string, got {result_digest!r}")
+            raise ValueError(
+                f"result_digest must be a valid 64-char SHA-256 hex string, got {result_digest!r}"
+            )
 
         existing = repo.get_idempotency_reservation(tid, change_id, reservation_id)
         if existing is None:
@@ -259,7 +270,9 @@ class IdempotencyKeyManager:
                 "receipt_status": receipt_status,
             }
         )
-        return repo.update_idempotency_reservation(tid, change_id, committed, expected_version=existing.version)
+        return repo.update_idempotency_reservation(
+            tid, change_id, committed, expected_version=existing.version
+        )
 
     @classmethod
     def release_intent(
@@ -284,4 +297,6 @@ class IdempotencyKeyManager:
                 "status": IdempotencyReservationStatus.RELEASED,
             }
         )
-        return repo.update_idempotency_reservation(tid, change_id, released, expected_version=existing.version)
+        return repo.update_idempotency_reservation(
+            tid, change_id, released, expected_version=existing.version
+        )

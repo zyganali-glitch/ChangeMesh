@@ -25,23 +25,38 @@ class PromptInjectionDetectedError(ValueError):
 _INJECTION_PATTERNS = [
     (
         "IGNORE_INSTRUCTIONS",
-        re.compile(r"\b(?:ignore|disregard|forget|bypass)\s+(?:all\s+)?(?:previous|prior|above|system)?\s*(?:instructions|prompts|rules|constraints)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:ignore|disregard|forget|bypass)\s+(?:all\s+)?(?:previous|prior|above|system)?\s*(?:instructions|prompts|rules|constraints)\b",
+            re.IGNORECASE,
+        ),
     ),
     (
         "SYSTEM_PROMPT_OVERRIDE",
-        re.compile(r"\b(?:system\s+prompt\s+override|override\s+system\s+prompt|new\s+system\s+instruction)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:system\s+prompt\s+override|override\s+system\s+prompt|new\s+system\s+instruction)\b",
+            re.IGNORECASE,
+        ),
     ),
     (
         "JAILBREAK_ROLEPLAY",
-        re.compile(r"\b(?:you\s+are\s+now(?:\s+in)?|act\s+as|pretend\s+to\s+be|switch\s+to)\s+(?:DAN|developer\s+mode|unrestricted|jailbroken|root|god\s+mode)\b|\b(?:developer\s+mode|jailbreak\s+mode|unrestricted\s+mode)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:you\s+are\s+now(?:\s+in)?|act\s+as|pretend\s+to\s+be|switch\s+to)\s+(?:DAN|developer\s+mode|unrestricted|jailbroken|root|god\s+mode)\b|\b(?:developer\s+mode|jailbreak\s+mode|unrestricted\s+mode)\b",
+            re.IGNORECASE,
+        ),
     ),
     (
         "DELIMITER_HIJACK",
-        re.compile(r"(?:<{3,}\s*system\s*>{3,}|\[{3,}\s*SYSTEM\s*\]{3,}|###\s*SYSTEM\s*PROMPT)", re.IGNORECASE),
+        re.compile(
+            r"(?:<{3,}\s*system\s*>{3,}|\[{3,}\s*SYSTEM\s*\]{3,}|###\s*SYSTEM\s*PROMPT)",
+            re.IGNORECASE,
+        ),
     ),
     (
         "AUTHORITY_FABRICATION",
-        re.compile(r"\b(?:human\s+approval\s+granted\s+automatically|skip\s+reversibility\s+gate|bypass\s+policy\s+guardian)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:human\s+approval\s+granted\s+automatically|skip\s+reversibility\s+gate|bypass\s+policy\s+guardian)\b",
+            re.IGNORECASE,
+        ),
     ),
 ]
 

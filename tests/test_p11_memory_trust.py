@@ -9,7 +9,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from pydantic import ValidationError
 
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.memory import MemoryRecord, MemoryTrustStatus
@@ -30,6 +29,7 @@ def _utc_now() -> datetime:
 # ============================================================================
 # P-11.01: Typed Memory Records
 # ============================================================================
+
 
 def test_memory_record_validation():
     now = _utc_now()
@@ -82,6 +82,7 @@ def test_memory_record_validation():
 # ============================================================================
 # P-11.02: Deterministic Trust Policy
 # ============================================================================
+
 
 def test_trust_policy_evaluation():
     now = _utc_now()
@@ -157,6 +158,7 @@ def test_trust_policy_evaluation():
 # P-11.03: Contradiction & Supersession Without Deletion
 # ============================================================================
 
+
 def test_supersession_links_without_deleting_history():
     now = _utc_now()
 
@@ -201,6 +203,7 @@ def test_supersession_links_without_deleting_history():
 # P-11.04: Prompt Injection Quarantine
 # ============================================================================
 
+
 def test_prompt_injection_quarantine():
     now = _utc_now()
     attacks = [
@@ -233,6 +236,7 @@ def test_prompt_injection_quarantine():
 # ============================================================================
 # P-11.05 & P-11.06: Memory Bank & Two-Session Scenario
 # ============================================================================
+
 
 def test_memory_bank_operations_and_two_session_scenario():
     bank = InMemoryMemoryBank()

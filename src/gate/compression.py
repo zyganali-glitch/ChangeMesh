@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Tuple
 
 from domain.contracts.autonomy import (
     ApprovalCompressionCard,
     AutonomyClass,
     AutonomyDecision,
 )
-from domain.contracts.conventions import UtcDateTime
 from src.gate.reversibility import ReversibilityAssessment
 
 

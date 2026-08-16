@@ -75,17 +75,13 @@ def get_standard_demo_requirements() -> Dict[str, AgentCapabilityRequirement]:
         ),
         "migration_engineer": AgentCapabilityRequirement(
             role_id="migration_engineer",
-            required_capabilities=(
-                CapabilityType.MIGRATION_SYNTHESIS_SQL,
-            ),
+            required_capabilities=(CapabilityType.MIGRATION_SYNTHESIS_SQL,),
             required_tool_ids=("sql_generator", "shadowlab_runner"),
             max_data_classification=DataClassLevel.CONFIDENTIAL,
         ),
         "release_steward": AgentCapabilityRequirement(
             role_id="release_steward",
-            required_capabilities=(
-                CapabilityType.PR_GENERATION,
-            ),
+            required_capabilities=(CapabilityType.PR_GENERATION,),
             required_tool_ids=("github_draft_pr", "writeback_receipt_signer"),
             max_data_classification=DataClassLevel.INTERNAL,
         ),

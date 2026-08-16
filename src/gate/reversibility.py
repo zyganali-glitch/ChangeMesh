@@ -79,12 +79,13 @@ class ReversibilityClassifier:
                     rationale="Destructive SQL statement (DROP/TRUNCATE) lacks automated down migration",
                 )
             else:
+                down_snippet = (sql_down[:60] + "...") if sql_down else "Down migration script"
                 return ReversibilityAssessment(
                     change_id=change_id,
                     reversibility_class=ReversibilityClass.HUMAN_INTERVENTION_REQUIRED,
                     blast_radius_score=blast_radius_score,
                     has_down_migration=True,
-                    rollback_plan_summary=f"Automated down migration available: {sql_down[:60]}...",
+                    rollback_plan_summary=f"Automated down migration available: {down_snippet}",
                     reversibility_score=0.35,
                     rationale="Destructive SQL statement with down migration requires human confirmation slot",
                 )
@@ -114,12 +115,13 @@ class ReversibilityClassifier:
             )
 
         # 4. Fully Reversible Automated (Additive column, index, views with down script)
+        down_snip = (sql_down[:60] + "...") if sql_down else "Single-step rollback"
         return ReversibilityAssessment(
             change_id=change_id,
             reversibility_class=ReversibilityClass.FULLY_REVERSIBLE_AUTOMATED,
             blast_radius_score=blast_radius_score,
             has_down_migration=True,
-            rollback_plan_summary=f"Automated single-step rollback: {sql_down[:60]}",
+            rollback_plan_summary=f"Automated single-step rollback: {down_snip}",
             reversibility_score=1.0,
             rationale="Additive schema operation with verified instantaneous down migration",
         )

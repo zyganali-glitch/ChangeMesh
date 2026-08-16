@@ -83,7 +83,10 @@ class MemorySupersessionManager:
                 # If candidate is explicitly marked as a replacement for an older record
                 if record.memory_id in candidate.contradiction_ids:
                     superseded.append(record.memory_id)
-                elif candidate.capture_timestamp > record.capture_timestamp and record.trust_status != MemoryTrustStatus.QUARANTINED:
+                elif (
+                    candidate.capture_timestamp > record.capture_timestamp
+                    and record.trust_status != MemoryTrustStatus.QUARANTINED
+                ):
                     # Potential contradiction if content states conflicting facts
                     if cls._has_semantic_conflict(candidate.content, record.content):
                         conflicts.append(record.memory_id)

@@ -13,10 +13,9 @@ from typing import Dict, List, Optional, Tuple
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.contracts.capability import CapabilityPassport
-from domain.contracts.conventions import UtcDateTime
+from src.orchestrator.state_repository import validate_tenant_id
 from src.registry.capabilities import CapabilityType
-from src.registry.passport_issuer import PassportValidationResult, PassportVerifier
-from src.orchestrator.state_repository import TenantIsolationError, validate_tenant_id
+from src.registry.passport_issuer import PassportVerifier
 
 CANONICAL_SCHEMA_VERSION = "1.0.0"
 
@@ -61,7 +60,9 @@ class AgentRegistry(ABC):
         pass
 
     @abstractmethod
-    def get_active_passport(self, tenant_id: str, agent_id: str, agent_revision: str) -> Optional[CapabilityPassport]:
+    def get_active_passport(
+        self, tenant_id: str, agent_id: str, agent_revision: str
+    ) -> Optional[CapabilityPassport]:
         """Fetch active, valid passport for exact agent revision."""
         pass
 
@@ -80,8 +81,12 @@ class InMemoryAgentRegistry(AgentRegistry):
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._descriptors: Dict[Tuple[str, str], AgentDescriptor] = {}  # (agent_id, revision) -> descriptor
-        self._passports: Dict[str, Dict[Tuple[str, str], CapabilityPassport]] = {}  # tenant_id -> (agent_id, revision) -> passport
+        self._descriptors: Dict[
+            Tuple[str, str], AgentDescriptor
+        ] = {}  # (agent_id, revision) -> descriptor
+        self._passports: Dict[
+            str, Dict[Tuple[str, str], CapabilityPassport]
+        ] = {}  # tenant_id -> (agent_id, revision) -> passport
 
     def register_agent(self, descriptor: AgentDescriptor) -> AgentDescriptor:
         with self._lock:
@@ -101,7 +106,9 @@ class InMemoryAgentRegistry(AgentRegistry):
         with self._lock:
             return self._descriptors.get((agent_id, agent_revision))
 
-    def get_active_passport(self, tenant_id: str, agent_id: str, agent_revision: str) -> Optional[CapabilityPassport]:
+    def get_active_passport(
+        self, tenant_id: str, agent_id: str, agent_revision: str
+    ) -> Optional[CapabilityPassport]:
         with self._lock:
             tid = validate_tenant_id(tenant_id)
             passport = self._passports.get(tid, {}).get((agent_id, agent_revision))
@@ -126,7 +133,10 @@ class InMemoryAgentRegistry(AgentRegistry):
                     continue
                 # Verify passport
                 val_res = PassportVerifier.verify(passport, expected_revision=rev)
-                if val_res.is_valid and required_capability.value in passport.qualified_capabilities:
+                if (
+                    val_res.is_valid
+                    and required_capability.value in passport.qualified_capabilities
+                ):
                     results.append((descriptor, passport))
 
             return results

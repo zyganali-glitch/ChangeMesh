@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from domain.contracts.change_lifecycle import ChangeState
 from domain.contracts.conventions import sha256_hex
 from domain.contracts.data_class import DataClassLevel
@@ -157,7 +155,9 @@ def test_release_and_retry():
     assert outcome1.status == IdempotencyReservationOutcomeStatus.GRANTED
 
     # Step fails transiently -> release reservation
-    released = IdempotencyKeyManager.release_intent(repo, tid, cid, outcome1.reservation.reservation_id)
+    released = IdempotencyKeyManager.release_intent(
+        repo, tid, cid, outcome1.reservation.reservation_id
+    )
     assert released.status == IdempotencyReservationStatus.RELEASED
 
     # Retry can now re-acquire immediately
