@@ -466,9 +466,9 @@ source_behavior:
 - pre-send privacy scanning for private keys, API keys, bearer tokens, connection strings, JWTs, and session cookies; two-tier severity (blockers cause fail-closed rejection, review patterns flag UUIDs/IPs/production markers); synthetic fixture domain allowlisting
 reuse_method: CLEAN_ROOM_REIMPLEMENTED
 target_paths_or_contracts:
-- src/policy/policy_guardian.py
+- src/agents/policy_guardian.py
 required_transformations:
-- Gemini input minimization, Policy Guardian deterministic gate, demo fixture boundary, remove OpenAI-specific pattern names
+- Gemini input minimization, Policy Guardian deterministic gate within canonical ADK agent (src/agents/policy_guardian.py), demo fixture boundary, remove OpenAI-specific pattern names
 forbidden_carry_over:
 - school-SaaS fixture data, openai_api_key pattern naming, ZeroKit product semantics
 required_tests:
