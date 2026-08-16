@@ -1,6 +1,6 @@
 # ChangeMesh Component Provenance
 
-Implementation status: `IN_PROGRESS` (ZK-VALID-001 `VERIFIED`; other components `PLANNED` or `APPROVED_FOR_IMPLEMENTATION`)
+Implementation status: `IN_PROGRESS` (component-level status governed by `docs/DONOR_REUSE_MANIFEST.md`; `ZK-VALID-001` became `VERIFIED` in P-08.02)
 Architecture donor preflight gate (P-04.00): `PASS`
 Gemini boundary donor preflight gate (P-08.00): `PASS`
 

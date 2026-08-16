@@ -125,15 +125,15 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Prevention rule: External SDK integrations must enforce exactly one explicit retry authority and defensively handle evolving response metadata schemas.
 - Status: `ACTIVE`
 
-### LESSON-20260816-02 — Pydantic v2 Strict types vs JSON String Enum Parsing and Security Fail-Closed Boundaries
+### LESSON-20260816-02 — Pydantic v2 Strict types vs JSON String Enum Parsing, Mandatory schema_version, and Zero-Default Deserialization Boundaries
 - Date/time: 2026-08-16
 - Active task: P-08.02
-- Symptom: Setting model-wide `ConfigDict(strict=True)` in Pydantic v2 blocks deserialization of JSON strings into Enum instances (e.g. `"LOW"` -> `SemanticRiskLevel.LOW`) because `strict=True` requires the input value to already be an exact Python Enum instance.
-- Root cause: Pydantic v2 strict mode enforces exact Python types on all fields including Enums when configured globally.
-- Incorrect approach: Disabling type strictness entirely or writing complex custom pre-validators for all enums.
-- Correct approach: Use `ConfigDict(extra="forbid", frozen=True)` on the model, use `StrictInt`, `StrictStr`, `StrictBool` on scalar fields to strictly forbid silent coercion (e.g. string to int or bool to str), allow Enum fields to parse valid string values natively while rejecting invalid ones, and apply deterministic security validators (`validate_safe_relative_path`, `validate_safe_endpoint`, `validate_action_type`) to reject path traversal and malicious payloads.
-- Prevention rule: When validating JSON model responses, pair `StrictStr`/`StrictInt` with controlled enum vocabularies, `extra="forbid"`, and deterministic security boundary checks.
-- Tests/evidence: `tests/test_p08_02_structured_output.py` (36 tests passed).
+- Symptom: (1) Setting model-wide `ConfigDict(strict=True)` in Pydantic v2 blocks deserialization of JSON strings into Enum instances (e.g. `"LOW"` -> `SemanticRiskLevel.LOW`) because `strict=True` requires the input value to already be an exact Python Enum instance; (2) Allowing Pydantic default values or `Field(default_factory=list)` on LLM response models masks model omission bugs by silently fabricating empty lists/defaults rather than failing closed; (3) Unversioned structured outputs allow payload schema drift across prompt iterations.
+- Root cause: (1) Pydantic v2 strict mode enforces exact Python types on all fields including Enums when configured globally; (2) Default field initializers provide silent fallback injection that violates zero-trust fail-closed parsing contracts; (3) LLM output models require explicit, non-coercing version validation.
+- Incorrect approach: Disabling type strictness entirely, writing complex custom pre-validators for all enums, using default factories to hide missing LLM fields, or relying on model prompt compliance without programmatic schema_version validation.
+- Correct approach: Use `ConfigDict(extra="forbid", frozen=True)` on all output models; use `StrictInt` and `StrictStr` on scalar fields to strictly forbid silent coercion (e.g. string to int or bool to str); allow Enum fields to parse valid string values natively while rejecting invalid ones; mandate exact `schema_version: StrictStr = "1.0.0"` via `validate_canonical_schema_version` on every root schema; make all root and nested collection fields strictly required without default/default_factory values; and apply deterministic security validators (`validate_safe_relative_path`, `validate_safe_endpoint`, `validate_action_type`) to reject path traversal and malicious payloads.
+- Prevention rule: When validating JSON model responses, pair `StrictStr`/`StrictInt` with controlled enum vocabularies, `extra="forbid"`, mandatory exact `schema_version`, zero default/default_factory injections, and deterministic security boundary checks.
+- Tests/evidence: `tests/test_p08_02_structured_output.py` (40 tests passed).
 - Affected files: `src/core/gemini_structured_output.py`, `tests/test_p08_02_structured_output.py`.
 - Reusable beyond this task: Yes (all future LLM structured output parsing and schema validation).
 - Status: `ACTIVE`
