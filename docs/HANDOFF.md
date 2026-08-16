@@ -36,12 +36,13 @@ P-08.00
 P-08.01
 P-08.02
 P-08.03
+P-08.04
 
 **Active Phase:**
 P-08
 
-**Active Task:**
-P-08.04 — Separate deterministic facts from model-visible evidence and withhold expected semantic classifications from auditor
+**Next Exact Task:**
+P-08.05 — Measure model latency, token use, cost, retry behavior
 
 ## Current P-08.03 State
 
@@ -59,26 +60,27 @@ values. `src/core/gemini_client.py` validates both prompt and
 `system_instruction` before request construction, so blocked input produces
 zero SDK calls. Untrusted external text remains data inside fixed boundary
 markers. P-08.02 strict output parsing and P-08.01 single-call ownership remain
-intact. P-08.04 and P-08.05 were not started.
+intact. P-08.05 was not started.
 
 ## Current P-08.04 State
 
-P-08.04 is `IN_PROGRESS`. `src/agents/evidence_auditor.py` now separates
+P-08.04 is `DONE`. `src/agents/evidence_auditor.py` separates
 locked deterministic claim facts from the model-visible blind bundle, rejects
 expected-answer fields and hints, bounds claim/evidence/prompt size, validates
 citations, and reconciles advisory model assessments without rewriting facts.
-The dedicated suite currently has 18 passing tests. Final P-DΩ/P-Ω closure,
-introduction-commit binding, and whole-suite verification remain pending.
+The dedicated suite has 18 passing tests. P-DΩ/P-Ω closure passed with the
+historical full-suite fixture debt preserved.
 
 ## Evidence
 
 - P-08.03 privacy suite: `uv run python -m pytest tests/test_p08_03_input_privacy.py -v --tb=short` -> 10 passed.
 - P-08.01 regression: `uv run python -m pytest tests/test_p08_01_gemini_client.py -v --tb=short` -> 39 passed.
 - P-08.02 regression: `uv run python -m pytest tests/test_p08_02_structured_output.py -v --tb=short` -> 40 passed.
-- Combined P-08: `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_03_input_privacy.py -v --tb=short` -> 89 passed.
+- P-08.04 dedicated: `uv run python -m pytest tests/test_p08_04_blind_audit.py -v --tb=short` -> 18 passed.
+- Combined P-08.01/P-08.02/P-08.04: `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_04_blind_audit.py -q` -> 97 passed.
 - Policy Guardian regression: `uv run python -m pytest tests/test_p07_02_agent_definitions.py -q` -> 59 passed, 1 warning.
-- Canonical unit: `uv run python scripts/cmd.py unit` -> 999 passed, 1 warning.
-- Full suite: `uv run python -m pytest tests/` -> 999 passed, 1 warning, 3 errors; **FAIL — known historical baseline GCP fixture debt** (`project` fixture in `tests/test_gcp_access.py`).
+- Canonical unit: `uv run python scripts/cmd.py unit` -> 1017 passed, 1 warning.
+- Full suite: `uv run python -m pytest tests/` -> 1017 passed, 1 warning, 3 errors; **FAIL — known historical baseline GCP fixture debt** (`project` fixture in `tests/test_gcp_access.py`).
 - Donor manifest lint: `uv run python tools/governance/donor_manifest_lint.py` -> 20 components passed.
 - Targeted Ruff, format, mypy, AST model-owner, domain import, secret scan, and `git diff --check`: `PASS`.
 
@@ -90,8 +92,14 @@ immutable SHA `d663db8c706cb914e1af5caf651df08edb5c50c0`, using only
 The actual ChangeMesh competition introduction commit is
 `4501c01ad4212a8ddd05024f99b5baab34b585de`.
 
+CCT-SEM-001 is `VERIFIED` as `CLEAN_ROOM_REIMPLEMENTED` from D-CCT at
+immutable SHA `65ee1b72faf9a7202d9166eed43fb671804815a8`, using only
+`cli/commands/codex-review.js` and `tests/test_codex_review.js`. The actual
+ChangeMesh competition introduction commit is
+`7cce78daca6ab37c027fea9d4637f3ecca4cfc28`.
+
 ## Open Boundaries
 
 - Model Armor remains `PERMISSION_BLOCKED / NOT_RUN`.
-- Generic enterprise DLP, universal PII discovery, cloud proxy filtering, full external adapter mode execution, and P-08.04 blind reconciliation remain `NOT_RUN` or `PLANNED` under their owning phases.
+- Generic enterprise DLP, universal PII discovery, cloud proxy filtering, full external adapter mode execution, and P-08.05 cost/latency measurement remain `NOT_RUN` or `PLANNED` under their owning phases.
 - Full repository test status remains the historical `FAIL` above and must not be relabeled `PASS`.

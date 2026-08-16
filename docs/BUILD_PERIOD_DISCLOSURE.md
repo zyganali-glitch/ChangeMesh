@@ -42,8 +42,8 @@ provider assumptions, and donor fixture identities were not carried over.
 - **License / Ownership:** Owner-authored / `VERIFIED_COMPATIBLE`
 - **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
 - **ChangeMesh Target Path:** `src/agents/evidence_auditor.py`
-- **Competition Introduction Commit:** `PENDING` until the immutable implementation commit is created
-- **Test Evidence:** `tests/test_p08_04_blind_audit.py` (18 tests PASS; final provenance closure pending)
+- **Competition Introduction Commit:** `7cce78daca6ab37c027fea9d4637f3ecca4cfc28`
+- **Test Evidence:** `tests/test_p08_04_blind_audit.py` (18 tests PASS)
 - **Materially New Competition Work:**
   - Neutral model-visible claims and bounded evidence are separated from application-only deterministic facts.
   - Expected-answer fields and hints are rejected before prompt construction.

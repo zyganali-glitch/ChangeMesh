@@ -110,8 +110,8 @@ generic enterprise DLP, universal PII discovery, proxy interception, or Model Ar
 
 ## P-08.04 Blind Semantic Audit Boundary
 
-`src/agents/evidence_auditor.py` now defines the P-08.04 implementation in
-progress: deterministic claim state is held in an application-only locked
+`src/agents/evidence_auditor.py` defines the completed P-08.04 implementation:
+deterministic claim state is held in an application-only locked
 package, while Gemini receives only neutral claims and bounded evidence summaries.
 Expected-answer fields (`expected_result`, `should_pass`, and equivalent
 deterministic/reconciliation fields) are rejected before prompt construction.
