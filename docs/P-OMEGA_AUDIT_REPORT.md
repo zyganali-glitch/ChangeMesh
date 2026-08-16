@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-07.05 Final Living-Doc Parity Repair
+# P-Ω Whole-Repository Integrity Audit — P-07.05 Final Master-Plan / HANDOFF Progression Parity Repair
 
-> **Produced by:** P-07.05 Add agent revision metadata to every event/evidence record (Final Living-Doc Parity Repair)
+> **Produced by:** P-07.05 Add agent revision metadata to every event/evidence record (Progression Parity Repair)
 > **Date:** 2026-08-16
-> **Entry SHA:** `b78c5d6d2345316c8d67520bd773c5dc71be4e58`
+> **Entry SHA:** `3d6aff1ee04c3b709ce75074965a4ab8edc5ba86`
 > **Original P-07.05 Repair Baseline SHA:** `25418a6f20afff279f71228d07a11c9bcd5804d6`
 > **Canonical Remote URL:** `https://github.com/zyganali-glitch/ChangeMesh.git`
 > **Canonical Branch:** `main`
@@ -13,7 +13,7 @@
 
 | Check ID | Verification Area | Result | Proof / Evidence |
 |---|---|---|---|
-| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Remote entry SHA `b78c5d6d2345316c8d67520bd773c5dc71be4e58` verified via `git rev-parse HEAD == origin/main`. Working tree verified clean before edits. Zero source code or tests modified in this living-doc parity repair. |
+| **A** | Canonical Entry SHA & Remote Tracking | **PASS** | Remote entry SHA `3d6aff1ee04c3b709ce75074965a4ab8edc5ba86` verified via `git rev-parse HEAD == origin/main`. Working tree verified clean before edits. Zero source code or tests modified in this progression parity repair. |
 | **B** | Cumulative Changed-File Scope & Restoration | **PASS** | Cumulative diff against `25418a6f20afff279f71228d07a11c9bcd5804d6` strictly contains only the 15 owned files. All 13 unrelated files (`domain/contracts/autonomy.py`, `capability.py`, `change_lifecycle.py`, `conventions.py`, `data_class.py`, `memory.py`, `rehearsal.py`, `tests/test_gcp_access.py`, `test_p05_01_contracts.py`, `test_p05_02_lifecycle.py`, `test_p05_03_evidence_contracts.py`, `test_p05_04_core_innovation_contracts.py`, `test_p06_03_config_safety.py`) remain restored exactly to baseline. |
 | **C** | Provider-Neutrality Boundary (AST Audit) | **PASS** | Verified via AST analysis in `test_no_provider_imports_in_agent_descriptor_or_evidence_or_envelope` that domain contract files import zero Google SDK, ADK, Vertex, Firestore, Pub/Sub, GitHub, or testing frameworks. |
 | **D** | Zero Credential Leakage | **PASS** | Verified via AST and model field inspection in `test_no_credentials_in_provenance_or_envelope_model_fields` that `AgentRevisionProvenance`, `Provenance`, and `EventEnvelope` contain 0 credential/token/secret fields. |
@@ -29,8 +29,8 @@
 | **N** | Canonical Unit Test Suite | **PASS** | `uv run python scripts/cmd.py unit` -> `910 passed, 1 warning in 6.46s` across 13 test modules (exit code 0). |
 | **O** | Full Repository Test Suite | **FAIL** | `uv run python -m pytest tests/` -> `910 passed, 1 warning, 3 errors in 7.10s` (exit code 1; missing `project` fixture in `test_gcp_access.py` honestly reported). |
 | **P** | Targeted Static Typing & Linting | **PASS** | Targeted mypy on changed files (`domain/contracts/__init__.py`, `evidence.py`, `event_envelope.py`, `src/agents/router.py`, `coordinator.py`, `tests/test_p07_05_agent_revision_provenance.py`) passed with 0 issues. Global format/lint/type-check honestly report historical baseline debt without unrelated edits. |
-| **Q** | API Contracts & Documentation Parity | **PASS** | Stale P-07.04 verification sentence in `AGENT_ENVIRONMENT_AND_API.md` corrected to P-07.05 (`910 passed`). `docs/API_CONTRACTS.md` updated with `EvidenceProducerKind`, orthogonal collection mode semantics, `Provenance` invariants, and `EventEnvelope` mandatory producer fields. Master plan, handoff, and READMEs completely synchronized. |
-| **R** | Non-Leakage of Future Phases | **PASS** | P-08 (`PENDING`), P-09 (`PENDING`), P-10 (`PENDING`), P-11 (`PENDING`), P-12 (`PENDING`), P-13 (`PENDING`), and later runtimes remain untouched. |
+| **Q** | Master Plan & HANDOFF Progression Parity | **PASS** | Canonical Master Plan explicitly defines `P-08.00 — Gemini boundary donor preflight` as the mandatory preflight gate before `P-08.01` or any P-08 implementation. `docs/HANDOFF.md` updated so `Next Exact Task` is exactly `P-08.00 — Gemini boundary donor preflight` and closing narrative accurately reflects that `P-08.01` remains `PENDING` and gated behind `P-08.00`. Stale immediate `P-08.01` eligibility claims eliminated. |
+| **R** | Non-Leakage of Future Phases & Zero P-08 Code | **PASS** | `P-08.00` (`PENDING`), `P-08.01` (`PENDING`), `P-09` (`PENDING`), `P-10` (`PENDING`), `P-11` (`PENDING`), `P-12` (`PENDING`), `P-13` (`PENDING`), and all subsequent runtimes remain untouched with 0 implementation code added. |
 
 ---
 
