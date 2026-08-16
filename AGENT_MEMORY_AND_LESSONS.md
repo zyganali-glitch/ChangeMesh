@@ -114,3 +114,13 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Correct approach: (1) In `BranchCoordinator.execute_plan()`, evaluate `is_parallel_safe()` for all requests for parallel execution (`plan.strategy == PARALLEL`, `force_strategy == PARALLEL`, or `execute_parallel()`), automatically falling back to sequential execution with `fallback_triggered=True` if unsafe; (2) Store `BranchPlan.branches` as an immutable sequence with deep copy validators; (3) In `execute_branch()`, deep copy the branch spec (`isolated_spec = copy.deepcopy(spec)`) before dispatching to the router and runner.
 - Prevention rule: Multi-agent execution engines must guarantee complete deep runtime input isolation and non-bypassable safety gates. Never allow an override parameter or shallow wrapper to suppress safety fallback.
 - Status: `ACTIVE`
+
+### LESSON-20260816-01 — Bounded Gemini model client single retry authority and usage metadata compatibility
+- Date/time: 2026-08-16
+- Active task: P-08.01
+- Symptom: (1) Relying on undocumented SDK retry behavior risks hidden retry multiplication between wrapper and transport; (2) In `google-genai` 2.18.1, `GenerateContentResponseUsageMetadata` uses `candidates_token_count` instead of `response_token_count` for candidate token output tracking.
+- Root cause: (1) Stacking wrapper retries on top of SDK internal retry loops creates unbounded exponential delays; (2) SDK Pydantic models evolve token count field naming across major/minor SDK versions.
+- Incorrect approach: Allowing ambient SDK retry settings to govern reliability, or assuming fixed token field naming without fallback attribute checking.
+- Correct approach: (1) Own retry explicitly in `BoundedGeminiClient` with bounded max attempts (3), observable status codes, and injected deterministic sleep functions for instant test execution; (2) Defensively extract candidate output tokens checking both `candidates_token_count` and `response_token_count`.
+- Prevention rule: External SDK integrations must enforce exactly one explicit retry authority and defensively handle evolving response metadata schemas.
+- Status: `ACTIVE`

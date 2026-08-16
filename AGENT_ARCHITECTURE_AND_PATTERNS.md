@@ -31,6 +31,7 @@ Managed-service integrations remain conditional on real access and must be label
 
 No agent receives unrestricted credentials. Every tool call is scoped by role, change ID, action class, and data class.
 Additional core targets:
+- `Bounded Gemini Model Client` (`src/core/gemini_client.py`): canonical single bounded Gemini client (P-08.01 IMPLEMENTED).
 - `Approval Compression` (`src/auth/approval_compression.py`): defines autonomous vs escalation boundaries (UIPATH-AUTH-001).
 - `ShadowLab Auth` (`src/policy/shadowlab_auth.py`): preflight validation and destructive action boundaries (CCT-PREFLIGHT-001).
 - `Change Passport` (`src/evidence/change_passport.py`): immutable passporting context (CS-PASS-001).
@@ -43,6 +44,7 @@ Additional core targets:
 
 - `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions; P-07.05 agent revision metadata IMPLEMENTED: AgentRevisionProvenance, Provenance/EventEnvelope integration)
 - `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches IMPLEMENTED; P-07.05 agent revision metadata IMPLEMENTED)
+- `src/core`: core system utilities and outer provider clients (P-08.01 `BoundedGeminiClient` in `src/core/gemini_client.py` IMPLEMENTED)
 - `api`: API entrypoint for HTTP/REST and webhook invocations (PLANNED)
 - `orchestration`: deterministic local routing/delegation IMPLEMENTED under P-07.03; multi-agent branch coordination, parallel execution, single-writer aggregation, sequential fallback, and exact revision tracing IMPLEMENTED under P-07.04/P-07.05 via `src/agents/coordinator.py`; durable saga transitions, Firestore persistence, Pub/Sub orchestration, and recovery remain PLANNED under their later owning phases
 - `events`: Pub/Sub envelope, replay, dead-letter handling (PLANNED)
@@ -112,6 +114,16 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Zero Escape Hatches**: No `unknown`, `latest`, `current`, `null`, `none`, `*`, `undefined`, or blank string may satisfy revision provenance.
 *   **Event Conflict Semantics**: Same `event_id` with changed immutable revision provenance deterministically produces `EventDeliveryDisposition.CONFLICT` rather than duplicate replay.
 *   **Canonical State Projection**: Multi-agent coordination state projection (`CoordinationResult.get_canonical_state_projection()`) strips wall-clock timestamps while preserving exact `agent_id`, `agent_revision`, and `role`.
+
+### 5.10 Bounded Gemini Model Client Invariants (P-08.01)
+
+*   **Single Model Authority Boundary**: All runtime Gemini invocations must flow through `BoundedGeminiClient` (`src/core/gemini_client.py`). No ad hoc SDK clients in application code.
+*   **Exact Canonical Model**: Strict binding to `gemini-3.6-flash`. Unapproved model overrides or ambient environment configurations fail closed with `ModelConfigurationError`.
+*   **Single Retry Authority**: ChangeMesh wrapper owns retry explicitly (max 3 attempts with exponential backoff on retryable status codes {429, 502, 503, 504} and network disconnects). Non-retryable errors (400, 401, 403, 404, safety blocks) fail immediately on attempt 1.
+*   **Explicit Positive Finite Bounds**: Timeout is bounded [1.0s, 60.0s] (default 30.0s). Max output tokens is bounded [1, 8192] (default 4096).
+*   **Immutable Enterprise Safety**: All 5 harm categories are strictly configured to `HarmBlockThreshold.BLOCK_LOW_AND_ABOVE`. Blocked responses raise `ModelSafetyBlockedError` and fail closed.
+*   **Non-Secret Operational Telemetry**: Typed `ModelCallTelemetry` records operational metrics while strictly forbidding credential material, prompt contents, and response text.
+*   **Zero Silent Fallback**: Zero fallback to other models, preview versions, other providers, cached answers, or fake PASS sentinels.
 
 ## 6. State labels
 
