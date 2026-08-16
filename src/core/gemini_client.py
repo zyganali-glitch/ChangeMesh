@@ -23,6 +23,8 @@ import httpx
 from google import genai
 from google.genai import errors, types
 
+from src.agents.policy_guardian import PolicyGuardian
+
 logger = logging.getLogger(__name__)
 
 # --- Frozen Model Authority & Configuration Constants ---
@@ -474,6 +476,13 @@ class BoundedGeminiClient:
 
         if system_instruction is not None and not isinstance(system_instruction, str):
             raise ModelConfigurationError("system_instruction must be a string if provided.")
+
+        # Policy Guardian is the single deterministic input/privacy owner.  This
+        # runs before timing, request construction, and the underlying SDK call.
+        PolicyGuardian.assert_model_input_safe(
+            prompt,
+            system_instruction=system_instruction,
+        )
 
         # Resolve and validate per-call output tokens (cannot raise ceiling)
         if max_output_tokens is None:

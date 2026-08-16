@@ -23,7 +23,7 @@ Managed-service integrations remain conditional on real access and must be label
 
 - `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): ADK intake skeleton implemented (P-07.01); deterministic routing/delegation implemented (P-07.03); multi-agent branch coordination, parallel execution, and sequential fallback implemented (P-07.04 via `src/agents/coordinator.py`); saga coordination, recovery PLANNED; durable workflow state is owned by Firestore Saga.
 - `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection, repository overlap, and parallel-change conflict detection (CS-BLAST-001, GL-CONFLICT-001 unified).
-- `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks (ZK-PRIV-001).
+- `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks, and the canonical P-08.03 input privacy/minimization boundary (ZK-PRIV-001).
 - `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation and migration boundaries (CS-MIG-001).
 - `Evidence Record / Ledger` (`src/evidence/evidence_record.py`): canonical deterministic fact and evidence authority (CCT-EVID-001).
 - `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent semantic sufficiency review (CCT-SEM-001).
@@ -44,7 +44,7 @@ Additional core targets:
 
 - `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions; P-07.05 agent revision metadata IMPLEMENTED: AgentRevisionProvenance, Provenance/EventEnvelope integration)
 - `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches IMPLEMENTED; P-07.05 agent revision metadata IMPLEMENTED)
-- `src/core`: core system utilities and outer provider clients (P-08.01 `BoundedGeminiClient` in `src/core/gemini_client.py` IMPLEMENTED)
+- `src/core`: core system utilities and outer provider clients (P-08.01 `BoundedGeminiClient` and P-08.02 structured output in `src/core/` IMPLEMENTED; P-08.03 boundary enforcement is called by the client and owned by Policy Guardian)
 - `api`: API entrypoint for HTTP/REST and webhook invocations (PLANNED)
 - `orchestration`: deterministic local routing/delegation IMPLEMENTED under P-07.03; multi-agent branch coordination, parallel execution, single-writer aggregation, sequential fallback, and exact revision tracing IMPLEMENTED under P-07.04/P-07.05 via `src/agents/coordinator.py`; durable saga transitions, Firestore persistence, Pub/Sub orchestration, and recovery remain PLANNED under their later owning phases
 - `events`: Pub/Sub envelope, replay, dead-letter handling (PLANNED)
@@ -124,6 +124,16 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Immutable Enterprise Safety Policy**: Immutable ChangeMesh dataclass policy (`CANONICAL_SAFETY_POLICY`) covering the 4 active, supported harm categories (`HARASSMENT`, `HATE_SPEECH`, `SEXUALLY_EXPLICIT`, `DANGEROUS_CONTENT`) configured to `HarmBlockThreshold.BLOCK_LOW_AND_ABOVE`. Fresh SDK `SafetySetting` objects are constructed internally per request. `HARM_CATEGORY_CIVIC_INTEGRITY` is officially deprecated in SDK 2.18.1 and excluded. Blocked responses raise `ModelSafetyBlockedError` and fail closed.
 *   **Non-Secret Operational Telemetry**: Typed `ModelCallTelemetry` records operational metrics while strictly forbidding credential material, prompt contents, and response text. Caller-supplied correlation IDs are sanitized and transformed into non-reversible opaque digests (`call_opaque_<sha256[:16]>`) if secret-bearing or malformed.
 *   **Zero Silent Fallback**: Zero fallback to other models, preview versions, other providers, cached answers, or fake PASS sentinels.
+
+### 5.11 Input Privacy and Prompt Minimization Invariants (P-08.03)
+
+*   **Single Privacy Owner**: `src/agents/policy_guardian.py` owns the only runtime privacy pattern table and prompt-context allowlist policy. `domain/contracts/conventions.py::redact_mapping` remains structural field-name redaction and is not treated as free-text DLP.
+*   **Pre-SDK Enforcement**: `BoundedGeminiClient` invokes Policy Guardian checks for both prompt text and `system_instruction` before request construction or `models.generate_content(...)`; blocked input produces zero SDK invocations.
+*   **Exact Surface Allowlists**: Goal Decomposition, Policy Explanation, and Semantic Audit accept only their explicitly required fields. Nested claim/evidence records reject unknown fields rather than forwarding them.
+*   **Credential and PII Deny**: Private keys, tokens, JWTs, bearer values, password-bearing connection strings, cookies, service-account material, real email addresses, and phone numbers fail closed regardless of `DataClassLevel`, including `PUBLIC`.
+*   **Review Is Not Permission**: UUID, public-IP, and production-marker findings are deterministic `REVIEW` findings and are rejected from Gemini. They cannot create policy authority or `HUMAN_AUTHORITY`.
+*   **Provenance Lock**: `collection_mode` and `declared_mode` must both be one of `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, or `LIVE_WRITE`, and must match exactly. Synthetic data cannot be labeled as live evidence.
+*   **Untrusted Data Delimitation**: External text remains data inside a fixed untrusted-data prompt section and cannot alter system instructions, policy, authority lanes, or tool permissions.
 
 ## 6. State labels
 

@@ -241,6 +241,15 @@
 - Boundary with P-06.04: P-06.02 does not create a general command runner or CI framework.
 - Boundary with P-06.05: P-06.02 validates fresh isolated virtual environment installation; P-06.05 later validates full separate-directory clean Git checkout reproduction.
 
+## ADR-0018 — Deterministic pre-SDK privacy gate and review-deny policy (P-08.03)
+- Date: 2026-08-16
+- Status: Accepted
+- Context: P-08.03 requires secrets, prohibited data classes, and broad prompt context to be stopped before the sole Gemini SDK call while preserving the four authority lanes.
+- Decision: `src/agents/policy_guardian.py` is the single privacy/minimization owner. It uses one category-based detector table, exact allowlists for the three P-08.02 semantic prompt surfaces, and matching `collection_mode`/`declared_mode` values. Credential/PII blockers and review findings both fail closed before Gemini. Review findings never become a human-authority request. `BoundedGeminiClient` repeats the scan for prompt and system instruction as a non-bypassable integration defense.
+- Alternatives: Allow raw prompt strings through the client (Rejected: secret-bearing direct calls could invoke the SDK); redact credential values and continue (Rejected: reusable secrets are never acceptable model input); escalate review findings to a human (Rejected: model-input privacy is deterministic policy enforcement and uncertainty cannot manufacture `HUMAN_AUTHORITY`).
+- Consequences: Reserved synthetic email domains remain usable for fixtures; real-looking email/phone, credentials, and review-sensitive markers cannot reach Gemini. This is not generic DLP or Model Armor.
+- Evidence: `tests/test_p08_03_input_privacy.py`; P-08.01/P-08.02 regressions; `docs/THREAT_MODEL.md`; `AGENT_ENVIRONMENT_AND_API.md`.
+
 ## ADR-0017 — Canonical Developer Command Interface and Non-Mutating Verification Semantics (P-06.04)
 - Date: 2026-08-15
 - Status: Accepted
@@ -261,4 +270,3 @@
     - Accurately distinguishes command interface verification from underlying check status.
     - 15 automated command contract tests in `tests/test_p06_04_commands.py` verify all dispatcher behaviors with zero network/cloud dependency.
 - Boundary with P-06.05: P-06.04 defines and verifies standard command contracts. P-06.05 owns first separate-directory clean-checkout reproduction.
-

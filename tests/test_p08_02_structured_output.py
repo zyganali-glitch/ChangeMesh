@@ -633,6 +633,8 @@ class TestPromptConstruction:
             target_systems=["user-service", "auth-db"],
             data_classification="CONFIDENTIAL",
             success_criteria=["No downtime during migration", "All unit tests pass"],
+            collection_mode="SIMULATION",
+            declared_mode="SIMULATION",
         )
         assert "Change Request ID: cr-test-100" in prompt
         assert "Update User Service" in prompt
@@ -649,6 +651,8 @@ class TestPromptConstruction:
             policy_source="POL-MIG-01",
             rationale="Schema migration requires shadowlab rehearsal.",
             violated_rules=["RULE-NO-DIRECT-PROD-MUTATION"],
+            collection_mode="SIMULATION",
+            declared_mode="SIMULATION",
         )
         assert "Change ID: chg-test-200" in prompt
         assert "Decision ID: dec-test-200" in prompt
@@ -674,6 +678,8 @@ class TestPromptConstruction:
                     "source": "ci/integration.log",
                 }
             ],
+            collection_mode="SIMULATION",
+            declared_mode="SIMULATION",
         )
         assert "Audit ID: audit-test-300" in prompt
         assert "Claim [c1]" in prompt
@@ -772,6 +778,8 @@ class TestModelClientIntegration:
             target_systems=["src/api/payment_v1.py"],
             data_classification="INTERNAL",
             success_criteria=["No breaking changes"],
+            collection_mode="SIMULATION",
+            declared_mode="SIMULATION",
         )
 
         response = client.generate_text(prompt)

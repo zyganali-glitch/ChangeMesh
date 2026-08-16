@@ -16,6 +16,25 @@ All components derived from earlier repositories are declared in [`docs/DONOR_RE
 
 ## Disclosed Pre-Existing Donor Components & Build-Period Reimplementation Ledger
 
+### ZK-PRIV-001 — Input Privacy and Prompt Minimization Boundary
+- **Donor Repository:** `zyganali-glitch/zerokit-ai-control-plane` (Donor ID: `D-ZEROKIT`)
+- **Immutable Donor Commit:** `d663db8c706cb914e1af5caf651df08edb5c50c0` (authored prior to competition build period)
+- **Source Paths:** `ai-buildweek/lib/privacy-guard.mjs`, `tests/unit/privacy-guard.test.mjs`
+- **License / Ownership:** MIT License / Owner-authored
+- **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
+- **ChangeMesh Target Path:** `src/agents/policy_guardian.py`
+- **Competition Introduction Commit:** `PENDING` until the immutable implementation commit is created
+- **Test Evidence:** `tests/test_p08_03_input_privacy.py` (PRIV-01 through PRIV-08 plus zero SDK invocation and system-instruction boundary tests)
+- **Materially New Competition Work:**
+  - Python-native canonical Policy Guardian implementation with one category-only detector table and no matched secret excerpts in findings, telemetry, or exceptions.
+  - Exact field-level allowlists for Goal Decomposition, Policy Explanation, and Semantic Audit, including nested claim/evidence restrictions and explicit mode/provenance matching.
+  - Non-bypassable integration from `BoundedGeminiClient` for prompt and system-instruction validation before the sole Gemini SDK call.
+  - Deterministic review-deny behavior that cannot manufacture `HUMAN_AUTHORITY`; Model Armor and generic DLP remain unclaimed.
+
+The donor's synthetic email allowlisting and blocker/review observable behavior
+informed this clean-room implementation. ZeroKit product/admin semantics,
+provider assumptions, and donor fixture identities were not carried over.
+
 ### 1. ZK-VALID-001 — Structured Output & Schema Validation Boundary
 - **Donor Repository:** `zyganali-glitch/zerokit-ai-control-plane` (Donor ID: `D-ZEROKIT`)
 - **Immutable Donor Commit:** `d663db8c706cb914e1af5caf651df08edb5c50c0` (authored prior to competition build period)

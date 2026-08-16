@@ -681,7 +681,7 @@ class TestTelemetryAndSecretIsolation:
         )
         client = BoundedGeminiClient(_sdk_client=fake_sdk)
 
-        secret_prompt = "Prompt containing confidential secret: sk-proj-1234567890"
+        secret_prompt = "Prompt containing confidential internal context"
         resp = client.generate_text(secret_prompt)
         telemetry = resp.telemetry
 

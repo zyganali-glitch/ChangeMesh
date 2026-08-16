@@ -18,7 +18,7 @@
 > - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, strict fail-closed safety guards for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown)
 > - **P-06 Local Environment and Dependency Freeze Phase:** `IMPLEMENTED` (`DONE` — P-06.01 through P-06.05 complete; clean checkout reproduction verified via [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
 > - **P-07 Google ADK Agent Skeleton and Fleet Phase:** `IMPLEMENTED` (`DONE` — P-07.01 Change Orchestrator ADK skeleton, P-07.02 six specialized ADK agent definitions with bounded tool/instruction contracts, P-07.03 deterministic local routing/delegation, P-07.04 multi-agent branch coordination & sequential fallback, and P-07.05 exact agent revision metadata provenance across domain contracts and execution traces)
-> - **Runtime product and agent fleet implementation:** Phase P-07 complete (`DONE`). Phase P-08 Gemini integration and structured reasoning boundary is next (`PENDING`). Cloud deployment, persistence, and P-12 Agent Registry / Capability Passport runtime are `PLANNED`.
+> - **Runtime product and agent fleet implementation:** Phase P-07 complete (`DONE`). Phase P-08 Gemini integration is `IN_PROGRESS`: P-08.01 bounded client, P-08.02 structured output, and P-08.03 deterministic input minimization/privacy enforcement are implemented pending final task closure. Cloud deployment, persistence, and P-12 Agent Registry / Capability Passport runtime are `PLANNED`.
 >
 > Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
 

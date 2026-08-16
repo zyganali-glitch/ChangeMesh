@@ -106,6 +106,16 @@ Record actual environment only; do not fill unknown values with guesses.
 - **Telemetry Boundary & Secret Isolation:** Typed `ModelCallTelemetry` capturing operational metadata (`call_id`, `model_id`, `provider`, `project`, `location`, `api_version`, timestamps, duration, attempts, outcome, status code, token counts, finish reason). Caller-provided correlation identifiers are validated and sanitized (`sanitize_telemetry_call_id`); secret-bearing, malformed, or unbounded identifiers are safely transformed into non-reversible opaque digests (`call_opaque_<sha256[:16]>`). Project and location are validated against strict regexes and secret checks. STRICTLY ZERO credentials, ZERO API keys, ZERO prompt contents, ZERO response text.
 - **Zero Fallback Invariant:** Zero silent fallback to other models, preview versions, other providers, cached answers, or fake PASS sentinels.
 
+### Input Privacy and Minimization Boundary (P-08.03)
+
+- **Canonical owner:** `src/agents/policy_guardian.py` owns the single deterministic privacy pattern table and prompt-context minimizer. `domain/contracts/conventions.py::redact_mapping` remains structural field-name redaction only.
+- **Model-call integration:** `BoundedGeminiClient.generate_text` invokes Policy Guardian validation for both `prompt` and `system_instruction` before request construction and before `models.generate_content(...)`. Blocked input produces zero SDK calls.
+- **Blocked categories:** private keys, API-key-looking values, GitHub/cloud access keys, JWTs, bearer values, password-bearing connection strings, session cookies, service-account material, non-reserved email addresses, and phone numbers.
+- **Review policy:** UUIDs, public IPs, and production-data markers produce deterministic `REVIEW` findings, but `safe_to_send` is false and Gemini is not invoked. Review does not manufacture `HUMAN_AUTHORITY`.
+- **Prompt surfaces and fields:** Goal Decomposition (`change_request_id`, `title`, `description`, `target_systems`, `data_classification`, `success_criteria`, `collection_mode`, `declared_mode`); Policy Explanation (`change_id`, `decision_id`, `action_class`, `autonomy_class`, `policy_source`, `rationale`, `violated_rules`, `collection_mode`, `declared_mode`); Semantic Audit (`audit_id`, `change_id`, `claims`, `evidence_summaries`, `collection_mode`, `declared_mode`) with nested claims limited to `claim_id`, `claim_description`, `target_criterion` and evidence summaries limited to `evidence_key`, `summary`, `source`.
+- **Mode/provenance:** `collection_mode` and `declared_mode` must match one of `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, or `LIVE_WRITE`; mismatches fail closed. Synthetic fixtures are not relabeled as live evidence.
+- **Honesty boundary:** This is not Model Armor, generic enterprise DLP, universal PII discovery, a cloud proxy/interceptor, or a production security certification. Model Armor remains `PERMISSION_BLOCKED / NOT_RUN`.
+
 ## Environment-variable registry
 
 | Variable | Purpose | Required | Secret | Safe example | Owner phase |
@@ -135,7 +145,9 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 | Unit tests (Combined P-05) | `python -m pytest tests/test_p05_01_contracts.py tests/test_p05_02_lifecycle.py tests/test_p05_03_evidence_contracts.py tests/test_p05_04_core_innovation_contracts.py tests/test_p05_05_event_envelope.py tests/test_p05_06_contract_conventions.py -v --tb=short` | `CLEAN_CHECKOUT_VERIFIED` | `PASS` (590 passed) | Local non-mutating test | 2026-08-15 |
 | Unit tests (P-06.03 Config Safety) | `python -m pytest tests/test_p06_03_config_safety.py -v --tb=short` | `CLEAN_CHECKOUT_VERIFIED` | `PASS` (14 passed) | Local non-mutating test | 2026-08-15 |
 | Unit tests (P-06.04 Commands) | `python -m pytest tests/test_p06_04_commands.py -v --tb=short` | `CLEAN_CHECKOUT_VERIFIED` | `PASS` (15 passed) | Local non-mutating test | 2026-08-15 |
-| Unit tests (P-08.01 Gemini Client) | `python -m pytest tests/test_p08_01_gemini_client.py -v --tb=short` | `VERIFIED` | `PASS` (38 passed) | Local non-mutating test | 2026-08-16 |
+| Unit tests (P-08.01 Gemini Client) | `python -m pytest tests/test_p08_01_gemini_client.py -v --tb=short` | `VERIFIED` | `PASS` (39 passed) | Local non-mutating test | 2026-08-16 |
+| Unit tests (P-08.02 Structured Output) | `python -m pytest tests/test_p08_02_structured_output.py -v --tb=short` | `VERIFIED` | `PASS` (40 passed) | Local non-mutating test | 2026-08-16 |
+| Unit tests (P-08.03 Input Privacy) | `python -m pytest tests/test_p08_03_input_privacy.py -v --tb=short` | `VERIFIED` | `PASS` (10 passed; PRIV-01–08 plus boundary regressions) | Local non-mutating test | 2026-08-16 |
 | Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (948 passed, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-16 |
 | Format | `uv run python scripts/cmd.py format` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports unformatted historical files) | Non-mutating (`ruff format --check .`) | 2026-08-15 |
 | Lint | `uv run python scripts/cmd.py lint` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports historical lint debt) | Non-mutating (`ruff check .`, no `--fix`) | 2026-08-15 |

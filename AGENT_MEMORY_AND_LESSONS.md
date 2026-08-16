@@ -137,3 +137,16 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `src/core/gemini_structured_output.py`, `tests/test_p08_02_structured_output.py`.
 - Reusable beyond this task: Yes (all future LLM structured output parsing and schema validation).
 - Status: `ACTIVE`
+
+### LESSON-20260816-03 — Privacy must be enforced before the sole SDK call
+- Date/time: 2026-08-16
+- Active task: P-08.03
+- Symptom: A prompt helper alone could be ignored by another caller, while a direct model-client caller could still submit raw content. A tracked-file secret scanner also correctly rejected literal private-key marker text in detector/test source.
+- Root cause: Input minimization and model-call ownership are separate boundaries; detector implementations and fixtures can themselves resemble credential material.
+- Incorrect approach: Relying only on prompt-builder conventions, retaining matched excerpts for diagnostics, or placing literal credential markers in tracked tests/source.
+- Correct approach: Keep one category-only detector/allowlist owner in `src/agents/policy_guardian.py`, call it from `BoundedGeminiClient` for prompt and system instruction before SDK request construction, reject review findings rather than escalating them, and construct test markers without contiguous credential signatures.
+- Prevention rule: Every model path must have a deterministic pre-SDK gate with zero-call negative evidence; privacy findings may retain only non-sensitive reason codes, severity, and offsets.
+- Tests/evidence: `tests/test_p08_03_input_privacy.py` (10 passed); combined P-08 suite (89 passed); canonical unit suite (999 passed, 1 warning); tracked secret scan (PASS); full suite remains historical GCP fixture debt.
+- Affected files: `src/agents/policy_guardian.py`, `src/core/gemini_client.py`, `src/core/gemini_structured_output.py`, `tests/test_p08_03_input_privacy.py`.
+- Reusable beyond this task: Yes (all future model-boundary integrations and privacy tests).
+- Status: `ACTIVE`

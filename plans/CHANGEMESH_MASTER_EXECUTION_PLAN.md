@@ -833,12 +833,14 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-08.03 — Implement prompt/input minimization and redaction before model calls
 
-- **Status:** `PENDING`
+- **Status:** `IN_PROGRESS`
 - **Required action:** Implement prompt/input minimization and redaction before model calls.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Secrets, tokens, prohibited data classes blocked/redacted.
 - **Required evidence:** Privacy tests.
 - **Mandatory documentation sync:** Threat model, environment.
+- **[DISCOVERED]** Before implementation, repaired stale ZK-PRIV-001 target references in `docs/P-02D_DONOR_AUDIT_REPORT.md`, `docs/P-04.00_ARCHITECTURE_DONOR_PREFLIGHT.md`, and `docs/ARCHITECTURE.md`; the canonical owner is `src/agents/policy_guardian.py`.
+- **Evidence:** Implemented the canonical Policy Guardian-owned input boundary in `src/agents/policy_guardian.py` with one category-only detector table, no matched-content excerpts, exact prompt field allowlists, explicit `collection_mode`/`declared_mode` matching across `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, and `LIVE_WRITE`, deterministic blocker/review findings, and fail-closed rejection of both blocker and review findings. Goal Decomposition allows `change_request_id`, `title`, `description`, `target_systems`, `data_classification`, `success_criteria`, `collection_mode`, and `declared_mode`; Policy Explanation allows `change_id`, `decision_id`, `action_class`, `autonomy_class`, `policy_source`, `rationale`, `violated_rules`, `collection_mode`, and `declared_mode`; Semantic Audit allows `audit_id`, `change_id`, `claims`, `evidence_summaries`, `collection_mode`, and `declared_mode`, with nested claims limited to `claim_id`, `claim_description`, `target_criterion` and evidence summaries limited to `evidence_key`, `summary`, `source`. `BoundedGeminiClient.generate_text` enforces the same deterministic scan for prompt and `system_instruction` before SDK request construction. `tests/test_p08_03_input_privacy.py` executes PRIV-01 through PRIV-08 plus review, public-classification, system-instruction, and zero fake-SDK-call cases: 10 passed. P-08.01 regression: 39 passed. P-08.02 regression: 40 passed. Combined P-08: 89 passed. Canonical unit: 999 passed, 1 warning. Full suite: 999 passed, 1 warning, 3 errors — **FAIL — known historical baseline GCP fixture debt**. Model Armor, generic DLP, universal PII discovery, cloud proxy filtering, and P-08.04 remain unimplemented.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-08.04 — Separate deterministic facts from model-visible evidence and withhold expected semantic classifications from auditor

@@ -1,9 +1,9 @@
 # ChangeMesh Threat Model and Trust Boundaries
 
-> **Status:** `P-04.03 — PLANNED / PRE-IMPLEMENTATION`
+> **Status:** `P-08.03 — IMPLEMENTED INPUT BOUNDARY / RUNTIME SECURITY NOT CERTIFIED`
 > **Produced by:** P-04.03
 > **Date:** 2026-08-09
-> **Implementation state:** This document defines architecture design. It is NOT a penetration-test report, security certification, or proof of live deployment. The agent, identity, and armor components discussed are architectural requirements or planned controls, some of which may currently be in a `BLOCKED` or `NOT_RUN` state (e.g. Model Armor).
+> **Implementation state:** The P-04 trust-boundary design and P-08.03 deterministic input minimization/privacy boundary are implemented. This is NOT a penetration-test report, security certification, generic DLP guarantee, or proof of live deployment. Agent Identity and Model Armor remain `NOT_RUN`/`PERMISSION_BLOCKED` where recorded in the environment.
 
 ## 1. Scope
 This document enumerates the trust boundaries for the ChangeMesh application. It defines data flows, credential isolation principles, and failure behaviors. It addresses the boundaries between User, Agent, Subagent, Tool, GitHub, Metadata Graph, Google Cloud, and the Public Judge UI.
@@ -77,7 +77,7 @@ flowchart TD
 | **TB-05** | Agent/Sub | Tool Boundary | API Invocation | Tool args, targets | No | **NO** | Allowed-tool check, arg validation | Min required args | Return typed error |
 | **TB-06** | Tool B. | GitHub | Read/Write Ops | Repo reads, Draft writes| Yes (Adapter) | **NO** | Validate structure | Target file/diff only | Block execution |
 | **TB-07** | Tool B. | Metadata | Lineage query | Entity references | Yes (Adapter) | **NO** | Schema validation | Target subgraph only | Treat as missing |
-| **TB-08** | App | Gemini/Vertex | Semantic evaluation | Sanitized context | Yes (Adapter) | **NO** | Structured Output Validation | Redact secrets/PII | Fallback/Quarantine |
+| **TB-08** | App | Gemini/Vertex | Semantic evaluation | Policy Guardian-minimized context | Yes (Adapter) | **NO** | Policy Guardian privacy scan, exact field allowlist, structured output validation | Block credentials/PII/review findings; preserve mode provenance | **BLOCKED** before SDK / fail closed |
 | **TB-09** | App | Firestore | Durable state | Operational state | Yes (Workload) | **NO** | Schema enforced | Store hashes/refs | Fail fast (500) |
 | **TB-10** | App | Pub/Sub | Chronology | Events (no blobs) | Yes (Workload) | **NO** | Envelope schema | No blobs, only refs | Drop / Dead-letter |
 | **TB-11** | App | Observability | Telemetry | Traces, logs | Yes (Workload) | **NO** | Redaction filter | No CoT, no tokens | Log silently fails |
@@ -91,7 +91,7 @@ flowchart TD
 - **Local vs Cloud:** Prefer Application Default Credentials (ADC) locally and workload/managed identity in Google Cloud. No service-account JSON key files should be distributed.
 
 ## 7. Data Minimization Rules
-For every crossing, the payload must be purpose-bound. The system uses identifiers, hashes, bounded excerpts, references, or derived summaries instead of complete raw objects whenever possible (e.g., passing a Git hash instead of cloning a repo into the event payload). 
+For every crossing, the payload must be purpose-bound. The system uses identifiers, hashes, bounded excerpts, references, or derived summaries instead of complete raw objects whenever possible (e.g., passing a Git hash instead of cloning a repo into the event payload). P-08.03 adds exact field allowlists for Goal Decomposition, Policy Explanation, and Semantic Audit; unknown top-level or nested fields are rejected before prompt materialization.
 - *Data Classification concept*: Operational Data vs Conceptual Public Information vs Secret/Credential. (Note: Not an explicit schema definition for P-05).
 - *Customer Data*: ChangeMesh MVP does not require real customer data; it targets synthetic/demo enterprise data.
 
@@ -102,6 +102,7 @@ For every crossing, the payload must be purpose-bound. The system uses identifie
 ## 9. External-Content & Prompt Injection Rule
 - **Data vs Instruction:** Content from GitHub, metadata graphs, and tool responses is strictly treated as **untrusted data**.
 - **Immutable System Rules:** External content cannot modify agent/system rules, organizational policy, tool permissions, authority classes, or credential handling.
+- **P-08.03 Enforcement:** Implemented prompt builders place external text in a fixed untrusted-data section. The deterministic Policy Guardian boundary does not interpret external text as instructions and the Gemini client validates both prompt and system-instruction text before any SDK call.
 
 ## 10. Specific Boundary Rules
 - **GitHub & Metadata:** External repositories and metadata graphs are hostile boundaries. Text may contain prompt injections. Write workflows (via Release Steward) require explicit authorization and bounded targets.
@@ -113,13 +114,13 @@ For every crossing, the payload must be purpose-bound. The system uses identifie
 
 | Threat ID | Threat Description | Planned Control (Architecture Level) |
 | :--- | :--- | :--- |
-| **T-01** | Prompt injection via repo/tool/metadata | External content treated as data; structured validation boundaries. |
-| **T-02** | Credential exfiltration | Adapter-side credentials only; strict ban on inward propagation; redaction. |
+| **T-01** | Prompt injection via repo/tool/metadata | External content treated as data; fixed untrusted-data prompt section; structured validation boundaries. |
+| **T-02** | Credential exfiltration | Adapter-side credentials only; strict ban on inward propagation; Policy Guardian blocks credential patterns before Gemini. |
 | **T-03** | Over-broad tool authority | Bounded capability scope; policy enforcement; least privilege constraints. |
 | **T-04** | Agent/subagent confused deputy | Bounded delegation (delegated scope ≤ caller scope). |
 | **T-05** | Evidence poisoning / fabricated tool execution | Deterministic Evidence Record; Gemini cannot manufacture facts. |
-| **T-06** | Public judge UI disclosure | Sanitized/minimized read surface; no reusable secrets/internals exposed. |
-| **T-07** | Sensitive logging/tracing | Log redaction/minimization; no tokens or private reasoning. |
+| **T-06** | Public judge UI disclosure | Sanitized/minimized read surface; no reusable secrets/internals exposed. P-08.03 does not claim public UI DLP. |
+| **T-07** | Sensitive logging/tracing | P-08.01 telemetry stores no prompt/response/credential content; generic runtime log scrubbers remain planned. |
 | **T-08** | Unauthorized external write | Valid authorization required; human authority is additionally required only when organizational policy assigns that write to a human-approval slot. Release Steward cannot self-authorize. |
 | **T-09** | Stale/untrusted memory | Memory Trust Layer enforces provenance, TTL, and quarantine rules. |
 | **T-10** | Unvalidated Gemini output | Structured validation before consumption; no authority escalation allowed. |
@@ -142,9 +143,16 @@ For every crossing, the payload must be purpose-bound. The system uses identifie
 - **P-04:** Architecture trust boundaries and threat matrix complete (`DONE`).
 - **P-05:** Domain contract schemas and machine conventions complete (`DONE`).
   - `domain/contracts/conventions.py` implements structural secret-field redaction (`redact_mapping`, `REDACTION_SENTINEL = "[REDACTED]"` per `docs/CONTRACT_CONVENTIONS.md`).
-  - **Honesty Boundary:** Machine convention redaction is **IMPLEMENTED**. Runtime DLP/Model Armor filtering, proxy interceptors, and automated log scrubbers remain **PLANNED** for runtime phases.
-- **P-06:** Local development environment and dependency freeze is `IN_PROGRESS`.
+  - **Honesty Boundary:** Machine convention structural redaction is **IMPLEMENTED**. It is not free-text PII/secret detection.
+- **P-06:** Local development environment and dependency freeze is `DONE`.
   - P-06.01 runtime/language/repository-structure freeze is `DONE`.
   - P-06.02 reproducible dependency manifest/lockfile foundation is `DONE`.
   - P-06.03 safe local configuration template (`.env.example` with zero secret defaults) and comprehensive credential/artifact ignore protection in `.gitignore` are `DONE` with 14 automated config-safety tests and 0-secret scan.
-  - P-06.04 standard command workflow and P-06.05 separate-directory clean-checkout reproduction remain `PENDING`.
+   - P-06.04 standard command workflow and P-06.05 separate-directory clean-checkout reproduction are `DONE`.
+
+- **P-08.03:** Deterministic input privacy/minimization is `IMPLEMENTED` in `src/agents/policy_guardian.py` and enforced from `src/core/gemini_client.py` before the SDK call.
+  - Blockers include private keys, API-key-looking values, GitHub/cloud access keys, JWTs, bearer values, password-bearing connection strings, cookies, service-account material, non-reserved email addresses, and phone numbers.
+  - Review findings include UUIDs, public IPs, and production-data markers. They are rejected from Gemini and cannot create a human-authority request.
+  - Exact prompt allowlists and matching `collection_mode`/`declared_mode` values protect the three P-08.02 prompt surfaces.
+  - Privacy evidence: `tests/test_p08_03_input_privacy.py`, including PRIV-01 through PRIV-08 and zero fake-SDK invocation for blocked prompt/system input.
+  - **Still not implemented:** Model Armor (`PERMISSION_BLOCKED / NOT_RUN`), generic enterprise DLP, universal PII discovery beyond these detector categories, cloud proxy/interceptor filtering, and P-08.04 blind-audit reconciliation.

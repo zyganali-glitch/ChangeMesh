@@ -11,7 +11,7 @@
 | CCT-PREFLIGHT-001 | D-CCT | 65ee1b7 | cli/lib/destructiveActionPreflight.js<br>tests/test_destructive_action_preflight.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/policy/shadowlab_auth.py | 0 |
 | CCT-SEM-001 | D-CCT | 65ee1b7 | cli/commands/codex-review.js<br>tests/test_codex_review.js | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/agents/evidence_auditor.py | 0 |
 | CCT-JUDGE-001 | D-CCT | 65ee1b7 | cli/commands/export-devpost.js<br>cli/lib/markdown.js | PASS | PASS | VERIFIED_COMPATIBLE | REFERENCE_ONLY | docs/JUDGING_MAP.md | 0 |
-| ZK-PRIV-001 | D-ZEROKIT | d663db8 | ai-buildweek/lib/privacy-guard.mjs<br>tests/unit/privacy-guard.test.mjs | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/policy/policy_guardian.py | 0 |
+| ZK-PRIV-001 | D-ZEROKIT | d663db8 | ai-buildweek/lib/privacy-guard.mjs<br>tests/unit/privacy-guard.test.mjs | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/agents/policy_guardian.py | 0 |
 | ZK-VALID-001 | D-ZEROKIT | d663db8 | frontend/js/config-validator.js<br>tests/unit/config-validator.test.mjs | PASS | PASS | VERIFIED_COMPATIBLE | CLEAN_ROOM_REIMPLEMENTED | src/core/gemini_structured_output.py | 0 |
 | ZK-CLAIM-001 | D-ZEROKIT | d663db8 | ai-buildweek/reports/jury-claim-audit.md<br>ai-buildweek/reports/jury-claim-audit.tr.md | PASS | PASS | VERIFIED_COMPATIBLE | REFERENCE_ONLY | src/audit/claim_audit.py | 0 |
 | CS-BLAST-001 | D-CONTEXTSEAL | 0dc924d | src/datahub/live-context.js<br>src/core/risk.js<br>src/core/workflow.js<br>tests/live-context.test.js | PASS | PASS | VERIFIED_COMPATIBLE | ADAPTED | src/git/impact_scout.py (unified) | 0 |

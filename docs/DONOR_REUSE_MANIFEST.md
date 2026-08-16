@@ -454,7 +454,7 @@ last_reviewed: '2026-08-09T10:20:00Z'
 
 ```yaml
 component_id: ZK-PRIV-001
-status: APPROVED_FOR_IMPLEMENTATION
+status: IMPLEMENTED_PENDING_PARITY
 donor_id: D-ZEROKIT
 repository: zyganali-glitch/zerokit-ai-control-plane
 source_commit: d663db8c706cb914e1af5caf651df08edb5c50c0
@@ -473,9 +473,11 @@ forbidden_carry_over:
 - school-SaaS fixture data, openai_api_key pattern naming, ZeroKit product semantics
 required_tests:
 - blocking patterns (private keys, API keys, bearer tokens, JWTs, connection strings) fail closed
-- review patterns (UUIDs, IPs, production markers) trigger review findings in reviewItems
+- review patterns (UUIDs, IPs, production markers) produce deterministic review findings and remain blocked from Gemini
 - synthetic fixture domain allowlisting (example.com, example.net, example.org, example.test)
-- model prompt contains only allowlisted fields
+- model prompt contains only allowlisted fields for Goal Decomposition, Policy Explanation, and Semantic Audit
+- unknown top-level/nested fields and mode/provenance mismatches fail before prompt materialization
+- blocked prompt/system input produces zero SDK model invocations
 - no school-SaaS data or ZeroKit semantics (forbidden carry-over)
 competition_introduction_commit: PENDING
 evidence:
@@ -483,8 +485,9 @@ evidence:
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
 - P-08.00 Gemini boundary donor preflight PASS
+- P-08.03 dedicated privacy suite PASS; final provenance parity pending immutable introduction commit and closure audit
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T11:53:00Z'
+last_reviewed: '2026-08-16T16:00:00Z'
 ```
 
 ### ZK-VALID-001

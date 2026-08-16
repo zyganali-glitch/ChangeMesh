@@ -32,6 +32,7 @@ ChangeMesh cleanly separates authority into four distinct lanes to ensure that d
 | Capability Passport validity/revocation | `DETERMINISTIC_CODE` | Signature/registry | Capability Module | Gemini, Policy, Human | Gemini, Human |
 | Memory trust/TTL/quarantine result | `DETERMINISTIC_CODE` | Memory Trust Layer rules | Memory Trust Layer | Gemini, Policy, Human | Gemini, Human |
 | Deterministic preflight result | `DETERMINISTIC_CODE` | Preflight checks | ShadowLab Auth | Gemini, Policy, Human | Gemini, Human |
+| Model-input privacy/minimization result | `DETERMINISTIC_CODE` | Policy Guardian boundary checks | `src/agents/policy_guardian.py` | Gemini, Policy, Human | Gemini, Human |
 | External-write receipt/result | `DETERMINISTIC_CODE` | Target API response | Release Steward | Gemini, Policy, Human | Gemini, Human |
 | Deterministic repository/blast-radius | `DETERMINISTIC_CODE` | Git/GitLab API | Impact Scout | Gemini, Policy, Human | Gemini, Human |
 | Mechanically verifiable public-claim parity | `DETERMINISTIC_CODE` | Linter / string matching | Claim Audit | Gemini, Policy, Human | Gemini, Human |

@@ -1,7 +1,7 @@
 # ChangeMesh Architecture
 
-> **Status:** `P-04 DONE; P-05 DONE (P-05.01–P-05.06 IMPLEMENTED); P-06 DONE; P-07 DONE (P-07.01–P-07.05 IMPLEMENTED); P-08 IN_PROGRESS (P-08.00 PREFLIGHT DONE, P-08.01 BOUNDED GEMINI CLIENT IMPLEMENTED)`
-> **Produced by:** P-04.01–P-04.05, P-05.01–P-05.06, P-06.01–P-06.05, P-07.01–P-07.05, P-08.00–P-08.01
+> **Status:** `P-04 DONE; P-05 DONE (P-05.01–P-05.06 IMPLEMENTED); P-06 DONE; P-07 DONE (P-07.01–P-07.05 IMPLEMENTED); P-08 IN_PROGRESS (P-08.00 PREFLIGHT DONE, P-08.01–P-08.03 IMPLEMENTED)`
+> **Produced by:** P-04.01–P-04.05, P-05.01–P-05.06, P-06.01–P-06.05, P-07.01–P-07.05, P-08.00–P-08.03
 > **Date:** 2026-08-16
 > **Implementation state:** Architecture design is complete (P-04). All domain contracts and machine conventions (P-05.01 foundational schemas, P-05.02 lifecycle state machine, P-05.03 evidence contracts, P-05.04 core innovation schemas, P-05.05 event envelope contract, and P-05.06 machine conventions) are implemented and verified. P-06 language/runtime/dependency freeze is complete. Change Orchestrator ADK skeleton (P-07.01) is implemented in `src/agents/change_orchestrator.py`. Specialized agent fleet definitions (P-07.02) are implemented in `src/agents/` (`ChangeOrchestrator`, `ImpactScout`, `PolicyGuardian`, `MigrationEngineer`, `EvidenceAuditor`, `ReleaseSteward`, `AgentDefinition`, `src/agents/registry.py`, `src/agents/schemas.py`) with bounded instructions/tool sets, explicit schemas, and zero external writes. Deterministic routing and delegation (P-07.03) is implemented in `src/agents/router.py` (`DeterministicRouter`, `RoutingRequest`, `RoutingResult`, `RoutingTraceRecord`). Multi-agent branch coordination, parallel execution, single-writer aggregation, and sequential fallback (P-07.04) is implemented in `src/agents/coordinator.py` (`BranchCoordinator`, `ExecutionStrategy`, `BranchPlan`, `BranchResult`, `CoordinationResult`). Agent revision metadata provenance (P-07.05) is implemented across domain contracts (`AgentRevisionProvenance`, `Provenance`, `EventEnvelope`) and agent coordination tracing (`RoutingTraceRecord`, `BranchExecutionTrace`, canonical projection). Bounded Gemini Model Client (P-08.01) is implemented in `src/core/gemini_client.py` (`BoundedGeminiClient`) with exact model (`gemini-3.6-flash`), Vertex AI provider, explicit timeouts, bounded retries, token caps, immutable safety settings, and non-secret telemetry. Gemini structured reasoning/parsers (P-08.02), Pub/Sub Event Backbone (P-09), Firestore dedup persistence & saga (P-10/P-20), Memory Trust Layer (P-11), Agent Registry / Capability Passport runtime (P-12), ShadowLab (P-13), Approval Compression runtime (P-14), Evidence Ledger, API Entrypoint (`api/`), Google Cloud adapters (`integrations/gcp/`), and Web Dashboard (`web/`) remain `PLANNED`.
 
@@ -338,7 +338,7 @@ All canonical target paths established during P-04.00 donor preflight are preser
 | CCT-PREFLIGHT-001 | `src/policy/shadowlab_auth.py` | PASS | Preserved |
 | CCT-SEM-001 | `src/agents/evidence_auditor.py` | PASS | Preserved |
 | CCT-JUDGE-001 | `docs/JUDGING_MAP.md` | PASS | Preserved |
-| ZK-PRIV-001 | `src/policy/policy_guardian.py` | PASS | Preserved |
+| ZK-PRIV-001 | `src/agents/policy_guardian.py` | PASS | Preserved |
 | ZK-VALID-001 | `src/core/gemini_structured_output.py` | PASS | Preserved |
 | ZK-CLAIM-001 | `src/audit/claim_audit.py` | PASS | Preserved |
 | CS-BLAST-001 | `src/git/impact_scout.py` | PASS | Preserved |

@@ -87,7 +87,27 @@ Under P-08.02 (`src/core/gemini_structured_output.py`), structured model output 
    - Path traversal tokens (`..`, `../`, `..\\`, `%2e%2e`) and unapproved external URLs fail closed.
    - Decisive verdicts (`SUPPORTS`, `CONTRADICTS`, `INSUFFICIENT`) enforce structural separation (OUT-10) requiring explicit evidence citations or counter/missing-evidence points distinct from generated narrative text.
 
+## P-08.03 Input Minimization and Privacy Boundary
+
+The canonical deterministic owner is `src/agents/policy_guardian.py`. Its single
+privacy pattern table blocks private keys, API-key-looking values, GitHub/cloud
+access tokens, JWTs, bearer values, password-bearing connection strings, session
+cookies, service-account material, non-reserved email addresses, and phone numbers.
+UUIDs, public IPs, and production-data markers are `REVIEW` findings, but review
+findings are also rejected before Gemini; they never grant `HUMAN_AUTHORITY`.
+
+The three implemented prompt surfaces require exact allowlists and matching
+`collection_mode`/`declared_mode` values from `FIXTURE`, `SIMULATION`,
+`RECORDED_CLOUD`, or `LIVE_WRITE`. Unknown fields, nested unknown fields, and
+mode mismatches fail before prompt materialization. Reserved synthetic email
+domains (`example.com`, `example.net`, `example.org`, `example.test`) are allowed.
+`BoundedGeminiClient` repeats the deterministic scan for both prompt text and
+`system_instruction` before constructing or invoking the SDK request. Findings
+retain only category, severity, and offset; matched content is never recorded.
+
+This is implemented deterministic minimization and boundary enforcement, not
+generic enterprise DLP, universal PII discovery, proxy interception, or Model Armor.
+
 4. **Deferred Phase Scope Boundary:**
-   - **P-08.03 (Input Minimization & Privacy Redaction):** `PENDING` — Secret/token/PII blocking and field-level prompt minimization before model calls are not yet implemented.
-   - **P-08.04 (Blind Audit Expected-Answer Isolation & Reconciler):** `PENDING` — Separating deterministic facts from model-visible evidence bundles and withholding expected answers from the auditor reconciler are not yet implemented.
+    - **P-08.04 (Blind Audit Expected-Answer Isolation & Reconciler):** `PENDING` — Separating deterministic facts from model-visible evidence bundles and withholding expected answers from the auditor reconciler are not yet implemented.
    - **P-08.05 (Cost & Latency Budgets):** `PENDING` — Adaptive token budget optimization is not yet implemented.
