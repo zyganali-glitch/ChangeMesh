@@ -250,6 +250,15 @@
 - Consequences: Reserved synthetic email domains remain usable for fixtures; real-looking email/phone, credentials, and review-sensitive markers cannot reach Gemini. This is not generic DLP or Model Armor.
 - Evidence: `tests/test_p08_03_input_privacy.py`; P-08.01/P-08.02 regressions; `docs/THREAT_MODEL.md`; `AGENT_ENVIRONMENT_AND_API.md`.
 
+## ADR-0019 — Blind semantic audit fact isolation and expected-answer withholding (P-08.04)
+- Date: 2026-08-16
+- Status: Accepted
+- Context: Evidence Auditor needs semantic review without allowing Gemini to see or echo deterministic expected classifications, execution states, or reconciliation hints.
+- Decision: `src/agents/evidence_auditor.py` creates a separated `BlindAuditPackage`. Locked deterministic claims remain application-only; the model receives neutral claims and bounded evidence summaries. Expected-answer fields fail closed. Existing `SemanticAuditResult` validation remains the model boundary, and reconciliation preserves deterministic facts while reporting advisory disagreement.
+- Alternatives: Send the complete evidence record to Gemini (Rejected: expected-answer leakage and fact-authority confusion); silently strip forbidden fields (Rejected: hidden input mutation); allow model disagreement to rewrite facts (Rejected: violates `DETERMINISTIC_CODE` sovereignty).
+- Consequences: Blind audits are bounded and reproducible, but a disagreement may create a review state. This review state is not an authorization or automatic human-authority grant. P-08.05 cost optimization remains separate.
+- Evidence: `tests/test_p08_04_blind_audit.py`; CCT-SEM-001 donor parity; `docs/EVIDENCE_BOUNDARY.md`; `AGENT_ARCHITECTURE_AND_PATTERNS.md`.
+
 ## ADR-0017 — Canonical Developer Command Interface and Non-Mutating Verification Semantics (P-06.04)
 - Date: 2026-08-15
 - Status: Accepted

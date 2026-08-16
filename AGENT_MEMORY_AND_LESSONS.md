@@ -150,3 +150,16 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `src/agents/policy_guardian.py`, `src/core/gemini_client.py`, `src/core/gemini_structured_output.py`, `tests/test_p08_03_input_privacy.py`.
 - Reusable beyond this task: Yes (all future model-boundary integrations and privacy tests).
 - Status: `ACTIVE`
+
+### LESSON-20260816-04 — Blind-audit reconciliation must retain the locked fact map
+- Date/time: 2026-08-16
+- Active task: P-08.04
+- Symptom: The first reconciliation implementation removed the local claim lookup while adding citation-scope validation; dedicated tests exposed the resulting `NameError` before closure.
+- Root cause: Validation and reconciliation used two adjacent lookup responsibilities without one shared canonical map.
+- Incorrect approach: Treating model claim IDs and deterministic claim state as interchangeable or allowing the validation map to be discarded before reconciliation.
+- Correct approach: Build one `locked_by_id` map, validate model claims/citations against it, and reuse it to produce immutable reconciliation records.
+- Prevention rule: Blind-audit code must validate identity, citation scope, and fact reconciliation against one locked deterministic map before returning any result.
+- Tests/evidence: `tests/test_p08_04_blind_audit.py` (13 passed after repair).
+- Affected files: `src/agents/evidence_auditor.py`, `tests/test_p08_04_blind_audit.py`.
+- Reusable beyond this task: Yes (semantic reconciliation and evidence authority boundaries).
+- Status: `ACTIVE`

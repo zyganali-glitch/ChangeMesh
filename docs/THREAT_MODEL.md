@@ -155,4 +155,9 @@ For every crossing, the payload must be purpose-bound. The system uses identifie
   - Review findings include UUIDs, public IPs, and production-data markers. They are rejected from Gemini and cannot create a human-authority request.
   - Exact prompt allowlists and matching `collection_mode`/`declared_mode` values protect the three P-08.02 prompt surfaces.
   - Privacy evidence: `tests/test_p08_03_input_privacy.py`, including PRIV-01 through PRIV-08 and zero fake-SDK invocation for blocked prompt/system input.
-  - **Still not implemented:** Model Armor (`PERMISSION_BLOCKED / NOT_RUN`), generic enterprise DLP, universal PII discovery beyond these detector categories, cloud proxy/interceptor filtering, and P-08.04 blind-audit reconciliation.
+  - **Still not implemented:** Model Armor (`PERMISSION_BLOCKED / NOT_RUN`), generic enterprise DLP, universal PII discovery beyond these detector categories, and cloud proxy/interceptor filtering.
+
+- **P-08.04:** Blind semantic fact isolation is `IN_PROGRESS` in `src/agents/evidence_auditor.py`.
+  - Locked deterministic states and expected semantic classifications remain application-only.
+  - Model-visible claim/evidence context is bounded and neutral; expected-answer fields and hints fail closed.
+  - Reconciliation preserves deterministic facts and reports advisory disagreement; it does not manufacture human authority.

@@ -108,6 +108,16 @@ retain only category, severity, and offset; matched content is never recorded.
 This is implemented deterministic minimization and boundary enforcement, not
 generic enterprise DLP, universal PII discovery, proxy interception, or Model Armor.
 
+## P-08.04 Blind Semantic Audit Boundary
+
+`src/agents/evidence_auditor.py` now defines the P-08.04 implementation in
+progress: deterministic claim state is held in an application-only locked
+package, while Gemini receives only neutral claims and bounded evidence summaries.
+Expected-answer fields (`expected_result`, `should_pass`, and equivalent
+deterministic/reconciliation fields) are rejected before prompt construction.
+Model assessments remain `GEMINI_SEMANTIC_JUDGMENT`; reconciliation preserves
+`EvidenceState` and reports disagreement without promoting facts or creating
+authority.
+
 4. **Deferred Phase Scope Boundary:**
-    - **P-08.04 (Blind Audit Expected-Answer Isolation & Reconciler):** `PENDING` — Separating deterministic facts from model-visible evidence bundles and withholding expected answers from the auditor reconciler are not yet implemented.
-   - **P-08.05 (Cost & Latency Budgets):** `PENDING` — Adaptive token budget optimization is not yet implemented.
+    - **P-08.05 (Cost & Latency Budgets):** `PENDING` — Adaptive token budget optimization is not yet implemented.

@@ -42,6 +42,18 @@ ChangeMesh is a new product/repository. Design benefits from ideas in owner's ea
 - **Test Evidence:** `tests/test_p08_03_input_privacy.py` (PRIV-01 through PRIV-08, review-deny policy, system-instruction bypass, and zero fake-SDK invocation)
 - **Materially New Contribution:** Python-native Policy Guardian ownership, one category-only detector table with no matched-content retention, strict allowlists for all three P-08.02 prompt surfaces, explicit execution-mode provenance matching, and non-bypassable integration from `BoundedGeminiClient` before SDK request construction. Secrets and real PII fail closed; review findings are also denied rather than escalated. No ZeroKit product semantics, donor fixture identities, or provider-specific runtime assumptions carry over.
 
+### CCT-SEM-001 — Blind Semantic Audit and Fact Reconciliation Boundary
+- **Status:** `IMPLEMENTED_PENDING_PARITY`
+- **Donor ID:** `D-CCT` (`zyganali-glitch/codex-control-tower`)
+- **Immutable Donor SHA:** `65ee1b72faf9a7202d9166eed43fb671804815a8`
+- **Source Paths:** `cli/commands/codex-review.js`, `tests/test_codex_review.js`
+- **License State:** `VERIFIED_COMPATIBLE` (owner-authored)
+- **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
+- **ChangeMesh Target:** `src/agents/evidence_auditor.py`
+- **Competition Introduction Commit:** `PENDING` until the immutable implementation commit is created
+- **Test Evidence:** `tests/test_p08_04_blind_audit.py` (18 tests PASS; final provenance closure pending)
+- **Materially New Contribution:** Python-native ADK Evidence Auditor boundary with separate locked deterministic claims and model-visible neutral context, expected-answer field rejection, bounded evidence/prompt sizes, Gemini structured output parsing, claim/citation scope enforcement, and deterministic reconciliation preserving `EvidenceState`. No Codex/OpenAI runtime, GPT model, donor event stream, or donor project identity carries over.
+
 ## Mandatory final disclosure
 
 Record original path, license, source commit, copied/adapted/clean-room status, competition-period introduction commit, tests proving new behavior, and why ChangeMesh contribution is materially new. 

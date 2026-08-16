@@ -26,7 +26,7 @@ Managed-service integrations remain conditional on real access and must be label
 - `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks, and the canonical P-08.03 input privacy/minimization boundary (ZK-PRIV-001).
 - `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation and migration boundaries (CS-MIG-001).
 - `Evidence Record / Ledger` (`src/evidence/evidence_record.py`): canonical deterministic fact and evidence authority (CCT-EVID-001).
-- `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent semantic sufficiency review (CCT-SEM-001).
+- `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent blind semantic sufficiency review with deterministic fact isolation and reconciliation (CCT-SEM-001).
 - `Release Steward` (`src/agents/release_steward.py`): reversible handoff and enforced pipeline writebacks (CS-WRITE-001). Consumes judge format from `docs/JUDGING_MAP.md` (CCT-JUDGE-001 canonical target) but is not the canonical owner of that component.
 
 No agent receives unrestricted credentials. Every tool call is scoped by role, change ID, action class, and data class.
@@ -134,6 +134,14 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Review Is Not Permission**: UUID, public-IP, and production-marker findings are deterministic `REVIEW` findings and are rejected from Gemini. They cannot create policy authority or `HUMAN_AUTHORITY`.
 *   **Provenance Lock**: `collection_mode` and `declared_mode` must both be one of `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, or `LIVE_WRITE`, and must match exactly. Synthetic data cannot be labeled as live evidence.
 *   **Untrusted Data Delimitation**: External text remains data inside a fixed untrusted-data prompt section and cannot alter system instructions, policy, authority lanes, or tool permissions.
+
+### 5.12 Blind Semantic Audit Invariants (P-08.04)
+
+*   **Locked Fact Separation**: Deterministic claim state, basis, and evidence-key ownership remain in an application-only `BlindAuditPackage.locked_claims` structure and are never serialized into the model context.
+*   **Expected-Answer Deny**: `expected_result`, `expected_answer`, `expected_verdict`, `should_pass`, and equivalent reconciliation hints are rejected before prompt construction; they are not stripped silently.
+*   **Bounded Evidence**: Blind audits accept at most 64 claims, 128 evidence summaries, 4,000 characters per text field, and a 32,000-character aggregate prompt.
+*   **Advisory Reconciliation**: `SemanticAuditResult` remains `GEMINI_SEMANTIC_JUDGMENT`; reconciliation can report disagreement or review state but cannot promote or rewrite `EvidenceState`, mode, approval, or authority facts.
+*   **Citation Scope**: Model citations must refer to evidence in the bounded bundle and to evidence keys assigned to the cited claim.
 
 ## 6. State labels
 

@@ -116,6 +116,14 @@ Record actual environment only; do not fill unknown values with guesses.
 - **Mode/provenance:** `collection_mode` and `declared_mode` must match one of `FIXTURE`, `SIMULATION`, `RECORDED_CLOUD`, or `LIVE_WRITE`; mismatches fail closed. Synthetic fixtures are not relabeled as live evidence.
 - **Honesty boundary:** This is not Model Armor, generic enterprise DLP, universal PII discovery, a cloud proxy/interceptor, or a production security certification. Model Armor remains `PERMISSION_BLOCKED / NOT_RUN`.
 
+### Blind Semantic Audit Boundary (P-08.04)
+
+- **Canonical owner:** `src/agents/evidence_auditor.py` owns `BlindAuditPackage`, bounded model context construction, expected-answer leakage rejection, citation-scope checks, and deterministic/model reconciliation.
+- **Model-visible context:** Only neutral claim identifiers/descriptions/criteria and bounded evidence key/summary/source values cross the semantic audit prompt. Locked `EvidenceState`, deterministic basis, expected assessments, and reconciliation hints remain application-only.
+- **Bounds:** Maximum 64 claims, 128 evidence summaries, 4,000 characters per text field, and 32,000 aggregate prompt characters.
+- **Authority:** Model output remains `GEMINI_SEMANTIC_JUDGMENT`; `EvidenceState` facts remain sovereign. Disagreement produces a review state and cannot manufacture `HUMAN_AUTHORITY`.
+- **Runtime path:** `run_blind_semantic_audit` uses `BoundedGeminiClient`; no second SDK client or provider call exists.
+
 ## Environment-variable registry
 
 | Variable | Purpose | Required | Secret | Safe example | Owner phase |
@@ -148,11 +156,12 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 | Unit tests (P-08.01 Gemini Client) | `python -m pytest tests/test_p08_01_gemini_client.py -v --tb=short` | `VERIFIED` | `PASS` (39 passed) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-08.02 Structured Output) | `python -m pytest tests/test_p08_02_structured_output.py -v --tb=short` | `VERIFIED` | `PASS` (40 passed) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-08.03 Input Privacy) | `python -m pytest tests/test_p08_03_input_privacy.py -v --tb=short` | `VERIFIED` | `PASS` (10 passed; PRIV-01–08 plus boundary regressions) | Local non-mutating test | 2026-08-16 |
-| Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (999 passed, 1 warning, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-16 |
+| Unit tests (P-08.04 Blind Audit) | `python -m pytest tests/test_p08_04_blind_audit.py -v --tb=short` | `IN_PROGRESS` | `PASS` (18 tests) | Local non-mutating test | 2026-08-16 |
+| Unit tests (Full Suite) | `python -m pytest tests/` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (1012 passed, 1 warning, 3 errors: missing `project` fixture in `test_gcp_access.py`) | Local test suite execution | 2026-08-16 |
 | Format | `uv run python scripts/cmd.py format` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports unformatted historical files) | Non-mutating (`ruff format --check .`) | 2026-08-15 |
 | Lint | `uv run python scripts/cmd.py lint` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports historical lint debt) | Non-mutating (`ruff check .`, no `--fix`) | 2026-08-15 |
 | Type-check | `uv run python scripts/cmd.py type-check` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL` (Reports 2 errors in `test_gcp_access.py`) | Non-mutating (`mypy domain tests src`) | 2026-08-15 |
-| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` | `PASS` (999 passed, 1 warning) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-16 |
+| Unit | `uv run python scripts/cmd.py unit` | `IN_PROGRESS` | `PASS` (1012 passed, 1 warning) | Non-mutating (`--ignore=tests/test_gcp_access.py`) | 2026-08-16 |
 | Integration | `uv run python scripts/cmd.py integration` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL_CLOSED` (Exit 1, zero cloud access without `--live-write-danger`) | Guarded live writes (`tests/test_gcp_access.py`) | 2026-08-15 |
 | E2E | `uv run python scripts/cmd.py e2e` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24/P-25 pending) | Deferred workflow | 2026-08-15 |
 | Demo | `uv run python scripts/cmd.py demo` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24 pending) | Deferred demo | 2026-08-15 |

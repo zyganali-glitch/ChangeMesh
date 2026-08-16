@@ -18,7 +18,7 @@
 > - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, strict fail-closed safety guards for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown)
 > - **P-06 Local Environment and Dependency Freeze Phase:** `IMPLEMENTED` (`DONE` — P-06.01 through P-06.05 complete; clean checkout reproduction verified via [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
 > - **P-07 Google ADK Agent Skeleton and Fleet Phase:** `IMPLEMENTED` (`DONE` — P-07.01 Change Orchestrator ADK skeleton, P-07.02 six specialized ADK agent definitions with bounded tool/instruction contracts, P-07.03 deterministic local routing/delegation, P-07.04 multi-agent branch coordination & sequential fallback, and P-07.05 exact agent revision metadata provenance across domain contracts and execution traces)
-> - **Runtime product and agent fleet implementation:** Phase P-07 complete (`DONE`). Phase P-08 Gemini integration is `IN_PROGRESS`: P-08.01 bounded client, P-08.02 structured output, and P-08.03 deterministic input minimization/privacy enforcement are `DONE`. Cloud deployment, persistence, and P-12 Agent Registry / Capability Passport runtime are `PLANNED`.
+> - **Runtime product and agent fleet implementation:** Phase P-07 complete (`DONE`). Phase P-08 Gemini integration is `IN_PROGRESS`: P-08.01 bounded client, P-08.02 structured output, and P-08.03 deterministic input minimization/privacy enforcement are `DONE`; P-08.04 blind semantic fact isolation is `IN_PROGRESS`. Cloud deployment, persistence, and P-12 Agent Registry / Capability Passport runtime are `PLANNED`.
 >
 > Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
 
@@ -183,7 +183,7 @@ The P-04.01 component dependency architecture is documented in [`docs/ARCHITECTU
 - Adapter replaceability contract
 
 > [!IMPORTANT]
-> This is a **component dependency architecture**. Domain schemas and machine conventions are implemented and frozen in P-05. Implementation stack and dependency freeze are complete in P-06. The Change Orchestrator ADK skeleton (P-07.01), specialized agent fleet definitions (P-07.02), deterministic local routing/delegation (P-07.03), and multi-agent branch coordination with sequential fallback (P-07.04) are `IMPLEMENTED` with typed intake, distinct change ID generation, `ChangeState.RECEIVED` initial state, bounded tool sets, exact capability/schema matching, zero shared mutable state, single-writer aggregation, and zero external writes. Agent revision metadata (P-07.05), bounded Gemini calls (P-08.01), structured output (P-08.02), and deterministic input privacy/minimization (P-08.03) are `IMPLEMENTED`. All other runtime, cloud adapter, and UI components remain `PLANNED` for their respective phases.
+> This is a **component dependency architecture**. Domain schemas and machine conventions are implemented and frozen in P-05. Implementation stack and dependency freeze are complete in P-06. The Change Orchestrator ADK skeleton (P-07.01), specialized agent fleet definitions (P-07.02), deterministic local routing/delegation (P-07.03), and multi-agent branch coordination with sequential fallback (P-07.04) are `IMPLEMENTED` with typed intake, distinct change ID generation, `ChangeState.RECEIVED` initial state, bounded tool sets, exact capability/schema matching, zero shared mutable state, single-writer aggregation, and zero external writes. Agent revision metadata (P-07.05), bounded Gemini calls (P-08.01), structured output (P-08.02), deterministic input privacy/minimization (P-08.03), and blind semantic fact isolation (P-08.04) are implemented or in progress under the Master Plan. All other runtime, cloud adapter, and UI components remain `PLANNED` for their respective phases.
 
 ## Google-native implementation policy
 
@@ -279,7 +279,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
    ```bash
    uv run python scripts/cmd.py unit
    ```
-    *(Executes 999 unit/contract tests across P-05 domain contracts, P-06.03/P-06.04 controls, P-07 agent fleet and coordination, and P-08.01/P-08.02/P-08.03 Gemini boundary tests with exit code 0; one ADK deprecation warning is recorded.)*
+    *(Executes 1012 unit/contract tests across P-05 domain contracts, P-06.03/P-06.04 controls, P-07 agent fleet and coordination, and P-08.01/P-08.02/P-08.03/P-08.04 Gemini boundary tests with exit code 0; one ADK deprecation warning is recorded.)*
 
 ### Configuration & Authentication Boundary
 
@@ -292,7 +292,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 
 | Command | Action | Check Semantics | Baseline Result |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (999 passed, 1 warning) |
+| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (1012 passed, 1 warning) |
 | `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `FAIL` (historical format debt) |
 | `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `FAIL` (historical lint debt) |
 | `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests src`) | `FAIL` (historical type debt in `test_gcp_access.py`) |

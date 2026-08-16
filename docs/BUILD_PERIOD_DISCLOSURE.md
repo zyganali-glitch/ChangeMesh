@@ -35,6 +35,21 @@ The donor's synthetic email allowlisting and blocker/review observable behavior
 informed this clean-room implementation. ZeroKit product/admin semantics,
 provider assumptions, and donor fixture identities were not carried over.
 
+### CCT-SEM-001 — Blind Semantic Audit and Fact Reconciliation Boundary
+- **Donor Repository:** `zyganali-glitch/codex-control-tower` (Donor ID: `D-CCT`)
+- **Immutable Donor Commit:** `65ee1b72faf9a7202d9166eed43fb671804815a8` (authored prior to competition build period)
+- **Source Paths:** `cli/commands/codex-review.js`, `tests/test_codex_review.js`
+- **License / Ownership:** Owner-authored / `VERIFIED_COMPATIBLE`
+- **Reuse Method:** `CLEAN_ROOM_REIMPLEMENTED`
+- **ChangeMesh Target Path:** `src/agents/evidence_auditor.py`
+- **Competition Introduction Commit:** `PENDING` until the immutable implementation commit is created
+- **Test Evidence:** `tests/test_p08_04_blind_audit.py` (18 tests PASS; final provenance closure pending)
+- **Materially New Competition Work:**
+  - Neutral model-visible claims and bounded evidence are separated from application-only deterministic facts.
+  - Expected-answer fields and hints are rejected before prompt construction.
+  - Gemini structured audit output is reconciled without rewriting deterministic states or manufacturing authority.
+  - Codex/OpenAI/GPT runtime, ChatGPT authentication, donor event types, and donor fixture identities are excluded.
+
 ### 1. ZK-VALID-001 — Structured Output & Schema Validation Boundary
 - **Donor Repository:** `zyganali-glitch/zerokit-ai-control-plane` (Donor ID: `D-ZEROKIT`)
 - **Immutable Donor Commit:** `d663db8c706cb914e1af5caf651df08edb5c50c0` (authored prior to competition build period)

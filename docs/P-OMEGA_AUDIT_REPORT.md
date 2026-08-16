@@ -6,6 +6,10 @@
 > **Implementation Introduction SHA:** `4501c01ad4212a8ddd05024f99b5baab34b585de`
 > **Canonical Branch:** `main`
 
+> **Historical scope note:** This report closes P-08.03. P-08.04 is now the
+> active Master Plan task; its closure will replace this report with a current
+> P-Ω audit and must not treat the P-08.03 evidence below as P-08.04 evidence.
+
 ## 1. Whole-Repository Integrity Matrix
 
 | Check | Result | Evidence |

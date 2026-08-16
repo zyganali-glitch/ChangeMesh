@@ -40,7 +40,7 @@ P-08.03
 **Active Phase:**
 P-08
 
-**Next Exact Task:**
+**Active Task:**
 P-08.04 — Separate deterministic facts from model-visible evidence and withhold expected semantic classifications from auditor
 
 ## Current P-08.03 State
@@ -60,6 +60,15 @@ values. `src/core/gemini_client.py` validates both prompt and
 zero SDK calls. Untrusted external text remains data inside fixed boundary
 markers. P-08.02 strict output parsing and P-08.01 single-call ownership remain
 intact. P-08.04 and P-08.05 were not started.
+
+## Current P-08.04 State
+
+P-08.04 is `IN_PROGRESS`. `src/agents/evidence_auditor.py` now separates
+locked deterministic claim facts from the model-visible blind bundle, rejects
+expected-answer fields and hints, bounds claim/evidence/prompt size, validates
+citations, and reconciles advisory model assessments without rewriting facts.
+The dedicated suite currently has 18 passing tests. Final P-DΩ/P-Ω closure,
+introduction-commit binding, and whole-suite verification remain pending.
 
 ## Evidence
 

@@ -16,7 +16,7 @@ Bu repo geliştirme aşamasında bir yarışma projesidir:
 - **Kanonik komut arayüzü (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, format, lint, type-check, unit, integration, e2e, demo, deploy, teardown komutları sıkı güvenlik sınırları ile tanımlandı)
 - **P-06 Yerel Geliştirme Ortamı ve Bağımlılık Dondurma Fazı:** `IMPLEMENTED` (`DONE` — P-06.01–P-06.05 tamamlandı; ayrı dizinden temiz klon doğrulaması [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md) ile kanıtlandı)
 - **P-07 Google ADK Ajan İskeleti ve Filosu Fazı:** `IMPLEMENTED` (`DONE` — P-07.01 Değişiklik Orkestratörü ADK iskeleti, P-07.02 altı uzmanlaşmış ADK ajan tanımı ile sınırlandırılmış araç/talimat kontratları, P-07.03 deterministik yerel yönlendirme/delege etme, P-07.04 çoklu ajan branch koordinasyonu & ardışık yedek ve P-07.05 ajan revizyon üstveri kanıtı tamamlandı)
-- **Çalışma zamanı ürün ve ajan filosu geliştirmesi:** P-07 fazı tamamlandı (`DONE`). P-08 Gemini sınırı `IN_PROGRESS`; P-08.01 sınırlı istemci, P-08.02 yapılandırılmış çıktı ve P-08.03 deterministik girdi gizliliği/minimizasyonu `IMPLEMENTED` durumundadır. Bulut dağıtımı, kalıcılık ve P-12 Ajan Kayıt Defteri / Yetenek Pasaportu çalışma zamanı henüz uygulanmamıştır / `PLANNED` durumundadır.
+- **Çalışma zamanı ürün ve ajan filosu geliştirmesi:** P-07 fazı tamamlandı (`DONE`). P-08 Gemini sınırı `IN_PROGRESS`; P-08.01 sınırlı istemci, P-08.02 yapılandırılmış çıktı ve P-08.03 deterministik girdi gizliliği/minimizasyonu tamamlandı, P-08.04 kör semantik gerçek ayrımı `IN_PROGRESS` durumundadır. Bulut dağıtımı, kalıcılık ve P-12 Ajan Kayıt Defteri / Yetenek Pasaportu çalışma zamanı henüz uygulanmamıştır / `PLANNED` durumundadır.
 
 Gerçek kanıt olmadan hiçbir özellik tamamlanmış gösterilemez (`PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, `QUARANTINED`).
 
@@ -54,7 +54,7 @@ Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yenid
    ```bash
    uv run python scripts/cmd.py unit
    ```
-   *(P-05 kontratları, P-06 kontrolleri, P-07 ajan filosu/koordinasyonu ve P-08.01/P-08.02/P-08.03 Gemini sınır testleri dahil 999 testi 0 çıkış koduyla çalıştırır; bir ADK kullanımdan kaldırma uyarısı kaydedilir).*
+   *(P-05 kontratları, P-06 kontrolleri, P-07 ajan filosu/koordinasyonu ve P-08.01/P-08.02/P-08.03/P-08.04 Gemini sınır testleri dahil 1012 testi 0 çıkış koduyla çalıştırır; bir ADK kullanımdan kaldırma uyarısı kaydedilir).*
 
 ### Yapılandırma ve Kimlik Doğrulama Sınırı
 
@@ -67,7 +67,7 @@ Kanonik çalışma kopyası dışındaki ayrı bir dizinden temiz klon ile yenid
 
 | Komut | Eylem | Denetim Semantiği | Temel Hat Sonucu |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Birim testleri çalıştır | Yerel deterministik test çalıştırma | `PASS` (999 geçti, 1 uyarı) |
+| `uv run python scripts/cmd.py unit` | Birim testleri çalıştır | Yerel deterministik test çalıştırma | `PASS` (1012 geçti, 1 uyarı) |
 | `uv run python scripts/cmd.py format` | Format denetimi | Değişiklik yapmayan (`ruff format --check .`) | `FAIL` (tarihsel format borcu) |
 | `uv run python scripts/cmd.py lint` | Lint denetimi | Değişiklik yapmayan (`ruff check .`, sıfır `--fix`) | `FAIL` (tarihsel lint borcu) |
 | `uv run python scripts/cmd.py type-check` | Tip denetimi | Değişiklik yapmayan (`mypy domain tests src`) | `FAIL` (`test_gcp_access.py` tarihsel tip borcu) |
