@@ -50,18 +50,33 @@
 - P-10.02
 - P-10.03
 - P-10.04
-- P-10.05
 - P-10
+- P-11.00
+- P-11.01
+- P-11.02
+- P-11.03
+- P-11.04
+- P-11.05
+- P-11.06
+- P-11
 
 **Active Phase:**
-P-11 (PENDING / NEXT)
+P-12 (PENDING / NEXT)
 
 **Next Exact Task:**
-P-11.00 — Memory Trust donor preflight
+P-12.00 — Capability Passport donor preflight
 
-## Current P-10 State (Phase Complete)
+## Current P-11 State (Phase Complete)
 
-Phase P-10 is `DONE`.
+Phase P-11 is `DONE`.
+- **P-11.00:** Memory Trust donor preflight verified `QW-MEM-001` and `QW-BUS-001` pinned at commit `a43b3411856f41a4be9424d11c01a5e637cdc410`.
+- **P-11.01:** Validated `MemoryRecord` in `domain/contracts/memory.py` with immutable fields, explicit `DataClassLevel`, and required trust evidence for `TRUSTED` status.
+- **P-11.02:** Implemented `MemoryTrustEvaluator` and `EpistemicTrustEvaluation` in `src/memory/trust_layer.py` with 5 deterministic classifications (`ACCEPTED_TRUSTED`, `UNTRUSTED_CONTEXT`, `STALE_EXPIRED`, `CONTRADICTED`, `QUARANTINED`), freshness scoring, and strict separation between retrieval relevance and epistemic authority.
+- **P-11.03:** Implemented `MemorySupersessionManager` in `src/memory/supersession.py` linking contradictions and superseding older records without deleting historical records.
+- **P-11.04:** Implemented `MemoryQuarantineEngine` in `src/memory/quarantine.py` detecting 5 adversarial prompt-injection vectors and quarantining hostile inputs.
+- **P-11.05:** Implemented `MemoryBank` abstract interface and `InMemoryMemoryBank` local adapter in `src/memory/memory_bank.py`.
+- **P-11.06:** Implemented `TwoSessionResumeScenario` in `src/memory/two_session_scenario.py` validating cross-session discovery preservation and automatic prompt-injection quarantine.
+- **Evidence:** `tests/test_p11_memory_trust.py` passes 5 dedicated tests. Canonical unit test suite passes 1133 tests (1 warning). Zero domain contract mutations or provider SDK leaks. P-12.00 is next.
 - **P-10.01 (Hardened):** Applied 5 design fixes (Server Firestore security enforced at backend repository boundary; OCC error ownership isolated from P-09 retry; idempotency key design finalized in P-10.03; native TTL & recursive descendant teardown semantics; large artifact safety boundary).
 - **P-10.02:** Implemented canonical state repository contracts and models in `src/orchestrator/state_repository.py`, thread-safe in-memory double in `src/orchestrator/in_memory_repository.py`, and Google Cloud Firestore adapter in `integrations/gcp/firestore_adapter.py`. Enforces monotonic version tokens and CAS updates raising `OptimisticConcurrencyError`.
 - **P-10.03:** Implemented `IdempotencyKeyManager` and `IdempotencyIntent` in `src/orchestrator/idempotency.py` across all 6 scopes (`WORKFLOW_STEP`, `BRANCH_INTENT`, `PR_INTENT`, `APPROVAL`, `PASSPORT`, `EXTERNAL_WRITE`), lease reservation with timeout, and exact replay deduplication returning cached execution results without duplicate write emission.

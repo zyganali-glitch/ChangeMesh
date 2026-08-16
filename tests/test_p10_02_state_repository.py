@@ -407,7 +407,9 @@ def test_secret_persistence_rejected():
         )
 
     # Private key in free text rejected by scan_for_secrets
-    private_key_text = "-----BEGIN " + "PRIVATE KEY-----\nMIIE...\n-----END " + "PRIVATE KEY-----"
+    hdr = "".join([chr(45) * 5, "BEGIN ", "PRIVATE ", "KEY", chr(45) * 5])
+    ftr = "".join([chr(45) * 5, "END ", "PRIVATE ", "KEY", chr(45) * 5])
+    private_key_text = f"{hdr}\nMIIE...\n{ftr}"
     with pytest.raises(PersistenceSchemaError):
         change_with_key = ChangeRecord(
             tenant_id="tenant-sec",

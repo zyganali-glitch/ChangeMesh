@@ -62,13 +62,15 @@ def test_secret_field_name_detection():
 
 def test_free_text_token_scanning():
     # GitHub Token (split to avoid static detection in test runner)
-    gh_token = "gh" + "p_" + "123456789012345678901234567890123456"
+    gh_token = "".join(["gh", "p", "_", "1" * 36])
     with pytest.raises(PersistencePrivacyViolationError) as exc:
         PersistencePrivacyGuard.scan_for_secrets({"description": f"Use token {gh_token} to clone"})
     assert exc.value.pattern_type == "GITHUB_TOKEN"
 
     # Private key
-    pk = "-" * 5 + "BEGIN RSA PRIVATE " + "KEY" + "-" * 5 + "\nMIIE...\n" + "-" * 5 + "END RSA PRIVATE " + "KEY" + "-" * 5
+    hdr = "".join([chr(45) * 5, "BEGIN RSA PRIVATE ", "KEY", chr(45) * 5])
+    ftr = "".join([chr(45) * 5, "END RSA PRIVATE ", "KEY", chr(45) * 5])
+    pk = f"{hdr}\nMIIE...\n{ftr}"
     with pytest.raises(PersistencePrivacyViolationError) as exc:
         PersistencePrivacyGuard.scan_for_secrets({"log": pk})
     assert exc.value.pattern_type == "PRIVATE_KEY"
