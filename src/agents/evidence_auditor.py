@@ -149,7 +149,8 @@ class ClaimAuditReconciliation:
     deterministic_status: EvidenceState
     model_assessment: str
     relation: str
-    human_review_required: bool
+    human_review_required: bool = False
+    conflict_detected: bool = False
 
 
 @dataclass(frozen=True)
@@ -161,7 +162,8 @@ class SemanticAuditReconciliation:
     model_overall_verdict: str
     claim_audits: tuple[ClaimAuditReconciliation, ...]
     review_state: str
-    human_review_required: bool
+    human_review_required: bool = False
+    conflict_detected: bool = False
 
 
 def _require_exact_keys(value: Mapping[str, Any], allowed: set[str]) -> None:
@@ -279,7 +281,9 @@ def reconcile_semantic_audit(
     package: BlindAuditPackage,
     model_result: Any,
 ) -> SemanticAuditReconciliation:
-    """Reconcile advisory output without promoting or rewriting local evidence."""
+    """Reconcile advisory output without promoting, rewriting local evidence,
+    or creating human authority.
+    """
     if (
         model_result.audit_id != package.model_context.audit_id
         or model_result.change_id != package.model_context.change_id
@@ -319,31 +323,33 @@ def reconcile_semantic_audit(
         model_assessment = item.assessment.value
         if locked.deterministic_status == EvidenceState.PASS and model_assessment == "SUPPORTS":
             relation = "AGREEMENT"
-            review_required = False
+            has_conflict = False
         elif locked.deterministic_status != EvidenceState.PASS and model_assessment != "SUPPORTS":
             relation = "COMPATIBLE_WITH_LOCKED_STATE"
-            review_required = False
+            has_conflict = False
         else:
             relation = "DISAGREEMENT_WITH_LOCKED_STATE"
-            review_required = True
+            has_conflict = True
         reconciled.append(
             ClaimAuditReconciliation(
                 claim_id=item.claim_id,
                 deterministic_status=locked.deterministic_status,
                 model_assessment=model_assessment,
                 relation=relation,
-                human_review_required=review_required,
+                human_review_required=False,
+                conflict_detected=has_conflict,
             )
         )
 
-    requires_review = any(item.human_review_required for item in reconciled)
+    has_conflict = any(item.conflict_detected for item in reconciled)
     return SemanticAuditReconciliation(
         audit_id=model_result.audit_id,
         change_id=model_result.change_id,
         model_overall_verdict=model_result.overall_verdict.value,
         claim_audits=tuple(reconciled),
-        review_state="HUMAN_REVIEW_REQUIRED" if requires_review else "NO_MODEL_CONFLICT",
-        human_review_required=requires_review,
+        review_state="SEMANTIC_DISAGREEMENT" if has_conflict else "NO_MODEL_CONFLICT",
+        human_review_required=False,
+        conflict_detected=has_conflict,
     )
 
 

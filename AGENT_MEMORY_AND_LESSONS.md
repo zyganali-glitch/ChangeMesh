@@ -151,28 +151,31 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all future model-boundary integrations and privacy tests).
 - Status: `ACTIVE`
 
-### LESSON-20260816-04 — Blind-audit reconciliation must retain the locked fact map
+### LESSON-20260816-04 — Blind-audit reconciliation must retain locked fact map and reject model-manufactured human authority
 - Date/time: 2026-08-16
 - Active task: P-08.04
-- Symptom: The first reconciliation implementation removed the local claim lookup while adding citation-scope validation; dedicated tests exposed the resulting `NameError` before closure.
-- Root cause: Validation and reconciliation used two adjacent lookup responsibilities without one shared canonical map.
-- Incorrect approach: Treating model claim IDs and deterministic claim state as interchangeable or allowing the validation map to be discarded before reconciliation.
-- Correct approach: Build one `locked_by_id` map, validate model claims/citations against it, and reuse it to produce immutable reconciliation records.
-- Prevention rule: Blind-audit code must validate identity, citation scope, and fact reconciliation against one locked deterministic map before returning any result.
-- Tests/evidence: `tests/test_p08_04_blind_audit.py` (13 passed after repair).
+- Symptom: The first reconciliation implementation removed the local claim lookup while adding citation-scope validation; additionally, an early pattern attempted to set `human_review_required=True` on model disagreements, violating the 4-lane authority invariant.
+- Root cause: Validation and reconciliation used two adjacent lookup responsibilities without one shared canonical map, and model disagreement was erroneously allowed to manufacture a human authority slot.
+- Incorrect approach: Treating model claim IDs and deterministic claim state as interchangeable or allowing model disagreement/uncertainty to route itself into a required human approval gate.
+- Correct approach: Build one `locked_by_id` map, validate model claims/citations against it, reuse it to produce immutable reconciliation records, record semantic disagreements as advisory conflicts (`relation="DISAGREEMENT_WITH_LOCKED_STATE"`, `conflict_detected=True`, `review_state="SEMANTIC_DISAGREEMENT"`), and strictly set `human_review_required=False`.
+- Prevention rule: Blind-audit code must validate identity, citation scope, and fact reconciliation against one locked deterministic map, and model disagreement can never create human authority.
+- Tests/evidence: `tests/test_p08_04_blind_audit.py` (18 passed).
 - Affected files: `src/agents/evidence_auditor.py`, `tests/test_p08_04_blind_audit.py`.
-- Reusable beyond this task: Yes (semantic reconciliation and evidence authority boundaries).
+- Reusable beyond this task: Yes (semantic reconciliation, authority boundaries, and human-on-the-loop exception design).
 - Status: `ACTIVE`
 
-### LESSON-20260816-05 — Cost telemetry must never infer provider pricing
+### LESSON-20260816-05 — Cost telemetry must never infer provider pricing; project budget policy must be explicit
 - Date/time: 2026-08-16
 - Active task: P-08.05
-- Symptom: Latency, token counts, and retry attempts were measured, but no verified canonical provider price was recorded for deterministic cost reporting.
-- Root cause: Provider pricing is an external, region/model/contract-dependent fact and must not be guessed inside the model client.
-- Incorrect approach: Hard-coding a plausible token price or silently treating absent rates as zero cost.
-- Correct approach: Accept an explicit immutable `GeminiCostRateCard`, calculate cost only when measured token counts and both rates exist, and report `cost_status=NOT_RUN` otherwise.
-- Prevention rule: Cost estimates require named rate provenance; missing pricing is visible `NOT_RUN`, never implicit zero or PASS.
-- Tests/evidence: `tests/test_p08_05_metrics.py` (6 passed); P-08.01 regression (39 passed).
-- Affected files: `src/core/gemini_client.py`, `src/core/__init__.py`, `tests/test_p08_05_metrics.py`.
-- Reusable beyond this task: Yes (all provider-cost and budget telemetry).
+- Symptom: Latency, token counts, and retry attempts were measured, but no verified canonical provider price was recorded for deterministic cost reporting, and Master Plan acceptance criteria for budget/latency limits were unmapped to explicit project policy.
+- Root cause: Provider pricing is an external, region/model/contract-dependent fact and must not be guessed inside the model client, while demo latency/budget limits require explicit project-level policy distinction.
+- Incorrect approach: Hard-coding a plausible token price, silently treating absent rates as zero cost or PASS, or confusing local project/demo limits with provider SLAs.
+- Correct approach:
+  1. Accept an explicit immutable `GeminiCostRateCard` with structured `RateProvenanceKind` (`TEST_FORMULA`, `CUSTOM_UNVERIFIED`, `PROVIDER_CALIBRATED`). Calculate cost only when measured token counts and both rates exist, reporting `cost_status="CALCULATED"`, and report `cost_status="NOT_RUN"` otherwise without guessing.
+  2. Define deterministic `ModelCallBudgetPolicy` (`DEMO_MAX_LATENCY_MS = 30000.0`, `DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()`, explicitly labeled as internal demo policy.
+  3. Export deterministic, non-secret metrics artifacts via `build_model_metrics_artifact()` and `export_metrics_artifact_json()`.
+- Prevention rule: Cost estimates require named rate provenance; missing pricing is visible `NOT_RUN`, never implicit zero or PASS; budget policies must be deterministic and distinct from provider SLAs.
+- Tests/evidence: `tests/test_p08_05_metrics.py` (11 passed); P-08 suite (118 passed); canonical unit (1028 passed).
+- Affected files: `src/core/gemini_client.py`, `src/core/__init__.py`, `tests/test_p08_05_metrics.py`, `docs/COST_PLAN.md`.
+- Reusable beyond this task: Yes (all provider-cost, budget telemetry, and execution evidence).
 - Status: `ACTIVE`

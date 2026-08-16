@@ -140,14 +140,15 @@ ChangeMesh enforces strict zero-trust boundary rules:
 *   **Locked Fact Separation**: Deterministic claim state, basis, and evidence-key ownership remain in an application-only `BlindAuditPackage.locked_claims` structure and are never serialized into the model context.
 *   **Expected-Answer Deny**: `expected_result`, `expected_answer`, `expected_verdict`, `should_pass`, and equivalent reconciliation hints are rejected before prompt construction; they are not stripped silently.
 *   **Bounded Evidence**: Blind audits accept at most 64 claims, 128 evidence summaries, 4,000 characters per text field, and a 32,000-character aggregate prompt.
-*   **Advisory Reconciliation**: `SemanticAuditResult` remains `GEMINI_SEMANTIC_JUDGMENT`; reconciliation can report disagreement or review state but cannot promote or rewrite `EvidenceState`, mode, approval, or authority facts.
+*   **Advisory Reconciliation & Authority Invariant**: `SemanticAuditResult` remains `GEMINI_SEMANTIC_JUDGMENT`. In `reconcile_semantic_audit()`, any semantic disagreement with locked evidence sets `relation="DISAGREEMENT_WITH_LOCKED_STATE"`, `conflict_detected=True`, and `review_state="SEMANTIC_DISAGREEMENT"`. Crucially, `human_review_required` is strictly `False` (Gemini uncertainty or model disagreement cannot manufacture `HUMAN_AUTHORITY`).
 *   **Citation Scope**: Model citations must refer to evidence in the bounded bundle and to evidence keys assigned to the cited claim.
 
-### 5.13 Gemini Measurement Invariants (P-08.05)
+### 5.13 Gemini Measurement and Budget Invariants (P-08.05)
 
-*   **Operational Metrics**: Each model call records bounded latency (`duration_ms`), prompt/response/total token counts, attempts, and derived `retry_count` without prompt or response text.
-*   **Explicit Cost Rates**: Cost is estimated only from an explicit immutable `GeminiCostRateCard`; missing provider pricing produces `cost_status=NOT_RUN` and no guessed amount.
-*   **Bounded Measurement Inputs**: Rate values must be finite and non-negative; token counts must be non-negative; existing timeout and output-token ceilings remain enforced.
+*   **Operational Metrics**: Each model call records non-secret `ModelCallTelemetry` with monotonic `duration_ms`, prompt/response/total token counts, attempts, derived `retry_count`, `cost_status` (`"CALCULATED"` / `"NOT_RUN"`), `rate_card_id`, `rate_provenance`, and `finish_reason`.
+*   **Rate Provenance Taxonomy**: `RateProvenanceKind` models `TEST_FORMULA`, `CUSTOM_UNVERIFIED`, and `PROVIDER_CALIBRATED`. Cost is estimated only from an explicit immutable `GeminiCostRateCard`; missing provider rates produce `cost_status="NOT_RUN"` without guessing. Provider pricing calibration is explicitly `NOT_RUN`.
+*   **Project / Demo Budget Policy**: Deterministic `ModelCallBudgetPolicy` (`DEMO_MAX_LATENCY_MS = 30000.0`, `DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()` enforce local project thresholds without claiming provider SLAs. Missing rate cards preserve `cost_status="NOT_RUN"` without manufacturing false PASS claims.
+*   **Canonical Metrics Artifact**: Deterministic `build_model_metrics_artifact()` and `export_metrics_artifact_json()` provide non-secret execution artifacts with strict secrecy guarantees (zero prompt, response, or credential text).
 *   **Single Reliability Authority**: Retry measurement observes the existing wrapper-owned retry loop and does not add another retry mechanism.
 
 ## 6. State labels

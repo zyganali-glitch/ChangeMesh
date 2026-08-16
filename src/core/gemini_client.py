@@ -17,12 +17,14 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Callable, Final, Optional
 
 import httpx
 from google import genai
 from google.genai import errors, types
 
+from domain.contracts.conventions import canonical_json_bytes
 from src.agents.policy_guardian import PolicyGuardian
 
 logger = logging.getLogger(__name__)
@@ -90,18 +92,47 @@ CANONICAL_SAFETY_POLICY: Final[tuple[CanonicalSafetyPolicyItem, ...]] = (
 )
 
 
+class RateProvenanceKind(str, Enum):
+    """Provenance category for model token pricing rates."""
+
+    TEST_FORMULA = "TEST_FORMULA"
+    CUSTOM_UNVERIFIED = "CUSTOM_UNVERIFIED"
+    PROVIDER_CALIBRATED = "PROVIDER_CALIBRATED"
+
+
 @dataclass(frozen=True)
 class GeminiCostRateCard:
     """Explicit caller-supplied token rates for deterministic cost estimation.
 
-    No provider pricing is guessed or silently defaulted.  A rate card is
-    required before a cost estimate can be reported as PASS.
+    No provider pricing is guessed or silently defaulted. A rate card with
+    explicit rate provenance is required before a cost estimate can be computed.
+    Provider pricing calibration remains NOT_RUN unless explicitly verified.
     """
 
     input_usd_per_million_tokens: float
     output_usd_per_million_tokens: float
+    rate_card_id: str = "rate-card-unspecified"
+    provenance_kind: RateProvenanceKind = RateProvenanceKind.CUSTOM_UNVERIFIED
+    currency: str = "USD"
 
     def __post_init__(self) -> None:
+        if not isinstance(self.rate_card_id, str) or not self.rate_card_id.strip():
+            raise ValueError("rate_card_id must be a non-empty string.")
+        if not isinstance(self.currency, str) or not self.currency.strip():
+            raise ValueError("currency must be a non-empty string.")
+        if not isinstance(self.provenance_kind, RateProvenanceKind):
+            if isinstance(self.provenance_kind, str):
+                try:
+                    object.__setattr__(
+                        self, "provenance_kind", RateProvenanceKind(self.provenance_kind)
+                    )
+                except ValueError as exc:
+                    raise ValueError(
+                        f"Invalid rate provenance kind: {self.provenance_kind}"
+                    ) from exc
+            else:
+                raise ValueError(f"Invalid rate provenance kind: {self.provenance_kind}")
+
         for field_name, value in (
             ("input_usd_per_million_tokens", self.input_usd_per_million_tokens),
             ("output_usd_per_million_tokens", self.output_usd_per_million_tokens),
@@ -129,6 +160,199 @@ class GeminiCostRateCard:
             + response_token_count * self.output_usd_per_million_tokens
         ) / 1_000_000
         return round(cost, 8)
+
+
+# --- Project / Demo Budget & Latency Policy Defaults ---
+# Note: These are internal ChangeMesh demonstration policy bounds, NOT provider SLAs.
+DEMO_MAX_LATENCY_MS: Final[float] = 30000.0
+DEMO_MAX_COST_USD: Final[float] = 0.05
+DEMO_MAX_TOTAL_TOKENS: Final[int] = 12288
+
+
+@dataclass(frozen=True)
+class ModelCallBudgetPolicy:
+    """Narrow local ChangeMesh project/demo policy for latency and cost budgets.
+
+    IMPORTANT: These limits represent internal ChangeMesh project/demo thresholds
+    for demonstration and evaluation, NOT a Google Cloud provider SLA, service
+    commitment, or pricing guarantee.
+    """
+
+    max_latency_ms: float = DEMO_MAX_LATENCY_MS
+    max_cost_usd: Optional[float] = DEMO_MAX_COST_USD
+    max_total_tokens: Optional[int] = DEMO_MAX_TOTAL_TOKENS
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.max_latency_ms, bool)
+            or not isinstance(self.max_latency_ms, (int, float))
+            or not math.isfinite(self.max_latency_ms)
+            or self.max_latency_ms <= 0
+        ):
+            raise ValueError("max_latency_ms must be a positive finite number.")
+        if self.max_cost_usd is not None and (
+            isinstance(self.max_cost_usd, bool)
+            or not isinstance(self.max_cost_usd, (int, float))
+            or not math.isfinite(self.max_cost_usd)
+            or self.max_cost_usd <= 0
+        ):
+            raise ValueError("max_cost_usd must be a positive finite number if provided.")
+        if self.max_total_tokens is not None and (
+            isinstance(self.max_total_tokens, bool)
+            or not isinstance(self.max_total_tokens, int)
+            or self.max_total_tokens <= 0
+        ):
+            raise ValueError("max_total_tokens must be a positive integer if provided.")
+
+
+@dataclass(frozen=True)
+class ModelCallBudgetEvaluation:
+    """Deterministic evaluation of telemetry against project/demo budget policy."""
+
+    latency_status: str  # "PASS", "FAIL"
+    latency_ms: float
+    max_latency_ms: float
+    cost_status: str  # "PASS", "FAIL", "NOT_RUN"
+    estimated_cost_usd: Optional[float]
+    max_cost_usd: Optional[float]
+    token_status: str  # "PASS", "FAIL", "NOT_RUN"
+    total_tokens: Optional[int]
+    max_total_tokens: Optional[int]
+    overall_budget_pass: bool
+    details: str
+
+
+def evaluate_model_call_budget(
+    telemetry: ModelCallTelemetry,
+    policy: Optional[ModelCallBudgetPolicy] = None,
+) -> ModelCallBudgetEvaluation:
+    """Evaluate telemetry against local project/demo budget and latency limits.
+
+    Ensures:
+    - Latency within limit -> latency_status='PASS'; exceeded -> 'FAIL'.
+    - Cost within limit when calculable -> cost_status='PASS'; exceeded -> 'FAIL'.
+    - Missing cost/rate card remains cost_status='NOT_RUN' (not treated as zero or false PASS).
+    - Token count within limit when present -> token_status='PASS'; exceeded -> 'FAIL'.
+    - overall_budget_pass is True only when all applicable criteria are PASS and none FAIL.
+    """
+    effective_policy = policy or ModelCallBudgetPolicy()
+
+    # Latency check
+    latency_passed = telemetry.duration_ms <= effective_policy.max_latency_ms
+    latency_status = "PASS" if latency_passed else "FAIL"
+
+    # Cost check
+    if telemetry.estimated_cost_usd is not None and effective_policy.max_cost_usd is not None:
+        cost_passed = telemetry.estimated_cost_usd <= effective_policy.max_cost_usd
+        cost_status = "PASS" if cost_passed else "FAIL"
+    else:
+        cost_passed = True
+        cost_status = "NOT_RUN"
+
+    # Token check
+    if telemetry.total_token_count is not None and effective_policy.max_total_tokens is not None:
+        token_passed = telemetry.total_token_count <= effective_policy.max_total_tokens
+        token_status = "PASS" if token_passed else "FAIL"
+    else:
+        token_passed = True
+        token_status = "NOT_RUN" if telemetry.total_token_count is None else "PASS"
+
+    overall_pass = latency_passed and (cost_status != "FAIL") and (token_status != "FAIL")
+
+    detail_parts = [
+        f"latency: {telemetry.duration_ms}ms / limit {effective_policy.max_latency_ms}ms "
+        f"({latency_status})"
+    ]
+    if cost_status == "NOT_RUN":
+        detail_parts.append("cost: NOT_RUN (no rate card provided; not guessed)")
+    else:
+        detail_parts.append(
+            f"cost: ${telemetry.estimated_cost_usd:.8f} / budget ${effective_policy.max_cost_usd} "
+            f"({cost_status})"
+        )
+    if token_status == "NOT_RUN":
+        detail_parts.append("tokens: NOT_RUN")
+    else:
+        detail_parts.append(
+            f"tokens: {telemetry.total_token_count} / limit {effective_policy.max_total_tokens} "
+            f"({token_status})"
+        )
+
+    return ModelCallBudgetEvaluation(
+        latency_status=latency_status,
+        latency_ms=telemetry.duration_ms,
+        max_latency_ms=effective_policy.max_latency_ms,
+        cost_status=cost_status,
+        estimated_cost_usd=telemetry.estimated_cost_usd,
+        max_cost_usd=effective_policy.max_cost_usd,
+        token_status=token_status,
+        total_tokens=telemetry.total_token_count,
+        max_total_tokens=effective_policy.max_total_tokens,
+        overall_budget_pass=overall_pass,
+        details="; ".join(detail_parts),
+    )
+
+
+def build_model_metrics_artifact(
+    telemetry: ModelCallTelemetry,
+    budget_evaluation: Optional[ModelCallBudgetEvaluation] = None,
+) -> dict[str, Any]:
+    """Construct a canonical deterministic, non-secret metrics evidence artifact."""
+    evaluation = budget_evaluation or evaluate_model_call_budget(telemetry)
+    is_calibrated = telemetry.rate_provenance == RateProvenanceKind.PROVIDER_CALIBRATED.value
+    return {
+        "artifact_schema_version": "1.0.0",
+        "artifact_kind": "MODEL_CALL_METRICS",
+        "call_id": telemetry.call_id,
+        "model_id": telemetry.model_id,
+        "provider": telemetry.provider,
+        "api_version": telemetry.api_version,
+        "timestamps": {
+            "start_time_iso": telemetry.start_time_iso,
+            "end_time_iso": telemetry.end_time_iso,
+        },
+        "performance": {
+            "duration_ms": telemetry.duration_ms,
+            "attempts": telemetry.attempts,
+            "retry_count": telemetry.retry_count,
+            "final_outcome": telemetry.final_outcome,
+            "finish_reason": telemetry.finish_reason,
+        },
+        "token_usage": {
+            "prompt_tokens": telemetry.prompt_token_count,
+            "response_tokens": telemetry.response_token_count,
+            "total_tokens": telemetry.total_token_count,
+        },
+        "cost_telemetry": {
+            "estimated_cost_usd": telemetry.estimated_cost_usd,
+            "cost_status": telemetry.cost_status,
+            "rate_card_id": telemetry.rate_card_id,
+            "rate_provenance": telemetry.rate_provenance,
+            "provider_pricing_calibrated": is_calibrated,
+        },
+        "budget_evaluation": {
+            "latency_status": evaluation.latency_status,
+            "latency_ms": evaluation.latency_ms,
+            "max_latency_ms": evaluation.max_latency_ms,
+            "cost_status": evaluation.cost_status,
+            "estimated_cost_usd": evaluation.estimated_cost_usd,
+            "max_cost_usd": evaluation.max_cost_usd,
+            "token_status": evaluation.token_status,
+            "total_tokens": evaluation.total_tokens,
+            "max_total_tokens": evaluation.max_total_tokens,
+            "overall_budget_pass": evaluation.overall_budget_pass,
+            "details": evaluation.details,
+        },
+    }
+
+
+def export_metrics_artifact_json(
+    telemetry: ModelCallTelemetry,
+    budget_evaluation: Optional[ModelCallBudgetEvaluation] = None,
+) -> str:
+    """Export the canonical model metrics artifact as a deterministic UTF-8 JSON string."""
+    artifact = build_model_metrics_artifact(telemetry, budget_evaluation)
+    return canonical_json_bytes(artifact).decode("utf-8")
 
 
 def get_canonical_safety_settings() -> list[types.SafetySetting]:
@@ -263,6 +487,8 @@ class ModelCallTelemetry:
     total_token_count: Optional[int] = None
     estimated_cost_usd: Optional[float] = None
     cost_status: str = "NOT_RUN"
+    rate_card_id: Optional[str] = None
+    rate_provenance: Optional[str] = None
     finish_reason: Optional[str] = None
 
 
@@ -913,6 +1139,11 @@ class BoundedGeminiClient:
             if self._cost_rate_card is not None
             else None
         )
+        rate_card_id = self._cost_rate_card.rate_card_id if self._cost_rate_card else None
+        rate_provenance = (
+            self._cost_rate_card.provenance_kind.value if self._cost_rate_card else None
+        )
+        cost_status = "CALCULATED" if estimated_cost_usd is not None else "NOT_RUN"
         record = ModelCallTelemetry(
             call_id=call_id,
             model_id=self._model_id,
@@ -932,7 +1163,9 @@ class BoundedGeminiClient:
             response_token_count=response_token_count,
             total_token_count=total_token_count,
             estimated_cost_usd=estimated_cost_usd,
-            cost_status="PASS" if estimated_cost_usd is not None else "NOT_RUN",
+            cost_status=cost_status,
+            rate_card_id=rate_card_id,
+            rate_provenance=rate_provenance,
             finish_reason=finish_reason,
         )
         self._telemetry_history.append(record)

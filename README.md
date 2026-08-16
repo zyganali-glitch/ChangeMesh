@@ -183,7 +183,7 @@ The P-04.01 component dependency architecture is documented in [`docs/ARCHITECTU
 - Adapter replaceability contract
 
 > [!IMPORTANT]
-> This is a **component dependency architecture**. Domain schemas and machine conventions are implemented and frozen in P-05. Implementation stack and dependency freeze are complete in P-06. The Change Orchestrator ADK skeleton (P-07.01), specialized agent fleet definitions (P-07.02), deterministic local routing/delegation (P-07.03), and multi-agent branch coordination with sequential fallback (P-07.04) are `IMPLEMENTED` with typed intake, distinct change ID generation, `ChangeState.RECEIVED` initial state, bounded tool sets, exact capability/schema matching, zero shared mutable state, single-writer aggregation, and zero external writes. Agent revision metadata (P-07.05), bounded Gemini calls (P-08.01), structured output (P-08.02), deterministic input privacy/minimization (P-08.03), and blind semantic fact isolation (P-08.04) are `IMPLEMENTED`. All other runtime, cloud adapter, and UI components remain `PLANNED` for their respective phases.
+> This is a **component dependency architecture**. Domain schemas and machine conventions are implemented and frozen in P-05. Implementation stack and dependency freeze are complete in P-06. The Change Orchestrator ADK skeleton (P-07.01), specialized agent fleet definitions (P-07.02), deterministic local routing/delegation (P-07.03), and multi-agent branch coordination with sequential fallback (P-07.04) are `IMPLEMENTED` with typed intake, distinct change ID generation, `ChangeState.RECEIVED` initial state, bounded tool sets, exact capability/schema matching, zero shared mutable state, single-writer aggregation, and zero external writes. Agent revision metadata (P-07.05), bounded Gemini calls (P-08.01), structured output (P-08.02), deterministic input privacy/minimization (P-08.03), blind semantic fact isolation (P-08.04), and model latency/token/cost/retry metrics & budget enforcement (P-08.05) are `IMPLEMENTED`. All other runtime, cloud adapter, and UI components remain `PLANNED` for their respective phases.
 
 ## Google-native implementation policy
 
@@ -279,7 +279,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
    ```bash
    uv run python scripts/cmd.py unit
    ```
-    *(Executes 1023 unit/contract tests across P-05 domain contracts, P-06.03/P-06.04 controls, P-07 agent fleet and coordination, and P-08.01 through P-08.05 Gemini boundary tests with exit code 0; one ADK deprecation warning is recorded.)*
+    *(Executes 1028 unit/contract tests across P-05 domain contracts, P-06.03/P-06.04 controls, P-07 agent fleet and coordination, and P-08.01 through P-08.05 Gemini boundary tests with exit code 0; one ADK deprecation warning is recorded.)*
 
 ### Configuration & Authentication Boundary
 
@@ -292,7 +292,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 
 | Command | Action | Check Semantics | Baseline Result |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (1023 passed, 1 warning) |
+| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (1028 passed, 1 warning) |
 | `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `FAIL` (historical format debt) |
 | `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `FAIL` (historical lint debt) |
 | `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests src`) | `FAIL` (historical type debt in `test_gcp_access.py`) |

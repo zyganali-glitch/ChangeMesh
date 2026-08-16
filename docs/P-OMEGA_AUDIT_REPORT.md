@@ -1,80 +1,87 @@
-# P-Ω Whole-Repository Integrity Audit — P-08.05 Gemini Measurements
+# P-Ω Whole-Repository Integrity Audit — P-08 Batch Phase-Closure Repair
 
-> **Produced by:** P-08.05 — Measure model latency, token use, cost, retry behavior
+> **Produced by:** P-08 Batch Phase-Closure Repair (P-08.03, P-08.04, P-08.05)
 > **Date:** 2026-08-16
-> **Entry Remote SHA:** `90f94969fb25d99ad18bb23f8f879b24d9ddf8ce`
+> **Entry Remote SHA:** `427aab43c501285c219199316c5c210323e56cbe`
 > **Canonical Branch:** `main`
+
+---
 
 ## 1. Integrity Matrix
 
 | Check | Result | Evidence |
 |---|---|---|
-| Canonical entry remote | **PASS** | Local `HEAD` and `origin/main` were `90f94969fb25d99ad18bb23f8f879b24d9ddf8ce` before P-08.05. |
-| P-08.05 scope | **PASS** | Latency, token, retry, and explicit-rate cost telemetry only; no provider, cloud, deployment, or future-phase expansion. |
+| Canonical entry remote | **PASS** | `origin/main` verified as `427aab43c501285c219199316c5c210323e56cbe` before repair. |
+| P-08.03 Preservation | **PASS** | `PolicyGuardian` preserved as single privacy/minimization owner; `BoundedGeminiClient` & `gemini_structured_output` dependency direction documented in `docs/ARCHITECTURE.md`. |
+| P-08.04 Non-Authority Semantics | **PASS** | Model disagreement sets `relation="DISAGREEMENT_WITH_LOCKED_STATE"`, `conflict_detected=True`, `review_state="SEMANTIC_DISAGREEMENT"`, and strictly `human_review_required=False`. Gemini cannot manufacture `HUMAN_AUTHORITY`. |
+| P-08.05 Budget Policy & Latency Limits | **PASS** | Deterministic `ModelCallBudgetPolicy` (`DEMO_MAX_LATENCY_MS = 30000.0`, `DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()` implemented and documented in `docs/COST_PLAN.md`. |
+| P-08.05 Rate Provenance Taxonomy | **PASS** | `RateProvenanceKind` models `TEST_FORMULA`, `CUSTOM_UNVERIFIED`, `PROVIDER_CALIBRATED`. Missing rates yield `cost_status="NOT_RUN"` with zero price guessing. |
+| P-08.05 Metrics Evidence Artifact | **PASS** | `build_model_metrics_artifact()` and `export_metrics_artifact_json()` provide deterministic non-secret execution artifacts with strict secrecy guarantees. |
 | Single model-call owner | **PASS** | Existing AST gate confirms `src/core/gemini_client.py` remains the only SDK model-call owner. |
-| P-08.01–P-08.04 regression | **PASS** | Existing boundaries remain intact. |
-| P-08.05 dedicated suite | **PASS** | 6 tests passed. |
-| Complete P-08 suite | **PASS** | 113 tests passed. |
-| Canonical unit command | **PASS** | 1023 passed, 1 warning. |
-| Full repository suite | **FAIL** | 1023 passed, 1 warning, 3 errors from the known missing `project` fixture in `tests/test_gcp_access.py`. Exact state: **FAIL — known historical baseline GCP fixture debt**. |
-| Provider pricing calibration | **NOT_RUN** | No authoritative current rate was supplied; the implementation reports `cost_status=NOT_RUN` without guessing. |
-| Future-phase leakage | **PASS** | P-09 and later phases remain pending; no cloud resource, pricing service, deployment, or optimization loop was added. |
-| Documentation parity | **PASS** | Plan, README English/Turkish, architecture, environment, evidence, memory, decision, handoff, and P-Ω surfaces synchronized. |
+| P-08.04 dedicated suite | **PASS** | 18 tests passed in `tests/test_p08_04_blind_audit.py`. |
+| P-08.05 dedicated suite | **PASS** | 11 tests passed in `tests/test_p08_05_metrics.py`. |
+| Complete P-08 suite | **PASS** | 118 tests passed across all 5 P-08 test files. |
+| Canonical unit command | **PASS** | 1028 passed, 1 warning in `uv run python scripts/cmd.py unit`. |
+| Full repository suite | **FAIL** | 1028 passed, 1 warning, 3 errors from known missing `project` fixture in `tests/test_gcp_access.py`. Exact state: **FAIL — known historical baseline GCP fixture debt**. |
+| Provider pricing calibration | **NOT_RUN** | Live provider pricing calibration is explicitly `NOT_RUN` (zero made-up Google prices). |
+| Documentation parity | **PASS** | `docs/ARCHITECTURE.md`, `docs/JUDGING_MAP.md`, `docs/DECISION_LOG.md`, `docs/EVIDENCE_BOUNDARY.md`, `docs/COST_PLAN.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `AGENT_ENVIRONMENT_AND_API.md`, `AGENT_MEMORY_AND_LESSONS.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, and `docs/HANDOFF.md` synchronized. |
 
-## 2. Validation Commands
+---
+
+## 2. Validation Commands and Exact Outcomes
 
 | Command | Result |
 |---|---|
-| `uv run python -m pytest tests/test_p08_05_metrics.py -v --tb=short` | **PASS** — 6 passed |
-| `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_03_input_privacy.py tests/test_p08_04_blind_audit.py tests/test_p08_05_metrics.py -q` | **PASS** — 113 passed |
-| `uv run python -m pytest tests/test_p07_02_agent_definitions.py -q` | **PASS** — 59 passed, 1 warning |
-| `uv run python scripts/cmd.py unit` | **PASS** — 1023 passed, 1 warning |
-| `uv run python -m pytest tests/` | **FAIL** — 1023 passed, 1 warning, 3 historical GCP fixture errors |
-| `uv run ruff check src/core/gemini_client.py src/core/__init__.py tests/test_p08_05_metrics.py` | **PASS** |
-| `uv run ruff format --check src/core/gemini_client.py src/core/__init__.py tests/test_p08_05_metrics.py` | **PASS** |
-| `uv run mypy src/core/gemini_client.py src/core/__init__.py tests/test_p08_05_metrics.py` | **PASS** |
-| `uv run python tools/governance/donor_manifest_lint.py` | **PASS** — 20 components |
-| `git diff --check` | **PASS** |
+| `uv run python -m pytest tests/test_p08_04_blind_audit.py -v --tb=short` | **PASS** — 18 passed in 1.74s |
+| `uv run python -m pytest tests/test_p08_05_metrics.py -v --tb=short` | **PASS** — 11 passed in 1.77s |
+| `uv run python -m pytest tests/test_p08_01_gemini_client.py tests/test_p08_02_structured_output.py tests/test_p08_03_input_privacy.py tests/test_p08_04_blind_audit.py tests/test_p08_05_metrics.py -q` | **PASS** — 118 passed in 2.20s |
+| `uv run python -m pytest tests/test_p07_02_agent_definitions.py -q` | **PASS** — 59 passed, 1 warning in 1.95s |
+| `uv run python scripts/cmd.py unit` | **PASS** — 1028 passed, 1 warning in 6.97s |
+| `uv run python -m pytest tests/` | **FAIL** — 1028 passed, 1 warning, 3 historical GCP fixture errors |
+| `uv run ruff check src/agents/evidence_auditor.py src/core/gemini_client.py src/core/__init__.py tests/test_p08_04_blind_audit.py tests/test_p08_05_metrics.py` | **PASS** — All checks passed |
+| `uv run ruff format --check src/agents/evidence_auditor.py src/core/gemini_client.py src/core/__init__.py tests/test_p08_04_blind_audit.py tests/test_p08_05_metrics.py` | **PASS** — 5 files already formatted |
+| `uv run mypy src/agents/evidence_auditor.py src/core/gemini_client.py src/core/__init__.py tests/test_p08_04_blind_audit.py tests/test_p08_05_metrics.py` | **PASS** — Success: no issues found in 5 source files |
+| `uv run python tools/governance/donor_manifest_lint.py` | **PASS** — 20 components valid |
+| `git diff --check` | **PASS** — 0 whitespace/conflict errors |
 
-## 3. Measurement Evidence
+---
+
+## 3. P-08.05 Measurement & Budget Proof
 
 | Metric | Result | Proof |
 |---|---|---|
-| Latency | **PASS** | `duration_ms` is recorded from the existing monotonic call timer and tested non-negative. |
-| Prompt tokens | **PASS** | `prompt_token_count` is captured from SDK usage metadata. |
-| Response tokens | **PASS** | Candidate token count is captured with existing compatibility fallback. |
-| Total tokens | **PASS** | `total_token_count` is captured and tested. |
-| Retry behavior | **PASS** | `attempts` and derived `retry_count` are tested through a transient 429 retry. |
-| Cost formula | **PASS** | Explicit `GeminiCostRateCard` computes input/output token cost deterministically. |
-| Missing pricing | **NOT_RUN** | No implicit price or zero-cost claim; telemetry reports `estimated_cost_usd=None`, `cost_status=NOT_RUN`. |
-| Metrics secrecy | **PASS** | Telemetry contains no prompt or response text. |
+| Latency Measurement | **PASS** | `duration_ms` recorded from monotonic call timer; tested within limit and exceeded limit. |
+| Token Usage | **PASS** | `prompt_token_count`, `response_token_count`, `total_token_count` captured from SDK usage metadata. |
+| Retry Telemetry | **PASS** | `attempts` and `retry_count` verified through transient 429 backoff retry. |
+| Cost Calculation | **PASS** | Explicit `GeminiCostRateCard` computes token cost deterministically via formula. |
+| Rate Provenance | **PASS** | `RateProvenanceKind` models `TEST_FORMULA`, `CUSTOM_UNVERIFIED`, `PROVIDER_CALIBRATED`. |
+| Missing Pricing | **NOT_RUN** | No implicit price guessing or false PASS; telemetry reports `estimated_cost_usd=None`, `cost_status="NOT_RUN"`. |
+| Budget Evaluation | **PASS** | `evaluate_model_call_budget()` enforces `ModelCallBudgetPolicy` bounds deterministically. |
+| Metrics Artifact | **PASS** | `build_model_metrics_artifact()` and `export_metrics_artifact_json()` generate canonical UTF-8 JSON. |
+| Metrics Secrecy | **PASS** | Telemetry and metrics artifacts strictly contain zero prompt text, zero response text, zero credentials, and zero API keys. |
 
-## 4. Authority and Architecture
+---
 
-- `ModelCallTelemetry` remains operational metadata, not evidence of live cloud execution.
-- Existing wrapper-owned retry authority remains unchanged; P-08.05 adds observation only.
-- Existing timeout and output-token ceilings remain enforced.
-- `GeminiCostRateCard` is explicit and immutable; provider pricing is not inferred.
-- No second SDK client, provider fallback, domain contract dependency, or external write was introduced.
+## 4. P-Ω.12 Whole-Repository Nine-Surface Parity
 
-## 5. P-Ω.12 Nine-Surface Parity
+| Surface | Status | Verification Summary |
+|---|---|---|
+| 1. Implementation ↔ Tests | **PASS** | 118 P-08 tests, 1028 canonical unit tests pass with zero failures. |
+| 2. Implementation ↔ Architecture | **PASS** | `docs/ARCHITECTURE.md` accurately documents component ownership, dependency directions, and P-08 implementation. |
+| 3. Implementation ↔ README | **PASS** | README documents P-08 phase closure and next eligible task P-09.01. |
+| 4. Master Plan ↔ Repository | **PASS** | P-08.01–P-08.05 marked `DONE` with verified evidence; P-09.01 marked `PENDING`. |
+| 5. Claims ↔ Evidence | **PASS** | Local boundaries verified; cloud deployments and provider pricing calibration honestly reported as `NOT_RUN` / `BLOCKED`. |
+| 6. Local ↔ Remote Revision | **PASS** | Entry SHA verified; repair commit to be pushed to `origin/main`. |
+| 7. English ↔ Turkish Surfaces | **PASS** | README English/Turkish sections synchronized. |
+| 8. Demo ↔ Actual Runtime | **PASS** | Budget and latency policy established in `docs/COST_PLAN.md`; demo limits labeled as internal project thresholds. |
+| 9. Devpost / Judge Claims ↔ Frozen Tag | **PASS** | `docs/JUDGING_MAP.md` updated with honest local verification states and preserved `NOT_RUN` boundaries. |
 
-| Surface | Result |
-|---|---|
-| Donor manifest | **PASS** — no donor-sensitive P-08.05 component added. |
-| Component provenance | **PASS** — P-08.04 provenance remains unchanged. |
-| Build-period disclosure | **PASS** — P-08.05 is new ChangeMesh telemetry work; no donor claim added. |
-| Architecture | **PASS** — measurement is inside the existing canonical Gemini client boundary. |
-| Tests | **PASS** — 6 dedicated and 113 complete P-08 tests. |
-| README English/Turkish | **PASS** — P-08 phase `DONE`, P-09 next, counts synchronized. |
-| Devpost/judge claims | **N/A** — no new public judge claim. |
-| Demo/media | **N/A** — no demo surface changed. |
-| Frozen release/tag | **N/A** — no final release exists. |
+---
 
-## 6. Honest Closure
+## 5. Final Honest Phase-Closure State
 
-- **P-08.05:** `DONE`.
-- **Full suite:** **FAIL — known historical baseline GCP fixture debt**; not relabeled `PASS`.
-- **Provider pricing calibration:** `NOT_RUN`, explicitly visible.
+- **Phase P-08 Status:** `DONE` (Repaired and independently verified).
+- **Full Suite State:** `FAIL — known historical baseline GCP fixture debt` (preserved honestly, not masked).
+- **Provider Pricing Calibration:** `NOT_RUN` (explicitly visible).
 - **Model Armor:** `PERMISSION_BLOCKED / NOT_RUN`.
-- **Next exact Master Plan task:** P-09.01.
+- **Next Eligible Master Plan Task:** `P-09.01` — Create topic/subscription topology for change, agent work, approvals, evidence, retries, dead letters.

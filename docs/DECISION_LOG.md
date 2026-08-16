@@ -250,23 +250,28 @@
 - Consequences: Reserved synthetic email domains remain usable for fixtures; real-looking email/phone, credentials, and review-sensitive markers cannot reach Gemini. This is not generic DLP or Model Armor.
 - Evidence: `tests/test_p08_03_input_privacy.py`; P-08.01/P-08.02 regressions; `docs/THREAT_MODEL.md`; `AGENT_ENVIRONMENT_AND_API.md`.
 
-## ADR-0019 — Blind semantic audit fact isolation and expected-answer withholding (P-08.04)
+## ADR-0019 — Blind semantic audit fact isolation and non-authoritative disagreement semantics (P-08.04)
 - Date: 2026-08-16
-- Status: Accepted
-- Context: Evidence Auditor needs semantic review without allowing Gemini to see or echo deterministic expected classifications, execution states, or reconciliation hints.
-- Decision: `src/agents/evidence_auditor.py` creates a separated `BlindAuditPackage`. Locked deterministic claims remain application-only; the model receives neutral claims and bounded evidence summaries. Expected-answer fields fail closed. Existing `SemanticAuditResult` validation remains the model boundary, and reconciliation preserves deterministic facts while reporting advisory disagreement.
-- Alternatives: Send the complete evidence record to Gemini (Rejected: expected-answer leakage and fact-authority confusion); silently strip forbidden fields (Rejected: hidden input mutation); allow model disagreement to rewrite facts (Rejected: violates `DETERMINISTIC_CODE` sovereignty).
-- Consequences: Blind audits are bounded and reproducible, but a disagreement may create a review state. This review state is not an authorization or automatic human-authority grant. P-08.05 cost optimization remains separate.
-- Evidence: `tests/test_p08_04_blind_audit.py`; CCT-SEM-001 donor parity; `docs/EVIDENCE_BOUNDARY.md`; `AGENT_ARCHITECTURE_AND_PATTERNS.md`.
+- Status: Accepted (Repaired)
+- Context: Evidence Auditor needs semantic review without allowing Gemini to see or echo deterministic expected classifications, execution states, or reconciliation hints, while strictly respecting the 4-lane authority model (Gemini cannot create human-authority slots).
+- Decision: `src/agents/evidence_auditor.py` creates a separated `BlindAuditPackage`. Locked deterministic claims remain application-only; the model receives neutral claims and bounded evidence summaries. Expected-answer fields fail closed. Existing `SemanticAuditResult` validation remains the model boundary. In `reconcile_semantic_audit()`, any semantic disagreement with locked evidence sets `relation="DISAGREEMENT_WITH_LOCKED_STATE"`, `conflict_detected=True`, and `review_state="SEMANTIC_DISAGREEMENT"`. Crucially, `human_review_required` is strictly `False` (Gemini uncertainty or disagreement cannot route itself into a human gate or manufacture `HUMAN_AUTHORITY`).
+- Alternatives: Send the complete evidence record to Gemini (Rejected: expected-answer leakage and fact-authority confusion); silently strip forbidden fields (Rejected: hidden input mutation); allow model disagreement to rewrite facts or create human approval gates (Rejected: violates `DETERMINISTIC_CODE` sovereignty and autonomous-by-default charter).
+- Consequences: Blind audits are bounded, reproducible, and advisory. Disagreements surface as non-authoritative conflicts without manufacturing human friction or altering execution truth.
+- Evidence: `tests/test_p08_04_blind_audit.py` (18 tests passing); CCT-SEM-001 donor parity; `docs/EVIDENCE_BOUNDARY.md`; `AGENT_ARCHITECTURE_AND_PATTERNS.md`.
 
-## ADR-0020 — Explicit-rate model cost measurement without pricing guesses (P-08.05)
+## ADR-0020 — Explicit-rate model cost measurement, project budget policy, and metrics artifact (P-08.05)
 - Date: 2026-08-16
-- Status: Accepted
-- Context: P-08.05 requires latency, token, retry, and cost measurement while the repository has no verified provider pricing contract for the canonical model.
-- Decision: Extend the existing canonical model telemetry with `retry_count`, `estimated_cost_usd`, and `cost_status`. Compute cost only from an explicit immutable `GeminiCostRateCard`; missing rates produce `NOT_RUN` rather than a guessed price. Existing wrapper-owned retries, timeout bounds, and token ceilings remain unchanged.
-- Alternatives: Hard-code a provider price (Rejected: unverifiable and region/contract dependent); call a pricing service during model calls (Rejected: new provider dependency, latency, and scope); omit cost fields (Rejected: fails the P-08.05 measurement contract).
-- Consequences: Local metric tests can deterministically verify cost formulas and retry/latency/token measurements. Production pricing calibration remains explicitly `NOT_RUN` until verified from an authoritative current source.
-- Evidence: `tests/test_p08_05_metrics.py`; `src/core/gemini_client.py`; `AGENT_ENVIRONMENT_AND_API.md`.
+- Status: Accepted (Repaired)
+- Context: P-08.05 requires latency, token, retry, and cost measurement, project/demo budget enforcement, and a canonical metrics artifact while provider pricing calibration remains unverified.
+- Decision:
+    1. **Extended Telemetry:** Record non-secret `ModelCallTelemetry` with monotonic `duration_ms`, `attempts`, `retry_count`, `prompt_token_count`, `response_token_count`, `total_token_count`, `estimated_cost_usd`, `cost_status` (`"CALCULATED"` / `"NOT_RUN"`), `rate_card_id`, `rate_provenance`, and `finish_reason`.
+    2. **Rate Provenance Taxonomy:** Model `RateProvenanceKind` (`TEST_FORMULA`, `CUSTOM_UNVERIFIED`, `PROVIDER_CALIBRATED`). Validate `GeminiCostRateCard` strictly (finite non-negative numbers, non-empty identifiers). Unprovided rate cards yield `cost_status="NOT_RUN"` without price guessing.
+    3. **Project / Demo Budget Policy:** Define deterministic `ModelCallBudgetPolicy` (`max_latency_ms=30000.0`, `max_cost_usd=0.05`, `max_total_tokens=12288`) and `evaluate_model_call_budget()`. Labeled explicitly as internal ChangeMesh demo policy, not provider SLA.
+    4. **Canonical Metrics Evidence Artifact:** Provide deterministic `build_model_metrics_artifact()` and `export_metrics_artifact_json()` using canonical JSON serialization. Maintain absolute secrecy (zero prompt/response text, zero credentials).
+    5. **Provider Pricing Calibration:** Provider pricing calibration is explicitly `NOT_RUN` (zero made-up Google prices).
+- Alternatives: Hard-code an unverified provider price (Rejected: unverifiable and region/contract dependent); call an external pricing service during model calls (Rejected: new provider dependency and latency); omit budget policy or cost fields (Rejected: fails Master Plan acceptance criteria).
+- Consequences: ChangeMesh has machine-checkable latency/budget verification and reproducible cost telemetry while maintaining complete honesty regarding provider pricing calibration.
+- Evidence: `tests/test_p08_05_metrics.py` (11 tests passing); `src/core/gemini_client.py`; `docs/COST_PLAN.md`; `AGENT_ENVIRONMENT_AND_API.md`.
 
 ## ADR-0017 — Canonical Developer Command Interface and Non-Mutating Verification Semantics (P-06.04)
 - Date: 2026-08-15

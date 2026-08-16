@@ -203,7 +203,12 @@ def test_audit_04_mission_gap_remains_insufficient() -> None:
     assert result.model_overall_verdict == "INSUFFICIENT"
     assert result.claim_audits[0].deterministic_status == EvidenceState.PASS
     assert result.claim_audits[0].relation == "DISAGREEMENT_WITH_LOCKED_STATE"
-    assert result.human_review_required is True
+    assert result.claim_audits[0].conflict_detected is True
+    assert result.review_state == "SEMANTIC_DISAGREEMENT"
+    assert result.conflict_detected is True
+    # Invariant: Gemini disagreement does NOT manufacture human authority
+    assert result.human_review_required is False
+    assert result.claim_audits[0].human_review_required is False
 
 
 @pytest.mark.parametrize(
@@ -218,8 +223,12 @@ def test_audit_05_to_07_model_support_cannot_promote_locked_state(
     assert result.claim_audits[0].deterministic_status == state
     assert result.claim_audits[0].model_assessment == "SUPPORTS"
     assert result.claim_audits[0].relation == "DISAGREEMENT_WITH_LOCKED_STATE"
-    assert result.review_state == "HUMAN_REVIEW_REQUIRED"
-    assert result.human_review_required is True
+    assert result.claim_audits[0].conflict_detected is True
+    assert result.review_state == "SEMANTIC_DISAGREEMENT"
+    assert result.conflict_detected is True
+    # Invariant: Gemini cannot create human authority
+    assert result.human_review_required is False
+    assert result.claim_audits[0].human_review_required is False
 
 
 def test_model_fact_and_authority_injection_is_rejected() -> None:
@@ -230,6 +239,11 @@ def test_model_fact_and_authority_injection_is_rejected() -> None:
 
     data = make_model_result("SUPPORTS").model_dump()
     data["approval_granted"] = True
+    with pytest.raises(StructuredOutputValidationError, match="extra"):
+        parse_semantic_audit_output(data)
+
+    data = make_model_result("SUPPORTS").model_dump()
+    data["human_review_required"] = True
     with pytest.raises(StructuredOutputValidationError, match="extra"):
         parse_semantic_audit_output(data)
 
@@ -293,6 +307,9 @@ def test_blocked_and_quarantined_states_remain_locked(state: EvidenceState) -> N
 
     assert result.claim_audits[0].deterministic_status == state
     assert result.claim_audits[0].relation == "COMPATIBLE_WITH_LOCKED_STATE"
+    assert result.claim_audits[0].conflict_detected is False
+    assert result.review_state == "NO_MODEL_CONFLICT"
+    assert result.human_review_required is False
 
 
 def test_p08_04_target_has_no_forbidden_donor_runtime_identifiers() -> None:
@@ -319,7 +336,9 @@ def test_real_bounded_client_path_receives_only_blind_context() -> None:
     result = run_blind_semantic_audit(package, client)
 
     assert result.claim_audits[0].deterministic_status == EvidenceState.NOT_RUN
-    assert result.human_review_required is True
+    assert result.conflict_detected is True
+    assert result.review_state == "SEMANTIC_DISAGREEMENT"
+    assert result.human_review_required is False
     assert len(fake_sdk.models.call_history) == 1
     outbound_prompt = fake_sdk.models.call_history[0]["contents"]
     assert "deterministic_status" not in outbound_prompt

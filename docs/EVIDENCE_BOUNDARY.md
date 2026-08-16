@@ -116,13 +116,15 @@ package, while Gemini receives only neutral claims and bounded evidence summarie
 Expected-answer fields (`expected_result`, `should_pass`, and equivalent
 deterministic/reconciliation fields) are rejected before prompt construction.
 Model assessments remain `GEMINI_SEMANTIC_JUDGMENT`; reconciliation preserves
-`EvidenceState` and reports disagreement without promoting facts or creating
-authority.
+`EvidenceState` sovereignty. Any semantic disagreement with locked evidence sets
+`relation="DISAGREEMENT_WITH_LOCKED_STATE"`, `conflict_detected=True`, and
+`review_state="SEMANTIC_DISAGREEMENT"`. It strictly sets `human_review_required=False`
+(Gemini uncertainty or model disagreement cannot manufacture `HUMAN_AUTHORITY`).
 
-## P-08.05 Measurement Boundary
+## P-08.05 Measurement and Project Budget Boundary
 
 `src/core/gemini_client.py` measures bounded latency, token counts, attempts,
-retry count, and optional deterministic cost. `GeminiCostRateCard` is explicit
-and immutable; absent provider rates produce `cost_status=NOT_RUN` rather than a
-guessed amount. This is measurement, not adaptive cost optimization or proof of
-production pricing.
+retry count, and formula-calculated cost.
+1. **Rate Provenance & Calibration:** `GeminiCostRateCard` carries structured `RateProvenanceKind` (`TEST_FORMULA`, `CUSTOM_UNVERIFIED`, `PROVIDER_CALIBRATED`). Provider pricing calibration is explicitly `NOT_RUN` (zero price guessing). Missing rate cards produce `cost_status="NOT_RUN"`.
+2. **Project / Demo Budget Policy:** Deterministic `ModelCallBudgetPolicy` (`DEMO_MAX_LATENCY_MS = 30000.0`, `DEMO_MAX_COST_USD = 0.05`, `DEMO_MAX_TOTAL_TOKENS = 12288`) and `evaluate_model_call_budget()` enforce local demonstration limits without claiming provider SLAs.
+3. **Canonical Metrics Evidence Artifact:** `build_model_metrics_artifact()` and `export_metrics_artifact_json()` export deterministic, non-secret execution metrics artifacts with strict secrecy guarantees (zero prompt, response, or credential text).
