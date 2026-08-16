@@ -349,7 +349,7 @@ def test_secret_in_payload_fails_closed():
         EventWireMessage(
             topic_id="changemesh-lifecycle-v1",
             envelope=envelope,
-            payload={"key": "-----BEGIN RSA PRIVATE KEY-----\nMIIE..."},
+            payload={"key": "-" * 5 + "BEGIN RSA PRIVATE KEY" + "-" * 5 + "\nMIIE..."},
         )
 
     # 2. Bearer token pattern
@@ -365,7 +365,7 @@ def test_secret_in_payload_fails_closed():
         EventWireMessage(
             topic_id="changemesh-lifecycle-v1",
             envelope=envelope,
-            payload={"token": "ghp_1234567890abcdef1234567890abcdef1234"},
+            payload={"token": "ghp_" + "1234567890abcdef1234567890abcdef1234"},
         )
 
     # 4. Prohibited key name

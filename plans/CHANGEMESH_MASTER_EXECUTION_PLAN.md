@@ -892,11 +892,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-09.03 — Implement retry schedule and dead-letter behavior
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement retry schedule and dead-letter behavior.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No infinite retry; terminal failure creates evidence/handoff.
 - **Required evidence:** Failure-injection tests.
+- **Evidence:** Implemented canonical bounded retry policy and failure classifier (`events/retry.py`) with `EventRetryPolicy` (`max_attempts` in `[1, 10]`, positive finite backoff, deterministic delays) and `classify_failure()`. Differentiates transient retryable failures from deterministic non-retryable errors (malformed JSON, schema version mismatch, extra envelope fields, secret payload, causal conflict). Deterministic invalid errors fail immediately on attempt 1 with zero retries. Implemented dead-letter models and diagnostic handoff generator (`events/dead_letter.py`) with `DeadLetterEventRecord`, `TerminalFailureHandoff`, `build_dead_letter_record()`, and `sanitize_error_message()`. Preserved the authority invariant: `TerminalFailureHandoff.human_authority_required` is strictly `False` (retry exhaustion never manufactures human authority). Preserved the secrecy invariant: credentials, private keys, and API tokens are sanitized from error messages and handoffs. Dedicated failure-injection suite `tests/test_p09_03_retry_dead_letter.py` passes 8 tests. Canonical unit suite passes 1067 tests (1 warning).
 - **Mandatory documentation sync:** Lessons, architecture.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

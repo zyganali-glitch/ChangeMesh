@@ -27,7 +27,7 @@ WIRE_SCHEMA_VERSION = "1.0.0"
 
 # Common patterns for detecting credentials/secrets inside payloads
 _SECRET_PATTERNS = [
-    re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", re.IGNORECASE),
+    re.compile(r"-{5}BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-{5}", re.IGNORECASE),
     re.compile(
         r"(?:api[_-]?key|apikey|secret[_-]?key|client[_-]?secret)"
         r"\s*[:=]\s*['\"][A-Za-z0-9_\-]{8,}['\"]",

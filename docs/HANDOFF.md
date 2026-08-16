@@ -40,12 +40,17 @@ P-08.04
 P-08.05
 P-09.01
 P-09.02
+P-09.03
 
 **Active Phase:**
 P-09
 
 **Next Exact Task:**
-P-09.03 — Implement retry schedule and dead-letter behavior
+P-09.04 — Implement local event-bus adapter with identical contracts and explicit LOCAL evidence mode
+
+## Current P-09.03 State
+
+P-09.03 is `DONE`. Implemented canonical bounded retry policy and failure classifier (`events/retry.py`) with `EventRetryPolicy` (`max_attempts` in `[1, 10]`, positive finite backoff, deterministic delays) and `classify_failure()`. Differentiates transient retryable failures from deterministic non-retryable errors (malformed JSON, schema version mismatch, extra envelope fields, secret payload, causal conflict). Deterministic invalid errors fail immediately on attempt 1 with zero retries. Implemented dead-letter models and diagnostic handoff generator (`events/dead_letter.py`) with `DeadLetterEventRecord`, `TerminalFailureHandoff`, `build_dead_letter_record()`, and `sanitize_error_message()`. Preserved the authority invariant: `TerminalFailureHandoff.human_authority_required` is strictly `False` (retry exhaustion never manufactures human authority). Preserved the secrecy invariant: credentials, private keys, and API tokens are sanitized from error messages and handoffs. Dedicated failure-injection suite `tests/test_p09_03_retry_dead_letter.py` passes 8 tests. Canonical unit passes 1067 tests (1 warning).
 
 ## Current P-09.02 State
 
