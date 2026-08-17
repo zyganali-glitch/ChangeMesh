@@ -4,7 +4,7 @@ import re
 from enum import Enum
 from typing import ClassVar, Protocol
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from domain.contracts.conventions import (
     canonical_json_bytes,
@@ -26,6 +26,45 @@ class GitHubAction(str, Enum):
     CREATE_DRAFT_PR = "CREATE_DRAFT_PR"
 
 
+class ReconciliationStatus(str, Enum):
+    FOUND = "FOUND"
+    NOT_FOUND = "NOT_FOUND"
+    UNKNOWN = "UNKNOWN"
+    ERROR = "ERROR"
+
+
+class GitHubReconciliationQuery(BaseModel):
+    """Semantic query for provider-observable reconciliation."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    action: GitHubAction
+    repository: str
+    branch: str | None = None
+    pr_title: str | None = None
+    pr_body: str | None = None
+    commit_message: str | None = None
+    files: dict[str, str] = Field(default_factory=dict)
+    idempotency_key: str | None = None
+    payload_digest: str | None = None
+    tenant_id: str | None = None
+    change_id: str | None = None
+
+
+class GitHubReconciliationResult(BaseModel):
+    """Authoritative result returned by provider reconciliation."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    status: ReconciliationStatus
+    result_url: str | None = None
+    commit_sha: str | None = None
+    error_message: str | None = None
+    raw_status_code: int | None = None
+    matched_idempotency_key: str | None = None
+    matched_payload_digest: str | None = None
+
+
 class GitHubRequest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -36,7 +75,7 @@ class GitHubRequest(BaseModel):
     commit_message: str | None = None
     pr_title: str | None = None
     pr_body: str | None = None
-    files: dict[str, str] = {}
+    files: dict[str, str] = Field(default_factory=dict)
     idempotency_key: str | None = None
     evidence_mode: ExecutionEvidenceMode = ExecutionEvidenceMode.FIXTURE
     change_id: str | None = None
@@ -101,13 +140,23 @@ class GitHubTransport(Protocol):
     def find_existing(
         self,
         token: str,
-        action: GitHubAction,
-        repository: str,
-        branch: str | None,
-        pr_title: str | None = None,
-        commit_message: str | None = None,
-        files: dict[str, str] | None = None,
-    ) -> GitHubTransportResult | None: ...
+        query: GitHubReconciliationQuery,
+    ) -> GitHubReconciliationResult: ...
+
+
+def format_draft_pr_body_with_intent_marker(
+    pr_body: str | None,
+    idempotency_key: str | None,
+    payload_digest: str,
+) -> str:
+    """Embeds non-secret deterministic intent marker for provider-observable idempotency."""
+    body = (pr_body or "").strip()
+    marker = f"<!-- changemesh-intent: key={idempotency_key or 'none'} digest={payload_digest} -->"
+    if marker in body:
+        return body
+    if body:
+        return f"{body}\n\n{marker}"
+    return marker
 
 
 class BoundedGitHubAdapter:
@@ -509,130 +558,259 @@ class BoundedGitHubAdapter:
                 idempotency_key=request.idempotency_key,
             )
 
-        # Check provider reconciliation before executing mutation
-        if hasattr(self._transport, "find_existing") and callable(
-            getattr(self._transport, "find_existing")
+        # Check provider reconciliation before executing mutation (MANDATORY for LIVE_WRITE)
+        find_existing_fn = getattr(self._transport, "find_existing", None)
+        if find_existing_fn is None or not callable(find_existing_fn):
+            if reservation_outcome and reservation_outcome.reservation:
+                try:
+                    IdempotencyKeyManager.release_intent(
+                        self._state_repository,
+                        tenant_id,
+                        change_id,
+                        reservation_outcome.reservation.reservation_id,
+                    )
+                except Exception:
+                    pass
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=(
+                    "Transport lacks required reconciliation capability 'find_existing' "
+                    "for LIVE_WRITE"
+                ),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
+        recon_query = GitHubReconciliationQuery(
+            action=request.action,
+            repository=request.repository,
+            branch=request.branch,
+            pr_title=request.pr_title,
+            pr_body=request.pr_body,
+            commit_message=request.commit_message,
+            files=request.files,
+            idempotency_key=request.idempotency_key,
+            payload_digest=payload_digest,
+            tenant_id=tenant_id,
+            change_id=change_id,
+        )
+
+        try:
+            recon_res = find_existing_fn(
+                token=self._token,
+                query=recon_query,
+            )
+        except Exception as find_ex:
+            if reservation_outcome and reservation_outcome.reservation:
+                try:
+                    IdempotencyKeyManager.release_intent(
+                        self._state_repository,
+                        tenant_id,
+                        change_id,
+                        reservation_outcome.reservation.reservation_id,
+                    )
+                except Exception:
+                    pass
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=self._sanitize(f"Provider reconciliation check failed: {find_ex}"),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
+        if not isinstance(recon_res, GitHubReconciliationResult):
+            if reservation_outcome and reservation_outcome.reservation:
+                try:
+                    IdempotencyKeyManager.release_intent(
+                        self._state_repository,
+                        tenant_id,
+                        change_id,
+                        reservation_outcome.reservation.reservation_id,
+                    )
+                except Exception:
+                    pass
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message="Provider reconciliation returned invalid result type",
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
+        if (
+            recon_res.status == ReconciliationStatus.UNKNOWN
+            or recon_res.status == ReconciliationStatus.ERROR
         ):
+            if reservation_outcome and reservation_outcome.reservation:
+                try:
+                    IdempotencyKeyManager.release_intent(
+                        self._state_repository,
+                        tenant_id,
+                        change_id,
+                        reservation_outcome.reservation.reservation_id,
+                    )
+                except Exception:
+                    pass
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=self._sanitize(
+                    recon_res.error_message
+                    or (
+                        f"Provider reconciliation returned indeterminate status "
+                        f"({recon_res.status.value})"
+                    )
+                ),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
+        if recon_res.status == ReconciliationStatus.FOUND:
+            # Reconciled existing action found on provider!
+            reconciled_url = recon_res.result_url
+            reconciled_sha = recon_res.commit_sha
+
+            if request.action == GitHubAction.CREATE_DRAFT_PR:
+                if not reconciled_url or not re.match(
+                    r"^https://github\.com/[^/]+/[^/]+/pull/\d+$", reconciled_url
+                ):
+                    if reservation_outcome and reservation_outcome.reservation:
+                        try:
+                            IdempotencyKeyManager.release_intent(
+                                self._state_repository,
+                                tenant_id,
+                                change_id,
+                                reservation_outcome.reservation.reservation_id,
+                            )
+                        except Exception:
+                            pass
+                    return GitHubResponse(
+                        request_id=request.request_id,
+                        action=request.action,
+                        success=False,
+                        error_message="Reconciled PR response missing valid real PR URL",
+                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                        idempotency_key=request.idempotency_key,
+                    )
+            elif request.action == GitHubAction.CREATE_COMMIT:
+                if (
+                    not reconciled_sha
+                    or reconciled_sha == "fixture-sha"
+                    or not re.match(r"^[0-9a-f]{40,64}$", reconciled_sha)
+                ):
+                    if reservation_outcome and reservation_outcome.reservation:
+                        try:
+                            IdempotencyKeyManager.release_intent(
+                                self._state_repository,
+                                tenant_id,
+                                change_id,
+                                reservation_outcome.reservation.reservation_id,
+                            )
+                        except Exception:
+                            pass
+                    return GitHubResponse(
+                        request_id=request.request_id,
+                        action=request.action,
+                        success=False,
+                        error_message=("Reconciled commit response missing valid real commit SHA"),
+                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                        idempotency_key=request.idempotency_key,
+                    )
+            elif request.action == GitHubAction.CREATE_BRANCH:
+                if not reconciled_url or not re.match(
+                    r"^https://github\.com/[^/]+/[^/]+/tree/.+$", reconciled_url
+                ):
+                    if reservation_outcome and reservation_outcome.reservation:
+                        try:
+                            IdempotencyKeyManager.release_intent(
+                                self._state_repository,
+                                tenant_id,
+                                change_id,
+                                reservation_outcome.reservation.reservation_id,
+                            )
+                        except Exception:
+                            pass
+                    return GitHubResponse(
+                        request_id=request.request_id,
+                        action=request.action,
+                        success=False,
+                        error_message="Reconciled branch response missing valid branch URL",
+                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                        idempotency_key=request.idempotency_key,
+                    )
+
+            # Persist reconciled result to durable state repository
+            res_val = reconciled_url or reconciled_sha or "APPLIED"
+            result_digest = sha256_hex(
+                canonical_json_bytes({"result": res_val, "action": request.action.value})
+            )
             try:
-                existing_transport_res = self._transport.find_existing(
-                    token=self._token,
-                    action=request.action,
-                    repository=request.repository,
-                    branch=request.branch,
-                    pr_title=request.pr_title,
-                    commit_message=request.commit_message,
-                    files=request.files,
+                IdempotencyKeyManager.commit_intent(
+                    self._state_repository,
+                    tenant_id,
+                    change_id,
+                    reservation_outcome.reservation.reservation_id,
+                    result_digest=result_digest,
+                    receipt_status=res_val,
                 )
-            except Exception as find_ex:
-                # Reconciliation query failed -> fail closed, zero mutation
+            except Exception as commit_ex:
                 return GitHubResponse(
                     request_id=request.request_id,
                     action=request.action,
                     success=False,
                     error_message=self._sanitize(
-                        f"Provider reconciliation check failed: {find_ex}"
+                        f"Reconciled existing provider entity ({res_val}) "
+                        f"but durable commit failed: {commit_ex}"
                     ),
                     evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
                     idempotency_key=request.idempotency_key,
                 )
 
-            if existing_transport_res is not None:
-                if not existing_transport_res.success:
-                    # Reconciliation query returned an error status -> fail closed, zero mutation
-                    return GitHubResponse(
-                        request_id=request.request_id,
-                        action=request.action,
-                        success=False,
-                        error_message=self._sanitize(
-                            existing_transport_res.error_message
-                            or "Provider reconciliation check returned failure"
-                        ),
-                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                        idempotency_key=request.idempotency_key,
-                    )
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=True,
+                result_url=reconciled_url,
+                commit_sha=reconciled_sha,
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
 
-                # Reconciled existing action found on provider!
-                # Validate provider response format
-                reconciled_url = existing_transport_res.result_url
-                reconciled_sha = existing_transport_res.commit_sha
-
-                if request.action == GitHubAction.CREATE_DRAFT_PR:
-                    if not reconciled_url or not re.match(
-                        r"^https://github\.com/[^/]+/[^/]+/pull/\d+$", reconciled_url
-                    ):
-                        return GitHubResponse(
-                            request_id=request.request_id,
-                            action=request.action,
-                            success=False,
-                            error_message="Reconciled PR response missing valid real PR URL",
-                            evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                            idempotency_key=request.idempotency_key,
-                        )
-                elif request.action == GitHubAction.CREATE_COMMIT:
-                    if (
-                        not reconciled_sha
-                        or reconciled_sha == "fixture-sha"
-                        or not re.match(r"^[0-9a-f]{40,64}$", reconciled_sha)
-                    ):
-                        return GitHubResponse(
-                            request_id=request.request_id,
-                            action=request.action,
-                            success=False,
-                            error_message=(
-                                "Reconciled commit response missing valid real commit SHA"
-                            ),
-                            evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                            idempotency_key=request.idempotency_key,
-                        )
-                elif request.action == GitHubAction.CREATE_BRANCH:
-                    if not reconciled_url or not re.match(
-                        r"^https://github\.com/[^/]+/[^/]+/tree/.+$", reconciled_url
-                    ):
-                        return GitHubResponse(
-                            request_id=request.request_id,
-                            action=request.action,
-                            success=False,
-                            error_message="Reconciled branch response missing valid branch URL",
-                            evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                            idempotency_key=request.idempotency_key,
-                        )
-
-                # Persist reconciled result to durable state repository
-                res_val = reconciled_url or reconciled_sha or "APPLIED"
-                result_digest = sha256_hex(
-                    canonical_json_bytes({"result": res_val, "action": request.action.value})
-                )
+        if recon_res.status != ReconciliationStatus.NOT_FOUND:
+            if reservation_outcome and reservation_outcome.reservation:
                 try:
-                    IdempotencyKeyManager.commit_intent(
+                    IdempotencyKeyManager.release_intent(
                         self._state_repository,
                         tenant_id,
                         change_id,
                         reservation_outcome.reservation.reservation_id,
-                        result_digest=result_digest,
-                        receipt_status=res_val,
                     )
-                except Exception as commit_ex:
-                    return GitHubResponse(
-                        request_id=request.request_id,
-                        action=request.action,
-                        success=False,
-                        error_message=self._sanitize(
-                            f"Reconciled existing provider entity ({res_val}) "
-                            f"but durable commit failed: {commit_ex}"
-                        ),
-                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                        idempotency_key=request.idempotency_key,
-                    )
+                except Exception:
+                    pass
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=(
+                    f"Reconciliation check did not authoritatively establish NOT_FOUND "
+                    f"(status={recon_res.status.value})"
+                ),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
 
-                return GitHubResponse(
-                    request_id=request.request_id,
-                    action=request.action,
-                    success=True,
-                    result_url=reconciled_url,
-                    commit_sha=reconciled_sha,
-                    evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                    idempotency_key=request.idempotency_key,
-                )
+        # Authoritative NOT_FOUND -> proceed with fresh mutation
+        pr_body_for_transport = request.pr_body
+        if request.action == GitHubAction.CREATE_DRAFT_PR:
+            pr_body_for_transport = format_draft_pr_body_with_intent_marker(
+                request.pr_body, request.idempotency_key, payload_digest
+            )
 
         try:
             transport_res = self._transport.execute(
@@ -642,7 +820,7 @@ class BoundedGitHubAdapter:
                 branch=request.branch,
                 commit_message=request.commit_message,
                 pr_title=request.pr_title,
-                pr_body=request.pr_body,
+                pr_body=pr_body_for_transport,
                 files=request.files,
             )
         except Exception as ex:

@@ -12,8 +12,11 @@ from domain.contracts.evidence import ExecutionEvidenceMode
 from integrations.github.github_adapter import (
     BoundedGitHubAdapter,
     GitHubAction,
+    GitHubReconciliationQuery,
+    GitHubReconciliationResult,
     GitHubRequest,
     GitHubTransportResult,
+    ReconciliationStatus,
 )
 from src.orchestrator.idempotency import (
     IdempotencyIntent,
@@ -60,29 +63,104 @@ def _setup_test_repo(
     return repo
 
 
+class MockStoredEntity:
+    def __init__(
+        self,
+        action: GitHubAction,
+        repository: str,
+        branch: str | None,
+        commit_message: str | None = None,
+        pr_title: str | None = None,
+        pr_body: str | None = None,
+        files: dict[str, str] | None = None,
+        result_url: str | None = None,
+        commit_sha: str | None = None,
+    ):
+        self.action = action
+        self.repository = repository
+        self.branch = branch
+        self.commit_message = commit_message
+        self.pr_title = pr_title
+        self.pr_body = pr_body
+        self.files = files or {}
+        self.result_url = result_url
+        self.commit_sha = commit_sha
+
+
+class MockTransportLackingReconciliation:
+    def __init__(self):
+        self.call_count = 0
+
+    def execute(
+        self,
+        token: str,
+        action: GitHubAction,
+        repository: str,
+        branch: str | None,
+        commit_message: str | None,
+        pr_title: str | None,
+        pr_body: str | None,
+        files: dict[str, str],
+    ) -> GitHubTransportResult:
+        self.call_count += 1
+        return GitHubTransportResult(success=True)
+
+
+class MockTransportNonCallableReconciliation:
+    def __init__(self):
+        self.call_count = 0
+        self.find_existing = "non-callable-string"
+
+    def execute(
+        self,
+        token: str,
+        action: GitHubAction,
+        repository: str,
+        branch: str | None,
+        commit_message: str | None,
+        pr_title: str | None,
+        pr_body: str | None,
+        files: dict[str, str],
+    ) -> GitHubTransportResult:
+        self.call_count += 1
+        return GitHubTransportResult(success=True)
+
+
 class MockGitHubTransport:
     def __init__(
         self,
         outcomes: dict[GitHubAction, GitHubTransportResult] | None = None,
-        existing_items: dict[Any, GitHubTransportResult] | None = None,
-        find_outcome: GitHubTransportResult | None = None,
+        existing_items: dict[Any, Any] | list[MockStoredEntity] | None = None,
+        find_outcome: GitHubReconciliationResult | None = None,
         find_raises: Exception | None = None,
-        disable_reconciliation: bool = False,
+        find_status: ReconciliationStatus | None = None,
+        find_error: str | None = None,
     ):
         self.outcomes = outcomes or {}
-        self.existing_items = existing_items or {}
+        self.stored_entities: list[MockStoredEntity] = []
+        if isinstance(existing_items, list):
+            self.stored_entities.extend(existing_items)
+        elif isinstance(existing_items, dict):
+            for k, v in existing_items.items():
+                if isinstance(v, (GitHubTransportResult, GitHubReconciliationResult)):
+                    action = k if isinstance(k, GitHubAction) else GitHubAction.CREATE_DRAFT_PR
+                    self.stored_entities.append(
+                        MockStoredEntity(
+                            action=action,
+                            repository="org/repo",
+                            branch=None,
+                            result_url=v.result_url,
+                            commit_sha=v.commit_sha,
+                        )
+                    )
         self.find_outcome = find_outcome
         self.find_raises = find_raises
-        self.disable_reconciliation = disable_reconciliation
+        self.find_status = find_status
+        self.find_error = find_error
         self.call_count = 0
         self.find_count = 0
         self.last_call: dict[str, Any] = {}
-        self.last_find: dict[str, Any] = {}
-
-    def _item_key(
-        self, action: GitHubAction, repository: str, branch: str | None
-    ) -> tuple[str, str, str]:
-        return (action.value, repository, branch or "")
+        self.last_find_query: GitHubReconciliationQuery | None = None
 
     def execute(
         self,
@@ -106,64 +184,148 @@ class MockGitHubTransport:
             "pr_body": pr_body,
             "files": files,
         }
-        key = self._item_key(action, repository, branch)
         if action in self.outcomes:
             res = self.outcomes[action]
             if res.success:
-                self.existing_items[key] = res
+                self.stored_entities.append(
+                    MockStoredEntity(
+                        action=action,
+                        repository=repository,
+                        branch=branch,
+                        commit_message=commit_message,
+                        pr_title=pr_title,
+                        pr_body=pr_body,
+                        files=files,
+                        result_url=res.result_url,
+                        commit_sha=res.commit_sha,
+                    )
+                )
             return res
+
         if action == GitHubAction.CREATE_DRAFT_PR:
             res = GitHubTransportResult(
                 success=True, result_url=f"https://github.com/{repository}/pull/42"
             )
-            self.existing_items[key] = res
+            self.stored_entities.append(
+                MockStoredEntity(
+                    action=action,
+                    repository=repository,
+                    branch=branch,
+                    pr_title=pr_title,
+                    pr_body=pr_body,
+                    result_url=res.result_url,
+                )
+            )
             return res
         elif action == GitHubAction.CREATE_COMMIT:
             res = GitHubTransportResult(
                 success=True, commit_sha="e0435f0962325e839e557b44784a0d9b9777174e"
             )
-            self.existing_items[key] = res
+            self.stored_entities.append(
+                MockStoredEntity(
+                    action=action,
+                    repository=repository,
+                    branch=branch,
+                    commit_message=commit_message,
+                    files=files,
+                    commit_sha=res.commit_sha,
+                )
+            )
             return res
         elif action == GitHubAction.CREATE_BRANCH:
             res = GitHubTransportResult(
                 success=True, result_url=f"https://github.com/{repository}/tree/{branch}"
             )
-            self.existing_items[key] = res
+            self.stored_entities.append(
+                MockStoredEntity(
+                    action=action,
+                    repository=repository,
+                    branch=branch,
+                    result_url=res.result_url,
+                )
+            )
             return res
         return GitHubTransportResult(success=False, error_message="Unknown action")
 
     def find_existing(
         self,
         token: str,
-        action: GitHubAction,
-        repository: str,
-        branch: str | None,
-        pr_title: str | None = None,
-        commit_message: str | None = None,
-        files: dict[str, str] | None = None,
-    ) -> GitHubTransportResult | None:
-        if self.disable_reconciliation:
-            return None
+        query: GitHubReconciliationQuery,
+    ) -> GitHubReconciliationResult:
         self.find_count += 1
-        self.last_find = {
-            "token": token,
-            "action": action,
-            "repository": repository,
-            "branch": branch,
-            "pr_title": pr_title,
-            "commit_message": commit_message,
-            "files": files,
-        }
+        self.last_find_query = query
+
         if self.find_raises is not None:
             raise self.find_raises
+        if self.find_status is not None:
+            return GitHubReconciliationResult(
+                status=self.find_status,
+                error_message=self.find_error,
+            )
         if self.find_outcome is not None:
             return self.find_outcome
-        key = self._item_key(action, repository, branch)
-        if key in self.existing_items:
-            return self.existing_items[key]
-        if action in self.existing_items:
-            return self.existing_items[action]
-        return None
+
+        for entity in self.stored_entities:
+            if entity.action != query.action or entity.repository != query.repository:
+                continue
+
+            if query.action == GitHubAction.CREATE_DRAFT_PR:
+                if entity.branch is not None and entity.branch != query.branch:
+                    continue
+
+                matched = False
+                if (
+                    query.idempotency_key
+                    and entity.pr_body
+                    and f"key={query.idempotency_key}" in entity.pr_body
+                ):
+                    matched = True
+                elif (
+                    query.payload_digest
+                    and entity.pr_body
+                    and f"digest={query.payload_digest}" in entity.pr_body
+                ):
+                    matched = True
+                elif entity.pr_title == query.pr_title and (
+                    entity.pr_body == query.pr_body
+                    or (entity.pr_body and (query.pr_body or "") in entity.pr_body)
+                ):
+                    matched = True
+                elif entity.result_url and (
+                    entity.pr_title is None or entity.pr_title == query.pr_title
+                ):
+                    matched = True
+
+                if matched:
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.FOUND,
+                        result_url=entity.result_url,
+                        matched_idempotency_key=query.idempotency_key,
+                        matched_payload_digest=query.payload_digest,
+                    )
+
+            elif query.action == GitHubAction.CREATE_COMMIT:
+                if (
+                    (entity.branch is None or entity.branch == query.branch)
+                    and (
+                        entity.commit_message is None
+                        or entity.commit_message == query.commit_message
+                    )
+                    and (not entity.files or entity.files == query.files)
+                ):
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.FOUND,
+                        commit_sha=entity.commit_sha,
+                    )
+
+            elif query.action == GitHubAction.CREATE_BRANCH:
+                if entity.branch is None or entity.branch == query.branch:
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.FOUND,
+                        result_url=entity.result_url,
+                    )
+
+        return GitHubReconciliationResult(status=ReconciliationStatus.NOT_FOUND)
 
 
 def test_adapter_allowed_actions():
@@ -1326,3 +1488,331 @@ def test_reconciliation_failure_remains_fail_closed_and_does_not_mutate():
     assert not res.success
     assert "reconciliation check failed" in (res.error_message or "").lower()
     assert transport.call_count == 0  # Zero mutation execute() call!
+
+
+def test_live_write_transport_lacking_find_existing_fails_closed_zero_mutation():
+    """Matrix 1: LIVE_WRITE transport lacking find_existing fails closed with zero mutation."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-no-find")
+    transport = MockTransportLackingReconciliation()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-no-find",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-no-find",
+        pr_title="No Find PR",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-no-find-key",
+        tenant_id="tenant-default",
+        change_id="change-no-find",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "lacks required reconciliation capability" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_live_write_transport_non_callable_find_existing_fails_closed_zero_mutation():
+    """Matrix 2: Non-callable reconciliation capability fails closed with zero mutation."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-non-callable")
+    transport = MockTransportNonCallableReconciliation()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-non-callable",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-non-callable",
+        pr_title="Non-Callable PR",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-non-callable-key",
+        tenant_id="tenant-default",
+        change_id="change-non-callable",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "lacks required reconciliation capability" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_live_write_reconciliation_unknown_status_fails_closed_zero_mutation():
+    """Matrix 3: Reconciliation UNKNOWN / ERROR status fails closed with zero mutation."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-unknown")
+    transport = MockGitHubTransport(find_status=ReconciliationStatus.UNKNOWN)
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-rec-unknown",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-unknown",
+        pr_title="Unknown PR",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-unknown-key",
+        tenant_id="tenant-default",
+        change_id="change-rec-unknown",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "indeterminate status" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_live_write_authoritative_not_found_permits_single_mutation():
+    """Matrix 5: Authoritative NOT_FOUND permits exactly one new mutation."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-not-found")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-not-found-1",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-not-found",
+        pr_title="Fresh PR",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-not-found-key",
+        tenant_id="tenant-default",
+        change_id="change-not-found",
+    )
+    res = adapter.execute(req)
+    assert res.success
+    assert res.result_url == "https://github.com/org/repo/pull/42"
+    assert transport.find_count == 1
+    assert transport.call_count == 1
+
+
+def test_live_write_same_branch_different_semantic_identity_is_not_treated_as_found():
+    """Matrix 7: Same repo + branch but different Draft PR semantic identity is NOT FOUND."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-diff-ident")
+    transport = MockGitHubTransport()
+
+    # Step 1: Create PR Alpha on branch feat-shared
+    adapter1 = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    req1 = GitHubRequest(
+        request_id="req-alpha",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-shared",
+        pr_title="PR Alpha Title",
+        pr_body="Body Alpha",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-alpha-key",
+        tenant_id="tenant-default",
+        change_id="change-diff-ident",
+    )
+    res1 = adapter1.execute(req1)
+    assert res1.success
+    assert transport.call_count == 1
+
+    # Step 2: Now create a different change/request for PR Beta on same branch feat-shared
+    req2 = GitHubRequest(
+        request_id="req-beta",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-shared",
+        pr_title="PR Beta Different Title",
+        pr_body="Body Beta Different",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-beta-key",
+        tenant_id="tenant-default",
+        change_id="change-diff-ident",
+    )
+    res2 = adapter1.execute(req2)
+    assert res2.success
+    # Must NOT have treated PR Alpha as FOUND; must have executed PR Beta mutation
+    assert transport.call_count == 2
+    assert len(transport.stored_entities) == 2
+
+
+def test_live_write_different_pr_body_under_same_branch_title_idempotency_detected():
+    """Matrix 8: Different PR body under same branch/title/idempotency is conflict."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-body-mod")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req1 = GitHubRequest(
+        request_id="req-body-1",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-body-mod",
+        pr_title="PR Title",
+        pr_body="Body Original",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-body-key-shared",
+        tenant_id="tenant-default",
+        change_id="change-body-mod",
+    )
+    res1 = adapter.execute(req1)
+    assert res1.success
+    assert transport.call_count == 1
+
+    req2 = GitHubRequest(
+        request_id="req-body-2",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-body-mod",
+        pr_title="PR Title",
+        pr_body="Body Mutated Modified",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-body-key-shared",
+        tenant_id="tenant-default",
+        change_id="change-body-mod",
+    )
+    res2 = adapter.execute(req2)
+    assert not res2.success
+    assert "idempotency conflict" in (res2.error_message or "").lower()
+    assert transport.call_count == 1  # Zero second mutation call!
+
+
+def test_live_write_malformed_found_provider_evidence_fails_closed():
+    """Matrix 11: Malformed FOUND provider evidence fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-malformed-found")
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="invalid-not-a-pull-url",
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-malformed-found",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-malformed",
+        pr_title="Malformed Found PR",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-malformed-key",
+        tenant_id="tenant-default",
+        change_id="change-malformed-found",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "missing valid real pr url" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_lease_expiry_reconciliation_and_single_mutation_end_to_end():
+    """Matrix 10: Complete 10-step ambiguous post-write lease expiry and reconciliation test.
+
+    Sequence:
+    1. Reserve semantic Draft PR intent
+    2. Provider mutation succeeds (call_count == 1)
+    3. Durable commit_intent fails
+    4. Reservation remains RESERVED
+    5. Immediate retry returns IN_PROGRESS (call_count == 1)
+    6. Advance lease expiration so expires_at <= now
+    7. Fresh worker process re-acquires reservation
+    8. Provider reconciliation finds exact created action via marker / semantic identity
+    9. Commits durable state from verified provider evidence
+    10. transport.call_count remains exactly 1 for the entire scenario!
+    """
+    inner_repo = _setup_test_repo(tid="tenant-default", cid="change-lease-exp-01")
+    failing_repo = FailingCommitRepoWrapper(inner_repo)
+    transport = MockGitHubTransport()
+
+    # Step 1-4: Execute through adapter with failing commit repo wrapper
+    adapter1 = BoundedGitHubAdapter(
+        token="ghp_validtoken123",
+        transport=transport,
+        state_repository=failing_repo,  # type: ignore[arg-type]
+    )
+    req = GitHubRequest(
+        request_id="req-e2e-1",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-e2e-lease",
+        pr_title="E2E Lease Expiry PR",
+        pr_body="E2E Body Content",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-e2e-lease-key",
+        tenant_id="tenant-default",
+        change_id="change-lease-exp-01",
+    )
+    res1 = adapter1.execute(req)
+    assert not res1.success
+    assert "External mutation succeeded on provider" in (res1.error_message or "")
+    assert transport.call_count == 1  # Step 2: Provider mutation executed once
+    assert len(transport.stored_entities) == 1
+
+    # Step 5: Immediate retry within active lease -> IN_PROGRESS
+    adapter_immediate = BoundedGitHubAdapter(
+        token="ghp_validtoken123",
+        transport=transport,
+        state_repository=inner_repo,
+    )
+    res_imm = adapter_immediate.execute(req)
+    assert not res_imm.success
+    assert "already in progress" in (res_imm.error_message or "").lower()
+    assert transport.call_count == 1  # ZERO additional mutation
+
+    # Step 6: Advance lease so it genuinely expires
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:pr-e2e-lease-key"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-e2e-lease",
+        "pr_title": "E2E Lease Expiry PR",
+        "pr_body": "E2E Body Content",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-lease-exp-01",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
+    )
+    idem_key = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+    doc_id = IdempotencyKeyManager.compute_reservation_doc_id(idem_key)
+    res_rec = inner_repo.get_idempotency_reservation(
+        "tenant-default", "change-lease-exp-01", doc_id
+    )
+    assert res_rec is not None
+    assert res_rec.status == IdempotencyReservationStatus.RESERVED
+
+    # Expire reservation record
+    past_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+    expired_rec = res_rec.model_copy(update={"expires_at": past_time})
+    inner_repo.update_idempotency_reservation(
+        "tenant-default", "change-lease-exp-01", expired_rec, expected_version=res_rec.version
+    )
+
+    # Step 7: Create fresh worker / adapter process
+    adapter_fresh = BoundedGitHubAdapter(
+        token="ghp_validtoken123",
+        transport=transport,
+        state_repository=inner_repo,
+    )
+
+    # Step 8-10: Execute retry
+    res_reconciled = adapter_fresh.execute(req)
+    assert res_reconciled.success
+    assert res_reconciled.result_url == "https://github.com/org/repo/pull/42"
+    # Total mutation calls across the entire lifecycle remain exactly 1!
+    assert transport.call_count == 1
+    assert transport.find_count >= 1
+
+    # Step 11: Subsequent exact replay returns committed state
+    res_replay = adapter_fresh.execute(req)
+    assert res_replay.success
+    assert res_replay.result_url == "https://github.com/org/repo/pull/42"
+    assert transport.call_count == 1

@@ -283,3 +283,21 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `integrations/github/github_adapter.py`, `tests/test_p19_release_steward.py`.
 - Reusable beyond this task: Yes (all external write integrations and dual-write reconciliation boundaries).
 - Status: `ACTIVE`
+
+### LESSON-20260818-01 — Mandatory Typed Reconciliation Capability, Provider-Observable Idempotency Markers, and Ambiguous Post-Write Multi-Process Recovery
+- Date/time: 2026-08-18
+- Active task: P-19.01 Final Narrow Reconciliation-Safety Repair
+- Symptom: (1) An external write adapter treated reconciliation capability as optional via `hasattr()` guards, allowing transports lacking `find_existing` to proceed directly to mutation; (2) Untyped/None reconciliation returns could mask network or parse failures as "not found", causing duplicate mutations; (3) Draft PRs lacked a deterministic provider-observable idempotency identity across process restarts; (4) Post-write commit failure followed by genuine lease expiry lacked an end-to-end multi-process integration test verifying that fresh workers query provider state and recover with exactly 1 total mutation.
+- Root cause: (1) Permitting mutation without guaranteed reconciliation capability; (2) Overloading `None` for both "checked and confirmed absent" and "unable to check"; (3) Missing non-secret embedded intent markers in provider payloads.
+- Incorrect approach: (1) Silently bypassing reconciliation if `find_existing` is absent on the transport; (2) Treating reconciliation errors or exceptions as `NOT_FOUND`; (3) Using `None` as a polymorphic return type for missing, absent, or error states.
+- Correct approach:
+  1. Enforce that any transport used for `LIVE_WRITE` MUST possess a callable `find_existing` reconciliation method. Missing, `None`, or non-callable capability releases the reservation and fails closed with zero mutation.
+  2. Implement strongly-typed reconciliation contracts (`ReconciliationStatus` with `FOUND`, `NOT_FOUND`, `UNKNOWN`, `ERROR`, `GitHubReconciliationQuery`, and `GitHubReconciliationResult`).
+  3. Treat only authoritative `NOT_FOUND` as permission to execute a single fresh mutation. Reconciliation query exceptions and `UNKNOWN`/`ERROR` statuses release the reservation and fail closed with zero mutations.
+  4. Embed deterministic non-secret intent markers (`<!-- changemesh-intent: key={idempotency_key} digest={payload_digest} -->`) in Draft PR bodies for provider-observable cross-process reconciliation.
+  5. Validate full 10-step ambiguous post-write lease expiry and recovery sequence through P-10 state machinery, proving that total transport `execute()` mutation calls remain exactly 1 for the entire scenario.
+- Prevention rule: External live write transports must strictly mandate typed reconciliation capability; non-authoritative reconciliation results must fail closed with zero mutations; provider payloads must carry deterministic intent markers.
+- Tests/evidence: `tests/test_p19_release_steward.py` (45 passed); canonical unit suite (1265 passed, 1 warning).
+- Affected files: `integrations/github/github_adapter.py`, `tests/test_p19_release_steward.py`.
+- Reusable beyond this task: Yes (all external mutation boundaries, GitHub/cloud adapters, and dual-write recovery workflows).
+- Status: `ACTIVE`
