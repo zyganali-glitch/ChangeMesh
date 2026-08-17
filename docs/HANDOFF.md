@@ -81,12 +81,113 @@
 - P-14.05
 - P-14.06
 - P-14
+- P-15.00
+- P-15.01
+- P-15.02
+- P-15.03
+- P-15.04
+- P-15.05
+- P-15.06
+- P-15
+- P-16.00
+- P-16.01
+- P-16.02
+- P-16.03
+- P-16.04
+- P-16.05
+- P-16
+- P-17.00
+- P-17.01
+- P-17.02
+- P-17.03
+- P-17.04
+- P-17.05
+- P-17.06
+- P-17
+- P-18.00
+- P-18.01
+- P-18.02
+- P-18.03
+- P-18.04
+- P-18.05
+- P-18
+- P-19.00
+- P-19.01
+- P-19.02
+- P-19.04
+- P-19.05
+- P-19
+
+**Blocked:**
+- P-19.03 (GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable)
 
 **Active Phase:**
-P-15 (PENDING / NEXT)
+P-20 (PENDING / NEXT)
 
 **Next Exact Task:**
-P-15.00 — Impact Scout donor preflight
+P-20.00 — Long-running orchestration donor preflight
+
+## Current P-19 State (Five-Phase Batch P-15 → P-19 Complete)
+
+Phase P-19 is `DONE` (P-19.03 `BLOCKED`).
+
+### P-15 — Impact Scout (DONE)
+- **P-15.00:** Impact Scout donor preflight verified CS-BLAST-001 (D-CONTEXTSEAL, `0dc924db9d82037d2e813548bdee27af5f180889`) and GL-CONFLICT-001 (D-GITLAB, `3c4a412b6040d8a8154c15325943c409be9105f2`). ADAPTED reuse method confirmed.
+- **P-15.01:** Defined read-only Impact Scout tool contracts and output schemas in `src/git/impact_scout.py`. `ScanFinding`, `MetadataGraph`, `BlastRadiusArtifact`, `DependencyPath`, `ImpactedAsset` — all frozen, extra=forbid, no write credentials.
+- **P-15.02:** Created `build_synthetic_billing_graph()` producing a deterministic enterprise billing graph with 7 node types (BACKEND_SERVICE, MIGRATION, API_CLIENT, DASHBOARD, DATA_JOB, POLICY, SCHEMA) and multi-hop dependencies.
+- **P-15.03:** Implemented `RepositoryScanner` for read-only file/symbol/test/migration/conflict scanning with explicit unsupported-language handling.
+- **P-15.04:** Implemented `GraphTraverser` with BFS-based multi-hop path preservation, cycle-safe traversal, and explicit unknown-owner handling.
+- **P-15.05:** Implemented `BlastRadiusMerger` producing deduplicated `BlastRadiusArtifact` with SHA-256 digest, contradiction surfacing, and no provenance loss.
+- **P-15.06:** `DataHubReadAdapter` records `NOT_RUN` — no DataHub access available. No live claim.
+- **Evidence:** `tests/test_p15_impact_scout.py` passes 12 tests.
+
+### P-16 — Policy Guardian (DONE)
+- **P-16.00:** Policy Guardian donor preflight verified ZK-PRIV-001 (VERIFIED), CCT-PREFLIGHT-001, CS-BLAST-001 convergence. Policy authority = DETERMINISTIC_CODE.
+- **P-16.01:** Implemented `DeterministicPolicyChecker` in `src/policy/policy_engine.py` with 5 deterministic checks (secrets, prohibited data, unregistered tools, unauthorized paths, irreversible actions). Structured findings cannot be bypassed by model text.
+- **P-16.02:** Implemented `InjectionDetector` with 5 deterministic prompt-injection patterns. Model Armor managed result = `NOT_RUN` (PERMISSION_BLOCKED). Suspicious content quarantined.
+- **P-16.03:** Implemented `generate_policy_explanation()` — advisory only, GEMINI_SEMANTIC_JUDGMENT authority, cannot change severity/authorization. Finding count preserved.
+- **P-16.04:** Implemented `BoundPolicyDecision` binding policy evaluation to event, state, rehearsal, passport. No policy decision exists only in UI text.
+- **P-16.05:** Adversarial suite: malformed input, oversized input, encoding edges, malicious instructions — all handled without crash, secret leak, or silent allow.
+- **Evidence:** `tests/test_p16_policy_engine.py` passes 13 tests.
+
+### P-17 — Migration Engineer (DONE)
+- **P-17.00:** Migration Engineer donor preflight verified CS-MIG-001 (D-CONTEXTSEAL). Expand-migrate-contract invariants extracted.
+- **P-17.01:** Implemented `WorktreeGuard` in `src/migration/worktree_guard.py` confining writes to allowed roots. Path traversal (../) blocked, governance paths blocked, symlinks resolved.
+- **P-17.02:** Implemented `MigrationPlanGenerator` in `src/migration/plan_generator.py` producing `ExpandMigrateContractPlan` with 8 step types including dual-write, backfill, verification, rollback, and deferred removal.
+- **P-17.03:** Implemented `ArtifactGenerator` in `src/migration/artifact_generator.py` producing typed migration artifacts with SHA-256 content hashes. No unresolved placeholders.
+- **P-17.04:** Focused tests against synthetic repository pass.
+- **P-17.05:** Implemented `BoundedCorrectionEngine` in `src/migration/correction_engine.py` with max 3 attempts. Corrected plans re-rehearsed. Failed corrections remain FAIL.
+- **P-17.06:** Implemented `ManifestGenerator` in `src/migration/manifest_generator.py` producing `ChangedFileManifest` with deterministic hashes. `deployment_claim = 'NONE'` always.
+- **Evidence:** `tests/test_p17_migration_engineer.py` passes 11 tests.
+
+### P-18 — Evidence Auditor (DONE)
+- **P-18.00:** Evidence Auditor donor preflight verified CCT-SEM-001 (VERIFIED), ZK-CLAIM-001. Expected-answer leakage prevention confirmed.
+- **P-18.01:** Implemented `ClaimDerivationEngine` in `src/audit/claim_derivation.py`. Neutral claims with no expected verdict. Forbidden fields (expected_result, should_pass, etc.) rejected.
+- **P-18.02:** Implemented `AuditBundleBuilder` in `src/audit/audit_bundle.py` with bounded claims/evidence, credential redaction, allowlisted evidence keys, and SHA-256 bundle hash.
+- **P-18.03:** Implemented `SemanticAuditor` in `src/audit/semantic_auditor.py` producing `SemanticAuditReport`. Decisive verdicts require non-empty citations. Uncited decisive output fails closed. MVP uses deterministic fixture-based evaluation.
+- **P-18.04:** Implemented `DeterministicReconciler` in `src/audit/reconciliation.py`. Semantic disagreement → ADVISORY_REVIEW (not state change). Deterministic state always preserved.
+- **P-18.05:** Controlled gap demonstrated: pre-correction fixture with missing evidence → INSUFFICIENT; post-correction with evidence → SUPPORTS.
+- **Evidence:** `tests/test_p18_evidence_auditor.py` passes 8 tests.
+
+### P-19 — Release Steward (DONE, P-19.03 BLOCKED)
+- **P-19.00:** Release Steward donor preflight verified CS-WRITE-001, GL-CONFLICT-001, UIPATH-AUTH-001. External-write allowlist: branch + commits + draft PR only.
+- **P-19.01:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py`. Allowed: CREATE_BRANCH, CREATE_COMMIT, CREATE_DRAFT_PR. Forbidden: merge, deploy, force push, repo deletion, protected-branch update, secret access. Credentials are adapter-only, never in models.
+- **P-19.02:** Implemented `DryRunArtifact` for inspectable pre-mutation review. Zero external mutation. Credentials redacted. evidence_mode is NOT LIVE_WRITE.
+- **P-19.03:** **BLOCKED** — GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable. Adapter and dry-run fully implemented and tested; live write not executed.
+- **P-19.04:** Implemented `BriefingGenerator` in `src/release/briefing_generator.py`. Briefing links to Change ID, PR, evidence version. Does NOT manufacture human authority requirement.
+- **P-19.05:** Implemented `ReceiptManager` in `src/release/receipt_manager.py`. External-action receipts capture request/response metadata without credentials. `contains_credentials` is always False.
+- **Evidence:** `tests/test_p19_release_steward.py` passes 6 tests.
+
+### Batch Evidence
+- Canonical unit suite: **1226 passed, 1 warning** (1176 baseline + 50 new). Zero regressions.
+- Format: 0 violations across 168 files.
+- Lint: 0 errors.
+- Type-check: 0 errors across 127 source files.
+- Donor manifest lint: 20 components valid.
+- `git diff --check`: 0 whitespace/conflict issues.
+- Full suite: FAIL — known historical baseline GCP fixture debt (3 errors in `tests/test_gcp_access.py`).
+- Model Armor: PERMISSION_BLOCKED / NOT_RUN.
+- GitHub demo repository: NOT_CREATED (P-19.03 BLOCKED).
 
 ## Current P-14 State (Phase Complete — Five-Phase Batch P-10 → P-14 Complete)
 
