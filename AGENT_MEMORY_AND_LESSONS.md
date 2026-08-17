@@ -267,3 +267,19 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all external write adapters, GitHub/cloud integrations, and receipt managers).
 - Status: `ACTIVE`
 
+### LESSON-20260817-02 — Mandatory Durable Idempotency Grounding, Protected Branch Update Prevention, Post-Mutation Ambiguity Reservation Retention, and Read-Based Reconciliation
+- Date/time: 2026-08-17
+- Active task: P-19.01 Safety Hardening
+- Symptom: (1) An external write adapter could execute `LIVE_WRITE` mutations with a real transport without passing a `SagaStateRepository`, bypassing P-10 durable idempotency; (2) `CREATE_COMMIT` lacked branch validation, allowing direct commits to protected branches (`main`, `master`, `prod`, `production`, `release`) or None; (3) If the external provider mutation succeeded but the local durable `commit_intent` persistence failed, releasing the reservation could allow a retry to issue a duplicate external mutation; (4) Retries after lease expiry or process restart lacked read-based provider reconciliation (`find_existing`) before attempting re-mutation.
+- Root cause: (1) `is_live` property and `_execute_live_write` did not enforce `state_repository is not None`; (2) Protected branch validation was applied only to `CREATE_BRANCH` rather than both `CREATE_BRANCH` and `CREATE_COMMIT`; (3) Transport execution error handling did not differentiate pre-transport failure (where `release_intent` is correct) from post-provider-success commit persistence failure (where the reservation must be held); (4) Adapter lacked a narrow read/reconciliation hook to inspect existing provider entities before executing fresh mutations.
+- Incorrect approach: (1) Allowing live external writes without a durable saga state repository; (2) Releasing idempotency leases after provider-side success when local commit fails; (3) Blindly re-executing transport mutations on retry without first checking if the entity was already created on the provider.
+- Correct approach:
+  1. Require `state_repository is not None` and valid `tenant_id`/`change_id` for all `LIVE_WRITE` operations. Missing repository or binding fails closed with zero transport calls.
+  2. Validate `request.branch` for `CREATE_COMMIT`, strictly failing closed with 0 transport calls if empty or in `PROTECTED_BRANCHES` (`{"main", "master", "prod", "production", "release"}`).
+  3. Differentiate failure boundaries: pre-transport exceptions release the reservation via `release_intent`. If provider mutation succeeds (`transport_res.success == True`) but durable `commit_intent` fails, the reservation is held (never released) and an explicit fail-closed indeterminate error is returned requiring reconciliation before retry.
+  4. Implement `find_existing()` in `GitHubTransport` Protocol and invoke provider reconciliation before fresh mutations on granted reservations. If the entity exists, validate real identifiers, commit verified real evidence to the durable repository, and return success with zero duplicate mutation calls. If reconciliation check fails/errors, fail closed with zero mutation calls.
+- Prevention rule: Never permit live writes without durable state persistence; never release reservation leases after provider-side success; always perform read-based provider reconciliation before re-mutating external state.
+- Tests/evidence: `tests/test_p19_release_steward.py` (37 passed); canonical unit suite (1257 passed, 1 warning).
+- Affected files: `integrations/github/github_adapter.py`, `tests/test_p19_release_steward.py`.
+- Reusable beyond this task: Yes (all external write integrations and dual-write reconciliation boundaries).
+- Status: `ACTIVE`

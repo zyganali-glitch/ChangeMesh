@@ -98,6 +98,17 @@ class GitHubTransport(Protocol):
         files: dict[str, str],
     ) -> GitHubTransportResult: ...
 
+    def find_existing(
+        self,
+        token: str,
+        action: GitHubAction,
+        repository: str,
+        branch: str | None,
+        pr_title: str | None = None,
+        commit_message: str | None = None,
+        files: dict[str, str] | None = None,
+    ) -> GitHubTransportResult | None: ...
+
 
 class BoundedGitHubAdapter:
     """Bounded GitHub adapter: branch, commits, draft PR ONLY."""
@@ -136,7 +147,11 @@ class BoundedGitHubAdapter:
 
     @property
     def is_live(self) -> bool:
-        return bool(self._token and self._token.strip()) and (self._transport is not None)
+        return (
+            bool(self._token and self._token.strip())
+            and (self._transport is not None)
+            and (self._state_repository is not None)
+        )
 
     def _sanitize(self, message: str) -> str:
         if not message:
@@ -254,6 +269,24 @@ class BoundedGitHubAdapter:
                 )
 
         elif request.action == GitHubAction.CREATE_COMMIT:
+            if not request.branch or not request.branch.strip():
+                return GitHubResponse(
+                    request_id=request.request_id,
+                    action=request.action,
+                    success=False,
+                    error_message="Branch name must be explicit and non-empty for CREATE_COMMIT",
+                    evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                    idempotency_key=request.idempotency_key,
+                )
+            if request.branch.strip().lower() in self.PROTECTED_BRANCHES:
+                return GitHubResponse(
+                    request_id=request.request_id,
+                    action=request.action,
+                    success=False,
+                    error_message=(f"Commit on protected branch {request.branch!r} is forbidden"),
+                    evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                    idempotency_key=request.idempotency_key,
+                )
             if not request.commit_message or not request.commit_message.strip():
                 return GitHubResponse(
                     request_id=request.request_id,
@@ -303,155 +336,300 @@ class BoundedGitHubAdapter:
                 idempotency_key=request.idempotency_key,
             )
 
+        if self._state_repository is None:
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=(
+                    "Durable SagaStateRepository is required for LIVE_WRITE external mutations"
+                ),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
         tenant_id = request.tenant_id or self._tenant_id
         change_id = request.change_id or self._change_id
-        reservation_outcome = None
-        intent = None
-
-        if self._state_repository is not None:
-            # Build semantic mutation payload dictionary (strictly excluding request_id)
-            if request.action == GitHubAction.CREATE_DRAFT_PR:
-                payload_dict = {
-                    "action": request.action.value,
-                    "repository": request.repository,
-                    "branch": request.branch,
-                    "pr_title": request.pr_title,
-                    "pr_body": request.pr_body or "",
-                }
-            elif request.action == GitHubAction.CREATE_COMMIT:
-                payload_dict = {
-                    "action": request.action.value,
-                    "repository": request.repository,
-                    "branch": request.branch or "",
-                    "commit_message": request.commit_message,
-                    "files": sorted(request.files.items()) if request.files else [],
-                }
-            elif request.action == GitHubAction.CREATE_BRANCH:
-                payload_dict = {
-                    "action": request.action.value,
-                    "repository": request.repository,
-                    "branch": request.branch,
-                }
-            else:
-                payload_dict = {
-                    "action": request.action.value,
-                    "repository": request.repository,
-                    "branch": request.branch,
-                }
-
-            payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
-
-            if request.idempotency_key:
-                action_type = f"{request.action.value}:{request.idempotency_key}"
-            else:
-                action_type = f"{request.action.value}:{request.branch or 'default'}"
-
-            intent = IdempotencyIntent(
-                tenant_id=tenant_id,
-                change_id=change_id,
-                scope=IdempotencyScope.EXTERNAL_WRITE,
-                action_type=action_type,
-                target_system=request.repository,
-                caller_revision="1.0.0",
-                payload_digest=payload_digest,
+        if not tenant_id or not tenant_id.strip() or not change_id or not change_id.strip():
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=(
+                    "Valid tenant_id and change_id are required for LIVE_WRITE idempotency"
+                ),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
             )
-            try:
-                reservation_outcome = IdempotencyKeyManager.reserve_intent(
-                    self._state_repository, intent
-                )
-            except Exception as ex:
-                return GitHubResponse(
-                    request_id=request.request_id,
-                    action=request.action,
-                    success=False,
-                    error_message=self._sanitize(f"Idempotency reservation failed: {ex}"),
-                    evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                    idempotency_key=request.idempotency_key,
-                )
 
-            # In-progress by another active worker -> fail closed with zero transport call
-            if reservation_outcome.status == IdempotencyReservationOutcomeStatus.IN_PROGRESS:
+        # Build semantic mutation payload dictionary (strictly excluding request_id)
+        if request.action == GitHubAction.CREATE_DRAFT_PR:
+            payload_dict = {
+                "action": request.action.value,
+                "repository": request.repository,
+                "branch": request.branch,
+                "pr_title": request.pr_title,
+                "pr_body": request.pr_body or "",
+            }
+        elif request.action == GitHubAction.CREATE_COMMIT:
+            payload_dict = {
+                "action": request.action.value,
+                "repository": request.repository,
+                "branch": request.branch or "",
+                "commit_message": request.commit_message,
+                "files": sorted(request.files.items()) if request.files else [],
+            }
+        elif request.action == GitHubAction.CREATE_BRANCH:
+            payload_dict = {
+                "action": request.action.value,
+                "repository": request.repository,
+                "branch": request.branch,
+            }
+        else:
+            payload_dict = {
+                "action": request.action.value,
+                "repository": request.repository,
+                "branch": request.branch,
+            }
+
+        payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+
+        if request.idempotency_key:
+            action_type = f"{request.action.value}:{request.idempotency_key}"
+        else:
+            action_type = f"{request.action.value}:{request.branch or 'default'}"
+
+        intent = IdempotencyIntent(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            scope=IdempotencyScope.EXTERNAL_WRITE,
+            action_type=action_type,
+            target_system=request.repository,
+            caller_revision="1.0.0",
+            payload_digest=payload_digest,
+        )
+        try:
+            reservation_outcome = IdempotencyKeyManager.reserve_intent(
+                self._state_repository, intent
+            )
+        except Exception as ex:
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=self._sanitize(f"Idempotency reservation failed: {ex}"),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
+        # In-progress by another active worker -> fail closed with zero transport call
+        if reservation_outcome.status == IdempotencyReservationOutcomeStatus.IN_PROGRESS:
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=(
+                    f"External write intent {action_type!r} is already in progress "
+                    f"by an active worker"
+                ),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
+        # Exact replay -> return verified real cached result without second transport call
+        if reservation_outcome.status == IdempotencyReservationOutcomeStatus.EXACT_REPLAY:
+            cached_res = reservation_outcome.cached_receipt_status
+            result_url = None
+            commit_sha = None
+
+            if request.action == GitHubAction.CREATE_DRAFT_PR:
+                if not cached_res or not re.match(
+                    r"^https://github\.com/[^/]+/[^/]+/pull/\d+$", cached_res
+                ):
+                    return GitHubResponse(
+                        request_id=request.request_id,
+                        action=request.action,
+                        success=False,
+                        error_message="Cached replay receipt missing or invalid real PR URL",
+                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                        idempotency_key=request.idempotency_key,
+                    )
+                result_url = cached_res
+
+            elif request.action == GitHubAction.CREATE_COMMIT:
+                if (
+                    not cached_res
+                    or cached_res == "fixture-sha"
+                    or not re.match(r"^[0-9a-f]{40,64}$", cached_res)
+                ):
+                    return GitHubResponse(
+                        request_id=request.request_id,
+                        action=request.action,
+                        success=False,
+                        error_message="Cached replay receipt missing or invalid commit SHA",
+                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                        idempotency_key=request.idempotency_key,
+                    )
+                commit_sha = cached_res
+
+            elif request.action == GitHubAction.CREATE_BRANCH:
+                if not cached_res or not re.match(
+                    r"^https://github\.com/[^/]+/[^/]+/tree/.+$", cached_res
+                ):
+                    return GitHubResponse(
+                        request_id=request.request_id,
+                        action=request.action,
+                        success=False,
+                        error_message="Cached replay receipt missing or invalid branch URL",
+                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                        idempotency_key=request.idempotency_key,
+                    )
+                result_url = cached_res
+
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=True,
+                result_url=result_url,
+                commit_sha=commit_sha,
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
+        if reservation_outcome.status != IdempotencyReservationOutcomeStatus.GRANTED:
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=(
+                    f"Idempotency reservation not granted: "
+                    f"status={reservation_outcome.status.value}"
+                ),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
+            )
+
+        # Check provider reconciliation before executing mutation
+        if hasattr(self._transport, "find_existing") and callable(
+            getattr(self._transport, "find_existing")
+        ):
+            try:
+                existing_transport_res = self._transport.find_existing(
+                    token=self._token,
+                    action=request.action,
+                    repository=request.repository,
+                    branch=request.branch,
+                    pr_title=request.pr_title,
+                    commit_message=request.commit_message,
+                    files=request.files,
+                )
+            except Exception as find_ex:
+                # Reconciliation query failed -> fail closed, zero mutation
                 return GitHubResponse(
                     request_id=request.request_id,
                     action=request.action,
                     success=False,
-                    error_message=(
-                        f"External write intent {action_type!r} is already in progress "
-                        f"by an active worker"
+                    error_message=self._sanitize(
+                        f"Provider reconciliation check failed: {find_ex}"
                     ),
                     evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
                     idempotency_key=request.idempotency_key,
                 )
 
-            # Exact replay -> return verified real cached result without second transport call
-            if reservation_outcome.status == IdempotencyReservationOutcomeStatus.EXACT_REPLAY:
-                cached_res = reservation_outcome.cached_receipt_status
-                result_url = None
-                commit_sha = None
+            if existing_transport_res is not None:
+                if not existing_transport_res.success:
+                    # Reconciliation query returned an error status -> fail closed, zero mutation
+                    return GitHubResponse(
+                        request_id=request.request_id,
+                        action=request.action,
+                        success=False,
+                        error_message=self._sanitize(
+                            existing_transport_res.error_message
+                            or "Provider reconciliation check returned failure"
+                        ),
+                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                        idempotency_key=request.idempotency_key,
+                    )
+
+                # Reconciled existing action found on provider!
+                # Validate provider response format
+                reconciled_url = existing_transport_res.result_url
+                reconciled_sha = existing_transport_res.commit_sha
 
                 if request.action == GitHubAction.CREATE_DRAFT_PR:
-                    if not cached_res or not re.match(
-                        r"^https://github\.com/[^/]+/[^/]+/pull/\d+$", cached_res
+                    if not reconciled_url or not re.match(
+                        r"^https://github\.com/[^/]+/[^/]+/pull/\d+$", reconciled_url
                     ):
                         return GitHubResponse(
                             request_id=request.request_id,
                             action=request.action,
                             success=False,
-                            error_message="Cached replay receipt missing or invalid real PR URL",
+                            error_message="Reconciled PR response missing valid real PR URL",
                             evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
                             idempotency_key=request.idempotency_key,
                         )
-                    result_url = cached_res
-
                 elif request.action == GitHubAction.CREATE_COMMIT:
                     if (
-                        not cached_res
-                        or cached_res == "fixture-sha"
-                        or not re.match(r"^[0-9a-f]{40,64}$", cached_res)
+                        not reconciled_sha
+                        or reconciled_sha == "fixture-sha"
+                        or not re.match(r"^[0-9a-f]{40,64}$", reconciled_sha)
                     ):
                         return GitHubResponse(
                             request_id=request.request_id,
                             action=request.action,
                             success=False,
-                            error_message="Cached replay receipt missing or invalid commit SHA",
+                            error_message=(
+                                "Reconciled commit response missing valid real commit SHA"
+                            ),
                             evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
                             idempotency_key=request.idempotency_key,
                         )
-                    commit_sha = cached_res
-
                 elif request.action == GitHubAction.CREATE_BRANCH:
-                    if not cached_res or not re.match(
-                        r"^https://github\.com/[^/]+/[^/]+/tree/.+$", cached_res
+                    if not reconciled_url or not re.match(
+                        r"^https://github\.com/[^/]+/[^/]+/tree/.+$", reconciled_url
                     ):
                         return GitHubResponse(
                             request_id=request.request_id,
                             action=request.action,
                             success=False,
-                            error_message="Cached replay receipt missing or invalid branch URL",
+                            error_message="Reconciled branch response missing valid branch URL",
                             evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
                             idempotency_key=request.idempotency_key,
                         )
-                    result_url = cached_res
+
+                # Persist reconciled result to durable state repository
+                res_val = reconciled_url or reconciled_sha or "APPLIED"
+                result_digest = sha256_hex(
+                    canonical_json_bytes({"result": res_val, "action": request.action.value})
+                )
+                try:
+                    IdempotencyKeyManager.commit_intent(
+                        self._state_repository,
+                        tenant_id,
+                        change_id,
+                        reservation_outcome.reservation.reservation_id,
+                        result_digest=result_digest,
+                        receipt_status=res_val,
+                    )
+                except Exception as commit_ex:
+                    return GitHubResponse(
+                        request_id=request.request_id,
+                        action=request.action,
+                        success=False,
+                        error_message=self._sanitize(
+                            f"Reconciled existing provider entity ({res_val}) "
+                            f"but durable commit failed: {commit_ex}"
+                        ),
+                        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                        idempotency_key=request.idempotency_key,
+                    )
 
                 return GitHubResponse(
                     request_id=request.request_id,
                     action=request.action,
                     success=True,
-                    result_url=result_url,
-                    commit_sha=commit_sha,
-                    evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                    idempotency_key=request.idempotency_key,
-                )
-
-            if reservation_outcome.status != IdempotencyReservationOutcomeStatus.GRANTED:
-                return GitHubResponse(
-                    request_id=request.request_id,
-                    action=request.action,
-                    success=False,
-                    error_message=(
-                        f"Idempotency reservation not granted: "
-                        f"status={reservation_outcome.status.value}"
-                    ),
+                    result_url=reconciled_url,
+                    commit_sha=reconciled_sha,
                     evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
                     idempotency_key=request.idempotency_key,
                 )
@@ -468,17 +646,16 @@ class BoundedGitHubAdapter:
                 files=request.files,
             )
         except Exception as ex:
-            if (
-                self._state_repository is not None
-                and reservation_outcome
-                and reservation_outcome.reservation
-            ):
-                IdempotencyKeyManager.release_intent(
-                    self._state_repository,
-                    tenant_id,
-                    change_id,
-                    reservation_outcome.reservation.reservation_id,
-                )
+            if reservation_outcome and reservation_outcome.reservation:
+                try:
+                    IdempotencyKeyManager.release_intent(
+                        self._state_repository,
+                        tenant_id,
+                        change_id,
+                        reservation_outcome.reservation.reservation_id,
+                    )
+                except Exception:
+                    pass
             return GitHubResponse(
                 request_id=request.request_id,
                 action=request.action,
@@ -489,17 +666,16 @@ class BoundedGitHubAdapter:
             )
 
         if not transport_res.success:
-            if (
-                self._state_repository is not None
-                and reservation_outcome
-                and reservation_outcome.reservation
-            ):
-                IdempotencyKeyManager.release_intent(
-                    self._state_repository,
-                    tenant_id,
-                    change_id,
-                    reservation_outcome.reservation.reservation_id,
-                )
+            if reservation_outcome and reservation_outcome.reservation:
+                try:
+                    IdempotencyKeyManager.release_intent(
+                        self._state_repository,
+                        tenant_id,
+                        change_id,
+                        reservation_outcome.reservation.reservation_id,
+                    )
+                except Exception:
+                    pass
             return GitHubResponse(
                 request_id=request.request_id,
                 action=request.action,
@@ -511,21 +687,11 @@ class BoundedGitHubAdapter:
                 idempotency_key=request.idempotency_key,
             )
 
+        # Provider SUCCESS observed!
         if request.action == GitHubAction.CREATE_DRAFT_PR:
             if not transport_res.result_url or not re.match(
                 r"^https://github\.com/[^/]+/[^/]+/pull/\d+$", transport_res.result_url
             ):
-                if (
-                    self._state_repository is not None
-                    and reservation_outcome
-                    and reservation_outcome.reservation
-                ):
-                    IdempotencyKeyManager.release_intent(
-                        self._state_repository,
-                        tenant_id,
-                        change_id,
-                        reservation_outcome.reservation.reservation_id,
-                    )
                 return GitHubResponse(
                     request_id=request.request_id,
                     action=request.action,
@@ -541,17 +707,6 @@ class BoundedGitHubAdapter:
                 or transport_res.commit_sha == "fixture-sha"
                 or not re.match(r"^[0-9a-f]{40,64}$", transport_res.commit_sha)
             ):
-                if (
-                    self._state_repository is not None
-                    and reservation_outcome
-                    and reservation_outcome.reservation
-                ):
-                    IdempotencyKeyManager.release_intent(
-                        self._state_repository,
-                        tenant_id,
-                        change_id,
-                        reservation_outcome.reservation.reservation_id,
-                    )
                 return GitHubResponse(
                     request_id=request.request_id,
                     action=request.action,
@@ -565,17 +720,6 @@ class BoundedGitHubAdapter:
             if not transport_res.result_url or not re.match(
                 r"^https://github\.com/[^/]+/[^/]+/tree/.+$", transport_res.result_url
             ):
-                if (
-                    self._state_repository is not None
-                    and reservation_outcome
-                    and reservation_outcome.reservation
-                ):
-                    IdempotencyKeyManager.release_intent(
-                        self._state_repository,
-                        tenant_id,
-                        change_id,
-                        reservation_outcome.reservation.reservation_id,
-                    )
                 return GitHubResponse(
                     request_id=request.request_id,
                     action=request.action,
@@ -585,16 +729,12 @@ class BoundedGitHubAdapter:
                     idempotency_key=request.idempotency_key,
                 )
 
-        if (
-            self._state_repository is not None
-            and reservation_outcome
-            and reservation_outcome.reservation
-            and intent is not None
-        ):
-            res_val = transport_res.result_url or transport_res.commit_sha or "APPLIED"
-            result_digest = sha256_hex(
-                canonical_json_bytes({"result": res_val, "action": request.action.value})
-            )
+        # Commit reservation to durable storage (DO NOT release on commit failure!)
+        res_val = transport_res.result_url or transport_res.commit_sha or "APPLIED"
+        result_digest = sha256_hex(
+            canonical_json_bytes({"result": res_val, "action": request.action.value})
+        )
+        try:
             IdempotencyKeyManager.commit_intent(
                 self._state_repository,
                 tenant_id,
@@ -602,6 +742,19 @@ class BoundedGitHubAdapter:
                 reservation_outcome.reservation.reservation_id,
                 result_digest=result_digest,
                 receipt_status=res_val,
+            )
+        except Exception as commit_ex:
+            return GitHubResponse(
+                request_id=request.request_id,
+                action=request.action,
+                success=False,
+                error_message=self._sanitize(
+                    f"External mutation succeeded on provider ({res_val}) "
+                    f"but durable commit failed: {commit_ex}. "
+                    f"Reservation held; reconciliation required before retry."
+                ),
+                evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                idempotency_key=request.idempotency_key,
             )
 
         return GitHubResponse(

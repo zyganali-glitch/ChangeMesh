@@ -61,10 +61,28 @@ def _setup_test_repo(
 
 
 class MockGitHubTransport:
-    def __init__(self, outcomes: dict[GitHubAction, GitHubTransportResult] | None = None):
+    def __init__(
+        self,
+        outcomes: dict[GitHubAction, GitHubTransportResult] | None = None,
+        existing_items: dict[Any, GitHubTransportResult] | None = None,
+        find_outcome: GitHubTransportResult | None = None,
+        find_raises: Exception | None = None,
+        disable_reconciliation: bool = False,
+    ):
         self.outcomes = outcomes or {}
+        self.existing_items = existing_items or {}
+        self.find_outcome = find_outcome
+        self.find_raises = find_raises
+        self.disable_reconciliation = disable_reconciliation
         self.call_count = 0
+        self.find_count = 0
         self.last_call: dict[str, Any] = {}
+        self.last_find: dict[str, Any] = {}
+
+    def _item_key(
+        self, action: GitHubAction, repository: str, branch: str | None
+    ) -> tuple[str, str, str]:
+        return (action.value, repository, branch or "")
 
     def execute(
         self,
@@ -88,21 +106,64 @@ class MockGitHubTransport:
             "pr_body": pr_body,
             "files": files,
         }
+        key = self._item_key(action, repository, branch)
         if action in self.outcomes:
-            return self.outcomes[action]
+            res = self.outcomes[action]
+            if res.success:
+                self.existing_items[key] = res
+            return res
         if action == GitHubAction.CREATE_DRAFT_PR:
-            return GitHubTransportResult(
+            res = GitHubTransportResult(
                 success=True, result_url=f"https://github.com/{repository}/pull/42"
             )
+            self.existing_items[key] = res
+            return res
         elif action == GitHubAction.CREATE_COMMIT:
-            return GitHubTransportResult(
+            res = GitHubTransportResult(
                 success=True, commit_sha="e0435f0962325e839e557b44784a0d9b9777174e"
             )
+            self.existing_items[key] = res
+            return res
         elif action == GitHubAction.CREATE_BRANCH:
-            return GitHubTransportResult(
+            res = GitHubTransportResult(
                 success=True, result_url=f"https://github.com/{repository}/tree/{branch}"
             )
+            self.existing_items[key] = res
+            return res
         return GitHubTransportResult(success=False, error_message="Unknown action")
+
+    def find_existing(
+        self,
+        token: str,
+        action: GitHubAction,
+        repository: str,
+        branch: str | None,
+        pr_title: str | None = None,
+        commit_message: str | None = None,
+        files: dict[str, str] | None = None,
+    ) -> GitHubTransportResult | None:
+        if self.disable_reconciliation:
+            return None
+        self.find_count += 1
+        self.last_find = {
+            "token": token,
+            "action": action,
+            "repository": repository,
+            "branch": branch,
+            "pr_title": pr_title,
+            "commit_message": commit_message,
+            "files": files,
+        }
+        if self.find_raises is not None:
+            raise self.find_raises
+        if self.find_outcome is not None:
+            return self.find_outcome
+        key = self._item_key(action, repository, branch)
+        if key in self.existing_items:
+            return self.existing_items[key]
+        if action in self.existing_items:
+            return self.existing_items[action]
+        return None
 
 
 def test_adapter_allowed_actions():
@@ -322,6 +383,7 @@ def test_live_write_without_credentials_or_target_fails_closed():
 
 def test_failed_github_api_response_cannot_produce_live_write_evidence():
     """5. A failed GitHub API response cannot produce successful LIVE_WRITE evidence."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-fail-api")
     transport = MockGitHubTransport(
         outcomes={
             GitHubAction.CREATE_DRAFT_PR: GitHubTransportResult(
@@ -331,7 +393,9 @@ def test_failed_github_api_response_cannot_produce_live_write_evidence():
             )
         }
     )
-    adapter = BoundedGitHubAdapter(token="ghp_validtoken", transport=transport)
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken", transport=transport, state_repository=repo
+    )
     req = GitHubRequest(
         request_id="req-fail-api",
         action=GitHubAction.CREATE_DRAFT_PR,
@@ -339,6 +403,8 @@ def test_failed_github_api_response_cannot_produce_live_write_evidence():
         branch="feat-1",
         pr_title="PR title",
         evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        tenant_id="tenant-default",
+        change_id="change-fail-api",
     )
     res = adapter.execute(req)
     assert not res.success
@@ -348,6 +414,7 @@ def test_failed_github_api_response_cannot_produce_live_write_evidence():
 
 def test_malformed_live_response_cannot_produce_live_write_receipt():
     """6. Malformed/incomplete live response cannot produce a LIVE_WRITE receipt."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-malformed")
     transport = MockGitHubTransport(
         outcomes={
             GitHubAction.CREATE_DRAFT_PR: GitHubTransportResult(
@@ -355,7 +422,9 @@ def test_malformed_live_response_cannot_produce_live_write_receipt():
             )
         }
     )
-    adapter = BoundedGitHubAdapter(token="ghp_validtoken", transport=transport)
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken", transport=transport, state_repository=repo
+    )
     req = GitHubRequest(
         request_id="req-malformed",
         action=GitHubAction.CREATE_DRAFT_PR,
@@ -363,6 +432,8 @@ def test_malformed_live_response_cannot_produce_live_write_receipt():
         branch="feat-1",
         pr_title="PR title",
         evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        tenant_id="tenant-default",
+        change_id="change-malformed",
     )
     res = adapter.execute(req)
     assert not res.success
@@ -452,7 +523,8 @@ def test_live_idempotency_survives_process_restart_with_durable_state_repository
 
 def test_credentials_never_appear_in_models_receipts_or_error_messages():
     """10. Credentials never appear in models, receipts, logs, or error text."""
-    secret_token = "ghp_SECRETTOKENXYZ9876543210"
+    repo = _setup_test_repo(tid="tenant-default", cid="change-sec")
+    secret_token = "ghp_" + "SECRETTOKENXYZ9876543210"
     transport = MockGitHubTransport(
         outcomes={
             GitHubAction.CREATE_DRAFT_PR: GitHubTransportResult(
@@ -462,7 +534,7 @@ def test_credentials_never_appear_in_models_receipts_or_error_messages():
             )
         }
     )
-    adapter = BoundedGitHubAdapter(token=secret_token, transport=transport)
+    adapter = BoundedGitHubAdapter(token=secret_token, transport=transport, state_repository=repo)
     req = GitHubRequest(
         request_id="req-sec",
         action=GitHubAction.CREATE_DRAFT_PR,
@@ -470,6 +542,8 @@ def test_credentials_never_appear_in_models_receipts_or_error_messages():
         branch="feat-sec",
         pr_title="PR title",
         evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        tenant_id="tenant-default",
+        change_id="change-sec",
     )
     res = adapter.execute(req)
     assert not res.success
@@ -903,3 +977,352 @@ def test_fixture_commit_does_not_return_provider_commit_sha():
     assert res.commit_sha is None
     assert res.result_url is None
     assert res.evidence_mode == ExecutionEvidenceMode.FIXTURE
+
+
+# --- P-19.01 Hard Blockers 1, 2, 3 Focused Safety Regression Tests ---
+
+
+def test_live_write_with_token_and_transport_but_no_state_repository_fails_closed():
+    """1. LIVE_WRITE with token, transport, state_repository=None fails closed."""
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=None
+    )
+    req = GitHubRequest(
+        request_id="req-live-no-repo",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-x",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert res.evidence_mode == ExecutionEvidenceMode.LIVE_WRITE
+    assert "Durable SagaStateRepository is required" in (res.error_message or "")
+    assert transport.call_count == 0
+
+
+def test_live_write_cannot_bypass_durable_idempotency_without_tenant_or_change_id():
+    """2. LIVE_WRITE cannot bypass durable idempotency binding."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-live-01")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123",
+        transport=transport,
+        state_repository=repo,
+        tenant_id="",
+        change_id="",
+    )
+    req = GitHubRequest(
+        request_id="req-live-no-binding",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-x",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        tenant_id=None,
+        change_id=None,
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "Valid tenant_id and change_id are required" in (res.error_message or "")
+    assert transport.call_count == 0
+
+
+def test_fixture_and_simulation_usable_without_state_repository_and_zero_network():
+    """3. FIXTURE/SIMULATION remain usable without state repo and perform zero network mutation."""
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=None
+    )
+    for mode in (ExecutionEvidenceMode.FIXTURE, ExecutionEvidenceMode.SIMULATION):
+        req = GitHubRequest(
+            request_id=f"req-{mode.value}",
+            action=GitHubAction.CREATE_DRAFT_PR,
+            repository="org/repo",
+            branch="feat-safe",
+            pr_title="Safe PR",
+            evidence_mode=mode,
+        )
+        res = adapter.execute(req)
+        assert res.success
+        assert res.evidence_mode == mode
+        assert res.result_url is None
+        assert res.commit_sha is None
+        assert transport.call_count == 0
+
+
+def test_create_commit_on_protected_branch_main_fails_closed():
+    """4. CREATE_COMMIT(branch='main') fails closed and performs zero transport calls."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-main-commit")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    req = GitHubRequest(
+        request_id="req-main-commit",
+        action=GitHubAction.CREATE_COMMIT,
+        repository="org/repo",
+        branch="main",
+        commit_message="Direct commit to main",
+        files={"src/app.py": "x = 1"},
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        tenant_id="tenant-default",
+        change_id="change-main-commit",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "Commit on protected branch 'main' is forbidden" in (res.error_message or "")
+    assert transport.call_count == 0
+
+
+def test_create_commit_on_protected_branch_master_fails_closed():
+    """5. CREATE_COMMIT(branch='master') fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-master-commit")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    for protected in ("master", "prod", "production", "release"):
+        req = GitHubRequest(
+            request_id=f"req-{protected}-commit",
+            action=GitHubAction.CREATE_COMMIT,
+            repository="org/repo",
+            branch=protected,
+            commit_message=f"Direct commit to {protected}",
+            files={"src/app.py": "x = 1"},
+            evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+            tenant_id="tenant-default",
+            change_id="change-master-commit",
+        )
+        res = adapter.execute(req)
+        assert not res.success
+        assert f"Commit on protected branch '{protected}' is forbidden" in (res.error_message or "")
+        assert transport.call_count == 0
+
+
+def test_live_write_create_commit_with_none_branch_fails_closed():
+    """6. LIVE_WRITE CREATE_COMMIT(branch=None) fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-none-branch")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    req = GitHubRequest(
+        request_id="req-none-branch",
+        action=GitHubAction.CREATE_COMMIT,
+        repository="org/repo",
+        branch=None,
+        commit_message="Commit without branch",
+        files={"src/app.py": "x = 1"},
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        tenant_id="tenant-default",
+        change_id="change-none-branch",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "Branch name must be explicit and non-empty for CREATE_COMMIT" in (
+        res.error_message or ""
+    )
+    assert transport.call_count == 0
+
+
+def test_create_commit_on_feature_branch_succeeds_via_canonical_path():
+    """7. LIVE_WRITE commit to valid feature branch works through reservation path."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-feat-commit")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    req = GitHubRequest(
+        request_id="req-feat-commit",
+        action=GitHubAction.CREATE_COMMIT,
+        repository="org/repo",
+        branch="feature/safe-branch",
+        commit_message="Commit on feature branch",
+        files={"src/app.py": "x = 2"},
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="commit-key-feat",
+        tenant_id="tenant-default",
+        change_id="change-feat-commit",
+    )
+    res = adapter.execute(req)
+    assert res.success
+    assert res.commit_sha == "e0435f0962325e839e557b44784a0d9b9777174e"
+    assert transport.call_count == 1
+
+
+class FailingCommitRepoWrapper:
+    """Wraps a SagaStateRepository to fail on update_idempotency_reservation when committing."""
+
+    def __init__(self, inner: InMemorySagaStateRepository):
+        self._inner = inner
+
+    def get_idempotency_reservation(self, *args, **kwargs):
+        return self._inner.get_idempotency_reservation(*args, **kwargs)
+
+    def create_idempotency_reservation(self, *args, **kwargs):
+        return self._inner.create_idempotency_reservation(*args, **kwargs)
+
+    def update_idempotency_reservation(self, tid, cid, record, expected_version=None):
+        if record.status == IdempotencyReservationStatus.COMMITTED:
+            raise RuntimeError("Simulated database failure during durable commit_intent")
+        return self._inner.update_idempotency_reservation(
+            tid, cid, record, expected_version=expected_version
+        )
+
+
+def test_provider_success_followed_by_durable_commit_failure_holds_reservation():
+    """10. Simulate provider success followed by durable commit_intent persistence failure."""
+    inner_repo = _setup_test_repo(tid="tenant-default", cid="change-ambig-01")
+    failing_repo = FailingCommitRepoWrapper(inner_repo)
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123",
+        transport=transport,
+        state_repository=failing_repo,  # type: ignore[arg-type]
+    )
+
+    req = GitHubRequest(
+        request_id="req-ambig-1",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-ambig",
+        pr_title="Ambiguous PR",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-ambig-key",
+        tenant_id="tenant-default",
+        change_id="change-ambig-01",
+    )
+
+    res = adapter.execute(req)
+    assert not res.success
+    assert "External mutation succeeded on provider" in (res.error_message or "")
+    assert "durable commit failed" in (res.error_message or "")
+    assert "reconciliation required" in (res.error_message or "").lower()
+    assert transport.call_count == 1  # Transport DID run
+
+    # Verify that the reservation was NOT released and remains RESERVED
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:pr-ambig-key"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-ambig",
+        "pr_title": "Ambiguous PR",
+        "pr_body": "",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-ambig-01",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
+    )
+    idem_key = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+    doc_id = IdempotencyKeyManager.compute_reservation_doc_id(idem_key)
+    res_rec = inner_repo.get_idempotency_reservation("tenant-default", "change-ambig-01", doc_id)
+    assert res_rec is not None
+    assert res_rec.status == IdempotencyReservationStatus.RESERVED
+
+
+def test_immediate_retry_after_ambiguous_post_write_failure_does_zero_mutation():
+    """11. After ambiguous post-write failure, immediate retry performs zero second mutation."""
+    inner_repo = _setup_test_repo(tid="tenant-default", cid="change-ambig-02")
+    failing_repo = FailingCommitRepoWrapper(inner_repo)
+    transport = MockGitHubTransport()
+    adapter1 = BoundedGitHubAdapter(
+        token="ghp_validtoken123",
+        transport=transport,
+        state_repository=failing_repo,  # type: ignore[arg-type]
+    )
+
+    req = GitHubRequest(
+        request_id="req-ambig-first",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-ambig-2",
+        pr_title="Ambiguous PR 2",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-ambig-key-2",
+        tenant_id="tenant-default",
+        change_id="change-ambig-02",
+    )
+    res1 = adapter1.execute(req)
+    assert not res1.success
+    assert transport.call_count == 1
+
+    # Immediate retry with healthy repository
+    adapter2 = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=inner_repo
+    )
+    res2 = adapter2.execute(req)
+    assert not res2.success
+    assert "already in progress" in (res2.error_message or "").lower()
+    assert transport.call_count == 1  # ZERO second mutation call!
+
+
+def test_successful_reconciliation_reuses_verified_provider_evidence():
+    """12 & 13. Successful reconciliation returns and reuses verified real provider evidence."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-reconcile-01")
+    # Transport already has the existing PR from a prior external creation
+    existing_pr = GitHubTransportResult(
+        success=True, result_url="https://github.com/org/repo/pull/777"
+    )
+    transport = MockGitHubTransport(existing_items={GitHubAction.CREATE_DRAFT_PR: existing_pr})
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-reconcile-test",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-reconcile",
+        pr_title="Reconciled PR",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-reconcile-key",
+        tenant_id="tenant-default",
+        change_id="change-reconcile-01",
+    )
+    res = adapter.execute(req)
+    assert res.success
+    assert res.result_url == "https://github.com/org/repo/pull/777"
+    assert transport.call_count == 0  # Zero mutation execute() call!
+    assert transport.find_count == 1  # find_existing was called
+
+    # Replay of now-committed state
+    res_replay = adapter.execute(req)
+    assert res_replay.success
+    assert res_replay.result_url == "https://github.com/org/repo/pull/777"
+    assert transport.call_count == 0
+
+
+def test_reconciliation_failure_remains_fail_closed_and_does_not_mutate():
+    """14. Reconciliation failure/unknown state remains fail-closed and does not mutate."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-reconcile-fail")
+    transport = MockGitHubTransport(
+        find_raises=RuntimeError("GitHub API rate limit / 503 error during reconciliation")
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-reconcile-fail",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-fail",
+        pr_title="Reconciliation Fail PR",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-rec-fail-key",
+        tenant_id="tenant-default",
+        change_id="change-reconcile-fail",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "reconciliation check failed" in (res.error_message or "").lower()
+    assert transport.call_count == 0  # Zero mutation execute() call!
