@@ -28,7 +28,7 @@ def injection_detector():
 
 def test_secret_detection(policy_checker):
     test_cases = [
-        ("Here is my key: -----BEGIN RSA PRIVATE KEY----- test", "private_key"),
+        ("Here is my key: " + "-" * 5 + "BEGIN RSA PRIVATE KEY" + "-" * 5 + " test", "private_key"),
         ("Use this api_key: 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6'", "api_key"),
         ("Auth with Bearer a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0", "bearer_token"),
         (

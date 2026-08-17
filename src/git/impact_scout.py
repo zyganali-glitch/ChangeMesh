@@ -364,9 +364,7 @@ class GraphTraverser:
         for start_id in start_ids:
             if start_id not in graph.nodes:
                 continue
-            queue: deque[tuple[str, list[str], list[str]]] = deque(
-                [(start_id, [start_id], [])]
-            )
+            queue: deque[tuple[str, list[str], list[str]]] = deque([(start_id, [start_id], [])])
             visited = {start_id}
 
             while queue:
