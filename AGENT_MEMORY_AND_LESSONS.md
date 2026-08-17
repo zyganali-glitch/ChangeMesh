@@ -248,10 +248,20 @@ This is the durable minefield and lessons record, not a chronological chat log.
   3. Implement thread-safe `ProcessLocalDeadLetterState` with `compute_dead_letter_id`, guaranteeing that replaying the exact same terminal event returns the identical logical handoff without duplicate emission.
   4. Strictly reject secret-bearing payloads on ingest via `scan_payload_for_secrets`, using `redact_mapping` only as structural defense-in-depth on accepted payloads.
   5. Implement `GooglePubSubDeadLetterConsumer` to convert dead-letter subscription messages into canonical handoffs.
-- Prevention rule: Maintain exactly ONE retry authority per transport; expose terminal handoff artifacts to callers; guarantee process-local replay idempotency; reject secret payloads on ingest fail-closed.
-- Tests/evidence: `tests/test_p09_01_topology.py` (18), `tests/test_p09_02_pubsub_adapters.py` (21), `tests/test_p09_03_retry_dead_letter.py` (9), `tests/test_p09_04_local_event_bus.py` (14), `tests/test_p09_05_pubsub_timeline.py` (14) -> 76 passed in P-09 suite; canonical unit suite passes 1106 tests (1 warning).
-- Affected files: `events/dead_letter.py`, `events/retry.py`, `events/publisher.py`, `events/local_bus.py`, `integrations/gcp/pubsub_adapter.py`, `tests/test_p09_02_pubsub_adapters.py`, `tests/test_p09_03_retry_dead_letter.py`, `tests/test_p09_04_local_event_bus.py`.
-- Reusable beyond this task: Yes (all event bus routing, GCP dead-letter processing, failure handoffs, and retry orchestration).
+### LESSON-20260817-01 — Explicit ExecutionEvidenceMode Separation, Fail-Closed Live Writes, and Durable Idempotency Grounding in External Adapters
+- Date/time: 2026-08-17
+- Active task: P-19 Surgical Repair
+- Symptom: (1) `BoundedGitHubAdapter.is_live` was inferred purely from token presence (`bool(self._token)`), and `execute()` defaulted to `LIVE_WRITE` mode without performing real API mutation, fabricating synthetic URLs and SHA values; (2) In-memory process dictionaries (`_created_prs`, `_commits`) lost state on process restart, creating vulnerability to duplicate mutations.
+- Root cause: (1) Inverting mode selection by inferring `LIVE_WRITE` from credential existence rather than requiring explicit `ExecutionEvidenceMode.LIVE_WRITE` in the request; (2) Using process-local memory as the sole idempotency store rather than integrating with the canonical P-10 `IdempotencyKeyManager` and `SagaStateRepository`.
+- Incorrect approach: Defaulting to `LIVE_WRITE` whenever a token is provided; manufacturing simulated identifiers under a `LIVE_WRITE` label; relying only on in-memory dicts for live action idempotency.
+- Correct approach:
+  1. Require explicit `request.evidence_mode == ExecutionEvidenceMode.LIVE_WRITE` to attempt live writes. FIXTURE and SIMULATION modes must perform zero network calls and strictly return non-live evidence modes (`FIXTURE`/`SIMULATION`).
+  2. Enforce fail-closed validation for `LIVE_WRITE`: require non-empty adapter-owned credentials, valid repository target (`owner/repo`), valid non-empty branch/commit/PR inputs, and active real transport. Missing prerequisites fail closed without fabricating success or identifiers.
+  3. Validate real response identifiers (valid GitHub PR URL pattern, valid commit hex SHA, valid branch ref URL). Missing or malformed responses fail closed and cannot produce `LIVE_WRITE` receipts.
+  4. Ground `LIVE_WRITE` idempotency in durable `SagaStateRepository` via `IdempotencyKeyManager.reserve_intent` / `commit_intent`, ensuring replay protection survives process restart.
+  5. Strictly sanitize credentials from models, receipts, logs, metadata, and error messages.
+- Prevention rule: External adapters must never infer live write mode from credentials, must never return fabricated identifiers labeled as `LIVE_WRITE`, and must ground live mutation idempotency in durable persistence.
+- Tests/evidence: `tests/test_p19_release_steward.py` (16 passed); canonical unit suite (1236 passed, 1 warning).
+- Affected files: `integrations/github/github_adapter.py`, `src/release/receipt_manager.py`, `tests/test_p19_release_steward.py`.
+- Reusable beyond this task: Yes (all external write adapters, GitHub/cloud integrations, and receipt managers).
 - Status: `ACTIVE`
-
-

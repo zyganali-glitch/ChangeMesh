@@ -116,20 +116,19 @@
 - P-19.02
 - P-19.04
 - P-19.05
-- P-19
 
 **Blocked:**
-- P-19.03 (GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable)
+- P-19.03 (Synthetic GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable, real LIVE_WRITE execution evidence absent)
 
 **Active Phase:**
-P-20 (PENDING / NEXT)
+P-19 (REPAIR COMPLETE / BLOCKED ON P-19.03 EXTERNAL PREREQUISITES)
 
 **Next Exact Task:**
-P-20.00 — Long-running orchestration donor preflight
+P-19.03 — Perform one real draft PR in synthetic GitHub repo with idempotency (BLOCKED until synthetic GitHub repository and GITHUB_TOKEN are provisioned; P-20 remains PENDING and NOT started)
 
-## Current P-19 State (Five-Phase Batch P-15 → P-19 Complete)
+## Current P-19 State (Surgical Repair Complete — Phase BLOCKED on P-19.03)
 
-Phase P-19 is `DONE` (P-19.03 `BLOCKED`).
+Phase P-19 is `BLOCKED` (P-19.01, P-19.02, P-19.04, P-19.05 DONE; P-19.03 BLOCKED).
 
 ### P-15 — Impact Scout (DONE)
 - **P-15.00:** Impact Scout donor preflight verified CS-BLAST-001 (D-CONTEXTSEAL, `0dc924db9d82037d2e813548bdee27af5f180889`) and GL-CONFLICT-001 (D-GITLAB, `3c4a412b6040d8a8154c15325943c409be9105f2`). ADAPTED reuse method confirmed.
@@ -169,17 +168,17 @@ Phase P-19 is `DONE` (P-19.03 `BLOCKED`).
 - **P-18.05:** Controlled gap demonstrated: pre-correction fixture with missing evidence → INSUFFICIENT; post-correction with evidence → SUPPORTS.
 - **Evidence:** `tests/test_p18_evidence_auditor.py` passes 8 tests.
 
-### P-19 — Release Steward (DONE, P-19.03 BLOCKED)
+### P-19 — Release Steward (BLOCKED on P-19.03)
 - **P-19.00:** Release Steward donor preflight verified CS-WRITE-001, GL-CONFLICT-001, UIPATH-AUTH-001. External-write allowlist: branch + commits + draft PR only.
-- **P-19.01:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py`. Allowed: CREATE_BRANCH, CREATE_COMMIT, CREATE_DRAFT_PR. Forbidden: merge, deploy, force push, repo deletion, protected-branch update, secret access. Credentials are adapter-only, never in models.
+- **P-19.01:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py`. Allowed: CREATE_BRANCH, CREATE_COMMIT, CREATE_DRAFT_PR. Forbidden: merge, deploy, force push, repo deletion, protected-branch update, secret access. Enforces explicit `ExecutionEvidenceMode.LIVE_WRITE` requirement, fail-closed live execution against real transport, and durable saga repository idempotency grounded in `IdempotencyKeyManager`. Credentials are adapter-only, never in models.
 - **P-19.02:** Implemented `DryRunArtifact` for inspectable pre-mutation review. Zero external mutation. Credentials redacted. evidence_mode is NOT LIVE_WRITE.
-- **P-19.03:** **BLOCKED** — GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable. Adapter and dry-run fully implemented and tested; live write not executed.
+- **P-19.03:** **BLOCKED** — GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable, real LIVE_WRITE execution evidence absent. Adapter fail-closed boundary and durable replay idempotency verified via contract tests; live write not executed.
 - **P-19.04:** Implemented `BriefingGenerator` in `src/release/briefing_generator.py`. Briefing links to Change ID, PR, evidence version. Does NOT manufacture human authority requirement.
-- **P-19.05:** Implemented `ReceiptManager` in `src/release/receipt_manager.py`. External-action receipts capture request/response metadata without credentials. `contains_credentials` is always False.
-- **Evidence:** `tests/test_p19_release_steward.py` passes 6 tests.
+- **P-19.05:** Implemented `ReceiptManager` in `src/release/receipt_manager.py`. External-action receipts capture request/response metadata without credentials, reject fake identifiers for `LIVE_WRITE`, and sanitize secrets.
+- **Evidence:** `tests/test_p19_release_steward.py` passes 16 tests.
 
 ### Batch Evidence
-- Canonical unit suite: **1226 passed, 1 warning** (1176 baseline + 50 new). Zero regressions.
+- Canonical unit suite: **1236 passed, 1 warning** (1176 baseline + 60 new tests across P-15..P-19). Zero regressions.
 - Format: 0 violations across 168 files.
 - Lint: 0 errors.
 - Type-check: 0 errors across 127 source files.
@@ -188,6 +187,7 @@ Phase P-19 is `DONE` (P-19.03 `BLOCKED`).
 - Full suite: FAIL — known historical baseline GCP fixture debt (3 errors in `tests/test_gcp_access.py`).
 - Model Armor: PERMISSION_BLOCKED / NOT_RUN.
 - GitHub demo repository: NOT_CREATED (P-19.03 BLOCKED).
+
 
 ## Current P-14 State (Phase Complete — Five-Phase Batch P-10 → P-14 Complete)
 

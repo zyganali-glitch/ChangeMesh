@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-14 Final Trusted-Authority Provenance Repair
+# P-Ω Whole-Repository Integrity Audit — P-19 Release Steward & Live-Write Boundary Surgical Repair
 
-> **Scope:** P-14 Final Trusted-Authority Provenance Repair (Removal of Direct Verified-Authority Inputs, Protocol-Based Authority Resolution, Adapter-Owned Decision Persistence, Adversarial Exploit Invariants)
+> **Scope:** P-19 Surgical Repair (Explicit ExecutionEvidenceMode Separation, Fail-Closed Live Mutation Boundary, Durable Saga Idempotency Grounding, Credential Sanitization, and P-19.03 Blocker Truth)
 > **Date:** 2026-08-17
-> **Verified Remote Entry SHA:** `d3b493c7afbbbcbf86bdc907ccd46bac7b0be4a5`
+> **Verified Remote Entry SHA:** `9de6999febd138839096ed43c7ddbd8f551d8558`
 > **Canonical Branch:** `main`
 
 ---
@@ -11,23 +11,19 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Canonical entry remote | **PASS** | `origin/main` verified as `d3b493c7afbbbcbf86bdc907ccd46bac7b0be4a5` prior to surgical repair. |
-| Direct Verified-Authority Bypass Removal | **PASS** | `PolicyGuardianGate.evaluate_inputs()` and `PolicyGuardianGate.evaluate_change_sql()` completely removed `verified_authority` parameter; callers cannot pass arbitrary `VerifiedAuthorityDecision` objects. |
-| Trusted Adapter / Resolver Architecture | **PASS** | Trust enters only via injected `AuthorityDecisionResolver` protocol; `HmacAuthorityDecisionVerifier` in `integrations/authority/hmac_adapter.py` owns HMAC secrets and decision storage. |
-| Reusable Authority & Supersession | **PASS** | Injected authority resolver supports reusing valid prior authority without re-prompting while invalidating reuse on changed plan, scope, slot, expiry, revocation, or supersession. |
-| Zero Placeholder Plan Hashes | **PASS** | Missing/blank plan hashes fail closed; tokens and authority decisions strictly bind to explicit active plan hash. |
-| Credential-Free Core Contracts | **PASS** | `src/gate/token.py` defines `SignedAuthorityEnvelope`, `VerifiedAuthorityDecision`, and `AuthorityDecisionResolver` protocol with zero cryptographic secret parameters or fields. |
-| Adapter-Only Cryptographic Verification | **PASS** | `HmacAuthorityDecisionVerifier` in `integrations/authority/hmac_adapter.py` owns HMAC secret and replay protection, materializing credential-free `VerifiedAuthorityDecision` only upon cryptographic verification. |
-| Mandatory Passport Evidence Verification | **PASS** | `evidence_verifier` mandatory in `PassportIssuer.issue_passport` and `PassportVerifier.verify`; negative matrix tests prove fake IDs, expired, revoked, wrong revision, and failed scenarios fail closed. |
-| ShadowLab Correction Re-Rehearsal | **PASS** | `PlanCorrectionEngine.evaluate_corrected_plan()` executes forward/rollback DDL and expand-contract compatibility views against `SimulatedDatabaseClient`; invalid mutated plans fail re-rehearsal. |
-| Zero Fabricated Digests | **PASS** | `PolicyGuardianGate` and `ApprovalCompressionEngine` evaluate strictly from verified facts and fail closed when evidence digests are missing. |
-| Bounded Future Card Expiry | **PASS** | `LockedFactBundle.expires_at` computed as `now + timedelta(minutes=30)`; rendered explicitly in `remaining_decision_summary`. |
-| Seven-Dimension Policy Gate | **PASS** | `PolicyGuardianGate.evaluate_inputs()` evaluates blast radius, reversibility, privilege, sensitivity, evidence, novelty, and rehearsal; table-driven tests pass. |
+| Canonical entry remote | **PASS** | `origin/main` verified as `9de6999febd138839096ed43c7ddbd8f551d8558` prior to surgical repair. |
+| Explicit ExecutionEvidenceMode Separation | **PASS** | `BoundedGitHubAdapter` requires explicit `ExecutionEvidenceMode.LIVE_WRITE` to attempt mutations; token presence cannot convert `FIXTURE` to `LIVE_WRITE`. |
+| Fail-Closed Live Mutation Boundary | **PASS** | `LIVE_WRITE` without token, target repo, branch/commit/PR inputs, or real transport fails closed with `success=False` and zero fabricated identifiers. |
+| Real Live Identifier Validation | **PASS** | `ReceiptManager` and `BoundedGitHubAdapter` enforce genuine GitHub PR URL and hex commit SHA formats; `"fixture-sha"` and `/pull/1` are rejected under `LIVE_WRITE`. |
+| Durable Idempotency Grounding | **PASS** | `LIVE_WRITE` idempotency is grounded in `SagaStateRepository` via `IdempotencyKeyManager.reserve_intent` / `commit_intent`, surviving process restart and preventing duplicate mutations. |
+| Credential Isolation & Sanitization | **PASS** | Tokens remain adapter-only; sanitized from models, receipts, metadata, and error messages (`test_credentials_never_appear_in_models_receipts_or_error_messages`). |
+| P-19.03 Blocker Parity | **BLOCKED** | Synthetic GitHub demo repository `NOT_CREATED`, `GITHUB_TOKEN` unavailable, real LIVE_WRITE execution evidence absent. Honestly tracked as `BLOCKED` with zero fake proof. |
+| P-20 Non-Leakage & Eligibility | **PASS** | Phase P-20 is `PENDING` / `NOT STARTED`; Master Plan, Handoff, and repository agree that P-20 cannot start until P-19 is unblocked. |
 | Donor Manifest Lint | **PASS** | 20 components valid in `uv run python tools/governance/donor_manifest_lint.py` (exit code `0`). |
-| Formatter & Linter | **PASS** | `uv run python scripts/cmd.py format` and `uv run python scripts/cmd.py lint` pass with 0 errors across 142 files. |
-| Type-Checker | **PASS** | `uv run python scripts/cmd.py type-check` passes with 0 errors across 101 source files. |
-| Canonical Unit Command | **PASS** | 1176 passed, 1 warning in `uv run python scripts/cmd.py unit` (exit code `0`). |
-| Full Repository Suite | **FAIL** | 1176 passed, 1 warning, 3 errors from missing `project` fixture in `tests/test_gcp_access.py` (`test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`). Exact state: **FAIL — known historical baseline GCP fixture debt**. |
+| Formatter & Linter | **PASS** | `uv run python scripts/cmd.py format` and `uv run python scripts/cmd.py lint` pass with 0 errors across 168 files. |
+| Type-Checker | **PASS** | `uv run python scripts/cmd.py type-check` passes with 0 errors across 127 source files. |
+| Canonical Unit Command | **PASS** | 1236 passed, 1 warning in `uv run python scripts/cmd.py unit` (exit code `0`). |
+| Full Repository Suite | **FAIL** | 1236 passed, 1 warning, 3 errors from missing `project` fixture in `tests/test_gcp_access.py` (`test_firestore_access`, `test_pubsub_access`, `test_cloud_run_access`). Exact state: **FAIL — known historical baseline GCP fixture debt**. |
 | Git Diff Hygiene | **PASS** | `git diff --check` passes with 0 whitespace or conflict marker issues. |
 
 ---
@@ -37,11 +33,12 @@
 | Command | Exit Code | Result | Details |
 |---|---|---|---|
 | `uv run python tools/governance/donor_manifest_lint.py` | `0` | **PASS** | 20 components valid |
-| `uv run python scripts/cmd.py format` | `0` | **PASS** | 142 files formatted, 0 violations |
+| `uv run python scripts/cmd.py format` | `0` | **PASS** | 168 files formatted, 0 violations |
 | `uv run python scripts/cmd.py lint` | `0` | **PASS** | 0 linter violations |
-| `uv run python scripts/cmd.py type-check` | `0` | **PASS** | 0 type violations across 101 source files |
-| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1176 passed, 1 warning |
-| `uv run python -m pytest tests/` | `1` | **FAIL** | 1176 passed, 1 warning, 3 errors (`tests/test_gcp_access.py`: missing `project` fixture) |
+| `uv run python scripts/cmd.py type-check` | `0` | **PASS** | 0 type violations across 127 source files |
+| `uv run python -m pytest tests/test_p19_release_steward.py` | `0` | **PASS** | 16 passed, 0 failures (10 dedicated negative/boundary tests) |
+| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1236 passed, 1 warning |
+| `uv run python -m pytest tests/` | `1` | **FAIL** | 1236 passed, 1 warning, 3 errors (`tests/test_gcp_access.py`: missing `project` fixture) |
 | `git diff --check` | `0` | **PASS** | Zero whitespace or lint errors |
 
 ---
@@ -50,21 +47,22 @@
 
 | Surface | Status | Verification Summary |
 |---|---|---|
-| 1. Implementation ↔ Tests | **PASS** | 1176 canonical unit tests pass with zero failures. |
-| 2. Implementation ↔ Architecture | **PASS** | Credential-free core contracts, protocol-based authority resolution, and adapter-owned HMAC verification match architectural boundaries. |
-| 3. Implementation ↔ README | **PASS** | README documents current unit test counts and honest `PLANNED` / `NOT_RUN` boundaries. |
-| 4. Master Plan ↔ Repository | **PASS** | P-10 through P-14 closed with verified evidence; P-15.00 PENDING. |
-| 5. Claims ↔ Evidence | **PASS** | All claims backed by test execution; simulated sandbox evidence explicitly labeled `SIMULATION`. |
-| 6. Local ↔ Remote Revision | **PASS** | Entry SHA (`d3b493c7afbbbcbf86bdc907ccd46bac7b0be4a5`) verified; single linear closure commit prepared. |
+| 1. Implementation ↔ Tests | **PASS** | 1236 canonical unit tests pass with zero failures; 16 dedicated P-19 tests verify all required negative/boundary semantics. |
+| 2. Implementation ↔ Architecture | **PASS** | Explicit `ExecutionEvidenceMode` usage, fail-closed adapter boundaries, and P-10 `IdempotencyKeyManager` grounding match architecture. |
+| 3. Implementation ↔ README | **PASS** | README and handoff accurately reflect P-19.03 blocker and unit test counts. |
+| 4. Master Plan ↔ Repository | **PASS** | Master Plan Phase Registry and P-19 section accurately mark P-19 as `BLOCKED` on P-19.03; P-20 as `PENDING`. |
+| 5. Claims ↔ Evidence | **PASS** | Zero fabricated GitHub proof; mock transport and fixture modes are explicitly labeled `FIXTURE` / `SIMULATION`. |
+| 6. Local ↔ Remote Revision | **PASS** | Entry SHA (`9de6999febd138839096ed43c7ddbd8f551d8558`) verified; surgical closure commit prepared for push to `main`. |
 | 7. English ↔ Turkish Surfaces | **PASS** | Synchronized across documentation surfaces. |
-| 8. Demo ↔ Actual Runtime | **PASS** | Demo limits labeled as internal project thresholds. |
-| 9. Devpost / Judge Claims ↔ Frozen Tag | **PASS** | Preserved honest local verification states and `NOT_RUN` boundaries. |
+| 8. Demo ↔ Actual Runtime | **PASS** | GitHub demo repository honestly recorded as `NOT_CREATED` / `BLOCKED`. |
+| 9. Devpost / Judge Claims ↔ Frozen Tag | **PASS** | Preserved honest verification states and `NOT_RUN` / `BLOCKED` boundaries. |
 
 ---
 
 ## 4. Final Honest Phase-Closure State
 
 - **Audit Character:** P-Ω repository integrity audit (not external independent certification).
-- **Phases P-10 through P-14 Status:** `DONE` (trusted authority provenance repair complete).
+- **Phase P-19 Status:** `BLOCKED` (P-19.01, P-19.02, P-19.04, P-19.05 DONE; P-19.03 BLOCKED due to unavailable GitHub token and uncreated synthetic repo).
+- **Phase P-20 Status:** `PENDING` (NOT STARTED / NOT ELIGIBLE until P-19.03 is unblocked).
 - **Full Suite State:** `FAIL — known historical baseline GCP fixture debt` (preserved honestly, not masked).
-- **Next Eligible Master Plan Task:** `P-15.00 — Impact Scout donor preflight` (PENDING / UNEXECUTED — DO NOT START).
+- **Next Exact Master Plan Task:** `P-19.03 — Perform one real draft PR in synthetic GitHub repo with idempotency` (BLOCKED).

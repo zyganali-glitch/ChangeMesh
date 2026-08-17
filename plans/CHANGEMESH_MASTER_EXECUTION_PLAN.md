@@ -128,11 +128,11 @@ Schedule is risk control, not permission to skip gates.
 | `P-12` | Agent Registry and Capability Passport | `DONE` | `P-11` |
 | `P-13` | ShadowLab Rehearsal Twin | `DONE` | `P-12` |
 | `P-14` | Reversibility Gate and Approval Compression | `DONE` | `P-13` |
-| `P-15` | Impact Scout — Repository and Metadata Graph | `PENDING` | `P-14` |
-| `P-16` | Policy Guardian | `PENDING` | `P-15` |
-| `P-17` | Migration Engineer | `PENDING` | `P-16` |
-| `P-18` | Evidence Auditor | `PENDING` | `P-17` |
-| `P-19` | Release Steward and GitHub Real Action | `PENDING` | `P-18` |
+| `P-15` | Impact Scout — Repository and Metadata Graph | `DONE` | `P-14` |
+| `P-16` | Policy Guardian | `DONE` | `P-15` |
+| `P-17` | Migration Engineer | `DONE` | `P-16` |
+| `P-18` | Evidence Auditor | `DONE` | `P-17` |
+| `P-19` | Release Steward and GitHub Real Action | `BLOCKED` | `P-18` |
 | `P-20` | Orchestrator Saga, Recovery, and Long-Running Behavior | `PENDING` | `P-19` |
 | `P-21` | Judge and Operator Dashboard | `PENDING` | `P-20` |
 | `P-22` | Evidence Ledger, Passport, and Observability | `PENDING` | `P-21` |
@@ -1532,7 +1532,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-19 — Release Steward and GitHub Real Action
 
-**Phase status:** `DONE` (Note: P-19.03 is `BLOCKED` due to external GitHub token requirement)
+**Phase status:** `BLOCKED` (P-19.01, P-19.02, P-19.04, P-19.05 DONE; P-19.03 BLOCKED on external GitHub token and synthetic repo)
 
 ## P-19.01 — Implement bounded GitHub adapter for branch, commits, draft PR only
 
@@ -1541,7 +1541,7 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No merge, protected-branch update, repo deletion, or secret access.
 - **Required evidence:** Adapter tests.
-- **Evidence:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py` supporting only `CREATE_BRANCH`, `COMMIT_FILES`, and `CREATE_DRAFT_PR`, strictly blocking forbidden mutations (`merge`, `deploy`, branch deletion) and credentials exposure. Validated in `tests/test_p19_release_steward.py::test_adapter_allowed_actions` and `test_adapter_forbidden_actions`.
+- **Evidence:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py` supporting only `CREATE_BRANCH`, `CREATE_COMMIT`, and `CREATE_DRAFT_PR`, strictly blocking forbidden mutations (`merge`, `deploy`, `force_push`, `delete_repo`, `update_protected_branch`, `access_secrets`, `export_secrets`) and credential exposure. Enforces explicit `ExecutionEvidenceMode.LIVE_WRITE` requirement, fail-closed live execution boundary against real transport, and durable saga repository idempotency grounded in `IdempotencyKeyManager`. Validated across 16 tests in `tests/test_p19_release_steward.py`.
 - **Mandatory documentation sync:** Threat model.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
@@ -1552,7 +1552,7 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Exact outbound request inspectable.
 - **Required evidence:** Dry-run artifact.
-- **Evidence:** Implemented dry-run generation in `BoundedGitHubAdapter.dry_run()` producing inspectable `GitHubDryRunArtifact` with sanitized request payloads and redacted credentials. Validated in `tests/test_p19_release_steward.py::test_dry_run`.
+- **Evidence:** Implemented dry-run generation in `BoundedGitHubAdapter.dry_run()` producing inspectable `DryRunArtifact` with sanitized request payloads and redacted credentials. Validated in `tests/test_p19_release_steward.py::test_dry_run`.
 - **Mandatory documentation sync:** Evidence boundary.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
@@ -1563,7 +1563,7 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Repeated run does not duplicate PR; URL/commit recorded.
 - **Required evidence:** GitHub evidence.
-- **Evidence:** BLOCKED: GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable. Idempotency contract implemented and verified in fixture mode (`tests/test_p19_release_steward.py::test_idempotency`).
+- **Evidence:** `BLOCKED` — Synthetic GitHub demo repository `NOT_CREATED`, `GITHUB_TOKEN` unavailable, real P-19.03 execution evidence absent. Adapter fail-closed boundary and durable replay idempotency verified via contract tests (`tests/test_p19_release_steward.py`). Real mutation deferred until prerequisites are provisioned. No fake proof.
 - **Mandatory documentation sync:** README, judging map.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
@@ -1585,13 +1585,14 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Receipt proves request/response metadata without credentials.
 - **Required evidence:** Receipt validation.
-- **Evidence:** Implemented `ReceiptManager` and `ExternalActionReceipt` in `src/release/receipt_manager.py` generating immutable receipts recording action metadata, target repositories, and response URLs while validating absence of credentials. Validated in `tests/test_p19_release_steward.py::test_receipt_manager`.
+- **Evidence:** Implemented `ReceiptManager` and `ExternalActionReceipt` in `src/release/receipt_manager.py` generating immutable receipts recording action metadata, target repositories, and response URLs while validating absence of credentials, rejecting fake identifiers for `LIVE_WRITE`, and sanitizing secrets. Validated in `tests/test_p19_release_steward.py::test_receipt_manager` and `test_malformed_live_response_cannot_produce_live_write_receipt`.
 - **Mandatory documentation sync:** Evidence boundary.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-20 — Orchestrator Saga, Recovery, and Long-Running Behavior
 
-**Phase status:** `PENDING`
+**Phase status:** `PENDING` (Blocked on P-19 completion)
+
 
 ## P-20.01 — Implement end-to-end saga across discover, qualify, rehearse, ground, authorize, execute, verify, certify
 
