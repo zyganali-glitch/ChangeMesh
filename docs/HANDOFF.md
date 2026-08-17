@@ -170,15 +170,15 @@ Phase P-19 is `BLOCKED` (P-19.01, P-19.02, P-19.04, P-19.05 DONE; P-19.03 BLOCKE
 
 ### P-19 — Release Steward (BLOCKED on P-19.03)
 - **P-19.00:** Release Steward donor preflight verified CS-WRITE-001, GL-CONFLICT-001, UIPATH-AUTH-001. External-write allowlist: branch + commits + draft PR only.
-- **P-19.01:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py`. Allowed: CREATE_BRANCH, CREATE_COMMIT, CREATE_DRAFT_PR. Forbidden: merge, deploy, force push, repo deletion, protected-branch update, secret access. Enforces explicit `ExecutionEvidenceMode.LIVE_WRITE` requirement, fail-closed live execution against real transport, and durable saga repository idempotency grounded in `IdempotencyKeyManager`. Credentials are adapter-only, never in models.
+- **P-19.01:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py`. Allowed: CREATE_BRANCH, CREATE_COMMIT, CREATE_DRAFT_PR. Forbidden: merge, deploy, force push, repo deletion, protected-branch update, secret access. Enforces explicit `ExecutionEvidenceMode.LIVE_WRITE` requirement, fail-closed live execution against real transport, durable saga repository idempotency grounded in `IdempotencyKeyManager`, `IN_PROGRESS` reservation lock exclusion with zero transport calls, semantic mutation payload digest (excluding ephemeral request IDs), revalidated `EXACT_REPLAY` receipts, and fixture identity purity. Credentials are adapter-only, never in models.
 - **P-19.02:** Implemented `DryRunArtifact` for inspectable pre-mutation review. Zero external mutation. Credentials redacted. evidence_mode is NOT LIVE_WRITE.
-- **P-19.03:** **BLOCKED** — GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable, real LIVE_WRITE execution evidence absent. Adapter fail-closed boundary and durable replay idempotency verified via contract tests; live write not executed.
+- **P-19.03:** **BLOCKED** — GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable, real LIVE_WRITE execution evidence absent. Adapter fail-closed boundary, IN_PROGRESS lock exclusion, and durable replay idempotency verified via contract tests; live write not executed.
 - **P-19.04:** Implemented `BriefingGenerator` in `src/release/briefing_generator.py`. Briefing links to Change ID, PR, evidence version. Does NOT manufacture human authority requirement.
 - **P-19.05:** Implemented `ReceiptManager` in `src/release/receipt_manager.py`. External-action receipts capture request/response metadata without credentials, reject fake identifiers for `LIVE_WRITE`, and sanitize secrets.
-- **Evidence:** `tests/test_p19_release_steward.py` passes 16 tests.
+- **Evidence:** `tests/test_p19_release_steward.py` passes 26 tests.
 
 ### Batch Evidence
-- Canonical unit suite: **1236 passed, 1 warning** (1176 baseline + 60 new tests across P-15..P-19). Zero regressions.
+- Canonical unit suite: **1246 passed, 1 warning** (1176 baseline + 70 new tests across P-15..P-19). Zero regressions.
 - Format: 0 violations across 168 files.
 - Lint: 0 errors.
 - Type-check: 0 errors across 127 source files.

@@ -1541,7 +1541,7 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No merge, protected-branch update, repo deletion, or secret access.
 - **Required evidence:** Adapter tests.
-- **Evidence:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py` supporting only `CREATE_BRANCH`, `CREATE_COMMIT`, and `CREATE_DRAFT_PR`, strictly blocking forbidden mutations (`merge`, `deploy`, `force_push`, `delete_repo`, `update_protected_branch`, `access_secrets`, `export_secrets`) and credential exposure. Enforces explicit `ExecutionEvidenceMode.LIVE_WRITE` requirement, fail-closed live execution boundary against real transport, and durable saga repository idempotency grounded in `IdempotencyKeyManager`. Validated across 16 tests in `tests/test_p19_release_steward.py`.
+- **Evidence:** Implemented `BoundedGitHubAdapter` in `integrations/github/github_adapter.py` supporting only `CREATE_BRANCH`, `CREATE_COMMIT`, and `CREATE_DRAFT_PR`, strictly blocking forbidden mutations (`merge`, `deploy`, `force_push`, `delete_repo`, `update_protected_branch`, `access_secrets`, `export_secrets`) and credential exposure. Enforces explicit `ExecutionEvidenceMode.LIVE_WRITE` requirement, fail-closed live execution boundary against real transport, durable saga repository idempotency grounded in `IdempotencyKeyManager`, `IN_PROGRESS` reservation fail-closed with zero transport calls, semantic mutation payload digest (excluding ephemeral request IDs), revalidated `EXACT_REPLAY` receipts, and fixture identity purity. Validated across 26 tests in `tests/test_p19_release_steward.py`.
 - **Mandatory documentation sync:** Threat model.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
@@ -1563,7 +1563,8 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Repeated run does not duplicate PR; URL/commit recorded.
 - **Required evidence:** GitHub evidence.
-- **Evidence:** `BLOCKED` — Synthetic GitHub demo repository `NOT_CREATED`, `GITHUB_TOKEN` unavailable, real P-19.03 execution evidence absent. Adapter fail-closed boundary and durable replay idempotency verified via contract tests (`tests/test_p19_release_steward.py`). Real mutation deferred until prerequisites are provisioned. No fake proof.
+- **Evidence:** `BLOCKED` — Synthetic GitHub demo repository `NOT_CREATED`, `GITHUB_TOKEN` unavailable, real P-19.03 execution evidence absent. Adapter fail-closed boundary, IN_PROGRESS lock exclusion, and durable replay idempotency verified via contract tests (`tests/test_p19_release_steward.py`). Real mutation deferred until prerequisites are provisioned. No fake proof.
+
 - **Mandatory documentation sync:** README, judging map.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

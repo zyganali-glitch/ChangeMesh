@@ -166,9 +166,20 @@ class BoundedGitHubAdapter:
             elif self._state_repository is not None:
                 tid = request.tenant_id or self._tenant_id
                 cid = request.change_id or self._change_id
-                doc_id = IdempotencyKeyManager.compute_reservation_doc_id(request.idempotency_key)
+                action_type = f"{request.action.value}:{request.idempotency_key}"
+                intent = IdempotencyIntent(
+                    tenant_id=tid,
+                    change_id=cid,
+                    scope=IdempotencyScope.EXTERNAL_WRITE,
+                    action_type=action_type,
+                    target_system=request.repository,
+                    caller_revision="1.0.0",
+                    payload_digest="0" * 64,
+                )
+                idem_key = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+                doc_id = IdempotencyKeyManager.compute_reservation_doc_id(idem_key)
                 existing = self._state_repository.get_idempotency_reservation(tid, cid, doc_id)
-                if existing is not None and existing.status.value == "COMMITTED":
+                if existing is not None and existing.status.value in ("COMMITTED", "RESERVED"):
                     would_dup = True
 
         evidence_mode = (
@@ -298,21 +309,48 @@ class BoundedGitHubAdapter:
         intent = None
 
         if self._state_repository is not None:
-            payload_dict = {
-                "request_id": request.request_id,
-                "action": request.action.value,
-                "repository": request.repository,
-                "branch": request.branch,
-                "commit_message": request.commit_message,
-                "pr_title": request.pr_title,
-                "files": sorted(request.files.items()) if request.files else [],
-            }
+            # Build semantic mutation payload dictionary (strictly excluding request_id)
+            if request.action == GitHubAction.CREATE_DRAFT_PR:
+                payload_dict = {
+                    "action": request.action.value,
+                    "repository": request.repository,
+                    "branch": request.branch,
+                    "pr_title": request.pr_title,
+                    "pr_body": request.pr_body or "",
+                }
+            elif request.action == GitHubAction.CREATE_COMMIT:
+                payload_dict = {
+                    "action": request.action.value,
+                    "repository": request.repository,
+                    "branch": request.branch or "",
+                    "commit_message": request.commit_message,
+                    "files": sorted(request.files.items()) if request.files else [],
+                }
+            elif request.action == GitHubAction.CREATE_BRANCH:
+                payload_dict = {
+                    "action": request.action.value,
+                    "repository": request.repository,
+                    "branch": request.branch,
+                }
+            else:
+                payload_dict = {
+                    "action": request.action.value,
+                    "repository": request.repository,
+                    "branch": request.branch,
+                }
+
             payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+
+            if request.idempotency_key:
+                action_type = f"{request.action.value}:{request.idempotency_key}"
+            else:
+                action_type = f"{request.action.value}:{request.branch or 'default'}"
+
             intent = IdempotencyIntent(
                 tenant_id=tenant_id,
                 change_id=change_id,
                 scope=IdempotencyScope.EXTERNAL_WRITE,
-                action_type=request.action.value,
+                action_type=action_type,
                 target_system=request.repository,
                 caller_revision="1.0.0",
                 payload_digest=payload_digest,
@@ -331,20 +369,69 @@ class BoundedGitHubAdapter:
                     idempotency_key=request.idempotency_key,
                 )
 
+            # In-progress by another active worker -> fail closed with zero transport call
+            if reservation_outcome.status == IdempotencyReservationOutcomeStatus.IN_PROGRESS:
+                return GitHubResponse(
+                    request_id=request.request_id,
+                    action=request.action,
+                    success=False,
+                    error_message=(
+                        f"External write intent {action_type!r} is already in progress "
+                        f"by an active worker"
+                    ),
+                    evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                    idempotency_key=request.idempotency_key,
+                )
+
+            # Exact replay -> return verified real cached result without second transport call
             if reservation_outcome.status == IdempotencyReservationOutcomeStatus.EXACT_REPLAY:
                 cached_res = reservation_outcome.cached_receipt_status
                 result_url = None
                 commit_sha = None
+
                 if request.action == GitHubAction.CREATE_DRAFT_PR:
-                    result_url = (
-                        cached_res if cached_res and cached_res.startswith("http") else None
-                    )
+                    if not cached_res or not re.match(
+                        r"^https://github\.com/[^/]+/[^/]+/pull/\d+$", cached_res
+                    ):
+                        return GitHubResponse(
+                            request_id=request.request_id,
+                            action=request.action,
+                            success=False,
+                            error_message="Cached replay receipt missing or invalid real PR URL",
+                            evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                            idempotency_key=request.idempotency_key,
+                        )
+                    result_url = cached_res
+
                 elif request.action == GitHubAction.CREATE_COMMIT:
-                    commit_sha = (
-                        cached_res if cached_res and not cached_res.startswith("http") else None
-                    )
+                    if (
+                        not cached_res
+                        or cached_res == "fixture-sha"
+                        or not re.match(r"^[0-9a-f]{40,64}$", cached_res)
+                    ):
+                        return GitHubResponse(
+                            request_id=request.request_id,
+                            action=request.action,
+                            success=False,
+                            error_message="Cached replay receipt missing or invalid commit SHA",
+                            evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                            idempotency_key=request.idempotency_key,
+                        )
+                    commit_sha = cached_res
+
                 elif request.action == GitHubAction.CREATE_BRANCH:
-                    result_url = f"https://github.com/{request.repository}/tree/{request.branch}"
+                    if not cached_res or not re.match(
+                        r"^https://github\.com/[^/]+/[^/]+/tree/.+$", cached_res
+                    ):
+                        return GitHubResponse(
+                            request_id=request.request_id,
+                            action=request.action,
+                            success=False,
+                            error_message="Cached replay receipt missing or invalid branch URL",
+                            evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                            idempotency_key=request.idempotency_key,
+                        )
+                    result_url = cached_res
 
                 return GitHubResponse(
                     request_id=request.request_id,
@@ -353,7 +440,20 @@ class BoundedGitHubAdapter:
                     result_url=result_url,
                     commit_sha=commit_sha,
                     evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-                    idempotency_key=request.idempotency_key or intent.action_type,
+                    idempotency_key=request.idempotency_key,
+                )
+
+            if reservation_outcome.status != IdempotencyReservationOutcomeStatus.GRANTED:
+                return GitHubResponse(
+                    request_id=request.request_id,
+                    action=request.action,
+                    success=False,
+                    error_message=(
+                        f"Idempotency reservation not granted: "
+                        f"status={reservation_outcome.status.value}"
+                    ),
+                    evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+                    idempotency_key=request.idempotency_key,
                 )
 
         try:
@@ -531,7 +631,7 @@ class BoundedGitHubAdapter:
                     request_id=request.request_id,
                     action=request.action,
                     success=True,
-                    result_url=self._created_prs[request.idempotency_key],
+                    result_url=None,
                     evidence_mode=mode,
                     idempotency_key=request.idempotency_key,
                 )
@@ -543,31 +643,22 @@ class BoundedGitHubAdapter:
                     request_id=request.request_id,
                     action=request.action,
                     success=True,
-                    commit_sha=self._commits[request.idempotency_key],
+                    commit_sha=None,
                     evidence_mode=mode,
                     idempotency_key=request.idempotency_key,
                 )
 
-        result_url = None
-        commit_sha = None
-
-        if request.action == GitHubAction.CREATE_BRANCH:
-            result_url = f"https://github.com/{request.repository}/tree/{request.branch}"
-        elif request.action == GitHubAction.CREATE_COMMIT:
-            commit_sha = "fixture-sha"
-            if request.idempotency_key:
-                self._commits[request.idempotency_key] = commit_sha
-        elif request.action == GitHubAction.CREATE_DRAFT_PR:
-            result_url = f"https://github.com/{request.repository}/pull/1"
-            if request.idempotency_key:
-                self._created_prs[request.idempotency_key] = result_url
+        if request.action == GitHubAction.CREATE_DRAFT_PR and request.idempotency_key:
+            self._created_prs[request.idempotency_key] = "SIMULATED_PR"
+        elif request.action == GitHubAction.CREATE_COMMIT and request.idempotency_key:
+            self._commits[request.idempotency_key] = "SIMULATED_COMMIT"
 
         return GitHubResponse(
             request_id=request.request_id,
             action=request.action,
             success=True,
-            result_url=result_url,
-            commit_sha=commit_sha,
+            result_url=None,
+            commit_sha=None,
             evidence_mode=mode,
             idempotency_key=request.idempotency_key,
         )
