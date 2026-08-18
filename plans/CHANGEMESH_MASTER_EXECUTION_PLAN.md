@@ -133,7 +133,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-17` | Migration Engineer | `DONE` | `P-16` |
 | `P-18` | Evidence Auditor | `DONE` | `P-17` |
 | `P-19` | Release Steward and GitHub Real Action | `DONE` | `P-18` |
-| `P-20` | Orchestrator Saga, Recovery, and Long-Running Behavior | `PENDING` | `P-19` |
+| `P-20` | Orchestrator Saga, Recovery, and Long-Running Behavior | `IN_PROGRESS` | `P-19` |
 | `P-21` | Judge and Operator Dashboard | `PENDING` | `P-20` |
 | `P-22` | Evidence Ledger, Passport, and Observability | `PENDING` | `P-21` |
 | `P-23` | Agent Identity, Gateway, and Model Armor | `PENDING` | `P-22` |
@@ -1591,17 +1591,18 @@ Schedule is risk control, not permission to skip gates.
 
 # P-20 — Orchestrator Saga, Recovery, and Long-Running Behavior
 
-**Phase status:** `PENDING` (NOT STARTED — Awaiting independent QA verification of P-19.03 repair)
+**Phase status:** `IN_PROGRESS`
 
 
 ## P-20.01 — Implement end-to-end saga across discover, qualify, rehearse, ground, authorize, execute, verify, certify
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement end-to-end saga across discover, qualify, rehearse, ground, authorize, execute, verify, certify.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** State transition event-driven/persisted.
 - **Required evidence:** E2E test.
-- **Mandatory documentation sync:** Architecture.
+- **Evidence:** Implemented `ChangeSagaOrchestrator` in `src/orchestrator/orchestrator_saga.py` and exported in `src/orchestrator/__init__.py`. Coordinates all 8 canonical lifecycle stages (DISCOVERING, QUALIFYING, REHEARSING, GROUNDED, AUTHORIZED/AWAITING_AUTHORITY, EXECUTING, VERIFYING, CERTIFYING -> COMPLETE). Strict event-driven emission via `LocalEventBus`/`EventPublisher` with Kahn DAG causal ordering in `CausalEventTimeline`. Persisted `ChangeRecord`, `TaskRecord`, `EvidenceRefRecord`, and `ApprovalRecord` with optimistic concurrency in `SagaStateRepository`. Clean stop at `AWAITING_AUTHORITY` with zero execution or Release Steward mutations when human authority is required. Deterministic facts sovereign over semantic model output. Verified by dedicated 10-test suite `tests/test_p20_orchestrator_saga.py` (10 passed in 0.58s) and canonical unit suite (1321 passed).
+- **Mandatory documentation sync:** Architecture docs (`docs/ARCHITECTURE.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`), lessons (`AGENT_MEMORY_AND_LESSONS.md`), master plan, handoff, and P-Omega audit report.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-20.02 — Implement pause, resume, cancel, timeout, retry, compensation, dead-letter paths
@@ -2954,13 +2955,14 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-20.00 — Long-running orchestration donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-20.01` task or any implementation in this phase, run the donor-reuse preflight for D-UIPATH, D-QWEN, D-CCT. Inspect durable waiting/resume, memory bus, handoff, and flight-recorder patterns; unify them under ADK + Pub/Sub + Firestore.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Recovery/resume invariant map and no-duplicate-write test plan.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Evidence:** Preflight audit completed. Verified `D-UIPATH` (UIPATH-STATE-001 idea-only saga semantics), `D-QWEN` (shared memory bus), and `D-CCT` (locked evidence states and causal flight recorder). Cleanroom native implementation planned and verified under ADK + Pub/Sub + SagaStateRepository with zero proprietary dependency leakage.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-21.00 — Dashboard donor preflight

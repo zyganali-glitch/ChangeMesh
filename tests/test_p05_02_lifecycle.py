@@ -318,11 +318,7 @@ class TestP0502Lifecycle:
 
     def test_lifecycle_020_no_provider_imports(self):
         """LIFECYCLE-020: Provider-specific imports absent from the new lifecycle domain module."""
-        import importlib
-
         import domain.contracts.change_lifecycle as change_lifecycle
-
-        importlib.reload(change_lifecycle)
 
         forbidden = ["google", "vertexai", "firebase", "github", "pydantic"]
 

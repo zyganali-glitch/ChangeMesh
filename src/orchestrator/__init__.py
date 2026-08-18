@@ -3,6 +3,10 @@
 Provides saga state persistence, multi-agent coordination, and recovery.
 """
 
+from src.orchestrator.orchestrator_saga import (
+    ChangeSagaOrchestrator,
+    SagaExecutionResult,
+)
 from src.orchestrator.state_repository import (
     ApprovalRecord,
     ChangeRecord,
@@ -33,4 +37,6 @@ __all__ = [
     "ApprovalRecord",
     "PassportRecord",
     "SagaStateRepository",
+    "ChangeSagaOrchestrator",
+    "SagaExecutionResult",
 ]

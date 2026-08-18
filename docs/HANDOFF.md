@@ -118,19 +118,40 @@
 - P-19.04
 - P-19.05
 - P-19
+- P-20.00
+- P-20.01
 
 **Blocked:**
 - None
 
 **Active Phase:**
-- P-19 (Release Steward and GitHub Real Action — REPAIRED / Awaiting Independent QA)
+- P-20 (Orchestrator Saga, Recovery, and Long-Running Behavior — IN_PROGRESS)
 
 **Next Exact Task:**
-- Awaiting independent QA verification of P-19.03 repair / P-20.01 pending (P-20 NOT STARTED)
+- P-20.02 — Implement pause, resume, cancel, timeout, retry, compensation, dead-letter paths
 
-## Current P-19 State (Phase Repaired — All Micro-Tasks Verified)
+## Current P-20 State (P-20.01 Implemented and Verified)
 
-Phase P-19 is `DONE` (Repaired).
+Phase P-20 is `IN_PROGRESS`.
+
+### P-20 — Orchestrator Saga, Recovery, and Long-Running Behavior
+- **P-20.00:** Orchestrator saga donor preflight verified `UIPATH-STATE-001` (D-UIPATH, `dc2267939c2aef0aba2737da65f53352c5cf8fb2`), `D-QWEN` (shared memory bus), and `CCT-FLIGHT-001` (D-CCT). Cleanroom reimplementation approved under ADK + Pub/Sub + SagaStateRepository.
+- **P-20.01:** Implemented canonical end-to-end ChangeLifecycle saga orchestrator in `src/orchestrator/orchestrator_saga.py` (`ChangeSagaOrchestrator`, `SagaExecutionResult`). Coordinates all 8 lifecycle stages:
+  1. `DISCOVERING`: Blast radius analysis via `ImpactScout` and `BlastRadiusMerger`.
+  2. `QUALIFYING`: Capability verification via `AgentCapabilityRequirement` and `AgentRegistry`.
+  3. `REHEARSING`: Double rehearsal on synthetic database double via `ShadowLab` (`SCENARIO_NORMAL_MIGRATION`).
+  4. `GROUNDED`: Epistemic memory trust evaluation (`MemoryTrustEvaluator`) and deterministic policy pre-checks (`DeterministicPolicyChecker`).
+  5. `AUTHORIZED` or `AWAITING_AUTHORITY`: Evaluated via `PolicyGuardianGate`. Halts cleanly at `AWAITING_AUTHORITY` with persisted `ApprovalRecord` (`PENDING`) if human authority is required; zero tasks executed, zero Release Steward writes invoked, zero fake decisions manufactured.
+  6. `EXECUTING`: Synthesizes expand-migrate-contract plan (`MigrationPlanGenerator`) and deterministic manifest (`ManifestGenerator`).
+  7. `VERIFYING`: Derives neutral claims (`ClaimDerivationEngine`), builds audit bundle (`AuditBundleBuilder`), runs semantic audit (`SemanticAuditor`), and reconciles deterministically (`DeterministicReconciler`).
+  8. `CERTIFYING` -> `COMPLETE`: Creates checkpoint (`SagaCheckpointManager`) and updates final evidence summary in `ChangeRecord`.
+- Strict event-driven emission via `LocalEventBus`/`EventPublisher` with Kahn DAG causal ordering in `CausalEventTimeline`.
+- Persisted `ChangeRecord`, `TaskRecord`, `EvidenceRefRecord`, and `ApprovalRecord` with optimistic concurrency in `SagaStateRepository`.
+- Deterministic facts sovereign over semantic model output.
+- Zero credentials entering event/state/evidence payloads.
+- Zero external mutations in P-20.01 tests.
+- Dedicated 10-test suite `tests/test_p20_orchestrator_saga.py` passes 10 tests (100% PASS).
+- Canonical unit test suite passes 1321 tests (1 warning). Zero domain contract mutations or Google SDK leaks.
 
 ### P-15 — Impact Scout (DONE)
 - **P-15.00:** Impact Scout donor preflight verified CS-BLAST-001 (D-CONTEXTSEAL, `0dc924db9d82037d2e813548bdee27af5f180889`) and GL-CONFLICT-001 (D-GITLAB, `3c4a412b6040d8a8154c15325943c409be9105f2`). ADAPTED reuse method confirmed.

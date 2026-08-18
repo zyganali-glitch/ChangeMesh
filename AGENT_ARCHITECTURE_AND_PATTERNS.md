@@ -21,41 +21,42 @@ Managed-service integrations remain conditional on real access and must be label
 
 ## 3. Agent architecture and target components
 
-- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`): ADK intake skeleton implemented (P-07.01); deterministic routing/delegation implemented (P-07.03); multi-agent branch coordination, parallel execution, and sequential fallback implemented (P-07.04 via `src/agents/coordinator.py`); saga coordination, recovery PLANNED; durable workflow state is owned by Firestore Saga.
-- `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection, repository overlap, and parallel-change conflict detection (CS-BLAST-001, GL-CONFLICT-001 unified).
-- `Policy Guardian` (`src/agents/policy_guardian.py`): deterministic and model-assisted policy checks, safety pre-checks, and the canonical P-08.03 input privacy/minimization boundary (ZK-PRIV-001).
-- `Migration Engineer` (`src/agents/migration_engineer.py`): scoped artifact generation and migration boundaries (CS-MIG-001).
-- `Evidence Record / Ledger` (`src/evidence/evidence_record.py`): canonical deterministic fact and evidence authority (CCT-EVID-001).
-- `Evidence Auditor` (`src/agents/evidence_auditor.py`): independent blind semantic sufficiency review with deterministic fact isolation and reconciliation (CCT-SEM-001).
-- `Release Steward` (`src/agents/release_steward.py`): reversible handoff and enforced pipeline writebacks (CS-WRITE-001). Consumes judge format from `docs/JUDGING_MAP.md` (CCT-JUDGE-001 canonical target) but is not the canonical owner of that component.
+- `Change Orchestrator (Google ADK)` (`src/agents/change_orchestrator.py`, `src/orchestrator/orchestrator_saga.py`): ADK intake skeleton implemented (P-07.01); deterministic routing/delegation implemented (P-07.03); multi-agent branch coordination, parallel execution, and sequential fallback implemented (P-07.04 via `src/agents/coordinator.py`); end-to-end 8-stage lifecycle saga orchestrator implemented in `src/orchestrator/orchestrator_saga.py` (`ChangeSagaOrchestrator`, P-20.01 DONE); durable workflow state is owned by SagaStateRepository (P-10.02 DONE).
+- `Impact Scout` (`src/git/impact_scout.py`): read-only blast-radius collection, repository overlap, and parallel-change conflict detection (P-15 DONE).
+- `Policy Guardian` (`src/agents/policy_guardian.py`, `src/gate/policy_guardian_gate.py`, `src/policy/policy_engine.py`): deterministic and model-assisted policy checks, safety pre-checks, input privacy/minimization boundary (P-08.03, P-14, P-16 DONE).
+- `Migration Engineer` (`src/agents/migration_engineer.py`, `src/migration/`): scoped artifact generation, expand/contract plan generator, and deterministic manifest generator (P-17 DONE).
+- `Evidence Record / Ledger` (`src/evidence/`): canonical deterministic fact and evidence authority (P-10.02, P-18 DONE).
+- `Evidence Auditor` (`src/agents/evidence_auditor.py`, `src/audit/`): independent blind semantic sufficiency review with deterministic fact isolation and reconciliation (P-18 DONE).
+- `Release Steward` (`src/agents/release_steward.py`, `src/release/`, `integrations/github/`): reversible handoff, safe PR drafting, 5-point idempotent writebacks, and isolated caller key boundaries (P-19 DONE).
 - `Bounded Gemini Model Client` (`src/core/gemini_client.py`): canonical single bounded Gemini client (P-08.01 IMPLEMENTED).
-- `Approval Compression` (`src/auth/approval_compression.py`): defines autonomous vs escalation boundaries (UIPATH-AUTH-001).
-- `ShadowLab Auth` (`src/policy/shadowlab_auth.py`): preflight validation and destructive action boundaries (CCT-PREFLIGHT-001).
-- `Change Passport` (`src/evidence/change_passport.py`): immutable passporting context (CS-PASS-001).
-- `Firestore Saga` (`src/orchestrator/firestore_saga.py`): persistent saga state (UIPATH-STATE-001).
+- `Approval Compression` (`src/gate/compression.py`): defines autonomous vs escalation boundaries and compressed human decision packets (P-14.02 DONE).
+- `ShadowLab Runner` (`src/shadowlab/`): isolated containerized simulated twin execution, fault recovery, and rollback verification (P-13 DONE).
+- `Memory Trust Layer` (`src/memory/`): epistemic classification, memory validation, quarantine, and contradiction resolution (P-11 DONE).
+- `Capability Registry & Passport` (`src/registry/`): capability requirements, verification, and agent qualification (P-12 DONE).
+- `Saga State Repository` (`src/orchestrator/`): durable multi-tenant operational state, optimistic concurrency, and saga checkpoints (P-10 DONE).
 - `Gemini Structured Output` (`src/core/gemini_structured_output.py`): zero trust deserialization and contract validation (ZK-VALID-001).
-- `Claim Audit` (`src/audit/claim_audit.py`): hard proof of claims and cross-document parity (ZK-CLAIM-001).
-- `PubSub Timeline` (`src/evidence/pubsub_timeline.py`): chronological execution and causal ordering (CCT-FLIGHT-001; P-09.05 IMPLEMENTED).
+- `Claim Audit` (`src/audit/`): claim derivation, audit bundles, and deterministic reconciliation (P-18 DONE).
+- `PubSub Timeline` (`src/evidence/pubsub_timeline.py`): chronological execution and causal ordering (P-09.05, P-20.01 DONE).
 
 No agent receives unrestricted credentials. Every tool call is scoped by role, change ID, action class, and data class.
 
 ## 4. Core modules
 
-- `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts IMPLEMENTED: ChangeRequest, SuccessCriterion, AgentDescriptor, ToolDescriptor, DataClass; P-05.02 lifecycle IMPLEMENTED; P-05.03 evidence IMPLEMENTED; P-05.04 core innovation contracts IMPLEMENTED: MemoryRecord, CapabilityPassport, RehearsalScenario, RehearsalResult, AutonomyDecision, ApprovalCompressionCard; P-05.05 event envelope IMPLEMENTED: EventEnvelope, EventDeliveryDisposition, classify_event_delivery; P-05.06 machine conventions IMPLEMENTED: HashAlgorithm, UtcDateTime, canonical_json_bytes, redact_mapping, naming/enum conventions; P-07.05 agent revision metadata IMPLEMENTED: AgentRevisionProvenance, Provenance/EventEnvelope integration)
-- `src/agents`: Google ADK agent implementations (P-07.01 Change Orchestrator skeleton IMPLEMENTED; P-07.02 specialized agent fleet definitions and bounded contracts IMPLEMENTED; P-07.03 deterministic routing/delegation IMPLEMENTED; P-07.04 sequential fallback and controlled parallel branches IMPLEMENTED; P-07.05 agent revision metadata IMPLEMENTED)
-- `src/core`: core system utilities and outer provider clients (P-08.01 `BoundedGeminiClient` and P-08.02 structured output in `src/core/` IMPLEMENTED; P-08.03 boundary enforcement is called by the client and owned by Policy Guardian; P-08.05 metrics and budget enforcement IMPLEMENTED)
-- `events`: Pub/Sub topology, wire serialization, publisher/consumer protocols, retry schedules, dead-letter routing, and local event bus (P-09.01–P-09.04 IMPLEMENTED)
-- `state` / `src/orchestrator`: Firestore persistence data model (P-10.01 DESIGN COMPLETE in `docs/P-10.01_FIRESTORE_DATA_MODEL.md`); repository implementation and idempotency (P-10.02+ PENDING)
-- `memory`: trust typing, provenance, TTL, contradiction, quarantine (PLANNED)
-- `capability`: passport generation, validation, expiry, revocation (PLANNED)
-- `shadowlab`: scenario definitions, tool doubles, fault injection, results (PLANNED)
-- `policy`: reversibility and autonomy classification (PLANNED)
-- `integrations/github`: bounded GitHub adapter (PLANNED)
-- `integrations/metadata`: synthetic graph and optional DataHub adapter (PLANNED)
-- `integrations/gcp`: Google Cloud provider adapters (Pub/Sub publisher/consumer in P-09.02 IMPLEMENTED; Firestore and Vertex AI in later phases)
-- `src/evidence`: append-only evidence ledger, causal event timeline, and passport seal (`src/evidence/pubsub_timeline.py` P-09.05 IMPLEMENTED)
-- `observability`: trace correlation and redaction (PLANNED)
-- `web`: browser-native HTML5/CSS3/JavaScript judge/operator dashboard with Node NOT_REQUIRED per ADR-0015 (PLANNED)
+- `domain/contracts`: versioned schemas and enums (P-05.01 foundational contracts, P-05.02 lifecycle, P-05.03 evidence, P-05.04 core innovation contracts, P-05.05 event envelope, P-05.06 machine conventions, P-07.05 agent revision metadata IMPLEMENTED)
+- `src/agents`: Google ADK agent implementations (Change Orchestrator, Impact Scout, Policy Guardian, Migration Engineer, Evidence Auditor, Release Steward)
+- `src/core`: core system utilities and outer provider clients (BoundedGeminiClient, structured output, input privacy, metrics & budget enforcement)
+- `events`: Pub/Sub topology, wire serialization, publisher/consumer protocols, retry schedules, dead-letter routing, and local event bus (P-09 DONE)
+- `src/orchestrator`: Firestore and in-memory state repository, step idempotency, saga checkpointing, retention/teardown, and end-to-end saga orchestration (P-10, P-20.01 DONE)
+- `src/memory`: epistemic trust classification, provenance, TTL, contradiction, quarantine (P-11 DONE)
+- `src/registry`: capability passport generation, validation, expiry, revocation (P-12 DONE)
+- `src/shadowlab`: scenario definitions, simulation runner, fault recovery (P-13 DONE)
+- `src/gate` / `src/policy`: reversibility and autonomy classification, approval compression (P-14, P-16 DONE)
+- `src/migration`: plan and manifest generation (P-17 DONE)
+- `src/audit`: claim derivation, audit bundle builder, semantic auditor, deterministic reconciler (P-18 DONE)
+- `src/release` / `integrations/github`: bounded GitHub adapter, safe receipt management, idempotent writebacks (P-19 DONE)
+- `integrations/gcp`: Google Cloud provider adapters (Pub/Sub and Firestore adapters)
+- `src/evidence`: append-only evidence ledger, causal event timeline, and passport seal (P-09.05, P-10.02, P-20.01 DONE)
+- `web`: browser-native HTML5/CSS3/JavaScript judge/operator dashboard with Node NOT_REQUIRED (P-23 PLANNED)
 
 ## 5. Architectural patterns
 
