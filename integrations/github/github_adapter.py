@@ -144,6 +144,363 @@ class GitHubTransport(Protocol):
     ) -> GitHubReconciliationResult: ...
 
 
+class UrllibGitHubTransport:
+    """Production/Live HTTP transport for GitHub REST API using urllib."""
+
+    def __init__(self, timeout_seconds: float = 30.0) -> None:
+        self._timeout = timeout_seconds
+
+    def _headers(self, token: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "ChangeMesh-ReleaseSteward/1.0",
+        }
+
+    def _request(
+        self,
+        token: str,
+        method: str,
+        url: str,
+        data: dict | None = None,
+    ) -> tuple[int, dict | list | None]:
+        import json
+        import urllib.error
+        import urllib.request
+
+        headers = self._headers(token)
+        body_bytes = json.dumps(data).encode("utf-8") if data is not None else None
+        if body_bytes is not None:
+            headers["Content-Type"] = "application/json"
+
+        req = urllib.request.Request(
+            url,
+            data=body_bytes,
+            headers=headers,
+            method=method,
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+                status_code = resp.status
+                content = resp.read().decode("utf-8")
+                parsed = json.loads(content) if content else None
+                return status_code, parsed
+        except urllib.error.HTTPError as he:
+            err_content = he.read().decode("utf-8") if he.fp else ""
+            parsed_err = None
+            try:
+                parsed_err = json.loads(err_content) if err_content else None
+            except Exception:
+                pass
+            return he.code, parsed_err
+
+    def find_existing(
+        self,
+        token: str,
+        query: GitHubReconciliationQuery,
+    ) -> GitHubReconciliationResult:
+        import re
+
+        repo = query.repository
+        if query.action == GitHubAction.CREATE_DRAFT_PR:
+            url = f"https://api.github.com/repos/{repo}/pulls?state=all&per_page=100"
+            try:
+                status_code, data = self._request(token, "GET", url)
+                if status_code != 200 or not isinstance(data, list):
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.ERROR,
+                        error_message=f"Failed to query pulls (HTTP {status_code})",
+                        raw_status_code=status_code,
+                    )
+                for pr in data:
+                    if not isinstance(pr, dict):
+                        continue
+                    body = pr.get("body") or ""
+                    match = re.search(
+                        r"<!-- changemesh-intent: key=([^\s]+) digest=([0-9a-f]{64}) -->",
+                        body,
+                    )
+                    if match:
+                        marker_key = match.group(1)
+                        marker_digest = match.group(2)
+                        pr_head = pr.get("head", {}).get("ref")
+                        if marker_key == query.idempotency_key or (
+                            query.branch and pr_head == query.branch
+                        ):
+                            return GitHubReconciliationResult(
+                                status=ReconciliationStatus.FOUND,
+                                result_url=pr.get("html_url"),
+                                matched_idempotency_key=marker_key,
+                                matched_payload_digest=marker_digest,
+                                raw_status_code=status_code,
+                            )
+                return GitHubReconciliationResult(
+                    status=ReconciliationStatus.NOT_FOUND,
+                    raw_status_code=status_code,
+                )
+            except Exception as e:
+                return GitHubReconciliationResult(
+                    status=ReconciliationStatus.ERROR,
+                    error_message=str(e),
+                )
+
+        elif query.action == GitHubAction.CREATE_BRANCH:
+            branch = query.branch
+            url = f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}"
+            try:
+                status_code, data = self._request(token, "GET", url)
+                if status_code == 200 and isinstance(data, dict):
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.FOUND,
+                        result_url=f"https://github.com/{repo}/tree/{branch}",
+                        matched_idempotency_key=query.idempotency_key,
+                        matched_payload_digest=query.payload_digest,
+                        raw_status_code=status_code,
+                    )
+                elif status_code == 404:
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.NOT_FOUND,
+                        raw_status_code=status_code,
+                    )
+                else:
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.ERROR,
+                        error_message=f"Failed to query branch ref (HTTP {status_code})",
+                        raw_status_code=status_code,
+                    )
+            except Exception as e:
+                return GitHubReconciliationResult(
+                    status=ReconciliationStatus.ERROR,
+                    error_message=str(e),
+                )
+
+        elif query.action == GitHubAction.CREATE_COMMIT:
+            branch = query.branch
+            url = f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}"
+            try:
+                status_code, data = self._request(token, "GET", url)
+                if status_code == 200 and isinstance(data, dict):
+                    commit_sha = data.get("object", {}).get("sha")
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.FOUND,
+                        commit_sha=commit_sha,
+                        matched_idempotency_key=query.idempotency_key,
+                        matched_payload_digest=query.payload_digest,
+                        raw_status_code=status_code,
+                    )
+                elif status_code == 404:
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.NOT_FOUND,
+                        raw_status_code=status_code,
+                    )
+                else:
+                    return GitHubReconciliationResult(
+                        status=ReconciliationStatus.ERROR,
+                        error_message=f"Failed to query commit ref (HTTP {status_code})",
+                        raw_status_code=status_code,
+                    )
+            except Exception as e:
+                return GitHubReconciliationResult(
+                    status=ReconciliationStatus.ERROR,
+                    error_message=str(e),
+                )
+
+        return GitHubReconciliationResult(
+            status=ReconciliationStatus.UNKNOWN,
+            error_message=f"Unsupported reconciliation action: {query.action}",
+        )
+
+    def execute(
+        self,
+        token: str,
+        action: GitHubAction,
+        repository: str,
+        branch: str | None,
+        commit_message: str | None,
+        pr_title: str | None,
+        pr_body: str | None,
+        files: dict[str, str],
+    ) -> GitHubTransportResult:
+        repo = repository
+
+        if action == GitHubAction.CREATE_BRANCH:
+            if not branch:
+                return GitHubTransportResult(
+                    success=False, error_message="Branch is required for CREATE_BRANCH"
+                )
+            repo_info_url = f"https://api.github.com/repos/{repo}"
+            status_code, repo_info = self._request(token, "GET", repo_info_url)
+            if status_code != 200 or not isinstance(repo_info, dict):
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=f"Failed to fetch repo info (HTTP {status_code})",
+                    raw_status_code=status_code,
+                )
+            default_branch = repo_info.get("default_branch", "main")
+            ref_url = f"https://api.github.com/repos/{repo}/git/refs/heads/{default_branch}"
+            status_code, ref_data = self._request(token, "GET", ref_url)
+            if status_code != 200 or not isinstance(ref_data, dict):
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=f"Failed to fetch default branch ref (HTTP {status_code})",
+                    raw_status_code=status_code,
+                )
+            base_sha = ref_data.get("object", {}).get("sha")
+
+            create_ref_url = f"https://api.github.com/repos/{repo}/git/refs"
+            create_payload = {"ref": f"refs/heads/{branch}", "sha": base_sha}
+            status_code, create_res = self._request(token, "POST", create_ref_url, create_payload)
+            if status_code not in (200, 201):
+                err_msg = ""
+                if isinstance(create_res, dict):
+                    err_msg = create_res.get("message", "")
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=(
+                        f"Failed to create branch {branch!r}: {err_msg} (HTTP {status_code})"
+                    ),
+                    raw_status_code=status_code,
+                )
+            return GitHubTransportResult(
+                success=True,
+                result_url=f"https://github.com/{repo}/tree/{branch}",
+                raw_status_code=status_code,
+            )
+
+        elif action == GitHubAction.CREATE_COMMIT:
+            if not branch:
+                return GitHubTransportResult(
+                    success=False, error_message="Branch is required for CREATE_COMMIT"
+                )
+            ref_url = f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}"
+            status_code, ref_data = self._request(token, "GET", ref_url)
+            if status_code != 200 or not isinstance(ref_data, dict):
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=f"Failed to fetch branch ref {branch!r} (HTTP {status_code})",
+                    raw_status_code=status_code,
+                )
+            latest_commit_sha = ref_data.get("object", {}).get("sha")
+
+            commit_url = f"https://api.github.com/repos/{repo}/git/commits/{latest_commit_sha}"
+            status_code, commit_data = self._request(token, "GET", commit_url)
+            if status_code != 200 or not isinstance(commit_data, dict):
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=(
+                        f"Failed to fetch commit {latest_commit_sha!r} (HTTP {status_code})"
+                    ),
+                    raw_status_code=status_code,
+                )
+            base_tree_sha = commit_data.get("tree", {}).get("sha")
+
+            tree_items = []
+            for path, content in files.items():
+                blob_url = f"https://api.github.com/repos/{repo}/git/blobs"
+                blob_payload = {"content": content, "encoding": "utf-8"}
+                status_code, blob_res = self._request(token, "POST", blob_url, blob_payload)
+                if status_code not in (200, 201) or not isinstance(blob_res, dict):
+                    return GitHubTransportResult(
+                        success=False,
+                        error_message=f"Failed to create blob for {path!r} (HTTP {status_code})",
+                        raw_status_code=status_code,
+                    )
+                blob_sha = blob_res.get("sha")
+                tree_items.append(
+                    {
+                        "path": path,
+                        "mode": "100644",
+                        "type": "blob",
+                        "sha": blob_sha,
+                    }
+                )
+
+            create_tree_url = f"https://api.github.com/repos/{repo}/git/trees"
+            create_tree_payload = {"base_tree": base_tree_sha, "tree": tree_items}
+            status_code, tree_res = self._request(
+                token, "POST", create_tree_url, create_tree_payload
+            )
+            if status_code not in (200, 201) or not isinstance(tree_res, dict):
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=f"Failed to create git tree (HTTP {status_code})",
+                    raw_status_code=status_code,
+                )
+            new_tree_sha = tree_res.get("sha")
+
+            create_commit_url = f"https://api.github.com/repos/{repo}/git/commits"
+            create_commit_payload = {
+                "message": commit_message or "ChangeMesh automated commit",
+                "tree": new_tree_sha,
+                "parents": [latest_commit_sha],
+            }
+            status_code, new_commit_data = self._request(
+                token, "POST", create_commit_url, create_commit_payload
+            )
+            if status_code not in (200, 201) or not isinstance(new_commit_data, dict):
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=f"Failed to create git commit (HTTP {status_code})",
+                    raw_status_code=status_code,
+                )
+            new_commit_sha = new_commit_data.get("sha")
+
+            patch_ref_url = f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}"
+            patch_payload = {"sha": new_commit_sha}
+            status_code, patch_res = self._request(token, "PATCH", patch_ref_url, patch_payload)
+            if status_code not in (200, 201):
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=f"Failed to update ref {branch!r} (HTTP {status_code})",
+                    raw_status_code=status_code,
+                )
+            return GitHubTransportResult(
+                success=True,
+                commit_sha=new_commit_sha,
+                raw_status_code=status_code,
+            )
+
+        elif action == GitHubAction.CREATE_DRAFT_PR:
+            if not branch:
+                return GitHubTransportResult(
+                    success=False, error_message="Branch is required for CREATE_DRAFT_PR"
+                )
+            repo_info_url = f"https://api.github.com/repos/{repo}"
+            status_code, repo_info = self._request(token, "GET", repo_info_url)
+            default_branch = (
+                repo_info.get("default_branch", "main") if isinstance(repo_info, dict) else "main"
+            )
+
+            pulls_url = f"https://api.github.com/repos/{repo}/pulls"
+            pull_payload = {
+                "title": pr_title or "ChangeMesh Automated Change",
+                "head": branch,
+                "base": default_branch,
+                "body": pr_body or "",
+                "draft": True,
+            }
+            status_code, pr_data = self._request(token, "POST", pulls_url, pull_payload)
+            if status_code not in (200, 201) or not isinstance(pr_data, dict):
+                err_msg = pr_data.get("message", "") if isinstance(pr_data, dict) else ""
+                return GitHubTransportResult(
+                    success=False,
+                    error_message=f"Failed to create draft PR: {err_msg} (HTTP {status_code})",
+                    raw_status_code=status_code,
+                )
+            html_url = pr_data.get("html_url")
+            return GitHubTransportResult(
+                success=True,
+                result_url=html_url,
+                raw_status_code=status_code,
+            )
+
+        return GitHubTransportResult(
+            success=False,
+            error_message=f"Unsupported transport action: {action}",
+        )
+
+
 def _caller_idempotency_fingerprint(caller_key: str | None) -> str | None:
     """Derives a safe non-secret deterministic SHA-256 fingerprint for caller idempotency keys."""
     if not caller_key or not caller_key.strip():

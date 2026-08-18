@@ -132,7 +132,7 @@ Schedule is risk control, not permission to skip gates.
 | `P-16` | Policy Guardian | `DONE` | `P-15` |
 | `P-17` | Migration Engineer | `DONE` | `P-16` |
 | `P-18` | Evidence Auditor | `DONE` | `P-17` |
-| `P-19` | Release Steward and GitHub Real Action | `BLOCKED` | `P-18` |
+| `P-19` | Release Steward and GitHub Real Action | `DONE` | `P-18` |
 | `P-20` | Orchestrator Saga, Recovery, and Long-Running Behavior | `PENDING` | `P-19` |
 | `P-21` | Judge and Operator Dashboard | `PENDING` | `P-20` |
 | `P-22` | Evidence Ledger, Passport, and Observability | `PENDING` | `P-21` |
@@ -1532,7 +1532,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-19 — Release Steward and GitHub Real Action
 
-**Phase status:** `BLOCKED` (P-19.01, P-19.02, P-19.04, P-19.05 DONE; P-19.03 BLOCKED on external GitHub token and synthetic repo)
+**Phase status:** `DONE`
 
 ## P-19.01 — Implement bounded GitHub adapter for branch, commits, draft PR only
 
@@ -1558,13 +1558,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-19.03 — Perform one real draft PR in synthetic GitHub repo with idempotency
 
-- **Status:** `BLOCKED`
+- **Status:** `DONE`
 - **Required action:** Perform one real draft PR in synthetic GitHub repo with idempotency.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Repeated run does not duplicate PR; URL/commit recorded.
 - **Required evidence:** GitHub evidence.
-- **Evidence:** `BLOCKED` — Synthetic GitHub demo repository `NOT_CREATED`, `GITHUB_TOKEN` unavailable, real P-19.03 execution evidence absent. Adapter fail-closed boundary, IN_PROGRESS lock exclusion, and durable replay idempotency verified via contract tests (`tests/test_p19_release_steward.py`). Real mutation deferred until prerequisites are provisioned. No fake proof.
-
+- **Evidence:** Executed real bounded `LIVE_WRITE` workflow against synthetic demo repository `zyganali-glitch/changemesh-livewrite-demo` (isolated from canonical ChangeMesh repository): (1) `CREATE_BRANCH` on `feature/cm-p19-livewrite-demo` (`https://github.com/zyganali-glitch/changemesh-livewrite-demo/tree/feature/cm-p19-livewrite-demo`); (2) `CREATE_COMMIT` creating synthetic demo evidence file (`demo/synthetic_change.txt`, real commit SHA `e8f362e55949da7e965d5b217cad701d450ab692`); (3) `CREATE_DRAFT_PR` (first run) creating real Draft PR #1 (`https://github.com/zyganali-glitch/changemesh-livewrite-demo/pull/1`) with `draft=True`, embedding canonical intent marker (`key=idem_external_write_a945e6c81ff52a95e1beab7e686e738a`), and generating validated non-secret external action receipt `receipt_req_pr_first_run_001`; (4) `CREATE_DRAFT_PR` (second run) repeating the exact same semantic intent with `EXACT_REPLAY` returning the identical Draft PR URL (`https://github.com/zyganali-glitch/changemesh-livewrite-demo/pull/1`) with 0 second PR mutations; (5) Cold-restart cross-process provider reconciliation (`UrllibGitHubTransport.find_existing`) with strict 5-point verification returning `ReconciliationStatus.FOUND` for matching tenant/change intent and failing closed on tenant mismatch; (6) Direct provider query confirming exactly ONE total PR exists on the target repository (`zyganali-glitch/changemesh-livewrite-demo/pull/1`, `draft=True`).
 - **Mandatory documentation sync:** README, judging map.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
@@ -1592,7 +1591,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-20 — Orchestrator Saga, Recovery, and Long-Running Behavior
 
-**Phase status:** `PENDING` (Blocked on P-19 completion)
+**Phase status:** `PENDING` (Eligible to start)
 
 
 ## P-20.01 — Implement end-to-end saga across discover, qualify, rehearse, ground, authorize, execute, verify, certify

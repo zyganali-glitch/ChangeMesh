@@ -23,7 +23,7 @@ Record actual environment only; do not fill unknown values with guesses.
 - Agent Gateway: `AVAILABLE / NOT_RUN` 
 - Model Armor: `PERMISSION_BLOCKED / NOT_RUN` (403 on modelarmor.googleapis.com)
 - Observability: `AVAILABLE / NOT_RUN`
-- GitHub demo repository: `NOT_CREATED`
+- GitHub demo repository: `VERIFIED` (`zyganali-glitch/changemesh-livewrite-demo`, LIVE_WRITE draft PR proven in P-19.03)
 - Public demo URL: `NOT_AVAILABLE`
 
 ## Rules
