@@ -8,6 +8,7 @@ from src.orchestrator.orchestrator_saga import (
     SagaExecutionResult,
     build_standard_demo_registry,
     sanitize_secrets_in_text,
+    validate_supported_change_intent,
 )
 from src.orchestrator.state_repository import (
     ApprovalRecord,
@@ -43,4 +44,5 @@ __all__ = [
     "SagaExecutionResult",
     "build_standard_demo_registry",
     "sanitize_secrets_in_text",
+    "validate_supported_change_intent",
 ]

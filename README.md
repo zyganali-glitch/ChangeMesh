@@ -279,7 +279,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
    ```bash
    uv run python scripts/cmd.py unit
    ```
-    *(Executes 1321 unit/contract tests across all implemented domain, agent, event, memory, capability, shadowlab, gate, policy, migration, audit, release, and saga modules with exit code 0; one ADK deprecation warning is recorded.)*
+    *(Executes 1335 unit/contract tests across all implemented domain, agent, event, memory, capability, shadowlab, gate, policy, migration, audit, release, and saga modules with exit code 0; one ADK deprecation warning is recorded.)*
 
 ### Configuration & Authentication Boundary
 
@@ -292,7 +292,7 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 
 | Command | Action | Check Semantics | Baseline Result |
 |---|---|---|---|
-| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (1321 passed, 1 warning) |
+| `uv run python scripts/cmd.py unit` | Run unit tests | Local deterministic test execution | `PASS` (1335 passed, 1 warning) |
 | `uv run python scripts/cmd.py format` | Format check | Non-mutating (`ruff format --check .`) | `PASS` (170 files checked) |
 | `uv run python scripts/cmd.py lint` | Lint check | Non-mutating (`ruff check .`, zero `--fix`) | `PASS` (0 violations) |
 | `uv run python scripts/cmd.py type-check` | Type-check | Non-mutating (`mypy domain tests src events integrations tools`) | `PASS` (129 source files checked) |

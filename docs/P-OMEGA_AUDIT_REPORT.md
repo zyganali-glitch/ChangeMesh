@@ -1,8 +1,8 @@
-# P-Ω Whole-Repository Integrity Audit — P-20.00 / P-20.01 Surgical Repair
+# P-Ω Whole-Repository Integrity Audit — P-20.00 / P-20.01 Second Surgical Repair
 
-> **Scope:** P-20.00 Long-Running Orchestration Donor Preflight & P-20.01 Surgical Repair of End-to-End Saga Orchestrator across 8 Canonical Stages, Persistence-First Consistency, Authority Branching Semantics, Secret Minimization, and Real Stage Execution
+> **Scope:** P-20.00 Long-Running Orchestration Donor Preflight & P-20.01 Second Surgical Repair of End-to-End Saga Orchestrator across 8 Canonical Stages, Intent Binding Validation, Pre-Persistence Intake Secret Boundary, Exact Bounded ApprovalRecord Projection, and Qualification Negative Evidence
 > **Date:** 2026-08-19
-> **Starting Remote Baseline SHA:** `4dd868657888ea7b11986ef5779a37635d2019fa`
+> **Starting Remote Baseline SHA:** `9abeaab13f9ccccf465d54c8a7953c345a0ab708`
 > **Canonical Branch:** `main`
 
 ---
@@ -11,9 +11,13 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Starting Remote Baseline SHA | **PASS** | `origin/main` baseline verified as `4dd868657888ea7b11986ef5779a37635d2019fa`. |
-| P-20.00 Donor Preflight & Manifest | **PASS** | `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md` created; `UIPATH-STATE-001`, `QW-BUS-001`, `CCT-FLIGHT-001` updated; `python tools/governance/donor_manifest_lint.py` passed (20 components valid, exit code `0`). |
+| Starting Remote Baseline SHA | **PASS** | `origin/main` baseline verified as `9abeaab13f9ccccf465d54c8a7953c345a0ab708`. |
+| P-20.00 Donor Preflight & Manifest | **PASS** | `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md` created with read-only subagent auditor findings (PASS); `UIPATH-STATE-001`, `QW-BUS-001`, `CCT-FLIGHT-001` updated; `python tools/governance/donor_manifest_lint.py` passed (20 components valid, exit code `0`). |
 | Target Demo Repo Isolation | **PASS** | Synthetic repo `zyganali-glitch/changemesh-livewrite-demo` remains isolated from canonical `zyganali-glitch/ChangeMesh`. Zero mutations against canonical repository. Zero live GitHub mutations during P-20.01 tests. |
+| Intent Binding Validation (No Fact Laundering) | **PASS** | Unsupported/destructive requests (e.g. `DROP TABLE billing_accounts;`) fail closed at intake Stage 0 to `ChangeState.BLOCKED` (0 tasks, 0 approval cards, 0 migration artifacts, state_reason explaining unsupported operation). Request `success_criteria` bound to claims at Stage 7. |
+| Pre-Persistence Intake Secret Boundary | **PASS** | Structural identities (`request_id`, `requested_by`) and sequence targets (`target_systems`) are scanned for secret patterns BEFORE any `ChangeRecord` creation or persistence and before any `EventEnvelope` construction. Adversarial tests confirm `ValueError` raised and 0 state/bus records created. |
+| Exact Bounded ApprovalRecord Projection | **PASS** | Persisted `ApprovalRecord` is an exact field-for-field projection of `ApprovalCompressionCard` (`card_id`, `authority_slot_ref`, `decision_question`, `decision_options`, `policy_reason`, `action_scope`, `completed_work_summary`, `rehearsed_work_summary`, `remaining_decision_summary`, `evidence_refs`, `card_created_at`). |
+| Qualification Negative Evidence | **PASS** | Qualification fails closed to `ChangeState.BLOCKED` on empty registry, missing capabilities, expired passports, revoked passports, and wrong agent revisions, producing 0 PASS evidence. |
 | Persistence-Before-Publish Consistency | **PASS** | Authoritative state committed to `SagaStateRepository` *before* publishing wire messages to `LocalEventBus`/`EventPublisher` or recording to `CausalEventTimeline`. Persistence failure leaves zero false event evidence on bus or timeline. |
 | Authority Semantics (BLOCKED) | **PASS** | Genuine hard blockers (`AutonomyClass.BLOCKED`) transition to `ChangeState.BLOCKED` with ZERO approval cards, zero bypass escape paths, and zero downstream execution tasks. |
 | Authority Semantics (HUMAN_AUTHORITY_REQUIRED) | **PASS** | When human authority is required, saga transitions to `ChangeState.AWAITING_AUTHORITY`, persists `ApprovalRecord` (`PENDING`) strictly derived from `gate_result.compression_card`, executes zero tasks, invokes zero external writes, and halts cleanly. |
@@ -25,8 +29,8 @@
 | ADK Change Orchestrator Bridge | **PASS** | `ChangeOrchestrator.run_lifecycle_saga` coordinates the saga without making ADK agent the durable state owner. |
 | Formatter & Linter | **PASS** | `uv run python scripts/cmd.py format` and `uv run python scripts/cmd.py lint` pass with 0 errors across 170 files. |
 | Type-Checker | **PASS** | `uv run python scripts/cmd.py type-check` passes with 0 errors across 129 source files. |
-| Canonical Unit Command | **PASS** | 1329 passed, 1 warning in `uv run python scripts/cmd.py unit` (exit code `0`). |
-| Full Repository Suite | **FAIL** | 1345 passed, 6 warnings, 3 errors from missing `project` fixture in `tests/test_gcp_access.py`. Exact state: **FAIL — known historical baseline GCP fixture debt** (preserved honestly, not masked). |
+| Canonical Unit Command | **PASS** | 1335 passed, 1 warning in `uv run python scripts/cmd.py unit` (exit code `0`). |
+| Full Repository Suite | **FAIL** | 1351 passed, 6 warnings, 3 errors from missing `project` fixture in `tests/test_gcp_access.py`. Exact state: **FAIL — known historical baseline GCP fixture debt** (preserved honestly, not masked). |
 | Git Diff Hygiene | **PASS** | `git diff --check` passes with 0 whitespace or conflict marker issues. |
 
 ---
@@ -39,9 +43,9 @@
 | `uv run python scripts/cmd.py format` | `0` | **PASS** | 170 files formatted, 0 violations |
 | `uv run python scripts/cmd.py lint` | `0` | **PASS** | 0 linter violations |
 | `uv run python scripts/cmd.py type-check` | `0` | **PASS** | 0 type violations across 129 source files |
-| `uv run python -m pytest tests/test_p20_orchestrator_saga.py` | `0` | **PASS** | 17 passed in 3.60s |
-| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1329 passed, 1 warning in 8.26s |
-| `uv run python -m pytest tests/` | `1` | **FAIL** | 1345 passed, 6 warnings, 3 errors (`tests/test_gcp_access.py`: missing `project` fixture) |
+| `uv run python -m pytest tests/test_p20_orchestrator_saga.py` | `0` | **PASS** | 23 passed in 3.65s |
+| `uv run python scripts/cmd.py unit` | `0` | **PASS** | 1335 passed, 1 warning in 8.35s |
+| `uv run python -m pytest tests/` | `1` | **FAIL** | 1351 passed, 6 warnings, 3 errors (`tests/test_gcp_access.py`: missing `project` fixture) |
 | `git diff --check` | `0` | **PASS** | Zero whitespace or lint errors |
 
 ---
@@ -50,9 +54,9 @@
 
 | Surface | Status | Verification Summary |
 |---|---|---|
-| 1. Implementation ↔ Tests | **PASS** | 1329 canonical unit tests pass with zero failures; 17 dedicated P-20.01 tests verify end-to-end saga orchestration, persistence-first ordering, authority safety, mode honesty, and credential secrecy. |
+| 1. Implementation ↔ Tests | **PASS** | 1335 canonical unit tests pass with zero failures; 23 dedicated P-20.01 tests verify end-to-end saga orchestration, intent binding, pre-persistence intake secret boundary, qualification negative evidence, exact bounded approval projection, persistence-first ordering, authority safety, mode honesty, and credential secrecy. |
 | 2. Implementation ↔ Architecture | **PASS** | `ChangeSagaOrchestrator` implements 8 canonical lifecycle stages, event-driven state transitions, persistent records, and deterministic reconciliation aligned with architecture principles. |
-| 3. Implementation ↔ README | **PASS** | Documentation accurately reflects P-20.01 progress, unit test count (1329 passed), and system invariants. |
+| 3. Implementation ↔ README | **PASS** | Documentation accurately reflects P-20.01 progress, unit test count (1335 passed), and system invariants. |
 | 4. Master Plan ↔ Repository | **PASS** | Master Plan records P-20.00 and P-20.01 as `DONE`, Phase P-20 as `IN_PROGRESS`, and next task as `P-20.02`. |
 | 5. Claims ↔ Evidence | **PASS** | All technical claims backed by concrete test executions and deterministic assertions. |
 | 6. Local ↔ GitHub ↔ Cloud Revision | **PASS** | Clean ancestry on `origin/main`; zero external mutation during P-20.01 tests. |

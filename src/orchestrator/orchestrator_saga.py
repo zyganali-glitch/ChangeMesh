@@ -147,6 +147,54 @@ def sanitize_secrets_in_text(text: str) -> str:
     return result
 
 
+def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]:
+    """Validate that the incoming ChangeRequest matches the supported synthetic billing operation.
+
+    If the request describes an unsupported, destructive, or unrelated operation (e.g. DROP TABLE),
+    fails closed immediately to prevent executing an unrelated fixture (fact laundering).
+    """
+    allowed_targets = {"billing-db", "payment-service", "billing_db", "billing-api"}
+    req_targets = set(request.target_systems)
+    if not req_targets or not req_targets.intersection(allowed_targets):
+        return False, "Target systems do not match supported synthetic billing targets"
+
+    text = (request.title + " " + request.description).lower()
+
+    # Reject destructive SQL commands explicitly
+    destructive_keywords = [
+        "drop table",
+        "drop database",
+        "drop column",
+        "delete from",
+        "truncate",
+        "drop schema",
+        "drop view",
+    ]
+    for kw in destructive_keywords:
+        if kw in text:
+            msg = (
+                f"Destructive operation {kw.upper()!r} is not supported in additive billing fixture"
+            )
+            return False, msg
+
+    # Check if it matches supported additive billing migration
+    supported_indicators = [
+        "payment_tier",
+        "add column",
+        "billing_accounts",
+        "billing",
+        "additive",
+        "tier",
+    ]
+    if not any(ind in text for ind in supported_indicators):
+        return (
+            False,
+            "Change request intent does not match supported synthetic billing migration fixture",
+        )
+
+    return True, ""
+
+
 def build_standard_demo_registry(
     tenant_id: str,
     now: Optional[datetime] = None,
@@ -273,6 +321,26 @@ class ChangeSagaOrchestrator:
         if now is None:
             now = datetime.now(timezone.utc)
         tid = validate_tenant_id(tenant_id)
+
+        # -------------------------------------------------------------------------
+        # Pre-Persistence Intake Secret Boundary (Fail Closed on Credentials in Identity/Structure)
+        # -------------------------------------------------------------------------
+        for id_field_name, id_val in [
+            ("request_id", request.request_id),
+            ("requested_by", request.requested_by),
+        ]:
+            if any(pattern.search(id_val) for pattern in _SECRET_REPLACEMENT_PATTERNS):
+                raise ValueError(
+                    f"Secret/credential detected in structural identity field {id_field_name!r}; "
+                    "refusing intake before state persistence"
+                )
+
+        for target_sys in request.target_systems:
+            if any(pattern.search(target_sys) for pattern in _SECRET_REPLACEMENT_PATTERNS):
+                raise ValueError(
+                    "Secret/credential detected in target_systems field; "
+                    "refusing intake before state persistence"
+                )
 
         # Enforce Mode Honesty: Local saga operations cannot be LIVE_WRITE without provider write
         if evidence_mode == ExecutionEvidenceMode.LIVE_WRITE:
@@ -457,6 +525,38 @@ class ChangeSagaOrchestrator:
                 final_state=current_state,
                 is_completed=False,
                 stopped_reason="Stopped at requested state RECEIVED",
+                events_emitted=events_emitted,
+                tasks_executed=tasks_executed,
+                evidence_collected=evidence_collected,
+                checkpoints_created=checkpoints_created,
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
+            )
+
+        # -------------------------------------------------------------------------
+        # Intent Binding Validation (Fail Closed for Unsupported / Destructive Operations)
+        # -------------------------------------------------------------------------
+        is_supported_intent, unsupported_reason = validate_supported_change_intent(request)
+        if not is_supported_intent:
+            transition_and_persist(
+                target_state=ChangeState.BLOCKED,
+                reason=f"UNSUPPORTED_OPERATION: {unsupported_reason}",
+                producer_id=self.orchestrator_id,
+                producer_role="change_orchestrator",
+                producer_revision=self.orchestrator_revision,
+                payload_summary={
+                    "action": "unsupported_change_intent_blocked",
+                    "reason": unsupported_reason,
+                },
+            )
+            return SagaExecutionResult(
+                tenant_id=tid,
+                change_id=change_id,
+                correlation_id=correlation_id,
+                initial_state=ChangeState.RECEIVED,
+                final_state=ChangeState.BLOCKED,
+                is_completed=False,
+                autonomy_class=AutonomyClass.BLOCKED,
+                stopped_reason=f"UNSUPPORTED_OPERATION: {unsupported_reason}",
                 events_emitted=events_emitted,
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
@@ -1023,30 +1123,23 @@ class ChangeSagaOrchestrator:
             # Persist Approval Record derived strictly from compression card
             if gate_result.compression_card is not None:
                 card = gate_result.compression_card
-                approval_card_id = f"card-{change_id}"
                 self.repository.create_approval(
                     tid,
                     change_id,
                     ApprovalRecord(
                         tenant_id=tid,
                         change_id=change_id,
-                        card_id=approval_card_id,
+                        card_id=card.card_id,
                         authority_slot_ref=card.authority_slot_ref,
                         decision_question=card.decision_question,
                         decision_options=card.decision_options,
-                        policy_reason=gate_result.decision_summary,
+                        policy_reason=card.policy_reason,
                         action_scope=card.action_scope,
-                        completed_work_summary=(
-                            card.completed_work_summary or "Completed discovery and qualification"
-                        ),
-                        rehearsed_work_summary=(
-                            card.rehearsed_work_summary or "Rehearsal simulation recorded"
-                        ),
-                        remaining_decision_summary=(
-                            card.remaining_decision_summary
-                            or f"Authorize live execution under slot {card.authority_slot_ref}"
-                        ),
-                        card_created_at=now,
+                        completed_work_summary=card.completed_work_summary,
+                        rehearsed_work_summary=card.rehearsed_work_summary,
+                        remaining_decision_summary=card.remaining_decision_summary,
+                        evidence_refs=card.evidence_refs,
+                        card_created_at=card.created_at,
                         resolution_status=ApprovalResolutionStatus.PENDING,
                         created_at=now,
                         updated_at=now,
@@ -1234,17 +1327,23 @@ class ChangeSagaOrchestrator:
             payload_summary={"action": "audit_and_reconcile"},
         )
 
-        # Derive Claims & Build Audit Bundle
+        # Derive Claims & Build Audit Bundle from request success criteria
         claim_engine = ClaimDerivationEngine()
-        success_criteria = [
-            {"id": "crit-01", "statement": "Rehearsal completed with zero unhandled faults."},
-            {
-                "id": "crit-02",
-                "statement": "Migration manifest contains deterministic file hashes.",
-            },
-        ]
+        if request.success_criteria:
+            criteria_inputs = [
+                {"id": crit.criterion_id, "statement": crit.description}
+                for crit in request.success_criteria
+            ]
+        else:
+            criteria_inputs = [
+                {"id": "crit-01", "statement": "Rehearsal completed with zero unhandled faults."},
+                {
+                    "id": "crit-02",
+                    "statement": "Migration manifest contains deterministic file hashes.",
+                },
+            ]
         claims = claim_engine.derive_claims(
-            success_criteria=success_criteria,
+            success_criteria=criteria_inputs,
             evidence_refs=[f"ev-rehearse-{change_id}", f"ev-execute-{change_id}"],
         )
 

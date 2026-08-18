@@ -58,6 +58,7 @@ from src.gate.reversibility import (
 from src.orchestrator.in_memory_repository import InMemorySagaStateRepository
 from src.orchestrator.orchestrator_saga import (
     ChangeSagaOrchestrator,
+    build_standard_demo_registry,
 )
 from src.orchestrator.state_repository import (
     ApprovalResolutionStatus,
@@ -66,6 +67,10 @@ from src.orchestrator.state_repository import (
     TaskStatus,
 )
 from src.registry.agent_registry import AgentDescriptor, InMemoryAgentRegistry
+from src.registry.evidence_verifier import (
+    QualificationEvidenceRegistry,
+    QualificationEvidenceVerifier,
+)
 from src.shadowlab.scenarios import ShadowScenario
 
 
@@ -442,14 +447,23 @@ def test_p20_01_human_authority_required_halts_with_derived_approval_record(
     assert change.state == ChangeState.AWAITING_AUTHORITY
     assert change.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
 
-    # 3. Approval record must be persisted and derived from compression card
+    # 3. Approval record must match compression card (field-for-field parity)
     approvals = repo.list_approvals("tenant-prod-alpha", result.change_id)
     assert len(approvals) == 1
     approval = approvals[0]
+    card = result.approval_card
+    assert approval.card_id == card.card_id
+    assert approval.authority_slot_ref == card.authority_slot_ref
+    assert approval.decision_question == card.decision_question
+    assert approval.decision_options == card.decision_options
+    assert approval.policy_reason == card.policy_reason
+    assert approval.action_scope == card.action_scope
+    assert approval.completed_work_summary == card.completed_work_summary
+    assert approval.rehearsed_work_summary == card.rehearsed_work_summary
+    assert approval.remaining_decision_summary == card.remaining_decision_summary
+    assert approval.evidence_refs == card.evidence_refs
+    assert approval.card_created_at == card.created_at
     assert approval.resolution_status == ApprovalResolutionStatus.PENDING
-    assert approval.authority_slot_ref == result.approval_card.authority_slot_ref
-    assert approval.action_scope == result.approval_card.action_scope
-    assert approval.decision_question == result.approval_card.decision_question
 
     # 4. Zero execution tasks or migration artifacts written
     tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
@@ -458,10 +472,10 @@ def test_p20_01_human_authority_required_halts_with_derived_approval_record(
     assert "evidence_auditor" not in task_roles
 
 
-def test_p20_01_no_caller_manufactured_reversibility_downgrade(
+def test_p20_01_destructive_or_unsupported_request_fails_closed(
     repo: InMemorySagaStateRepository, bus: LocalEventBus
 ) -> None:
-    """Prove untrusted caller cannot force a dangerous change into an autonomous class."""
+    """Prove unsupported destructive request fails closed at intake with zero fact laundering."""
     destructive_request = ChangeRequest(
         schema_version="1.0.0",
         request_id="req-p20-destr-001",
@@ -483,16 +497,173 @@ def test_p20_01_no_caller_manufactured_reversibility_downgrade(
     )
 
     orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
-
-    # There is NO force_reversibility_class argument on run_saga
     result = orchestrator.run_saga(
         tenant_id="tenant-prod-alpha",
         request=destructive_request,
     )
 
-    # Must be completed or authorized autonomously ONLY if deterministic classifier allowed it
-    # Here standard sample SQL is additive, but Policy Guardian gate evaluates deterministic inputs
-    assert result is not None
+    # 1. Must fail closed to ChangeState.BLOCKED
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "UNSUPPORTED_OPERATION" in (result.stopped_reason or "")
+    assert "DROP TABLE" in (result.stopped_reason or "")
+
+    # 2. Cannot reach AUTHORIZED, EXECUTING, VERIFYING, CERTIFYING, or COMPLETE
+    assert result.final_state not in (
+        ChangeState.AUTHORIZED,
+        ChangeState.EXECUTING,
+        ChangeState.VERIFYING,
+        ChangeState.CERTIFYING,
+        ChangeState.COMPLETE,
+    )
+
+    # 3. Zero approval cards or approval records created (cannot bypass via human authority)
+    assert result.approval_card is None
+    assert repo.list_approvals("tenant-prod-alpha", result.change_id) == []
+
+    # 4. Zero execution tasks or migration artifacts created
+    tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
+    assert len(tasks) == 0
+
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "migration_artifacts" for ref in evidence_refs)
+
+    # 5. Persisted change record truthfully explains why execution was blocked
+    persisted_change = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted_change is not None
+    assert persisted_change.state == ChangeState.BLOCKED
+    assert "UNSUPPORTED_OPERATION" in (persisted_change.state_reason or "")
+
+
+def test_p20_01_intake_secret_in_target_systems_fails_closed_before_persistence(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify secret pattern in target_systems raises ValueError before creating state or events."""
+    gh_prefix = "ghp_"
+    dummy_secret = gh_prefix + ("abcdef1234567890" * 3)[:36]
+
+    bad_request = sample_change_request.model_copy(
+        update={"target_systems": [f"billing-db-{dummy_secret}"]}
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+
+    with pytest.raises(ValueError, match="Secret/credential detected in target_systems"):
+        orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=bad_request)
+
+    assert repo.list_changes("tenant-prod-alpha") == []
+    assert len(bus.published_history) == 0
+
+
+def test_p20_01_intake_secret_in_request_id_fails_closed_before_persistence(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify secret pattern in request_id raises ValueError before creating state or events."""
+    gh_prefix = "ghp_"
+    dummy_secret = gh_prefix + ("abcdef1234567890" * 3)[:36]
+
+    bad_request = sample_change_request.model_copy(update={"request_id": f"req-{dummy_secret}"})
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+
+    with pytest.raises(ValueError, match="Secret/credential detected in structural identity"):
+        orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=bad_request)
+
+    assert repo.list_changes("tenant-prod-alpha") == []
+    assert len(bus.published_history) == 0
+
+
+def test_p20_01_intake_secret_in_requested_by_fails_closed_before_persistence(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify secret pattern in requested_by raises ValueError before creating state or events."""
+    gh_prefix = "ghp_"
+    dummy_secret = gh_prefix + ("abcdef1234567890" * 3)[:36]
+
+    bad_request = sample_change_request.model_copy(
+        update={"requested_by": f"admin-{dummy_secret}@corp.internal"}
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+
+    with pytest.raises(ValueError, match="Secret/credential detected in structural identity"):
+        orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=bad_request)
+
+    assert repo.list_changes("tenant-prod-alpha") == []
+    assert len(bus.published_history) == 0
+
+
+def test_p20_01_qualification_fails_closed_on_expired_passport(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify qualification fails closed if an agent's passport has expired."""
+    tid = "tenant-prod-alpha"
+    past = datetime.datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime.datetime(2026, 8, 18, tzinfo=timezone.utc)
+    registry = build_standard_demo_registry(tenant_id=tid, now=past)
+
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus, agent_registry=registry)
+    result = orchestrator.run_saga(tenant_id=tid, request=sample_change_request, now=now)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "QUALIFICATION_FAILED" in (result.stopped_reason or "")
+
+
+def test_p20_01_qualification_fails_closed_on_revoked_passport(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify qualification fails closed if an agent's passport is revoked."""
+    tid = "tenant-prod-alpha"
+    now = datetime.datetime(2026, 8, 18, tzinfo=timezone.utc)
+    registry = build_standard_demo_registry(tenant_id=tid, now=now)
+
+    active_passport = registry.get_active_passport(tid, "agent-impact-scout", "1.0.0")
+    assert active_passport is not None
+    revoked_passport = active_passport.model_copy(
+        update={
+            "is_revoked": True,
+            "revoked_at": now,
+            "revocation_reason": "Security audit revocation",
+        }
+    )
+    registry.register_passport(tid, revoked_passport)
+
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus, agent_registry=registry)
+    result = orchestrator.run_saga(tenant_id=tid, request=sample_change_request, now=now)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "QUALIFICATION_FAILED" in (result.stopped_reason or "")
+
+
+def test_p20_01_qualification_fails_closed_on_wrong_agent_revision_passport(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify qualification fails closed if passport revision does not match required 1.0.0."""
+    tid = "tenant-prod-alpha"
+    now = datetime.datetime(2026, 8, 18, tzinfo=timezone.utc)
+    ev_reg = QualificationEvidenceRegistry()
+    verifier = QualificationEvidenceVerifier(registry=ev_reg)
+    registry = InMemoryAgentRegistry(evidence_verifier=verifier)
+
+    desc = AgentDescriptor(
+        agent_id="agent-impact-scout",
+        agent_name="Impact Scout",
+        agent_role="impact_scout",
+        agent_revision="0.9.0",
+        description="Outdated revision scout",
+        declared_capabilities=("AST_STATIC_ANALYSIS", "BLAST_RADIUS_ESTIMATION"),
+    )
+    registry.register_agent(desc)
+
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus, agent_registry=registry)
+    result = orchestrator.run_saga(tenant_id=tid, request=sample_change_request, now=now)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "QUALIFICATION_FAILED" in (result.stopped_reason or "")
 
 
 def test_p20_01_evidence_mode_honesty_enforcement(
