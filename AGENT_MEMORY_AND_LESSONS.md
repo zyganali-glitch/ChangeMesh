@@ -318,3 +318,20 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `integrations/github/github_adapter.py`, `tests/test_p19_release_steward.py`, `docs/P-OMEGA_AUDIT_REPORT.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`.
 - Reusable beyond this task: Yes (all external write adapters, provider reconciliation bridges, and multi-tenant key management).
 - Status: `ACTIVE`
+
+### LESSON-20260818-03 — Structural Isolation of Untrusted Caller Idempotency Keys at Receipt and Evidence Boundaries
+- Date/time: 2026-08-18
+- Active task: P-19 Narrow Receipt/Evidence-Boundary Repair
+- Symptom: `ReceiptManager.create_receipt` recorded `req_meta = {"idempotency_key": str(github_request.idempotency_key or "none")}`, propagating raw caller-supplied idempotency keys into evidence receipts.
+- Root cause: Treating caller request metadata as safe receipt evidence rather than consuming the safe canonical adapter output identity (`github_response.idempotency_key`). Regex sanitization is insufficient because ordinary caller tokens and novel secret formats propagate unredacted.
+- Incorrect approach: (1) Copying untrusted `github_request.idempotency_key` into receipt metadata; (2) Re-hashing or reconstructing identities inside `ReceiptManager`.
+- Correct approach:
+  1. Structurally consume only safe adapter output: `req_meta = {"idempotency_key": str(github_response.idempotency_key or "none")}`.
+  2. For successful `LIVE_WRITE`, replay, and reconciled actions, the receipt records the safe canonical P-10 identity already produced by the adapter.
+  3. If response has no safe identity (e.g. `None` on failed responses or fixtures), record `"none"`.
+  4. Never access or copy raw caller request keys anywhere in `ReceiptManager`.
+- Prevention rule: Evidence and receipt managers must never propagate raw caller request metadata; receipt identity must be structurally sourced only from validated, safe canonical adapter output.
+- Tests/evidence: `tests/test_p19_release_steward.py` (69 passed); canonical unit suite (1289 passed, 1 warning).
+- Affected files: `src/release/receipt_manager.py`, `tests/test_p19_release_steward.py`, `docs/P-OMEGA_AUDIT_REPORT.md`, `docs/HANDOFF.md`.
+- Reusable beyond this task: Yes (all audit receipts, evidence passports, and external action logs).
+- Status: `ACTIVE`

@@ -49,7 +49,7 @@ class ReceiptManager:
     def create_receipt(
         self, change_id: str, github_response: GitHubResponse, github_request: GitHubRequest
     ) -> ExternalActionReceipt:
-        req_meta = {"idempotency_key": str(github_request.idempotency_key or "none")}
+        req_meta = {"idempotency_key": str(github_response.idempotency_key or "none")}
         resp_meta = {
             "success": str(github_response.success),
             "evidence_mode": github_response.evidence_mode.value,

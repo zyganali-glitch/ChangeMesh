@@ -1586,7 +1586,7 @@ Schedule is risk control, not permission to skip gates.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Receipt proves request/response metadata without credentials.
 - **Required evidence:** Receipt validation.
-- **Evidence:** Implemented `ReceiptManager` and `ExternalActionReceipt` in `src/release/receipt_manager.py` generating immutable receipts recording action metadata, target repositories, and response URLs while validating absence of credentials, rejecting fake identifiers for `LIVE_WRITE`, and sanitizing secrets. Validated in `tests/test_p19_release_steward.py::test_receipt_manager` and `test_malformed_live_response_cannot_produce_live_write_receipt`.
+- **Evidence:** Implemented `ReceiptManager` and `ExternalActionReceipt` in `src/release/receipt_manager.py` generating immutable receipts recording action metadata, target repositories, response URLs, and safe adapter response idempotency identities while isolating untrusted caller request keys (zero raw caller key propagation into serialized receipts), validating absence of credentials, rejecting fake identifiers for `LIVE_WRITE`, and sanitizing secrets. Validated in `tests/test_p19_release_steward.py::test_receipt_manager`, `test_malformed_live_response_cannot_produce_live_write_receipt`, and 8 focused caller key isolation tests.
 - **Mandatory documentation sync:** Evidence boundary.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

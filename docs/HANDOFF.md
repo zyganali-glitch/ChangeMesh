@@ -174,11 +174,11 @@ Phase P-19 is `BLOCKED` (P-19.01, P-19.02, P-19.04, P-19.05 DONE; P-19.03 BLOCKE
 - **P-19.02:** Implemented `DryRunArtifact` for inspectable pre-mutation review. Zero external mutation. Credentials redacted. evidence_mode is NOT LIVE_WRITE.
 - **P-19.03:** **BLOCKED** — GitHub demo repository NOT_CREATED, GITHUB_TOKEN unavailable, real LIVE_WRITE execution evidence absent. Adapter fail-closed boundary, IN_PROGRESS lock exclusion, durable replay idempotency, and post-write reconciliation verified via contract tests; live write not executed.
 - **P-19.04:** Implemented `BriefingGenerator` in `src/release/briefing_generator.py`. Briefing links to Change ID, PR, evidence version. Does NOT manufacture human authority requirement.
-- **P-19.05:** Implemented `ReceiptManager` in `src/release/receipt_manager.py`. External-action receipts capture request/response metadata without credentials, reject fake identifiers for `LIVE_WRITE`, and sanitize secrets.
-- **Evidence:** `tests/test_p19_release_steward.py` passes 61 tests (covering all 12 mandatory reconciliation safety matrix tests and 16 new negative/boundary tests).
+- **P-19.05:** Implemented `ReceiptManager` and `ExternalActionReceipt` in `src/release/receipt_manager.py`. External-action receipts capture request/response metadata without credentials, store safe adapter response idempotency identities (`github_response.idempotency_key`), strictly isolate untrusted caller request keys (zero raw caller key propagation into serialized receipts), reject fake identifiers for `LIVE_WRITE`, and sanitize secrets.
+- **Evidence:** `tests/test_p19_release_steward.py` passes 69 tests (covering all 12 mandatory reconciliation safety matrix tests, 16 adapter boundary tests, and 8 focused receipt isolation tests).
 
 ### Batch Evidence
-- Canonical unit suite: **1281 passed, 1 warning** (1176 baseline + 105 new tests across P-15..P-19). Zero regressions.
+- Canonical unit suite: **1289 passed, 1 warning** (1176 baseline + 113 new tests across P-15..P-19). Zero regressions.
 - Format: 0 violations across 168 files.
 - Lint: 0 errors.
 - Type-check: 0 errors across 127 source files.

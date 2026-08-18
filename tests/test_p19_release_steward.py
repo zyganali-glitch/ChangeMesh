@@ -16,6 +16,7 @@ from integrations.github.github_adapter import (
     GitHubReconciliationQuery,
     GitHubReconciliationResult,
     GitHubRequest,
+    GitHubResponse,
     GitHubTransportResult,
     ReconciliationStatus,
     format_draft_pr_body_with_intent_marker,
@@ -2575,3 +2576,281 @@ def test_canonical_provider_marker_deterministic_across_process_restart():
     marker2 = format_draft_pr_body_with_intent_marker("Body text", canonical_id2, payload_digest)
 
     assert marker1 == marker2
+
+
+# --- Receipt Manager Untrusted Caller Key Isolation Tests ---
+
+
+def test_successful_live_write_receipt_stores_safe_canonical_response_idempotency_key():
+    """1. Successful LIVE_WRITE receipt stores safe canonical response idempotency_key."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-01")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    raw_key = "customer-operation-123"
+    req = GitHubRequest(
+        request_id="req-rec-01",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-01",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=raw_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-01",
+    )
+    res = adapter.execute(req)
+    assert res.success
+    assert res.idempotency_key is not None
+    assert res.idempotency_key.startswith("idem_external_write_")
+
+    manager = ReceiptManager()
+    receipt = manager.create_receipt("change-rec-01", res, req)
+    assert receipt.request_metadata.get("idempotency_key") == res.idempotency_key
+    assert raw_key not in receipt.model_dump_json()
+    assert not manager.validate_receipt(receipt)
+
+
+def test_ordinary_raw_caller_idempotency_key_absent_from_full_serialized_receipt():
+    """2. Ordinary raw caller idempotency key is absent from full serialized receipt."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-02")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    raw_key = "user-supplied-key-abc-456"
+    req = GitHubRequest(
+        request_id="req-rec-02",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-02",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=raw_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-02",
+    )
+    res = adapter.execute(req)
+    assert res.success
+
+    manager = ReceiptManager()
+    receipt = manager.create_receipt("change-rec-02", res, req)
+    serialized = receipt.model_dump_json()
+    assert raw_key not in serialized
+    assert raw_key not in str(receipt.request_metadata)
+    assert raw_key not in str(receipt.response_metadata)
+
+
+def test_github_token_pattern_caller_key_absent_from_full_serialized_receipt():
+    """3. GitHub-token-pattern caller key is absent from full serialized receipt."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-03")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    raw_key = "ghp_FAKECALLERSECRET999888777666555"
+    req = GitHubRequest(
+        request_id="req-rec-03",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-03",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=raw_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-03",
+    )
+    res = adapter.execute(req)
+    assert res.success
+
+    manager = ReceiptManager()
+    receipt = manager.create_receipt("change-rec-03", res, req)
+    serialized = receipt.model_dump_json()
+    assert raw_key not in serialized
+    assert "ghp_" not in serialized
+    assert not receipt.contains_credentials
+    assert not manager.validate_receipt(receipt)
+
+
+def test_arbitrary_opaque_secret_caller_key_absent_from_full_serialized_receipt():
+    """4. Arbitrary opaque secret-like caller key not covered by SECRET_PATTERNS is absent."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-04")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    raw_key = "opaque-sensitive-value-928374"
+    req = GitHubRequest(
+        request_id="req-rec-04",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-04",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=raw_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-04",
+    )
+    res = adapter.execute(req)
+    assert res.success
+
+    manager = ReceiptManager()
+    receipt = manager.create_receipt("change-rec-04", res, req)
+    serialized = receipt.model_dump_json()
+    assert raw_key not in serialized
+
+
+def test_receipt_metadata_does_not_derive_or_reconstruct_identity_from_raw_request_key():
+    """5. Receipt metadata does not derive/reconstruct identity from raw request key."""
+    manager = ReceiptManager()
+    req = GitHubRequest(
+        request_id="req-rec-05",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-05",
+        idempotency_key="raw-untrusted-key-999",
+    )
+    # If response has a canonical safe identity, receipt uses it directly
+    safe_identity = "idem_external_write_canonical_safe_id_123"
+    res = GitHubResponse(
+        request_id="req-rec-05",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        success=True,
+        result_url="https://github.com/org/repo/pull/1",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=safe_identity,
+    )
+    receipt = manager.create_receipt("change-rec-05", res, req)
+    assert receipt.request_metadata["idempotency_key"] == safe_identity
+    assert "raw-untrusted-key-999" not in receipt.model_dump_json()
+
+
+def test_failed_response_with_none_idempotency_key_does_not_fall_back_to_raw_request_key():
+    """6. Failed response with idempotency_key=None does not fall back to raw request key."""
+    manager = ReceiptManager()
+    raw_key = "untrusted-raw-caller-key-should-never-leak"
+    req = GitHubRequest(
+        request_id="req-rec-06",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-06",
+        idempotency_key=raw_key,
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+    )
+    res = GitHubResponse(
+        request_id="req-rec-06",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        success=False,
+        error_message="Fail-closed rejection",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=None,
+    )
+    receipt = manager.create_receipt("change-rec-06", res, req)
+    assert receipt.request_metadata["idempotency_key"] == "none"
+    assert raw_key not in receipt.model_dump_json()
+
+
+def test_exact_replay_successful_response_receipt_uses_same_canonical_safe_identity():
+    """7. EXACT_REPLAY successful response receipt uses the same canonical safe identity."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-07")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    raw_key = "caller-replay-key-777"
+    req = GitHubRequest(
+        request_id="req-rec-07",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-07",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=raw_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-07",
+    )
+    res1 = adapter.execute(req)
+    assert res1.success
+    manager = ReceiptManager()
+    receipt1 = manager.create_receipt("change-rec-07", res1, req)
+
+    # Replay
+    res2 = adapter.execute(req)
+    assert res2.success
+    receipt2 = manager.create_receipt("change-rec-07", res2, req)
+
+    assert receipt1.request_metadata["idempotency_key"] == res1.idempotency_key
+    assert receipt2.request_metadata["idempotency_key"] == res2.idempotency_key
+    assert (
+        receipt1.request_metadata["idempotency_key"] == receipt2.request_metadata["idempotency_key"]
+    )
+    assert raw_key not in receipt1.model_dump_json()
+    assert raw_key not in receipt2.model_dump_json()
+
+
+def test_reconciled_found_successful_response_receipt_uses_canonical_safe_identity():
+    """8. Reconciled FOUND successful response receipt uses the canonical safe identity."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-08")
+    raw_key = "caller-recon-key-888"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-rec-08",
+        "pr_title": "PR Title",
+        "pr_body": "PR Body",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    key_fp = sha256_hex(raw_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-rec-08",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
+    )
+    canonical_id = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+
+    stored_pr_body = format_draft_pr_body_with_intent_marker(
+        "PR Body", canonical_id, payload_digest
+    )
+    transport = MockGitHubTransport(
+        existing_items=[
+            MockStoredEntity(
+                action=GitHubAction.CREATE_DRAFT_PR,
+                repository="org/repo",
+                branch="feat-rec-08",
+                result_url="https://github.com/org/repo/pull/88",
+                pr_body=stored_pr_body,
+                idempotency_key=canonical_id,
+            )
+        ]
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    req = GitHubRequest(
+        request_id="req-rec-08",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-08",
+        pr_title="PR Title",
+        pr_body="PR Body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=raw_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-08",
+    )
+    res = adapter.execute(req)
+    assert res.success
+    assert res.idempotency_key == canonical_id
+    assert transport.call_count == 0  # Reconciled without mutation
+
+    manager = ReceiptManager()
+    receipt = manager.create_receipt("change-rec-08", res, req)
+    assert receipt.request_metadata["idempotency_key"] == canonical_id
+    assert raw_key not in receipt.model_dump_json()
+    assert not manager.validate_receipt(receipt)
