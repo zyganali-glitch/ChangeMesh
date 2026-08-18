@@ -19,6 +19,7 @@ from integrations.github.github_adapter import (
     GitHubResponse,
     GitHubTransportResult,
     ReconciliationStatus,
+    UrllibGitHubTransport,
     format_draft_pr_body_with_intent_marker,
 )
 from src.orchestrator.idempotency import (
@@ -2854,3 +2855,664 @@ def test_reconciled_found_successful_response_receipt_uses_canonical_safe_identi
     assert receipt.request_metadata["idempotency_key"] == canonical_id
     assert raw_key not in receipt.model_dump_json()
     assert not manager.validate_receipt(receipt)
+
+
+# ==============================================================================
+# UrllibGitHubTransport Production Transport Deterministic Contract Tests
+# ==============================================================================
+
+
+class ScriptedUrllibTransport(UrllibGitHubTransport):
+    """Deterministic in-memory test double for UrllibGitHubTransport HTTP routing."""
+
+    def __init__(self, routes: dict[tuple[str, str], tuple[int, Any]] | None = None) -> None:
+        super().__init__(timeout_seconds=5.0)
+        self.routes = routes or {}
+        self.request_history: list[dict[str, Any]] = []
+
+    def _request(
+        self,
+        token: str,
+        method: str,
+        url: str,
+        data: dict | None = None,
+    ) -> tuple[int, dict | list | None]:
+        self.request_history.append(
+            {
+                "token": token,
+                "method": method,
+                "url": url,
+                "data": data,
+            }
+        )
+        key = (method, url)
+        if key in self.routes:
+            status_code, resp_data = self.routes[key]
+            return status_code, resp_data
+        # Match URL without query params if exact match not found
+        url_base = url.split("?")[0]
+        base_key = (method, url_base)
+        if base_key in self.routes:
+            status_code, resp_data = self.routes[base_key]
+            return status_code, resp_data
+        return 404, {"message": f"Not Found in test script: {method} {url}"}
+
+
+def test_urllib_create_branch_existing_ref_does_not_echo_query_idempotency_key_or_digest():
+    """1. Existing CREATE_BRANCH ref does NOT echo query idempotency key or payload digest."""
+    branch = "feature/existing-branch"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (
+            200,
+            {
+                "ref": f"refs/heads/{branch}",
+                "node_id": "REF_123",
+                "url": f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+                "object": {
+                    "sha": "e8f362e55949da7e965d5b217cad701d450ab692",
+                    "type": "commit",
+                    "url": f"https://api.github.com/repos/{repo}/git/commits/e8f362e55949da7e965d5b217cad701d450ab692",
+                },
+            },
+        ),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_BRANCH,
+        repository=repo,
+        branch=branch,
+        idempotency_key="expected_query_idempotency_key_123",
+        payload_digest="d" * 64,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+
+    # Must NOT echo query idempotency key or payload digest
+    assert result.status == ReconciliationStatus.UNKNOWN
+    assert result.matched_idempotency_key is None
+    assert result.matched_payload_digest is None
+    assert result.matched_idempotency_key != query.idempotency_key
+    assert result.matched_payload_digest != query.payload_digest
+
+
+def test_urllib_create_branch_404_produces_authoritative_not_found():
+    """2. CREATE_BRANCH 404 produces authoritative NOT_FOUND."""
+    branch = "feature/new-branch"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (404, {"message": "Not Found"}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_BRANCH,
+        repository=repo,
+        branch=branch,
+        idempotency_key="expected_query_idempotency_key_123",
+        payload_digest="d" * 64,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.NOT_FOUND
+    assert result.raw_status_code == 404
+    assert result.matched_idempotency_key is None
+    assert result.matched_payload_digest is None
+
+
+def test_urllib_create_commit_unrelated_head_is_not_adopted_returns_not_found():
+    """3. Existing unrelated CREATE_COMMIT HEAD is not adopted as intended semantic commit."""
+    branch = "feature/work"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    head_sha = "1111222233334444555566667777888899990000"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (200, {"object": {"sha": head_sha}}),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/commits/{head_sha}",
+        ): (200, {"sha": head_sha, "message": "Initial commit from main"}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): synthetic livewrite demo change",
+        idempotency_key="expected_commit_key",
+        payload_digest="c" * 64,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.NOT_FOUND
+    assert result.commit_sha == head_sha
+    assert result.matched_idempotency_key is None
+    assert result.matched_payload_digest is None
+
+
+def test_urllib_create_commit_matching_message_without_provable_marker_fails_closed_zero_mutation():
+    """4. Semantic commit match without independently provable canonical identity fails closed."""
+    branch = "feature/work"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    head_sha = "2222333344445555666677778888999900001111"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (200, {"object": {"sha": head_sha}}),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/commits/{head_sha}",
+        ): (200, {"sha": head_sha, "message": "feat(p19): synthetic livewrite demo change"}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): synthetic livewrite demo change",
+        idempotency_key="expected_commit_key",
+        payload_digest="c" * 64,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    # Must FAIL CLOSED (UNKNOWN status, no invented matched key/digest)
+    assert result.status == ReconciliationStatus.UNKNOWN
+    assert result.commit_sha == head_sha
+    assert result.matched_idempotency_key is None
+    assert result.matched_payload_digest is None
+
+    # Verify BoundedGitHubAdapter integration with this transport fails closed with zero mutation
+    state_repo = _setup_test_repo(tid="tenant-default", cid="change-live-commit-01")
+    adapter = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport,
+        state_repository=state_repo,
+        tenant_id="tenant-default",
+        change_id="change-live-commit-01",
+    )
+    req = GitHubRequest(
+        request_id="req-commit-01",
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): synthetic livewrite demo change",
+        files={"demo/test.txt": "content"},
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="raw_caller_key_123",
+        tenant_id="tenant-default",
+        change_id="change-live-commit-01",
+    )
+    resp = adapter.execute(req)
+    assert not resp.success
+    assert "lacks verifiable canonical idempotency marker" in (resp.error_message or "")
+    # Verify no POST /git/trees or POST /git/commits or PATCH /git/refs mutation occurred
+    mutation_methods = [
+        h["method"]
+        for h in transport.request_history
+        if h["method"] in ("POST", "PATCH", "PUT", "DELETE")
+    ]
+    assert len(mutation_methods) == 0
+
+
+def test_urllib_create_commit_exact_marker_returns_actual_provider_marker():
+    """5. Commit with exact provider marker returns FOUND with observed marker key and digest."""
+    branch = "feature/work"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    head_sha = "3333444455556666777788889999000011112222"
+    marker_key = "idem_external_write_commit_999"
+    marker_digest = "e" * 64
+    commit_msg = (
+        f"feat(p19): verified commit\n\n"
+        f"<!-- changemesh-intent: key={marker_key} digest={marker_digest} -->"
+    )
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (200, {"object": {"sha": head_sha}}),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/commits/{head_sha}",
+        ): (200, {"sha": head_sha, "message": commit_msg}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): verified commit",
+        idempotency_key=marker_key,
+        payload_digest=marker_digest,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.FOUND
+    assert result.commit_sha == head_sha
+    assert result.matched_idempotency_key == marker_key
+    assert result.matched_payload_digest == marker_digest
+
+
+def test_urllib_create_draft_pr_exact_marker_returns_actual_provider_marker():
+    """6. Exact Draft PR provider marker returns actual provider marker key and digest."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    branch = "feature/cm-p19-livewrite-demo"
+    real_key = "idem_external_write_a945e6c81ff52a95e1beab7e686e738a"
+    real_digest = "53afb2127a2658c1dc276b1f59c9c5ae4b3f64a106ca9c1f0598495c79ee8d3b"
+    pr_body = (
+        f"ChangeMesh Demonstration PR\n\n"
+        f"<!-- changemesh-intent: key={real_key} digest={real_digest} -->"
+    )
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/pulls?state=all&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {
+                    "number": 1,
+                    "title": "feat(demo): ChangeMesh P-19.03 Live Write Demonstration",
+                    "html_url": f"https://github.com/{repo}/pull/1",
+                    "body": pr_body,
+                    "head": {"ref": branch},
+                    "base": {"ref": "main"},
+                    "draft": True,
+                }
+            ],
+        ),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch=branch,
+        idempotency_key=real_key,
+        payload_digest=real_digest,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.FOUND
+    assert result.result_url == f"https://github.com/{repo}/pull/1"
+    assert result.matched_idempotency_key == real_key
+    assert result.matched_payload_digest == real_digest
+
+
+def test_urllib_create_draft_pr_same_branch_conflicting_marker_fails_closed_zero_mutation():
+    """7. Same branch with conflicting provider marker fails closed and does NOT create PR."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    branch = "feature/cm-p19-livewrite-demo"
+    conflicting_key = "idem_external_write_conflicting_key_other_run"
+    conflicting_digest = "b" * 64
+    pr_body = (
+        f"Conflicting PR body\n\n"
+        f"<!-- changemesh-intent: key={conflicting_key} digest={conflicting_digest} -->"
+    )
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/pulls?state=all&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {
+                    "number": 1,
+                    "title": "Conflicting PR",
+                    "html_url": f"https://github.com/{repo}/pull/1",
+                    "body": pr_body,
+                    "head": {"ref": branch},
+                    "base": {"ref": "main"},
+                    "draft": True,
+                }
+            ],
+        ),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch=branch,
+        idempotency_key="idem_external_write_my_intended_key",
+        payload_digest="a" * 64,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.FOUND
+    assert result.matched_idempotency_key == conflicting_key
+    assert result.matched_payload_digest == conflicting_digest
+
+    # Verify BoundedGitHubAdapter rejects the mismatched marker and performs 0 POST /pulls
+    state_repo = _setup_test_repo(tid="tenant-default", cid="change-live-pr-conflict")
+    adapter = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport,
+        state_repository=state_repo,
+        tenant_id="tenant-default",
+        change_id="change-live-pr-conflict",
+    )
+    req = GitHubRequest(
+        request_id="req-pr-conflict-01",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch=branch,
+        pr_title="My PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="raw_caller_key_456",
+        tenant_id="tenant-default",
+        change_id="change-live-pr-conflict",
+    )
+    resp = adapter.execute(req)
+    assert not resp.success
+    # Must fail closed with zero POST /pulls mutation
+    post_pulls = [
+        h for h in transport.request_history if h["method"] == "POST" and "pulls" in h["url"]
+    ]
+    assert len(post_pulls) == 0
+
+
+def test_urllib_create_draft_pr_wrong_marker_digest_fails_closed():
+    """8. Wrong provider marker digest fails closed."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    branch = "feature/cm-p19-livewrite-demo"
+    state_repo = _setup_test_repo(tid="tenant-default", cid="change-live-pr-digest")
+
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": repo,
+        "branch": branch,
+        "pr_title": "PR Title",
+        "pr_body": "PR Body",
+    }
+    expected_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    raw_key = "caller-key-pr-digest"
+    key_fp = sha256_hex(raw_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-live-pr-digest",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system=repo,
+        caller_revision="1.0.0",
+        payload_digest=expected_digest,
+    )
+    canonical_id = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+
+    wrong_digest = "f" * 64
+    pr_body_with_wrong_digest = (
+        f"PR Body\n\n<!-- changemesh-intent: key={canonical_id} digest={wrong_digest} -->"
+    )
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/pulls?state=all&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {
+                    "number": 1,
+                    "title": "PR Title",
+                    "html_url": f"https://github.com/{repo}/pull/1",
+                    "body": pr_body_with_wrong_digest,
+                    "head": {"ref": branch},
+                    "base": {"ref": "main"},
+                    "draft": True,
+                }
+            ],
+        ),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    adapter = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport,
+        state_repository=state_repo,
+        tenant_id="tenant-default",
+        change_id="change-live-pr-digest",
+    )
+    req = GitHubRequest(
+        request_id="req-pr-digest-01",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch=branch,
+        pr_title="PR Title",
+        pr_body="PR Body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=raw_key,
+        tenant_id="tenant-default",
+        change_id="change-live-pr-digest",
+    )
+    resp = adapter.execute(req)
+    assert not resp.success
+    assert "matched_payload_digest mismatch" in (resp.error_message or "")
+    post_pulls = [
+        h for h in transport.request_history if h["method"] == "POST" and "pulls" in h["url"]
+    ]
+    assert len(post_pulls) == 0
+
+
+def test_urllib_create_draft_pr_missing_marker_on_existing_intended_pr_fails_closed():
+    """9. Missing provider marker on a conflicting existing intended PR fails closed."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    branch = "feature/cm-p19-livewrite-demo"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/pulls?state=all&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {
+                    "number": 1,
+                    "title": "Unmarked PR on same branch",
+                    "html_url": f"https://github.com/{repo}/pull/1",
+                    "body": "This PR has no intent marker anywhere in the description",
+                    "head": {"ref": branch},
+                    "base": {"ref": "main"},
+                    "draft": True,
+                }
+            ],
+        ),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch=branch,
+        idempotency_key="idem_external_write_test_key",
+        payload_digest="a" * 64,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.UNKNOWN
+    assert "lacks required provider intent marker" in (result.error_message or "")
+
+    state_repo = _setup_test_repo(tid="tenant-default", cid="change-live-pr-unmarked")
+    adapter = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport,
+        state_repository=state_repo,
+        tenant_id="tenant-default",
+        change_id="change-live-pr-unmarked",
+    )
+    req = GitHubRequest(
+        request_id="req-pr-unmarked-01",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch=branch,
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="raw_caller_key_789",
+        tenant_id="tenant-default",
+        change_id="change-live-pr-unmarked",
+    )
+    resp = adapter.execute(req)
+    assert not resp.success
+    post_pulls = [
+        h for h in transport.request_history if h["method"] == "POST" and "pulls" in h["url"]
+    ]
+    assert len(post_pulls) == 0
+
+
+def test_urllib_create_draft_pr_exhaustive_pagination_discovers_pr_beyond_first_100_results():
+    """10. Intended PR located beyond first 100 results is found without false NOT_FOUND."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    target_branch = "feature/p19-page2-branch"
+    target_key = "idem_external_write_page2_key"
+    target_digest = "7" * 64
+
+    # Page 1: 100 non-matching PRs
+    page1_prs = [
+        {
+            "number": i,
+            "title": f"PR {i}",
+            "html_url": f"https://github.com/{repo}/pull/{i}",
+            "body": f"PR body {i}",
+            "head": {"ref": f"feature/other-branch-{i}"},
+            "base": {"ref": "main"},
+            "draft": True,
+        }
+        for i in range(1, 101)
+    ]
+
+    # Page 2: PR #105 with target marker
+    target_body = (
+        f"Target PR Body on page 2\n\n"
+        f"<!-- changemesh-intent: key={target_key} digest={target_digest} -->"
+    )
+    page2_prs = [
+        {
+            "number": 105,
+            "title": "Target PR on Page 2",
+            "html_url": f"https://github.com/{repo}/pull/105",
+            "body": target_body,
+            "head": {"ref": target_branch},
+            "base": {"ref": "main"},
+            "draft": True,
+        }
+    ]
+
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/pulls?state=all&per_page=100&page=1",
+        ): (200, page1_prs),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/pulls?state=all&per_page=100&page=2",
+        ): (200, page2_prs),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch=target_branch,
+        idempotency_key=target_key,
+        payload_digest=target_digest,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.FOUND
+    assert result.result_url == f"https://github.com/{repo}/pull/105"
+    assert result.matched_idempotency_key == target_key
+    assert result.matched_payload_digest == target_digest
+    # Verify pagination queried both page 1 and page 2
+    queried_urls = [h["url"] for h in transport.request_history if h["method"] == "GET"]
+    assert any("page=1" in u for u in queried_urls)
+    assert any("page=2" in u for u in queried_urls)
+
+
+def test_urllib_create_draft_pr_failed_repo_metadata_fails_closed_zero_post_pulls_mutation():
+    """11. Failed repo metadata causes CREATE_DRAFT_PR to fail closed (0 POST /pulls)."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}",
+        ): (500, {"message": "Internal Server Error"}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    res = transport.execute(
+        token="ghp_testtoken",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch="feature/branch-fail",
+        commit_message=None,
+        pr_title="PR Title",
+        pr_body="PR Body",
+        files={},
+    )
+    assert not res.success
+    assert "Failed to authoritatively retrieve default branch" in (res.error_message or "")
+    post_pulls = [
+        h for h in transport.request_history if h["method"] == "POST" and "pulls" in h["url"]
+    ]
+    assert len(post_pulls) == 0
+
+
+def test_urllib_create_branch_failed_repo_metadata_fails_closed_zero_post_refs_mutation():
+    """Failed repo metadata causes CREATE_BRANCH to fail closed (0 POST /git/refs)."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}",
+        ): (404, {"message": "Repository not found"}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    res = transport.execute(
+        token="ghp_testtoken",
+        action=GitHubAction.CREATE_BRANCH,
+        repository=repo,
+        branch="feature/new-branch",
+        commit_message=None,
+        pr_title=None,
+        pr_body=None,
+        files={},
+    )
+    assert not res.success
+    assert "Failed to authoritatively retrieve default branch" in (res.error_message or "")
+    post_refs = [
+        h for h in transport.request_history if h["method"] == "POST" and "refs" in h["url"]
+    ]
+    assert len(post_refs) == 0
+
+
+def test_urllib_transport_errors_never_expose_github_token():
+    """12. Transport errors never expose the GitHub token."""
+    secret_token = "ghp_VERY_SECRET_RAW_TOKEN_VALUE_XYZ12345"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+
+    # Simulate HTTP error containing the raw token
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}",
+        ): (401, {"message": f"Bad credentials for {secret_token}"}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    res = transport.execute(
+        token=secret_token,
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository=repo,
+        branch="feature/test",
+        commit_message=None,
+        pr_title="PR Title",
+        pr_body="PR Body",
+        files={},
+    )
+    assert not res.success
+    assert secret_token not in (res.error_message or "")
+
+    # Test find_existing error sanitization
+    error_routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/feature/test",
+        ): (500, {"message": f"Server error with {secret_token}"}),
+    }
+    transport_err = ScriptedUrllibTransport(error_routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_BRANCH,
+        repository=repo,
+        branch="feature/test",
+    )
+    recon_res = transport_err.find_existing(token=secret_token, query=query)
+    assert not recon_res.error_message or secret_token not in recon_res.error_message

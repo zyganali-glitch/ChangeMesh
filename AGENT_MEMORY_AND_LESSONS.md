@@ -335,3 +335,20 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `src/release/receipt_manager.py`, `tests/test_p19_release_steward.py`, `docs/P-OMEGA_AUDIT_REPORT.md`, `docs/HANDOFF.md`.
 - Reusable beyond this task: Yes (all audit receipts, evidence passports, and external action logs).
 - Status: `ACTIVE`
+
+### LESSON-20260818-04 — Production Urllib Transport Reconciliation Grounding, Zero Self-Attestation, and Exhaustive Provider Queries
+- Date/time: 2026-08-18
+- Active task: P-19.03 Live GitHub Transport Safety Repair
+- Symptom: `UrllibGitHubTransport.find_existing` copied `query.idempotency_key` and `query.payload_digest` directly into reconciliation results for branch and commit ref lookups without provider proof (forbidden self-attestation); draft PR queries lacked pagination causing false NOT_FOUND on PRs beyond page 1; execution fell back to guessing 'main' when repository metadata failed.
+- Root cause: (1) Conflating provider existence check with cryptographic binding proof; (2) Single-page API requests assuming PRs are in the first 100 items; (3) Silent default-branch fallback violating no-silent-fallback rules.
+- Incorrect approach: (1) Echoing expected query keys/digests in transport results; (2) Treating unpaginated REST queries as exhaustive; (3) Guessing 'main' if repository metadata lookup fails.
+- Correct approach:
+  1. `find_existing` MUST only return values actually observed from provider state. Branch ref 200 returns `UNKNOWN` with `matched_idempotency_key=None, matched_payload_digest=None`. Commit ref distinguishes unrelated HEAD (`NOT_FOUND`), matching message without marker (`UNKNOWN`, fail closed), and exact marker in commit message (`FOUND` with observed marker).
+  2. Draft PR queries paginate across all pages (`page=1, 2, ...` with `per_page=100`), ensuring all provider PRs are scanned.
+  3. Fail closed if repository metadata cannot authoritatively provide `default_branch` with zero mutations.
+  4. Sanitize tokens in all transport error messages and exceptions.
+- Prevention rule: Transport layers must never echo expected query keys as provider evidence; provider reconciliation queries must be exhaustive; metadata lookup failures must fail closed.
+- Tests/evidence: `tests/test_p19_release_steward.py` (82 passed); canonical unit suite (1302 passed, 1 warning).
+- Affected files: `integrations/github/github_adapter.py`, `tests/test_p19_release_steward.py`, `docs/P-OMEGA_AUDIT_REPORT.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`.
+- Reusable beyond this task: Yes (all production transports, provider reconciliation bridges, and REST API adapters).
+- Status: `ACTIVE`
