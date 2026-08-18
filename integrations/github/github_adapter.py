@@ -327,73 +327,95 @@ class UrllibGitHubTransport:
 
             elif query.action == GitHubAction.CREATE_COMMIT:
                 branch = query.branch
-                url = f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}"
-                status_code, data = self._request(token, "GET", url)
-                if status_code == 404:
-                    return GitHubReconciliationResult(
-                        status=ReconciliationStatus.NOT_FOUND,
-                        raw_status_code=status_code,
-                    )
-                elif status_code != 200 or not isinstance(data, dict):
+                if not branch:
                     return GitHubReconciliationResult(
                         status=ReconciliationStatus.ERROR,
-                        error_message=self._sanitize(
-                            f"Failed to query branch ref for commit (HTTP {status_code})", token
-                        ),
-                        raw_status_code=status_code,
+                        error_message="Branch is required for CREATE_COMMIT reconciliation",
                     )
-                commit_sha = data.get("object", {}).get("sha")
-                if not commit_sha:
-                    return GitHubReconciliationResult(
-                        status=ReconciliationStatus.ERROR,
-                        error_message=f"Branch ref {branch!r} missing commit SHA",
-                        raw_status_code=status_code,
+                page = 1
+                per_page = 100
+                while True:
+                    url = (
+                        f"https://api.github.com/repos/{repo}/commits"
+                        f"?sha={branch}&per_page={per_page}&page={page}"
                     )
+                    status_code, data = self._request(token, "GET", url)
+                    if status_code == 404:
+                        return GitHubReconciliationResult(
+                            status=ReconciliationStatus.NOT_FOUND,
+                            raw_status_code=status_code,
+                        )
+                    if status_code != 200 or not isinstance(data, list):
+                        return GitHubReconciliationResult(
+                            status=ReconciliationStatus.ERROR,
+                            error_message=self._sanitize(
+                                f"Failed to query branch commits for {branch!r} "
+                                f"(HTTP {status_code})",
+                                token,
+                            ),
+                            raw_status_code=status_code,
+                        )
 
-                commit_url = f"https://api.github.com/repos/{repo}/git/commits/{commit_sha}"
-                status_code, commit_data = self._request(token, "GET", commit_url)
-                if status_code != 200 or not isinstance(commit_data, dict):
-                    return GitHubReconciliationResult(
-                        status=ReconciliationStatus.ERROR,
-                        error_message=self._sanitize(
-                            f"Failed to query commit {commit_sha!r} (HTTP {status_code})", token
-                        ),
-                        raw_status_code=status_code,
-                    )
-                commit_msg = commit_data.get("message") or ""
-                match = re.search(
-                    r"<!-- changemesh-intent: key=([^\s]+) digest=([0-9a-f]{64}) -->",
-                    commit_msg,
-                )
-                if match:
-                    marker_key = match.group(1)
-                    marker_digest = match.group(2)
-                    return GitHubReconciliationResult(
-                        status=ReconciliationStatus.FOUND,
-                        commit_sha=commit_sha,
-                        matched_idempotency_key=marker_key,
-                        matched_payload_digest=marker_digest,
-                        raw_status_code=status_code,
-                    )
-                if query.commit_message and (
-                    commit_msg == query.commit_message
-                    or commit_msg.startswith(query.commit_message)
-                ):
-                    return GitHubReconciliationResult(
-                        status=ReconciliationStatus.UNKNOWN,
-                        commit_sha=commit_sha,
-                        matched_idempotency_key=None,
-                        matched_payload_digest=None,
-                        error_message=(
-                            "Branch HEAD commit matches commit message but lacks "
-                            "verifiable canonical idempotency marker"
-                        ),
-                        raw_status_code=status_code,
-                    )
+                    for commit in data:
+                        if not isinstance(commit, dict):
+                            continue
+                        commit_sha = commit.get("sha")
+                        if not commit_sha:
+                            continue
+                        commit_obj = commit.get("commit")
+                        if isinstance(commit_obj, dict):
+                            commit_msg = commit_obj.get("message") or ""
+                        else:
+                            commit_msg = commit.get("message") or ""
+
+                        match = re.search(
+                            r"<!-- changemesh-intent: key=([^\s]+) digest=([0-9a-f]{64}) -->",
+                            commit_msg,
+                        )
+                        if match:
+                            marker_key = match.group(1)
+                            marker_digest = match.group(2)
+                            if query.idempotency_key and marker_key == query.idempotency_key:
+                                return GitHubReconciliationResult(
+                                    status=ReconciliationStatus.FOUND,
+                                    commit_sha=commit_sha,
+                                    matched_idempotency_key=marker_key,
+                                    matched_payload_digest=marker_digest,
+                                    raw_status_code=status_code,
+                                )
+                            elif not query.idempotency_key:
+                                return GitHubReconciliationResult(
+                                    status=ReconciliationStatus.FOUND,
+                                    commit_sha=commit_sha,
+                                    matched_idempotency_key=marker_key,
+                                    matched_payload_digest=marker_digest,
+                                    raw_status_code=status_code,
+                                )
+                        else:
+                            # No marker found in this commit
+                            if query.commit_message and (
+                                commit_msg == query.commit_message
+                                or commit_msg.startswith(query.commit_message)
+                            ):
+                                return GitHubReconciliationResult(
+                                    status=ReconciliationStatus.UNKNOWN,
+                                    commit_sha=commit_sha,
+                                    matched_idempotency_key=None,
+                                    matched_payload_digest=None,
+                                    error_message=(
+                                        f"Branch commit {commit_sha[:8]} matches commit message "
+                                        f"but lacks verifiable canonical idempotency marker"
+                                    ),
+                                    raw_status_code=status_code,
+                                )
+
+                    if len(data) < per_page:
+                        break
+                    page += 1
+
                 return GitHubReconciliationResult(
                     status=ReconciliationStatus.NOT_FOUND,
-                    commit_sha=commit_sha,
-                    raw_status_code=status_code,
+                    raw_status_code=200,
                 )
 
             return GitHubReconciliationResult(
@@ -676,6 +698,21 @@ def format_draft_pr_body_with_intent_marker(
         return body
     if body:
         return f"{body}\n\n{marker}"
+    return marker
+
+
+def format_commit_message_with_intent_marker(
+    commit_message: str | None,
+    idempotency_key: str | None,
+    payload_digest: str,
+) -> str:
+    """Embeds deterministic intent marker in commit message for provider-observable idempotency."""
+    msg = (commit_message or "ChangeMesh automated commit").strip()
+    marker = f"<!-- changemesh-intent: key={idempotency_key or 'none'} digest={payload_digest} -->"
+    if marker in msg:
+        return msg
+    if msg:
+        return f"{msg}\n\n{marker}"
     return marker
 
 
@@ -1399,9 +1436,14 @@ class BoundedGitHubAdapter:
 
         # Authoritative NOT_FOUND -> proceed with fresh mutation
         pr_body_for_transport = request.pr_body
+        commit_message_for_transport = request.commit_message
         if request.action == GitHubAction.CREATE_DRAFT_PR:
             pr_body_for_transport = format_draft_pr_body_with_intent_marker(
                 request.pr_body, canonical_idempotency_id, payload_digest
+            )
+        elif request.action == GitHubAction.CREATE_COMMIT:
+            commit_message_for_transport = format_commit_message_with_intent_marker(
+                request.commit_message, canonical_idempotency_id, payload_digest
             )
 
         try:
@@ -1410,7 +1452,7 @@ class BoundedGitHubAdapter:
                 action=request.action,
                 repository=request.repository,
                 branch=request.branch,
-                commit_message=request.commit_message,
+                commit_message=commit_message_for_transport,
                 pr_title=request.pr_title,
                 pr_body=pr_body_for_transport,
                 files=request.files,

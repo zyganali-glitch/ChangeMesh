@@ -20,6 +20,8 @@ from integrations.github.github_adapter import (
     GitHubTransportResult,
     ReconciliationStatus,
     UrllibGitHubTransport,
+    _caller_idempotency_fingerprint,
+    format_commit_message_with_intent_marker,
     format_draft_pr_body_with_intent_marker,
 )
 from src.orchestrator.idempotency import (
@@ -2963,51 +2965,210 @@ def test_urllib_create_branch_404_produces_authoritative_not_found():
     assert result.matched_payload_digest is None
 
 
-def test_urllib_create_commit_unrelated_head_is_not_adopted_returns_not_found():
-    """3. Existing unrelated CREATE_COMMIT HEAD is not adopted as intended semantic commit."""
+def test_urllib_create_commit_exact_marker_at_head_returns_found():
+    """1. Intended commit is current HEAD with exact provider marker -> FOUND."""
     branch = "feature/work"
     repo = "zyganali-glitch/changemesh-livewrite-demo"
-    head_sha = "1111222233334444555566667777888899990000"
+    head_sha = "3333444455556666777788889999000011112222"
+    marker_key = "idem_external_write_commit_head"
+    marker_digest = "e" * 64
+    commit_msg = (
+        f"feat(p19): verified head commit\n\n"
+        f"<!-- changemesh-intent: key={marker_key} digest={marker_digest} -->"
+    )
     routes = {
         (
             "GET",
-            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
-        ): (200, {"object": {"sha": head_sha}}),
-        (
-            "GET",
-            f"https://api.github.com/repos/{repo}/git/commits/{head_sha}",
-        ): (200, {"sha": head_sha, "message": "Initial commit from main"}),
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (200, [{"sha": head_sha, "commit": {"message": commit_msg}}]),
     }
     transport = ScriptedUrllibTransport(routes)
     query = GitHubReconciliationQuery(
         action=GitHubAction.CREATE_COMMIT,
         repository=repo,
         branch=branch,
-        commit_message="feat(p19): synthetic livewrite demo change",
+        commit_message="feat(p19): verified head commit",
+        idempotency_key=marker_key,
+        payload_digest=marker_digest,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.FOUND
+    assert result.commit_sha == head_sha
+    assert result.matched_idempotency_key == marker_key
+    assert result.matched_payload_digest == marker_digest
+
+
+def test_urllib_create_commit_exact_marker_behind_head_returns_found():
+    """2. Intended commit is behind current HEAD in branch history -> FOUND, not NOT_FOUND."""
+    branch = "feature/work"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    head_sha = "1111222233334444555566667777888899990000"
+    older_sha = "aaaaaaaaabbbbbbbbccccccccddddddddeeeeeee"
+    marker_key = "idem_external_write_older_commit"
+    marker_digest = "a" * 64
+    target_msg = (
+        f"feat(p19): original change\n\n"
+        f"<!-- changemesh-intent: key={marker_key} digest={marker_digest} -->"
+    )
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {"sha": head_sha, "commit": {"message": "Unrelated subsequent hotfix"}},
+                {"sha": older_sha, "commit": {"message": target_msg}},
+            ],
+        ),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): original change",
+        idempotency_key=marker_key,
+        payload_digest=marker_digest,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.FOUND
+    assert result.commit_sha == older_sha
+    assert result.matched_idempotency_key == marker_key
+    assert result.matched_payload_digest == marker_digest
+
+
+def test_urllib_create_commit_unrelated_head_with_older_exact_marker_zero_duplicate_mutation():
+    """3. Older exact marker commit in history performs ZERO duplicate mutations."""
+    branch = "feature/work"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    head_sha = "1111222233334444555566667777888899990000"
+    older_sha = "aaaaaaaaabbbbbbbbccccccccddddddddeeeeeee"
+    caller_key = "0123456789abcdef"
+    caller_fp = _caller_idempotency_fingerprint(caller_key)
+    assert caller_fp is not None
+
+    commit_payload = {
+        "action": "CREATE_COMMIT",
+        "repository": repo,
+        "branch": branch,
+        "commit_message": "feat(p19): original change",
+        "files": sorted({"demo/file.txt": "content"}.items()),
+    }
+    canonical_digest = sha256_hex(canonical_json_bytes(commit_payload))
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-live-commit-behind-head",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=f"CREATE_COMMIT:fp_{caller_fp[:16]}",
+        target_system=repo,
+        caller_revision="1.0.0",
+        payload_digest=canonical_digest,
+    )
+    canonical_key = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+
+    target_msg = (
+        f"feat(p19): original change\n\n"
+        f"<!-- changemesh-intent: key={canonical_key} digest={canonical_digest} -->"
+    )
+
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {"sha": head_sha, "commit": {"message": "Unrelated hotfix"}},
+                {"sha": older_sha, "commit": {"message": target_msg}},
+            ],
+        ),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    state_repo = _setup_test_repo(tid="tenant-default", cid="change-live-commit-behind-head")
+    adapter = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport,
+        state_repository=state_repo,
+        tenant_id="tenant-default",
+        change_id="change-live-commit-behind-head",
+    )
+    req = GitHubRequest(
+        request_id="req-commit-behind-head",
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): original change",
+        files={"demo/file.txt": "content"},
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="0123456789abcdef",
+        tenant_id="tenant-default",
+        change_id="change-live-commit-behind-head",
+    )
+    resp = adapter.execute(req)
+    assert resp.success
+    assert resp.commit_sha == older_sha
+    assert resp.idempotency_key == canonical_key
+
+    # Confirm ZERO mutating calls occurred
+    mutation_methods = [
+        h["method"]
+        for h in transport.request_history
+        if h["method"] in ("POST", "PATCH", "PUT", "DELETE")
+    ]
+    assert len(mutation_methods) == 0
+
+
+def test_urllib_create_commit_exhaustive_search_no_matching_marker_returns_not_found():
+    """4. Exhaustive search of branch history with no matching marker returns NOT_FOUND."""
+    branch = "feature/work"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {"sha": "1111", "commit": {"message": "Initial commit"}},
+                {"sha": "2222", "commit": {"message": "Second commit"}},
+            ],
+        ),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): nonexistent commit",
         idempotency_key="expected_commit_key",
         payload_digest="c" * 64,
     )
     result = transport.find_existing(token="ghp_testtoken", query=query)
     assert result.status == ReconciliationStatus.NOT_FOUND
-    assert result.commit_sha == head_sha
+    assert result.raw_status_code == 200
     assert result.matched_idempotency_key is None
     assert result.matched_payload_digest is None
 
 
 def test_urllib_create_commit_matching_message_without_provable_marker_fails_closed_zero_mutation():
-    """4. Semantic commit match without independently provable canonical identity fails closed."""
+    """5. Semantic commit match without independently provable canonical identity fails closed."""
     branch = "feature/work"
     repo = "zyganali-glitch/changemesh-livewrite-demo"
     head_sha = "2222333344445555666677778888999900001111"
     routes = {
         (
             "GET",
-            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
-        ): (200, {"object": {"sha": head_sha}}),
-        (
-            "GET",
-            f"https://api.github.com/repos/{repo}/git/commits/{head_sha}",
-        ): (200, {"sha": head_sha, "message": "feat(p19): synthetic livewrite demo change"}),
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {
+                    "sha": head_sha,
+                    "commit": {"message": "feat(p19): synthetic livewrite demo change"},
+                }
+            ],
+        ),
     }
     transport = ScriptedUrllibTransport(routes)
     query = GitHubReconciliationQuery(
@@ -3049,7 +3210,6 @@ def test_urllib_create_commit_matching_message_without_provable_marker_fails_clo
     resp = adapter.execute(req)
     assert not resp.success
     assert "lacks verifiable canonical idempotency marker" in (resp.error_message or "")
-    # Verify no POST /git/trees or POST /git/commits or PATCH /git/refs mutation occurred
     mutation_methods = [
         h["method"]
         for h in transport.request_history
@@ -3058,18 +3218,129 @@ def test_urllib_create_commit_matching_message_without_provable_marker_fails_clo
     assert len(mutation_methods) == 0
 
 
-def test_urllib_create_commit_exact_marker_returns_actual_provider_marker():
-    """5. Commit with exact provider marker returns FOUND with observed marker key and digest."""
+def test_urllib_create_commit_conflicting_marker_digest_fails_closed():
+    """6. Conflicting provider marker digest fails closed with zero mutation."""
     branch = "feature/work"
     repo = "zyganali-glitch/changemesh-livewrite-demo"
-    head_sha = "3333444455556666777788889999000011112222"
-    marker_key = "idem_external_write_commit_999"
-    marker_digest = "e" * 64
+    head_sha = "4444555566667777888899990000111122223333"
+    target_key = "idem_external_write_commit_conflict"
+    expected_digest = "e" * 64
+    wrong_digest = "f" * 64
     commit_msg = (
-        f"feat(p19): verified commit\n\n"
-        f"<!-- changemesh-intent: key={marker_key} digest={marker_digest} -->"
+        f"feat(p19): conflicting digest\n\n"
+        f"<!-- changemesh-intent: key={target_key} digest={wrong_digest} -->"
     )
     routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (200, [{"sha": head_sha, "commit": {"message": commit_msg}}]),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): conflicting digest",
+        idempotency_key=target_key,
+        payload_digest=expected_digest,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.FOUND
+    assert result.matched_idempotency_key == target_key
+    assert result.matched_payload_digest == wrong_digest
+
+
+def test_urllib_create_commit_exact_marker_on_page_2_is_found():
+    """7. Exact matching commit appearing beyond page 1 is found via pagination."""
+    branch = "feature/work"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    target_sha = "9999888877776666555544443333222211110000"
+    target_key = "idem_external_write_page2_commit"
+    target_digest = "9" * 64
+
+    page1_commits = [
+        {"sha": f"sha_p1_{i}", "commit": {"message": f"Non-matching commit {i}"}}
+        for i in range(1, 101)
+    ]
+    target_msg = (
+        f"feat(p19): page 2 commit\n\n"
+        f"<!-- changemesh-intent: key={target_key} digest={target_digest} -->"
+    )
+    page2_commits = [{"sha": target_sha, "commit": {"message": target_msg}}]
+
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (200, page1_commits),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=2",
+        ): (200, page2_commits),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(p19): page 2 commit",
+        idempotency_key=target_key,
+        payload_digest=target_digest,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.FOUND
+    assert result.commit_sha == target_sha
+    assert result.matched_idempotency_key == target_key
+    assert result.matched_payload_digest == target_digest
+    queried_urls = [h["url"] for h in transport.request_history if h["method"] == "GET"]
+    assert any("page=1" in u for u in queried_urls)
+    assert any("page=2" in u for u in queried_urls)
+
+
+def test_urllib_create_commit_history_pagination_failure_returns_error_never_not_found():
+    """8. History pagination failure on page 2 returns ERROR, never NOT_FOUND."""
+    branch = "feature/work"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    page1_commits = [
+        {"sha": f"sha_p1_{i}", "commit": {"message": f"Non-matching commit {i}"}}
+        for i in range(1, 101)
+    ]
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (200, page1_commits),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=2",
+        ): (500, {"message": "Internal Server Error"}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    query = GitHubReconciliationQuery(
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        idempotency_key="some_key",
+        payload_digest="a" * 64,
+    )
+    result = transport.find_existing(token="ghp_testtoken", query=query)
+    assert result.status == ReconciliationStatus.ERROR
+    assert result.raw_status_code == 500
+    assert result.status != ReconciliationStatus.NOT_FOUND
+
+
+def test_bounded_github_adapter_create_commit_outbound_message_contains_canonical_marker():
+    """9. Outbound CREATE_COMMIT commit message contains canonical safe ChangeMesh marker."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    branch = "feature/commit-marker-test"
+    head_sha = "1111222233334444555566667777888899990000"
+    created_commit_sha = "bbbb1111cccc2222dddd3333eeee4444ffff5555"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (404, {"message": "Not Found"}),
         (
             "GET",
             f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
@@ -3077,22 +3348,285 @@ def test_urllib_create_commit_exact_marker_returns_actual_provider_marker():
         (
             "GET",
             f"https://api.github.com/repos/{repo}/git/commits/{head_sha}",
-        ): (200, {"sha": head_sha, "message": commit_msg}),
+        ): (200, {"sha": head_sha, "tree": {"sha": "tree123"}}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/blobs"): (201, {"sha": "blob123"}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/trees"): (201, {"sha": "newtree123"}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/commits"): (
+            201,
+            {"sha": created_commit_sha},
+        ),
+        (
+            "PATCH",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (200, {"sha": created_commit_sha}),
     }
     transport = ScriptedUrllibTransport(routes)
-    query = GitHubReconciliationQuery(
+    state_repo = _setup_test_repo(tid="tenant-default", cid="change-marker-test")
+    adapter = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport,
+        state_repository=state_repo,
+        tenant_id="tenant-default",
+        change_id="change-marker-test",
+    )
+    req = GitHubRequest(
+        request_id="req-marker-01",
         action=GitHubAction.CREATE_COMMIT,
         repository=repo,
         branch=branch,
-        commit_message="feat(p19): verified commit",
-        idempotency_key=marker_key,
-        payload_digest=marker_digest,
+        commit_message="feat: important user change",
+        files={"test.txt": "hello"},
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="caller_idempotency_key_xyz",
+        tenant_id="tenant-default",
+        change_id="change-marker-test",
     )
-    result = transport.find_existing(token="ghp_testtoken", query=query)
-    assert result.status == ReconciliationStatus.FOUND
-    assert result.commit_sha == head_sha
-    assert result.matched_idempotency_key == marker_key
-    assert result.matched_payload_digest == marker_digest
+    resp = adapter.execute(req)
+    assert resp.success
+    executed_calls = [
+        h
+        for h in transport.request_history
+        if h.get("method") == "POST" and "git/commits" in h.get("url", "")
+    ]
+    assert len(executed_calls) == 1
+    sent_msg = executed_calls[0].get("data", {}).get("message") or ""
+    assert "feat: important user change" in sent_msg
+    assert "<!-- changemesh-intent: key=idem_external_write_" in sent_msg
+    assert "digest=" in sent_msg
+
+
+def test_bounded_github_adapter_create_commit_outbound_message_never_contains_raw_caller_key():
+    """10. Outbound CREATE_COMMIT commit message never exposes raw caller idempotency key."""
+    raw_secret_key = "ghp_VERY_SECRET_RAW_CALLER_TOKEN_99999"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    branch = "feature/no-secret-key"
+    head_sha = "1111222233334444555566667777888899990000"
+    created_commit_sha = "bbbb1111cccc2222dddd3333eeee4444ffff5555"
+    routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (404, {"message": "Not Found"}),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (200, {"object": {"sha": head_sha}}),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/commits/{head_sha}",
+        ): (200, {"sha": head_sha, "tree": {"sha": "tree123"}}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/blobs"): (201, {"sha": "blob123"}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/trees"): (201, {"sha": "newtree123"}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/commits"): (
+            201,
+            {"sha": created_commit_sha},
+        ),
+        (
+            "PATCH",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (200, {"sha": created_commit_sha}),
+    }
+    transport = ScriptedUrllibTransport(routes)
+    state_repo = _setup_test_repo(tid="tenant-default", cid="change-no-secret")
+    adapter = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport,
+        state_repository=state_repo,
+        tenant_id="tenant-default",
+        change_id="change-no-secret",
+    )
+    req = GitHubRequest(
+        request_id="req-no-secret-01",
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat: clean commit",
+        files={"clean.txt": "data"},
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=raw_secret_key,
+        tenant_id="tenant-default",
+        change_id="change-no-secret",
+    )
+    resp = adapter.execute(req)
+    assert resp.success
+    executed_calls = [
+        h
+        for h in transport.request_history
+        if h.get("method") == "POST" and "git/commits" in h.get("url", "")
+    ]
+    assert len(executed_calls) == 1
+    sent_msg = executed_calls[0].get("data", {}).get("message") or ""
+    assert raw_secret_key not in sent_msg
+
+
+def test_bounded_github_adapter_create_commit_payload_digest_unaffected_by_marker():
+    """11. Semantic payload digest remains based on original semantic intent."""
+    original_msg = "feat: initial commit message"
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    branch = "feature/digest-check"
+    files = {"sample.py": "print('ok')"}
+
+    expected_payload_dict = {
+        "action": "CREATE_COMMIT",
+        "repository": repo,
+        "branch": branch,
+        "commit_message": original_msg,
+        "files": sorted(files.items()),
+    }
+    expected_digest = sha256_hex(canonical_json_bytes(expected_payload_dict))
+
+    marker_msg = format_commit_message_with_intent_marker(
+        original_msg, "idem_key_123", expected_digest
+    )
+    assert marker_msg != original_msg
+    assert "<!-- changemesh-intent:" in marker_msg
+
+
+def test_create_commit_post_provider_success_commit_failure_and_recovery():
+    """12. Commit failure, lease expiry, unrelated HEAD advance, and recovery."""
+    repo = "zyganali-glitch/changemesh-livewrite-demo"
+    branch = "feature/multi-step-recovery"
+    cid = "change-commit-recovery-01"
+    tid = "tenant-default"
+    head_sha = "1111222233334444555566667777888899990000"
+    commit_a_sha = "aaaa1111bbbb2222cccc3333dddd4444eeee5555"
+    commit_b_sha = "bbbb2222cccc3333dddd4444eeee5555ffff6666"
+    caller_key = "recov0123456789abcdef"
+    caller_fp = _caller_idempotency_fingerprint(caller_key)
+    assert caller_fp is not None
+
+    commit_payload = {
+        "action": "CREATE_COMMIT",
+        "repository": repo,
+        "branch": branch,
+        "commit_message": "feat(demo): recoverable change",
+        "files": sorted({"recover.txt": "payload"}.items()),
+    }
+    canonical_digest = sha256_hex(canonical_json_bytes(commit_payload))
+    intent = IdempotencyIntent(
+        tenant_id=tid,
+        change_id=cid,
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=f"CREATE_COMMIT:fp_{caller_fp[:16]}",
+        target_system=repo,
+        caller_revision="1.0.0",
+        payload_digest=canonical_digest,
+    )
+    canonical_key = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+
+    commit_a_msg = (
+        f"feat(demo): recoverable change\n\n"
+        f"<!-- changemesh-intent: key={canonical_key} digest={canonical_digest} -->"
+    )
+
+    # Routes for worker 1: authoritative NOT_FOUND during find_existing, then execute succeeds
+    worker1_routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (404, {"message": "Branch not found"}),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (200, {"object": {"sha": head_sha}}),
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/git/commits/{head_sha}",
+        ): (200, {"sha": head_sha, "tree": {"sha": "tree123"}}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/blobs"): (201, {"sha": "blob123"}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/trees"): (201, {"sha": "newtree123"}),
+        ("POST", f"https://api.github.com/repos/{repo}/git/commits"): (201, {"sha": commit_a_sha}),
+        (
+            "PATCH",
+            f"https://api.github.com/repos/{repo}/git/refs/heads/{branch}",
+        ): (200, {"sha": commit_a_sha}),
+    }
+    transport1 = ScriptedUrllibTransport(worker1_routes)
+    inner_repo = _setup_test_repo(tid=tid, cid=cid)
+    failing_repo = FailingCommitRepoWrapper(inner_repo)
+
+    adapter1 = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport1,
+        state_repository=failing_repo,  # type: ignore[arg-type]
+        tenant_id=tid,
+        change_id=cid,
+    )
+    req = GitHubRequest(
+        request_id="req-recov-01",
+        action=GitHubAction.CREATE_COMMIT,
+        repository=repo,
+        branch=branch,
+        commit_message="feat(demo): recoverable change",
+        files={"recover.txt": "payload"},
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id=tid,
+        change_id=cid,
+    )
+    resp1 = adapter1.execute(req)
+    # Worker 1 executed provider mutation but failed durable commit
+    # -> fails closed holding reservation
+    assert not resp1.success
+    assert "durable commit failed" in (resp1.error_message or "")
+
+    # Step 4: Simulate lease expiry on the active reservation
+    res_dict = inner_repo._idempotency_reservations.get(tid, {}).get(cid, {})
+    for res_id, res_record in list(res_dict.items()):
+        if res_record.action_type == intent.action_type:
+            expired_record = IdempotencyReservationRecord(
+                reservation_id=res_record.reservation_id,
+                tenant_id=res_record.tenant_id,
+                change_id=res_record.change_id,
+                idempotency_key=res_record.idempotency_key,
+                scope=res_record.scope,
+                action_type=res_record.action_type,
+                target_system=res_record.target_system,
+                caller_revision=res_record.caller_revision,
+                payload_digest=res_record.payload_digest,
+                status=IdempotencyReservationStatus.RESERVED,
+                reserved_at=res_record.reserved_at - timedelta(hours=2),
+                expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+            )
+            inner_repo._idempotency_reservations[tid][cid][res_id] = expired_record
+
+    # Step 5: An unrelated commit B is pushed to branch, making B the new HEAD
+    worker2_routes = {
+        (
+            "GET",
+            f"https://api.github.com/repos/{repo}/commits?sha={branch}&per_page=100&page=1",
+        ): (
+            200,
+            [
+                {"sha": commit_b_sha, "commit": {"message": "Unrelated hotfix on branch"}},
+                {"sha": commit_a_sha, "commit": {"message": commit_a_msg}},
+            ],
+        ),
+    }
+    transport2 = ScriptedUrllibTransport(worker2_routes)
+
+    # Step 6: Worker 2 cold-starts and retries the exact same semantic intent
+    adapter2 = BoundedGitHubAdapter(
+        token="ghp_testtoken",
+        transport=transport2,
+        state_repository=inner_repo,
+        tenant_id=tid,
+        change_id=cid,
+    )
+    resp2 = adapter2.execute(req)
+
+    # Worker 2 successfully reconciles commit A from history past HEAD commit B!
+    assert resp2.success
+    assert resp2.commit_sha == commit_a_sha
+    assert resp2.idempotency_key == canonical_key
+
+    # Confirm Worker 2 executed ZERO mutating calls
+    worker2_mutations = [
+        h["method"]
+        for h in transport2.request_history
+        if h["method"] in ("POST", "PATCH", "PUT", "DELETE")
+    ]
+    assert len(worker2_mutations) == 0
 
 
 def test_urllib_create_draft_pr_exact_marker_returns_actual_provider_marker():
