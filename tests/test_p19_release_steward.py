@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -17,6 +18,7 @@ from integrations.github.github_adapter import (
     GitHubRequest,
     GitHubTransportResult,
     ReconciliationStatus,
+    format_draft_pr_body_with_intent_marker,
 )
 from src.orchestrator.idempotency import (
     IdempotencyIntent,
@@ -75,6 +77,8 @@ class MockStoredEntity:
         files: dict[str, str] | None = None,
         result_url: str | None = None,
         commit_sha: str | None = None,
+        idempotency_key: str | None = None,
+        payload_digest: str | None = None,
     ):
         self.action = action
         self.repository = repository
@@ -85,6 +89,8 @@ class MockStoredEntity:
         self.files = files or {}
         self.result_url = result_url
         self.commit_sha = commit_sha
+        self.idempotency_key = idempotency_key
+        self.payload_digest = payload_digest
 
 
 class MockTransportLackingReconciliation:
@@ -273,35 +279,39 @@ class MockGitHubTransport:
                 if entity.branch is not None and entity.branch != query.branch:
                     continue
 
-                matched = False
-                if (
-                    query.idempotency_key
-                    and entity.pr_body
-                    and f"key={query.idempotency_key}" in entity.pr_body
-                ):
-                    matched = True
-                elif (
-                    query.payload_digest
-                    and entity.pr_body
-                    and f"digest={query.payload_digest}" in entity.pr_body
-                ):
-                    matched = True
-                elif entity.pr_title == query.pr_title and (
-                    entity.pr_body == query.pr_body
-                    or (entity.pr_body and (query.pr_body or "") in entity.pr_body)
-                ):
-                    matched = True
-                elif entity.result_url and (
-                    entity.pr_title is None or entity.pr_title == query.pr_title
-                ):
-                    matched = True
+                # ChangeMesh-created Draft PR marker extraction
+                if entity.pr_body:
+                    match = re.search(
+                        r"<!-- changemesh-intent: key=([^\s]+) digest=([0-9a-f]{64}) -->",
+                        entity.pr_body,
+                    )
+                    if match:
+                        marker_key = match.group(1)
+                        marker_digest = match.group(2)
+                        if (
+                            query.idempotency_key == marker_key
+                            and query.payload_digest == marker_digest
+                        ):
+                            return GitHubReconciliationResult(
+                                status=ReconciliationStatus.FOUND,
+                                result_url=entity.result_url,
+                                matched_idempotency_key=marker_key,
+                                matched_payload_digest=marker_digest,
+                            )
+                        continue
 
-                if matched:
+                # Explicit matched fields seeded on MockStoredEntity
+                if (
+                    entity.idempotency_key == query.idempotency_key
+                    and entity.payload_digest == query.payload_digest
+                    and query.idempotency_key is not None
+                    and query.payload_digest is not None
+                ):
                     return GitHubReconciliationResult(
                         status=ReconciliationStatus.FOUND,
                         result_url=entity.result_url,
-                        matched_idempotency_key=query.idempotency_key,
-                        matched_payload_digest=query.payload_digest,
+                        matched_idempotency_key=entity.idempotency_key,
+                        matched_payload_digest=entity.payload_digest,
                     )
 
             elif query.action == GitHubAction.CREATE_COMMIT:
@@ -313,17 +323,39 @@ class MockGitHubTransport:
                     )
                     and (not entity.files or entity.files == query.files)
                 ):
-                    return GitHubReconciliationResult(
-                        status=ReconciliationStatus.FOUND,
-                        commit_sha=entity.commit_sha,
-                    )
+                    commit_payload = {
+                        "action": entity.action.value,
+                        "repository": entity.repository,
+                        "branch": entity.branch or "",
+                        "commit_message": entity.commit_message or query.commit_message or "",
+                        "files": sorted(entity.files.items())
+                        if entity.files
+                        else (sorted(query.files.items()) if query.files else []),
+                    }
+                    entity_digest = sha256_hex(canonical_json_bytes(commit_payload))
+                    if entity_digest == query.payload_digest:
+                        return GitHubReconciliationResult(
+                            status=ReconciliationStatus.FOUND,
+                            commit_sha=entity.commit_sha,
+                            matched_idempotency_key=query.idempotency_key,
+                            matched_payload_digest=entity_digest,
+                        )
 
             elif query.action == GitHubAction.CREATE_BRANCH:
                 if entity.branch is None or entity.branch == query.branch:
-                    return GitHubReconciliationResult(
-                        status=ReconciliationStatus.FOUND,
-                        result_url=entity.result_url,
-                    )
+                    branch_payload = {
+                        "action": entity.action.value,
+                        "repository": entity.repository,
+                        "branch": entity.branch or query.branch,
+                    }
+                    entity_digest = sha256_hex(canonical_json_bytes(branch_payload))
+                    if entity_digest == query.payload_digest:
+                        return GitHubReconciliationResult(
+                            status=ReconciliationStatus.FOUND,
+                            result_url=entity.result_url,
+                            matched_idempotency_key=query.idempotency_key,
+                            matched_payload_digest=entity_digest,
+                        )
 
         return GitHubReconciliationResult(status=ReconciliationStatus.NOT_FOUND)
 
@@ -728,7 +760,9 @@ def test_in_progress_reservation_causes_zero_transport_calls():
     transport = MockGitHubTransport()
 
     # Pre-reserve the intent via canonical P-10 IdempotencyKeyManager to simulate active Worker 1
-    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:pr-concurrent-100"
+    caller_key = "pr-concurrent-100"
+    key_fp = sha256_hex(caller_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
     payload_dict = {
         "action": GitHubAction.CREATE_DRAFT_PR.value,
         "repository": "org/repo",
@@ -761,7 +795,7 @@ def test_in_progress_reservation_causes_zero_transport_calls():
         pr_title="Concurrent PR",
         pr_body="Body text",
         evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-        idempotency_key="pr-concurrent-100",
+        idempotency_key=caller_key,
         tenant_id="tenant-default",
         change_id="change-concurrent-01",
     )
@@ -944,7 +978,9 @@ def test_exact_replay_with_malformed_cached_pr_url_fails_closed():
         token="ghp_testtoken", transport=transport, state_repository=repo
     )
 
-    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:pr-badcache-key"
+    caller_key = "pr-badcache-key"
+    key_fp = sha256_hex(caller_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
     payload_dict = {
         "action": GitHubAction.CREATE_DRAFT_PR.value,
         "repository": "org/repo",
@@ -995,7 +1031,7 @@ def test_exact_replay_with_malformed_cached_pr_url_fails_closed():
         branch="feat-badcache",
         pr_title="Bad Cache PR",
         evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-        idempotency_key="pr-badcache-key",
+        idempotency_key=caller_key,
         tenant_id="tenant-default",
         change_id="change-badcache-01",
     )
@@ -1013,7 +1049,9 @@ def test_exact_replay_with_malformed_cached_commit_sha_fails_closed():
         token="ghp_testtoken", transport=transport, state_repository=repo
     )
 
-    action_type = f"{GitHubAction.CREATE_COMMIT.value}:commit-badsha-key"
+    caller_key = "commit-badsha-key"
+    key_fp = sha256_hex(caller_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_COMMIT.value}:fp_{key_fp[:16]}"
     payload_dict = {
         "action": GitHubAction.CREATE_COMMIT.value,
         "repository": "org/repo",
@@ -1065,7 +1103,7 @@ def test_exact_replay_with_malformed_cached_commit_sha_fails_closed():
         commit_message="Commit msg",
         files={"a.py": "1"},
         evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-        idempotency_key="commit-badsha-key",
+        idempotency_key=caller_key,
         tenant_id="tenant-default",
         change_id="change-badsha-01",
     )
@@ -1366,7 +1404,8 @@ def test_provider_success_followed_by_durable_commit_failure_holds_reservation()
     assert transport.call_count == 1  # Transport DID run
 
     # Verify that the reservation was NOT released and remains RESERVED
-    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:pr-ambig-key"
+    caller_fp = sha256_hex("pr-ambig-key".encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{caller_fp[:16]}"
     payload_dict = {
         "action": GitHubAction.CREATE_DRAFT_PR.value,
         "repository": "org/repo",
@@ -1430,11 +1469,47 @@ def test_immediate_retry_after_ambiguous_post_write_failure_does_zero_mutation()
 def test_successful_reconciliation_reuses_verified_provider_evidence():
     """12 & 13. Successful reconciliation returns and reuses verified real provider evidence."""
     repo = _setup_test_repo(tid="tenant-default", cid="change-reconcile-01")
-    # Transport already has the existing PR from a prior external creation
-    existing_pr = GitHubTransportResult(
-        success=True, result_url="https://github.com/org/repo/pull/777"
+    tid = "tenant-default"
+    cid = "change-reconcile-01"
+    branch = "feat-reconcile"
+    pr_title = "Reconciled PR"
+    pr_body = "Reconciled PR body"
+    caller_key = "pr-reconcile-key"
+
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": branch,
+        "pr_title": pr_title,
+        "pr_body": pr_body,
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    key_fp = sha256_hex(caller_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
+    intent = IdempotencyIntent(
+        tenant_id=tid,
+        change_id=cid,
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
     )
-    transport = MockGitHubTransport(existing_items={GitHubAction.CREATE_DRAFT_PR: existing_pr})
+    canonical_id = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+
+    # Format stored PR with exact ChangeMesh intent marker
+    body_with_marker = (
+        f"{pr_body}\n\n<!-- changemesh-intent: key={canonical_id} digest={payload_digest} -->"
+    )
+    existing_entity = MockStoredEntity(
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch=branch,
+        pr_title=pr_title,
+        pr_body=body_with_marker,
+        result_url="https://github.com/org/repo/pull/777",
+    )
+    transport = MockGitHubTransport(existing_items=[existing_entity])
     adapter = BoundedGitHubAdapter(
         token="ghp_validtoken123", transport=transport, state_repository=repo
     )
@@ -1443,16 +1518,18 @@ def test_successful_reconciliation_reuses_verified_provider_evidence():
         request_id="req-reconcile-test",
         action=GitHubAction.CREATE_DRAFT_PR,
         repository="org/repo",
-        branch="feat-reconcile",
-        pr_title="Reconciled PR",
+        branch=branch,
+        pr_title=pr_title,
+        pr_body=pr_body,
         evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
-        idempotency_key="pr-reconcile-key",
-        tenant_id="tenant-default",
-        change_id="change-reconcile-01",
+        idempotency_key=caller_key,
+        tenant_id=tid,
+        change_id=cid,
     )
     res = adapter.execute(req)
     assert res.success
     assert res.result_url == "https://github.com/org/repo/pull/777"
+    assert res.idempotency_key == canonical_id
     assert transport.call_count == 0  # Zero mutation execute() call!
     assert transport.find_count == 1  # find_existing was called
 
@@ -1460,6 +1537,7 @@ def test_successful_reconciliation_reuses_verified_provider_evidence():
     res_replay = adapter.execute(req)
     assert res_replay.success
     assert res_replay.result_url == "https://github.com/org/repo/pull/777"
+    assert res_replay.idempotency_key == canonical_id
     assert transport.call_count == 0
 
 
@@ -1674,7 +1752,7 @@ def test_live_write_different_pr_body_under_same_branch_title_idempotency_detect
     )
     res2 = adapter.execute(req2)
     assert not res2.success
-    assert "idempotency conflict" in (res2.error_message or "").lower()
+    assert "conflict" in (res2.error_message or "").lower()
     assert transport.call_count == 1  # Zero second mutation call!
 
 
@@ -1685,6 +1763,8 @@ def test_live_write_malformed_found_provider_evidence_fails_closed():
         find_outcome=GitHubReconciliationResult(
             status=ReconciliationStatus.FOUND,
             result_url="invalid-not-a-pull-url",
+            matched_idempotency_key="key",
+            matched_payload_digest="digest",
         )
     )
     adapter = BoundedGitHubAdapter(
@@ -1763,7 +1843,8 @@ def test_lease_expiry_reconciliation_and_single_mutation_end_to_end():
     assert transport.call_count == 1  # ZERO additional mutation
 
     # Step 6: Advance lease so it genuinely expires
-    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:pr-e2e-lease-key"
+    caller_fp = sha256_hex("pr-e2e-lease-key".encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{caller_fp[:16]}"
     payload_dict = {
         "action": GitHubAction.CREATE_DRAFT_PR.value,
         "repository": "org/repo",
@@ -1816,3 +1897,681 @@ def test_lease_expiry_reconciliation_and_single_mutation_end_to_end():
     assert res_replay.success
     assert res_replay.result_url == "https://github.com/org/repo/pull/42"
     assert transport.call_count == 1
+
+
+# --- Mandatory Negative Tests: Binding Verification & Non-Secret Idempotency ---
+
+
+def test_reconciliation_found_valid_pr_missing_matched_payload_digest_fails_closed():
+    """1. FOUND + valid PR URL + missing matched_payload_digest fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-no-digest")
+    caller_key = "pr-no-digest-key"
+    key_fp = sha256_hex(caller_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-rec-no-digest",
+        "pr_title": "PR Title",
+        "pr_body": "PR Body",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-rec-no-digest",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
+    )
+    canonical_id = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="https://github.com/org/repo/pull/888",
+            matched_idempotency_key=canonical_id,
+            matched_payload_digest=None,  # MISSING digest
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-rec-no-digest",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-no-digest",
+        pr_title="PR Title",
+        pr_body="PR Body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-no-digest",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "missing matched_payload_digest" in (res.error_message or "").lower()
+    assert transport.call_count == 0  # Zero mutation
+
+
+def test_reconciliation_found_valid_pr_wrong_matched_payload_digest_fails_closed():
+    """2. FOUND + valid PR URL + wrong matched_payload_digest fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-wrong-digest")
+    caller_key = "pr-wrong-digest-key"
+    key_fp = sha256_hex(caller_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-rec-wrong-digest",
+        "pr_title": "PR Title",
+        "pr_body": "PR Body",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-rec-wrong-digest",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
+    )
+    canonical_id = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="https://github.com/org/repo/pull/888",
+            matched_idempotency_key=canonical_id,
+            matched_payload_digest="0" * 64,  # WRONG digest
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-rec-wrong-digest",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-wrong-digest",
+        pr_title="PR Title",
+        pr_body="PR Body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-wrong-digest",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "mismatch" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_reconciliation_found_valid_pr_missing_matched_idempotency_key_fails_closed():
+    """3. FOUND + valid PR URL + missing matched_idempotency_key fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-no-key")
+    caller_key = "pr-no-key-key"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-rec-no-key",
+        "pr_title": "PR Title",
+        "pr_body": "PR Body",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="https://github.com/org/repo/pull/888",
+            matched_idempotency_key=None,  # MISSING key
+            matched_payload_digest=payload_digest,
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-rec-no-key",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-no-key",
+        pr_title="PR Title",
+        pr_body="PR Body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-no-key",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "missing matched_idempotency_key" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_reconciliation_found_valid_pr_wrong_matched_idempotency_key_fails_closed():
+    """4. FOUND + valid PR URL + wrong matched canonical idempotency identity fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-rec-wrong-key")
+    caller_key = "pr-wrong-key-key"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-rec-wrong-key",
+        "pr_title": "PR Title",
+        "pr_body": "PR Body",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+
+    wrong_key = "idem_external_write_" + ("0" * 32)
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="https://github.com/org/repo/pull/888",
+            matched_idempotency_key=wrong_key,
+            matched_payload_digest=payload_digest,
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-rec-wrong-key",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-rec-wrong-key",
+        pr_title="PR Title",
+        pr_body="PR Body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id="tenant-default",
+        change_id="change-rec-wrong-key",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "mismatch" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_reconciliation_found_commit_mismatched_binding_fails_closed():
+    """5. Commit FOUND with mismatched binding fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-commit-mismatch")
+    caller_key = "commit-mismatch-key"
+    files = {"src/foo.py": "print(1)"}
+
+    # Missing payload_digest
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            commit_sha="e0435f0962325e839e557b44784a0d9b9777174e",
+            matched_idempotency_key="idem_external_write_dummy",
+            matched_payload_digest=None,
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-commit-mismatch",
+        action=GitHubAction.CREATE_COMMIT,
+        repository="org/repo",
+        branch="feat-commit-mismatch",
+        commit_message="Commit message",
+        files=files,
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id="tenant-default",
+        change_id="change-commit-mismatch",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "missing matched_payload_digest" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_reconciliation_found_branch_mismatched_binding_fails_closed():
+    """6. Branch FOUND with mismatched binding fails closed."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-branch-mismatch")
+    caller_key = "branch-mismatch-key"
+
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="https://github.com/org/repo/tree/feat-branch-mismatch",
+            matched_idempotency_key="idem_external_write_wrong",
+            matched_payload_digest="0" * 64,
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-branch-mismatch",
+        action=GitHubAction.CREATE_BRANCH,
+        repository="org/repo",
+        branch="feat-branch-mismatch",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id="tenant-default",
+        change_id="change-branch-mismatch",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert "mismatch" in (res.error_message or "").lower()
+    assert transport.call_count == 0
+
+
+def test_failed_binding_verification_does_not_call_commit_intent():
+    """7. Failed binding verification does NOT call commit_intent."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-no-commit-intent")
+    caller_key = "pr-no-commit-intent-key"
+    key_fp = sha256_hex(caller_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-no-ci",
+        "pr_title": "PR Title",
+        "pr_body": "PR Body",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-no-commit-intent",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
+    )
+    idem_key = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+    doc_id = IdempotencyKeyManager.compute_reservation_doc_id(idem_key)
+
+    # Return FOUND with missing payload digest
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="https://github.com/org/repo/pull/999",
+            matched_idempotency_key=idem_key,
+            matched_payload_digest=None,
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-no-ci",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-no-ci",
+        pr_title="PR Title",
+        pr_body="PR Body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id="tenant-default",
+        change_id="change-no-commit-intent",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+
+    # Verify reservation is NOT COMMITTED in repo
+    stored = repo.get_idempotency_reservation("tenant-default", "change-no-commit-intent", doc_id)
+    assert stored is not None
+    assert stored.status != IdempotencyReservationStatus.COMMITTED
+    assert stored.result_digest is None
+
+
+def test_failed_binding_verification_performs_zero_mutation():
+    """8. Failed binding verification performs zero mutation."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-zero-mut")
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="https://github.com/org/repo/pull/111",
+            matched_idempotency_key="wrong_key",
+            matched_payload_digest="wrong_digest",
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-zero-mut",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-zero-mut",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="pr-zero-mut-key",
+        tenant_id="tenant-default",
+        change_id="change-zero-mut",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert transport.call_count == 0
+
+
+def test_exact_canonical_idempotency_and_payload_digest_and_valid_evidence_succeeds():
+    """9. Exact canonical identity + payload digest + valid provider evidence succeeds."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-exact-success")
+    caller_key = "pr-exact-success-key"
+    key_fp = sha256_hex(caller_key.encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-exact",
+        "pr_title": "Exact PR",
+        "pr_body": "Exact Body",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    intent = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-exact-success",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
+    )
+    canonical_id = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)
+
+    transport = MockGitHubTransport(
+        find_outcome=GitHubReconciliationResult(
+            status=ReconciliationStatus.FOUND,
+            result_url="https://github.com/org/repo/pull/555",
+            matched_idempotency_key=canonical_id,
+            matched_payload_digest=payload_digest,
+        )
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-exact",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-exact",
+        pr_title="Exact PR",
+        pr_body="Exact Body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=caller_key,
+        tenant_id="tenant-default",
+        change_id="change-exact-success",
+    )
+    res = adapter.execute(req)
+    assert res.success
+    assert res.result_url == "https://github.com/org/repo/pull/555"
+    assert res.idempotency_key == canonical_id
+    assert transport.call_count == 0
+
+
+def test_same_repo_branch_title_different_intent_marker_is_not_found():
+    """10. Same repo/branch/title but different canonical intent marker is NOT FOUND."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-diff-marker")
+    # Transport entity has a different intent marker in its body
+    other_marker = (
+        "<!-- changemesh-intent: key=idem_external_write_OTHERKEY digest=" + ("1" * 64) + " -->"
+    )
+    other_entity = MockStoredEntity(
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-marker-test",
+        pr_title="Shared Title",
+        pr_body=f"Some body\n\n{other_marker}",
+        result_url="https://github.com/org/repo/pull/123",
+    )
+    transport = MockGitHubTransport(existing_items=[other_entity])
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-marker-test",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-marker-test",
+        pr_title="Shared Title",
+        pr_body="Some body",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="my-new-intent-key",
+        tenant_id="tenant-default",
+        change_id="change-diff-marker",
+    )
+    res = adapter.execute(req)
+    # The existing entity with different marker must NOT be reused; a fresh mutation must execute!
+    assert res.success
+    assert transport.call_count == 1
+    assert res.result_url == "https://github.com/org/repo/pull/42"
+
+
+def test_same_canonical_caller_intent_changed_body_becomes_semantic_conflict():
+    """11. Same canonical caller intent with changed body still becomes P-10 semantic conflict."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-sem-conf")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req1 = GitHubRequest(
+        request_id="req-conf-a",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-conflict-test",
+        pr_title="PR Title",
+        pr_body="Initial body text",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="same-caller-key",
+        tenant_id="tenant-default",
+        change_id="change-sem-conf",
+    )
+    res1 = adapter.execute(req1)
+    assert res1.success
+    assert transport.call_count == 1
+
+    req2 = GitHubRequest(
+        request_id="req-conf-b",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-conflict-test",
+        pr_title="PR Title",
+        pr_body="Modified conflicting body text",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="same-caller-key",
+        tenant_id="tenant-default",
+        change_id="change-sem-conf",
+    )
+    res2 = adapter.execute(req2)
+    assert not res2.success
+    assert "conflict" in (res2.error_message or "").lower()
+    assert transport.call_count == 1  # ZERO second mutation!
+
+
+def test_caller_idempotency_key_with_token_pattern_never_in_outbound_pr_body():
+    """12. Caller key containing credential pattern is NEVER in outbound PR body."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-token-key")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    secret_key = "ghp_" + "CALLERTOKENSHOULDNOTLEAK123456789"
+    req = GitHubRequest(
+        request_id="req-token-key",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-sec-key",
+        pr_title="Security PR",
+        pr_body="Description without token",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=secret_key,
+        tenant_id="tenant-default",
+        change_id="change-token-key",
+    )
+    res = adapter.execute(req)
+    assert res.success
+    assert transport.call_count == 1
+
+    outbound_pr_body = transport.last_call.get("pr_body", "")
+    assert secret_key not in outbound_pr_body
+    # Verify the marker contains canonical P-10 identity instead
+    assert "ghp_" not in outbound_pr_body
+    assert "idem_external_write_" in outbound_pr_body
+
+
+def test_raw_caller_idempotency_key_absent_from_persisted_action_type():
+    """13. Raw caller idempotency key is absent from persisted action_type."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-action-type-sec")
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    secret_key = "ghp_" + "SUPERSECRETKEY9876543210"
+    req = GitHubRequest(
+        request_id="req-sec-action-type",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-sec-action",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=secret_key,
+        tenant_id="tenant-default",
+        change_id="change-action-type-sec",
+    )
+    res = adapter.execute(req)
+    assert res.success
+
+    # Inspect all reservations in repo
+    key_fp = sha256_hex(secret_key.encode("utf-8"))[:32]
+    expected_action_type = f"CREATE_DRAFT_PR:fp_{key_fp[:16]}"
+    doc_id = IdempotencyKeyManager.compute_reservation_doc_id(res.idempotency_key)
+    rec = repo.get_idempotency_reservation("tenant-default", "change-action-type-sec", doc_id)
+    assert rec is not None
+    assert rec.action_type == expected_action_type
+    assert secret_key not in rec.action_type
+    assert "ghp_" not in rec.action_type
+
+
+def test_raw_caller_idempotency_key_absent_from_live_write_error_messages():
+    """14. Raw caller idempotency key is absent from LIVE_WRITE error messages."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-sec-err")
+    secret_key = "ghp_" + "CALLERSECRETINERROR12345"
+    transport = MockGitHubTransport(
+        outcomes={
+            GitHubAction.CREATE_DRAFT_PR: GitHubTransportResult(
+                success=False,
+                error_message="HTTP 500 Internal Server Error",
+                raw_status_code=500,
+            )
+        }
+    )
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-sec-err",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-sec-err",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=secret_key,
+        tenant_id="tenant-default",
+        change_id="change-sec-err",
+    )
+    res = adapter.execute(req)
+    assert not res.success
+    assert secret_key not in (res.error_message or "")
+    assert "ghp_" not in (res.error_message or "")
+
+
+def test_raw_caller_idempotency_key_absent_from_successful_external_evidence_response_identity():
+    """15. Raw caller key is absent from external evidence/response identity."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-sec-resp")
+    secret_key = "ghp_" + "CALLERKEYNOTINRESPONSE12345"
+    transport = MockGitHubTransport()
+    adapter = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+
+    req = GitHubRequest(
+        request_id="req-sec-resp",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-sec-resp",
+        pr_title="PR Title",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key=secret_key,
+        tenant_id="tenant-default",
+        change_id="change-sec-resp",
+    )
+    res = adapter.execute(req)
+    assert res.success
+    assert secret_key not in (res.idempotency_key or "")
+    assert "ghp_" not in (res.idempotency_key or "")
+    assert res.idempotency_key.startswith("idem_external_write_")
+    assert secret_key not in res.model_dump_json()
+
+
+def test_canonical_provider_marker_deterministic_across_process_restart():
+    """16. Canonical provider marker remains deterministic across process restart/retry."""
+    repo = _setup_test_repo(tid="tenant-default", cid="change-marker-restart")
+    transport = MockGitHubTransport()
+
+    # Process 1
+    adapter1 = BoundedGitHubAdapter(
+        token="ghp_validtoken123", transport=transport, state_repository=repo
+    )
+    req1 = GitHubRequest(
+        request_id="req-restart-1",
+        action=GitHubAction.CREATE_DRAFT_PR,
+        repository="org/repo",
+        branch="feat-marker-det",
+        pr_title="PR Title",
+        pr_body="Body text",
+        evidence_mode=ExecutionEvidenceMode.LIVE_WRITE,
+        idempotency_key="shared-caller-key",
+        tenant_id="tenant-default",
+        change_id="change-marker-restart",
+    )
+    res1 = adapter1.execute(req1)
+    assert res1.success
+    marker1 = transport.last_call.get("pr_body", "")
+
+    # Process 2: Fresh instance, fresh transport, query format
+    payload_dict = {
+        "action": GitHubAction.CREATE_DRAFT_PR.value,
+        "repository": "org/repo",
+        "branch": "feat-marker-det",
+        "pr_title": "PR Title",
+        "pr_body": "Body text",
+    }
+    payload_digest = sha256_hex(canonical_json_bytes(payload_dict))
+    key_fp = sha256_hex("shared-caller-key".encode("utf-8"))[:32]
+    action_type = f"{GitHubAction.CREATE_DRAFT_PR.value}:fp_{key_fp[:16]}"
+    intent2 = IdempotencyIntent(
+        tenant_id="tenant-default",
+        change_id="change-marker-restart",
+        scope=IdempotencyScope.EXTERNAL_WRITE,
+        action_type=action_type,
+        target_system="org/repo",
+        caller_revision="1.0.0",
+        payload_digest=payload_digest,
+    )
+    canonical_id2 = IdempotencyKeyManager.compute_canonical_idempotency_key(intent2)
+    marker2 = format_draft_pr_body_with_intent_marker("Body text", canonical_id2, payload_digest)
+
+    assert marker1 == marker2

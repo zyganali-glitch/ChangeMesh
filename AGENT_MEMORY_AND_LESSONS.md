@@ -301,3 +301,20 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `integrations/github/github_adapter.py`, `tests/test_p19_release_steward.py`.
 - Reusable beyond this task: Yes (all external mutation boundaries, GitHub/cloud adapters, and dual-write recovery workflows).
 - Status: `ACTIVE`
+
+### LESSON-20260818-02 — 5-Point Strict Reconciled Evidence-Identity Verification and Untrusted Caller Idempotency Key Non-Secret Isolation
+- Date/time: 2026-08-18
+- Active task: P-19.01 Evidence-Identity and Non-Secret Idempotency Repair
+- Symptom: (1) An external write adapter accepted `ReconciliationStatus.FOUND` based solely on provider URL formatting without verifying that the found entity matched the expected canonical idempotency key and semantic payload digest; (2) Raw caller idempotency keys (which could contain bearer tokens or arbitrary untrusted tokens) were passed directly into `action_type`, PR body markers, reconciliation queries, and error messages.
+- Root cause: (1) Delegating semantic matching verification entirely to the transport double rather than enforcing strict adapter-side cryptographic and semantic binding; (2) Treating caller-supplied idempotency keys as safe internal identifiers instead of untrusted user input.
+- Incorrect approach: (1) Assuming `FOUND` implies identity match; (2) Placing raw caller strings into persisted document IDs, markdown markers, and error strings.
+- Correct approach:
+  1. Enforce strict 5-point adapter-side verification on `FOUND`: (a) valid provider identifier format; (b) `matched_payload_digest` presence; (c) `matched_payload_digest == payload_digest`; (d) `matched_idempotency_key` presence; (e) `matched_idempotency_key == canonical_idempotency_id`. Any mismatch releases the reservation, returns fail-closed `success=False`, performs zero mutation, and never commits durable state.
+  2. Treat caller keys as untrusted metadata: derive non-secret SHA-256 fingerprint `fp_{hash[:16]}` for `action_type`. Derive canonical P-10 safe identity `canonical_idempotency_id = IdempotencyKeyManager.compute_canonical_idempotency_key(intent)` (`idem_external_write_<hash>`).
+  3. Use only safe canonical identities for PR markers (`<!-- changemesh-intent: key={canonical_idempotency_id} digest={payload_digest} -->`), reconciliation queries, expected match keys, and response identities.
+  4. Never leak raw caller strings into persistence records, external bodies, error messages, receipts, or logs.
+- Prevention rule: Never accept reconciled provider state without verifying exact 5-point semantic and cryptographic bindings; never propagate raw caller idempotency keys into external payloads, markers, persistence, or diagnostics.
+- Tests/evidence: `tests/test_p19_release_steward.py` (61 passed); canonical unit suite (1281 passed, 1 warning).
+- Affected files: `integrations/github/github_adapter.py`, `tests/test_p19_release_steward.py`, `docs/P-OMEGA_AUDIT_REPORT.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`.
+- Reusable beyond this task: Yes (all external write adapters, provider reconciliation bridges, and multi-tenant key management).
+- Status: `ACTIVE`
