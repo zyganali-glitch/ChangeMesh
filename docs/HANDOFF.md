@@ -130,28 +130,31 @@
 **Next Exact Task:**
 - P-20.02 — Implement pause, resume, cancel, timeout, retry, compensation, dead-letter paths
 
-## Current P-20 State (P-20.01 Implemented and Verified)
+## Current P-20 State (P-20.00 & P-20.01 Surgically Repaired and Verified)
 
 Phase P-20 is `IN_PROGRESS`.
 
 ### P-20 — Orchestrator Saga, Recovery, and Long-Running Behavior
-- **P-20.00:** Orchestrator saga donor preflight verified `UIPATH-STATE-001` (D-UIPATH, `dc2267939c2aef0aba2737da65f53352c5cf8fb2`), `D-QWEN` (shared memory bus), and `CCT-FLIGHT-001` (D-CCT). Cleanroom reimplementation approved under ADK + Pub/Sub + SagaStateRepository.
-- **P-20.01:** Implemented canonical end-to-end ChangeLifecycle saga orchestrator in `src/orchestrator/orchestrator_saga.py` (`ChangeSagaOrchestrator`, `SagaExecutionResult`). Coordinates all 8 lifecycle stages:
-  1. `DISCOVERING`: Blast radius analysis via `ImpactScout` and `BlastRadiusMerger`.
-  2. `QUALIFYING`: Capability verification via `AgentCapabilityRequirement` and `AgentRegistry`.
-  3. `REHEARSING`: Double rehearsal on synthetic database double via `ShadowLab` (`SCENARIO_NORMAL_MIGRATION`).
-  4. `GROUNDED`: Epistemic memory trust evaluation (`MemoryTrustEvaluator`) and deterministic policy pre-checks (`DeterministicPolicyChecker`).
-  5. `AUTHORIZED` or `AWAITING_AUTHORITY`: Evaluated via `PolicyGuardianGate`. Halts cleanly at `AWAITING_AUTHORITY` with persisted `ApprovalRecord` (`PENDING`) if human authority is required; zero tasks executed, zero Release Steward writes invoked, zero fake decisions manufactured.
-  6. `EXECUTING`: Synthesizes expand-migrate-contract plan (`MigrationPlanGenerator`) and deterministic manifest (`ManifestGenerator`).
-  7. `VERIFYING`: Derives neutral claims (`ClaimDerivationEngine`), builds audit bundle (`AuditBundleBuilder`), runs semantic audit (`SemanticAuditor`), and reconciles deterministically (`DeterministicReconciler`).
+- **P-20.00:** Orchestrator saga donor preflight completed and verified in `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md` covering `UIPATH-STATE-001` (D-UIPATH, `dc2267939c2aef0aba2737da65f53352c5cf8fb2`), `QW-BUS-001` (D-QWEN, `a43b3411856f41a4be9424d11c01a5e637cdc410`), and `CCT-FLIGHT-001` (D-CCT, `65ee1b72faf9a7202d9166eed43fb671804815a8`). Cleanroom reimplementation approved under ADK + Pub/Sub + SagaStateRepository. Manifest linting passed (20 components valid, exit code `0`).
+- **P-20.01:** Implemented and surgically repaired canonical end-to-end ChangeLifecycle saga orchestrator in `src/orchestrator/orchestrator_saga.py` (`ChangeSagaOrchestrator`, `SagaExecutionResult`, `build_standard_demo_registry`, `sanitize_secrets_in_text`) and ADK bridge `ChangeOrchestrator.run_lifecycle_saga` in `src/agents/change_orchestrator.py`. Coordinates all 8 lifecycle stages:
+  1. `DISCOVERING`: Blast radius analysis via real `RepositoryScanner`, `GraphTraverser`, and `BlastRadiusMerger` over synthetic billing graph.
+  2. `QUALIFYING`: Capability verification via real `AgentRegistry`, `AgentCapabilityRequirement`, `PassportVerifier`, and `QualificationEvidenceVerifier`. Fails closed to `ChangeState.BLOCKED` on empty registry, missing capability, or expired passport with zero PASS evidence.
+  3. `REHEARSING`: Double rehearsal via real `ShadowLabRunner.run_scenario(...)`. Consumes returned `RehearsalOutcome`. Rehearsal failure blocks progression and transitions to `ChangeState.BLOCKED`. Mode is strictly `SIMULATION` with `EvidenceState.SIMULATED`.
+  4. `GROUNDED`: Epistemic memory trust evaluation (`MemoryTrustEvaluator`) and deterministic policy pre-checks (`DeterministicPolicyChecker`). Fails closed on policy blocker.
+  5. `AUTHORIZED` or `AWAITING_AUTHORITY` or `BLOCKED`: Evaluated via `PolicyGuardianGate.evaluate_inputs(...)`.
+     - Hard blocker (`AutonomyClass.BLOCKED`): transitions to `ChangeState.BLOCKED` with ZERO approval cards, zero bypass escape paths, and zero downstream execution tasks.
+     - Human authority required (`AutonomyClass.HUMAN_AUTHORITY_REQUIRED`): halts cleanly at `ChangeState.AWAITING_AUTHORITY` with persisted `ApprovalRecord` (`PENDING`) strictly derived from `gate_result.compression_card` (`authority_slot_ref`, `decision_question`, `decision_options`, `action_scope`, `policy_reason`, `completed_work_summary`, `rehearsed_work_summary`, `remaining_decision_summary`); zero downstream tasks executed, zero Release Steward mutations invoked.
+     - Autonomous authorization (`AUTO_EXECUTE` / `REHEARSE_THEN_EXECUTE`): transitions to `ChangeState.AUTHORIZED` and proceeds.
+  6. `EXECUTING`: Synthesizes migration plan (`MigrationPlanGenerator`) and deterministic manifest (`ManifestGenerator`).
+  7. `VERIFYING`: Derives neutral claims (`ClaimDerivationEngine`), builds audit bundle (`AuditBundleBuilder`), runs semantic audit (`SemanticAuditor`), and reconciles deterministically (`DeterministicReconciler`). Reconciler strictly preserves deterministic machine facts.
   8. `CERTIFYING` -> `COMPLETE`: Creates checkpoint (`SagaCheckpointManager`) and updates final evidence summary in `ChangeRecord`.
-- Strict event-driven emission via `LocalEventBus`/`EventPublisher` with Kahn DAG causal ordering in `CausalEventTimeline`.
-- Persisted `ChangeRecord`, `TaskRecord`, `EvidenceRefRecord`, and `ApprovalRecord` with optimistic concurrency in `SagaStateRepository`.
-- Deterministic facts sovereign over semantic model output.
-- Zero credentials entering event/state/evidence payloads.
-- Zero external mutations in P-20.01 tests.
-- Dedicated 10-test suite `tests/test_p20_orchestrator_saga.py` passes 10 tests (100% PASS).
-- Canonical unit test suite passes 1321 tests (1 warning). Zero domain contract mutations or Google SDK leaks.
+- **Consistency & Ordering Invariant:** Authoritative state persisted to `SagaStateRepository` (with optimistic concurrency check) *before* publishing wire messages to `LocalEventBus`/`EventPublisher` or recording in `CausalEventTimeline`. Persistence failure leaves zero false event evidence.
+- **Secret Minimization:** Free-form request input and payload mappings are sanitized with secret-pattern redaction (`sanitize_secrets_in_text`, `redact_mapping`, `scan_payload_for_secrets`) before state persistence or wire emission.
+- **Mode Honesty:** Local stages are strictly labeled `SIMULATION` or `FIXTURE`; claiming `LIVE_WRITE` for local execution without real external mutation raises `ValueError`. Zero fake `LIVE_WRITE` PASS evidence.
+- **Contract Type Safety:** `domain/contracts/change_lifecycle.py` restored to strict `isinstance(..., ChangeState)` type checks.
+- **ADK Bridge:** `ChangeOrchestrator.run_lifecycle_saga` coordinates the saga without making ADK agent the durable state owner.
+- **Test Evidence:** Dedicated 17-test suite `tests/test_p20_orchestrator_saga.py` passes 17 tests (100% PASS).
+- **Canonical Unit Baseline:** Unit test suite passes 1329 tests (1 warning). Lint, format, and type checks all pass with 0 errors.
 
 ### P-15 — Impact Scout (DONE)
 - **P-15.00:** Impact Scout donor preflight verified CS-BLAST-001 (D-CONTEXTSEAL, `0dc924db9d82037d2e813548bdee27af5f180889`) and GL-CONFLICT-001 (D-GITLAB, `3c4a412b6040d8a8154c15325943c409be9105f2`). ADAPTED reuse method confirmed.

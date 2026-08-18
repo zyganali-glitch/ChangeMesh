@@ -221,8 +221,9 @@ evidence:
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
 - P-10.00 saga persistence donor preflight PASS
+- P-20.00 long-running orchestration donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T19:58:00Z'
+last_reviewed: '2026-08-19T00:30:00Z'
 ```
 
 ### UIPATH-AUTH-001
@@ -333,8 +334,9 @@ evidence:
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
 - P-09.05 causal event timeline implementation and dedicated tests PASS
+- P-20.00 long-running orchestration donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-16T17:34:00Z'
+last_reviewed: '2026-08-19T00:30:00Z'
 ```
 
 ### CCT-PREFLIGHT-001
@@ -804,8 +806,9 @@ evidence:
 - source inspection
 - P-04.00 architecture preflight PASS
 - donor-reuse-auditor PASS
+- P-20.00 long-running orchestration donor preflight PASS
 reviewer: primary agent + donor-reuse-auditor
-last_reviewed: '2026-08-09T10:20:00Z'
+last_reviewed: '2026-08-19T00:30:00Z'
 ```
 
 ### GL-CONFLICT-001

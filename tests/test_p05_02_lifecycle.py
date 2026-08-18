@@ -344,3 +344,26 @@ class TestP0502Lifecycle:
 
         with pytest.raises(TypeError):
             RETRY_RESUME_TARGETS[ChangeState.DISCOVERING] = frozenset()  # type: ignore
+
+    def test_lifecycle_022_foreign_impostors_rejected(self):
+        """LIFECYCLE-022: Arbitrary objects or enum impostors with matching .value are rejected."""
+
+        class FakeState:
+            def __init__(self, value: str):
+                self.value = value
+
+        impostor_received = FakeState("RECEIVED")
+        impostor_discovering = FakeState("DISCOVERING")
+
+        assert not can_transition(impostor_received, ChangeState.DISCOVERING)  # type: ignore
+        assert not can_transition(ChangeState.RECEIVED, impostor_discovering)  # type: ignore
+        assert not can_transition(impostor_received, impostor_discovering)  # type: ignore
+
+        with pytest.raises(IllegalTransitionError, match="Invalid current state type"):
+            require_transition(impostor_received, ChangeState.DISCOVERING)  # type: ignore
+
+        with pytest.raises(IllegalTransitionError, match="Invalid target state type"):
+            require_transition(ChangeState.RECEIVED, impostor_discovering)  # type: ignore
+
+        with pytest.raises(ValueError, match="Unknown state"):
+            is_terminal(impostor_received)  # type: ignore

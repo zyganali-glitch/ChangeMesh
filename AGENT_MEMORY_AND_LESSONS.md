@@ -353,17 +353,35 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all production transports, provider reconciliation bridges, and REST API adapters).
 - Status: `ACTIVE`
 
-### LESSON-20260818-05 — Module Reload Enum Identity Corruption and Robust Lifecycle Transition Checks
+### LESSON-20260818-05 — Module Reload Enum Identity Corruption and Strict Lifecycle Contract Safety
 - Date/time: 2026-08-18
 - Active task: P-20.01 End-to-End Saga Orchestration
-- Symptom: `IllegalTransitionError: Invalid current state type: <enum 'ChangeState'>` occurred during whole-test suite execution when earlier tests called `importlib.reload(change_lifecycle)`.
-- Root cause: `importlib.reload` on foundational enum/contract modules creates distinct new class identities in `sys.modules`, corrupting `isinstance()` identity checks for objects instantiated before or after the reload across the test runner process.
-- Incorrect approach: (1) Calling `importlib.reload` in test suites to verify module imports when AST disk parsing is sufficient; (2) Rigid `isinstance(x, EnumClass)` without resilient member/value-map validation.
+- Symptom: `IllegalTransitionError: Invalid current state type: <enum 'ChangeState'>` occurred when tests used `importlib.reload(change_lifecycle)`.
+- Root cause: `importlib.reload` on foundational enum/contract modules creates distinct new class identities in `sys.modules`, corrupting `isinstance()` identity checks.
+- Incorrect approach: Duck-typing foreign objects matching `.value` in domain contracts; this weakens domain contract freeze.
 - Correct approach:
   1. Never reload foundational domain contract modules inside test cases; use static AST inspection of the raw source file to verify imports without mutating runtime types.
-  2. Implement robust duck-typed enum resolution in `can_transition` and `require_transition`: if `not isinstance(state, ChangeState)`, check if `hasattr(state, 'value') and state.value in ChangeState._value2member_map_` and cleanly resolve `ChangeState(state.value)`.
-- Prevention rule: Never call `importlib.reload` on core domain types in unit tests; make contract boundary validators resilient against cross-module enum identity drift.
-- Tests/evidence: `tests/test_p05_02_lifecycle.py` (24 passed); `tests/test_p20_orchestrator_saga.py` (10 passed); canonical unit suite (1321 passed, 1 warning).
+  2. Maintain strict `isinstance(state, ChangeState)` across `is_terminal`, `can_transition`, `require_transition`, rejecting foreign objects and impostors even if `.value` matches.
+- Prevention rule: Never call `importlib.reload` on core domain types in unit tests; keep domain contract type checks strictly typed.
+- Tests/evidence: `tests/test_p05_02_lifecycle.py` (25 passed); `tests/test_p20_orchestrator_saga.py` (17 passed); canonical unit suite (1329 passed, 1 warning).
 - Affected files: `domain/contracts/change_lifecycle.py`, `tests/test_p05_02_lifecycle.py`, `tests/test_p20_orchestrator_saga.py`, `AGENT_MEMORY_AND_LESSONS.md`.
 - Reusable beyond this task: Yes (all lifecycle transitions, saga orchestrators, and enum contract validators).
+- Status: `ACTIVE`
+
+### LESSON-20260819-06 — Persistence-First Consistency Before Event Publication and Authority Branching Discipline
+- Date/time: 2026-08-19
+- Active task: P-20.00 / P-20.01 Surgical Repair
+- Symptom: (1) Orchestrator published wire events and updated causal timeline before committing state to `SagaStateRepository`, leaving contradictory event evidence if persistence failed; (2) `AutonomyClass.BLOCKED` was incorrectly routed to `AWAITING_AUTHORITY`; (3) Free-form text and caller request descriptions leaked raw tokens into storage and wire envelopes; (4) Local operations were susceptible to false `LIVE_WRITE` labeling.
+- Root cause: (1) Inverted state mutation / notification order; (2) Incomplete branching on Policy Guardian gate evaluation result; (3) Lack of early sanitization at the intake boundary; (4) Global mode inheritance without per-stage honesty checks.
+- Incorrect approach: (1) Publishing events before database transaction succeeds; (2) Creating fake approval cards for blocked changes; (3) Allowing callers to force reversibility downgrade; (4) Claiming `LIVE_WRITE` for local in-memory operations.
+- Correct approach:
+  1. Commit state to `SagaStateRepository` with optimistic concurrency check FIRST. If persistence fails, abort immediately without publishing wire messages or appending to timeline.
+  2. Explicitly branch on `gate_result.autonomy_class`: if `BLOCKED`, transition to `ChangeState.BLOCKED` with ZERO approval cards and zero downstream execution. If `HUMAN_AUTHORITY_REQUIRED`, transition to `ChangeState.AWAITING_AUTHORITY` and derive `ApprovalRecord` fields directly from `gate_result.compression_card`.
+  3. Derive reversibility deterministically via `ReversibilityClassifier.classify_sql`; remove caller overrides.
+  4. Sanitize free-form input and wire payload mappings (`sanitize_secrets_in_text`, `redact_mapping`, `scan_payload_for_secrets`) before storage or wire emission.
+  5. Local operations are strictly `SIMULATION` or `FIXTURE`; claiming `LIVE_WRITE` for local operations raises `ValueError`.
+- Prevention rule: Authoritative state persistence must always precede event publication; hard blockers never produce approval cards; secrets must be minimized before storage/wire emission; mode honesty is strictly enforced.
+- Tests/evidence: `tests/test_p20_orchestrator_saga.py` (17 passed); canonical unit suite (1329 passed, 1 warning).
+- Affected files: `src/orchestrator/orchestrator_saga.py`, `src/agents/change_orchestrator.py`, `tests/test_p20_orchestrator_saga.py`, `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md`.
+- Reusable beyond this task: Yes (all saga orchestrators, event-driven workflows, and authority boundaries).
 - Status: `ACTIVE`

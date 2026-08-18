@@ -6,6 +6,8 @@ Provides saga state persistence, multi-agent coordination, and recovery.
 from src.orchestrator.orchestrator_saga import (
     ChangeSagaOrchestrator,
     SagaExecutionResult,
+    build_standard_demo_registry,
+    sanitize_secrets_in_text,
 )
 from src.orchestrator.state_repository import (
     ApprovalRecord,
@@ -39,4 +41,6 @@ __all__ = [
     "SagaStateRepository",
     "ChangeSagaOrchestrator",
     "SagaExecutionResult",
+    "build_standard_demo_registry",
+    "sanitize_secrets_in_text",
 ]

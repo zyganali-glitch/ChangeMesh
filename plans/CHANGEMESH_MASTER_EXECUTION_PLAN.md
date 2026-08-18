@@ -1593,16 +1593,26 @@ Schedule is risk control, not permission to skip gates.
 
 **Phase status:** `IN_PROGRESS`
 
+## P-20.00 — Long-running orchestration donor preflight
+
+- **Status:** `DONE`
+- **Required action:** Run the donor-reuse preflight for D-UIPATH (`dc2267939c2aef0aba2737da65f53352c5cf8fb2`), D-QWEN (`a43b3411856f41a4be9424d11c01a5e637cdc410`), D-CCT (`65ee1b72faf9a7202d9166eed43fb671804815a8`). Produce `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md` detailing recovery/resume invariant map, no-duplicate-write test plan, exact donor-to-ChangeMesh target mapping, forbidden carry-over, and intentional differences under ADK + Pub/Sub + SagaStateRepository.
+- **Forbidden shortcuts:** Do not write product code during preflight; do not copy donor code wholesale; do not skip dependency inspection.
+- **Acceptance criteria:** Every component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests.
+- **Required evidence:** Preflight report `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md`, `docs/DONOR_REUSE_MANIFEST.md` update, and lint pass.
+- **Evidence:** Preflight report written and verified in `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md`. Donor manifest linting passed (20 components valid, exit code `0`).
+- **Mandatory documentation sync:** `docs/DONOR_REUSE_MANIFEST.md`, `docs/HANDOFF.md`.
+- **Closure:** Run donor preflight gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-20.01 — Implement end-to-end saga across discover, qualify, rehearse, ground, authorize, execute, verify, certify
 
 - **Status:** `DONE`
-- **Required action:** Implement end-to-end saga across discover, qualify, rehearse, ground, authorize, execute, verify, certify.
-- **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
-- **Acceptance criteria:** State transition event-driven/persisted.
-- **Required evidence:** E2E test.
-- **Evidence:** Implemented `ChangeSagaOrchestrator` in `src/orchestrator/orchestrator_saga.py` and exported in `src/orchestrator/__init__.py`. Coordinates all 8 canonical lifecycle stages (DISCOVERING, QUALIFYING, REHEARSING, GROUNDED, AUTHORIZED/AWAITING_AUTHORITY, EXECUTING, VERIFYING, CERTIFYING -> COMPLETE). Strict event-driven emission via `LocalEventBus`/`EventPublisher` with Kahn DAG causal ordering in `CausalEventTimeline`. Persisted `ChangeRecord`, `TaskRecord`, `EvidenceRefRecord`, and `ApprovalRecord` with optimistic concurrency in `SagaStateRepository`. Clean stop at `AWAITING_AUTHORITY` with zero execution or Release Steward mutations when human authority is required. Deterministic facts sovereign over semantic model output. Verified by dedicated 10-test suite `tests/test_p20_orchestrator_saga.py` (10 passed in 0.58s) and canonical unit suite (1321 passed).
-- **Mandatory documentation sync:** Architecture docs (`docs/ARCHITECTURE.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`), lessons (`AGENT_MEMORY_AND_LESSONS.md`), master plan, handoff, and P-Omega audit report.
+- **Required action:** Implement end-to-end saga across discover, qualify, rehearse, ground, authorize, execute, verify, certify with full deterministic repair.
+- **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence; do not bypass authority semantics.
+- **Acceptance criteria:** State transitions event-driven/persisted. Authoritative state persisted before event emission. BLOCKED transitions to `ChangeState.BLOCKED` (0 cards, 0 execution). HUMAN_AUTHORITY_REQUIRED halts at `ChangeState.AWAITING_AUTHORITY` with derived `ApprovalRecord` and 0 execution. Real component integration (P-15 impact scout, P-12 agent registry/passport verifier, P-13 shadowlab runner, P-17 migration planner, P-18 semantic auditor/reconciler). Truthful evidence modes (`SIMULATION`/`FIXTURE`, never fake `LIVE_WRITE`). Secret minimization. Strict enum type safety on `ChangeState`. ADK `ChangeOrchestrator` bridge method.
+- **Required evidence:** E2E test suite.
+- **Evidence:** Implemented `ChangeSagaOrchestrator` in `src/orchestrator/orchestrator_saga.py`, `build_standard_demo_registry`, `sanitize_secrets_in_text`, and `ChangeOrchestrator.run_lifecycle_saga` bridge in `src/agents/change_orchestrator.py`. Validated across 17 comprehensive deterministic tests in `tests/test_p20_orchestrator_saga.py` (17 passed) and full canonical unit suite (1329 passed, exit code `0`).
+- **Mandatory documentation sync:** `docs/ARCHITECTURE.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `AGENT_MEMORY_AND_LESSONS.md`, master plan, handoff, and P-Omega audit report.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-20.02 — Implement pause, resume, cancel, timeout, retry, compensation, dead-letter paths

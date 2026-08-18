@@ -5,7 +5,7 @@ P-20.01: Implements the canonical end-to-end change lifecycle saga across:
 2. Qualify (QUALIFYING)
 3. Rehearse (REHEARSING)
 4. Ground (GROUNDED)
-5. Authorize (AUTHORIZED or AWAITING_AUTHORITY)
+5. Authorize (AUTHORIZED or AWAITING_AUTHORITY or BLOCKED)
 6. Execute (EXECUTING)
 7. Verify (VERIFYING)
 8. Certify (CERTIFYING -> COMPLETE)
@@ -13,8 +13,13 @@ P-20.01: Implements the canonical end-to-end change lifecycle saga across:
 Invariants:
 - State transitions are strictly event-driven and persisted.
 - Persisted ChangeRecord with optimistic concurrency is authoritative workflow state.
+- Authoritative state is persisted in SagaStateRepository before EventEnvelope publishing.
 - Every admitted lifecycle transition publishes an EventEnvelope with full causation chain.
-- Human authority cannot be bypassed or fabricated; halts at AWAITING_AUTHORITY.
+- Policy Guardian Gate hard blockers transition to BLOCKED with zero approval cards.
+- HUMAN_AUTHORITY_REQUIRED halts at AWAITING_AUTHORITY with a derived Approval Compression card.
+- No downstream execution tasks or external mutations on BLOCKED or AWAITING_AUTHORITY.
+- Execution evidence modes remain strictly truthful; local actions are never LIVE_WRITE.
+- Credentials and secrets are minimized before wire message emission and state persistence.
 - Release Steward and external actions are isolated and respect ExecutionEvidenceMode.
 - Deterministic facts cannot be overwritten by semantic model outputs.
 """
@@ -22,8 +27,9 @@ Invariants:
 from __future__ import annotations
 
 import logging
+import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict
@@ -35,6 +41,7 @@ from domain.contracts.change_lifecycle import (
     require_transition,
 )
 from domain.contracts.change_request import ChangeRequest
+from domain.contracts.conventions import REDACTION_SENTINEL, redact_mapping
 from domain.contracts.event_envelope import EventEnvelope
 from domain.contracts.evidence import (
     EvidenceProducerKind,
@@ -45,36 +52,29 @@ from domain.contracts.memory import MemoryRecord
 from events.local_bus import LocalEventBus
 from events.publisher import EventPublisher
 from events.topology import get_canonical_topology
-from events.wire import EventWireMessage
+from events.wire import EventWireMessage, scan_payload_for_secrets
 from src.audit.audit_bundle import AuditBundleBuilder
 from src.audit.claim_derivation import ClaimDerivationEngine
 from src.audit.reconciliation import DeterministicReconciler
 from src.audit.semantic_auditor import SemanticAuditor
 from src.evidence.pubsub_timeline import CausalEventTimeline
-from src.gate.policy_guardian_gate import (
-    PolicyGuardianGate,
-)
+from src.gate.policy_guardian_gate import PolicyGuardianGate
 from src.gate.reversibility import (
     DeterministicPolicyInputs,
     NoveltyTier,
     PrivilegeLevel,
     RehearsalStatus,
-    ReversibilityClass,
+    ReversibilityClassifier,
 )
 from src.git.impact_scout import (
     BlastRadiusMerger,
-    DependencyPath,
-    GraphNodeType,
-    ImpactedAsset,
-    ScanFinding,
-    ScanFindingType,
+    GraphTraverser,
+    RepositoryScanner,
     build_synthetic_billing_graph,
 )
 from src.memory.trust_layer import EpistemicTrustClass, MemoryTrustEvaluator
 from src.migration.manifest_generator import ManifestGenerator
-from src.migration.plan_generator import (
-    MigrationPlanGenerator,
-)
+from src.migration.plan_generator import MigrationPlanGenerator
 from src.orchestrator.saga_checkpoint import SagaCheckpointManager
 from src.orchestrator.state_repository import (
     CANONICAL_SCHEMA_VERSION,
@@ -88,20 +88,129 @@ from src.orchestrator.state_repository import (
     TenantRecord,
     validate_tenant_id,
 )
-from src.policy.policy_engine import (
-    DeterministicPolicyChecker,
+from src.policy.policy_engine import DeterministicPolicyChecker
+from src.registry.agent_registry import (
+    AgentDescriptor,
+    AgentRegistry,
+    InMemoryAgentRegistry,
 )
-from src.registry.agent_registry import AgentRegistry, InMemoryAgentRegistry
 from src.registry.capabilities import (
     get_standard_demo_requirements,
 )
+from src.registry.evidence_verifier import (
+    QualificationEvidenceRecord,
+    QualificationEvidenceRegistry,
+    QualificationEvidenceVerifier,
+)
+from src.registry.passport_issuer import (
+    PassportIssuanceRequest,
+    PassportIssuer,
+    PassportVerifier,
+)
+from src.shadowlab.runner import ShadowLabRunner
 from src.shadowlab.scenarios import (
-    RehearsalOutcome,
-    compute_simulation_digest,
+    ShadowScenario,
     get_standard_shadow_scenarios,
 )
 
 logger = logging.getLogger(__name__)
+
+_SECRET_REPLACEMENT_PATTERNS = [
+    re.compile(
+        r"-{5}BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-{5}"
+        r".*?-{5}END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-{5}",
+        re.DOTALL | re.IGNORECASE,
+    ),
+    re.compile(r"-{5}BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-{5}", re.IGNORECASE),
+    re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{30,}\b"),
+    re.compile(r"\bBearer\s+[A-Za-z0-9_\-\.]{15,}\b", re.IGNORECASE),
+    re.compile(r"\b(?:sk-(?:proj-|svcacct-)?|AIza)[A-Za-z0-9_-]{8,}\b"),
+    re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
+    re.compile(
+        r"(?:api[_-]?key|apikey|secret[_-]?key|client[_-]?secret)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{8,}['\"]?",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:password|passwd|pwd)\s*[:=]\s*['\"]?[^'\"]{4,}['\"]?",
+        re.IGNORECASE,
+    ),
+]
+
+
+def sanitize_secrets_in_text(text: str) -> str:
+    """Sanitize credential patterns from free-form text strings."""
+    if not isinstance(text, str):
+        return text
+    result = text
+    for pattern in _SECRET_REPLACEMENT_PATTERNS:
+        result = pattern.sub(REDACTION_SENTINEL, result)
+    return result
+
+
+def build_standard_demo_registry(
+    tenant_id: str,
+    now: Optional[datetime] = None,
+) -> InMemoryAgentRegistry:
+    """Build an in-memory agent registry populated with valid passports for standard roles."""
+    if now is None:
+        now = datetime.now(timezone.utc)
+    ev_reg = QualificationEvidenceRegistry()
+    verifier = QualificationEvidenceVerifier(registry=ev_reg)
+    registry = InMemoryAgentRegistry(evidence_verifier=verifier)
+
+    roles = {
+        "impact_scout": ("1.0.0", ("AST_STATIC_ANALYSIS", "BLAST_RADIUS_ESTIMATION")),
+        "policy_guardian": ("1.0.0", ("POLICY_VERIFICATION", "REVERSIBILITY_ANALYSIS")),
+        "migration_engineer": ("1.0.0", ("MIGRATION_SYNTHESIS_SQL",)),
+        "release_steward": ("1.0.0", ("PR_GENERATION",)),
+    }
+
+    for role_id, (rev, caps) in roles.items():
+        desc = AgentDescriptor(
+            agent_id=f"agent-{role_id.replace('_', '-')}",
+            agent_name=role_id.replace("_", " ").title(),
+            agent_role=role_id,
+            agent_revision=rev,
+            description=f"Standard qualified {role_id} revision {rev}",
+            declared_capabilities=caps,
+        )
+        registry.register_agent(desc)
+
+        ev_ids = []
+        for cap in caps:
+            ev_id = f"ev-qual-{role_id}-{cap.lower()}"
+            ev_ids.append(ev_id)
+            ev_reg.register_evidence(
+                QualificationEvidenceRecord(
+                    evidence_id=ev_id,
+                    agent_id=desc.agent_id,
+                    agent_revision=rev,
+                    qualified_capability=cap,
+                    scenario_id="SCENARIO_NORMAL_MIGRATION",
+                    passed=True,
+                    evidence_state=EvidenceState.SIMULATED,
+                    evidence_mode=ExecutionEvidenceMode.SIMULATION,
+                    producer_kind=EvidenceProducerKind.SIMULATION,
+                    evidence_digest="a" * 64,
+                    collected_at=now,
+                    expires_at=now + timedelta(days=30),
+                )
+            )
+
+        passport = PassportIssuer.issue_passport(
+            PassportIssuanceRequest(
+                agent_id=desc.agent_id,
+                agent_revision=rev,
+                qualified_capabilities=caps,
+                qualification_evidence_ids=tuple(ev_ids),
+                issuer="qualification_engine",
+            ),
+            evidence_verifier=verifier,
+            now=now,
+        )
+        registry.register_passport(tenant_id, passport)
+
+    return registry
 
 
 class SagaExecutionResult(BaseModel):
@@ -145,7 +254,7 @@ class ChangeSagaOrchestrator:
         self.orchestrator_id = orchestrator_id
         self.orchestrator_revision = orchestrator_revision
         self.timeline = timeline
-        self.agent_registry = agent_registry or InMemoryAgentRegistry()
+        self.agent_registry = agent_registry
         self.policy_gate = policy_gate or PolicyGuardianGate()
         self._topology = get_canonical_topology()
 
@@ -155,15 +264,22 @@ class ChangeSagaOrchestrator:
         request: ChangeRequest,
         *,
         evidence_mode: ExecutionEvidenceMode = ExecutionEvidenceMode.SIMULATION,
-        force_reversibility_class: Optional[ReversibilityClass] = None,
         initial_memory_records: Sequence[MemoryRecord] = (),
         stop_at_state: Optional[ChangeState] = None,
+        rehearsal_scenario: Optional[ShadowScenario] = None,
         now: Optional[datetime] = None,
     ) -> SagaExecutionResult:
         """Execute the end-to-end ChangeMesh lifecycle saga synchronously and deterministically."""
         if now is None:
             now = datetime.now(timezone.utc)
         tid = validate_tenant_id(tenant_id)
+
+        # Enforce Mode Honesty: Local saga operations cannot be LIVE_WRITE without provider write
+        if evidence_mode == ExecutionEvidenceMode.LIVE_WRITE:
+            raise ValueError(
+                "LIVE_WRITE mode cannot be claimed for local saga execution without real "
+                "credential-backed external provider mutation"
+            )
 
         # -------------------------------------------------------------------------
         # Ensure Tenant Record Exists
@@ -189,6 +305,10 @@ class ChangeSagaOrchestrator:
         else:
             self.timeline.change_id = change_id
 
+        # Sanitize free-form user input to guarantee zero secrets in state & wire payloads
+        clean_title = sanitize_secrets_in_text(request.title)
+        clean_description = sanitize_secrets_in_text(request.description)
+
         # State tracking
         current_state = ChangeState.RECEIVED
         last_event_id: Optional[str] = None
@@ -201,7 +321,7 @@ class ChangeSagaOrchestrator:
         active_approval_card: Optional[ApprovalCompressionCard] = None
 
         # -------------------------------------------------------------------------
-        # Event Emission & State Persistence Helper
+        # Event Emission & State Persistence Helper (Persistence-Before-Publish)
         # -------------------------------------------------------------------------
         def transition_and_persist(
             target_state: ChangeState,
@@ -213,10 +333,54 @@ class ChangeSagaOrchestrator:
         ) -> EventEnvelope:
             nonlocal current_state, last_event_id, event_seq, events_emitted
 
-            # 1. Enforce lifecycle transition rules
+            # 1. Enforce lifecycle transition rules (strict enum type check)
             if current_state != target_state:
                 require_transition(current_state, target_state)
 
+            sanitized_reason = sanitize_secrets_in_text(reason)
+            sanitized_payload = redact_mapping(payload_summary)
+            # Ensure no raw secret strings remain in payload
+            sanitized_payload = {
+                k: sanitize_secrets_in_text(v) if isinstance(v, str) else v
+                for k, v in sanitized_payload.items()
+            }
+
+            # 2. Persist authoritative state in repository FIRST (optimistic concurrency)
+            existing_record = self.repository.get_change(tid, change_id)
+            if existing_record is None:
+                new_record = ChangeRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    correlation_id=correlation_id,
+                    title=clean_title,
+                    description=clean_description,
+                    target_systems=tuple(request.target_systems),
+                    data_classification=request.data_classification,
+                    requested_by=request.requested_by,
+                    requested_at=now,
+                    state=target_state,
+                    state_updated_at=now,
+                    state_reason=sanitized_reason,
+                    assigned_orchestrator_revision=self.orchestrator_revision,
+                    created_at=now,
+                    updated_at=now,
+                )
+                self.repository.create_change(tid, new_record)
+            else:
+                updated_record = existing_record.model_copy(
+                    update={
+                        "state": target_state,
+                        "state_updated_at": now,
+                        "state_reason": sanitized_reason,
+                        "autonomy_class": active_autonomy_class or existing_record.autonomy_class,
+                        "updated_at": now,
+                    }
+                )
+                self.repository.update_change(
+                    tid, updated_record, expected_version=existing_record.version
+                )
+
+            # 3. Only after persistence succeeds, publish wire message & update timeline
             event_seq += 1
             event_id = f"evt-{change_id}-{event_seq:03d}-{target_state.value.lower()}"
             idempotency_key = f"idem_lc_{change_id}_{target_state.value.lower()}_{event_seq}"
@@ -241,65 +405,31 @@ class ChangeSagaOrchestrator:
                 idempotency_key=idempotency_key,
             )
 
-            # Determine route and topic from topology
             route = self._topology.get_route_for_state(target_state)
             topic_id = route.primary_topic_id if route else "changemesh-lifecycle-v1"
+
+            # Pre-dispatch secret scanning fails closed on residual secrets
+            scan_payload_for_secrets(sanitized_payload)
 
             wire_msg = EventWireMessage(
                 topic_id=topic_id,
                 envelope=envelope,
-                payload=payload_summary,
+                payload=sanitized_payload,
                 published_at=now,
             )
 
-            # Publish event
             if isinstance(self.event_bus, LocalEventBus):
                 self.event_bus.publish_message(wire_msg)
             else:
                 self.event_bus.publish(wire_msg)
+
             if self.timeline is not None:
                 self.timeline.record_event(
-                    envelope, topic_id=topic_id, payload=payload_summary, transport="LOCAL"
+                    envelope, topic_id=topic_id, payload=sanitized_payload, transport="LOCAL"
                 )
 
             events_emitted += 1
             last_event_id = event_id
-
-            # 2. Persist state in repository
-            existing_record = self.repository.get_change(tid, change_id)
-            if existing_record is None:
-                new_record = ChangeRecord(
-                    tenant_id=tid,
-                    change_id=change_id,
-                    correlation_id=correlation_id,
-                    title=request.title,
-                    description=request.description,
-                    target_systems=tuple(request.target_systems),
-                    data_classification=request.data_classification,
-                    requested_by=request.requested_by,
-                    requested_at=now,
-                    state=target_state,
-                    state_updated_at=now,
-                    state_reason=reason,
-                    assigned_orchestrator_revision=self.orchestrator_revision,
-                    created_at=now,
-                    updated_at=now,
-                )
-                self.repository.create_change(tid, new_record)
-            else:
-                updated_record = existing_record.model_copy(
-                    update={
-                        "state": target_state,
-                        "state_updated_at": now,
-                        "state_reason": reason,
-                        "autonomy_class": active_autonomy_class or existing_record.autonomy_class,
-                        "updated_at": now,
-                    }
-                )
-                self.repository.update_change(
-                    tid, updated_record, expected_version=existing_record.version
-                )
-
             current_state = target_state
             return envelope
 
@@ -313,7 +443,7 @@ class ChangeSagaOrchestrator:
             producer_role="change_orchestrator",
             producer_revision=self.orchestrator_revision,
             payload_summary={
-                "intent": request.description,
+                "intent": clean_description,
                 "targets": list(request.target_systems),
             },
         )
@@ -331,11 +461,11 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
-        # STAGE 1: Discover (DISCOVERING)
+        # STAGE 1: Discover (DISCOVERING) — Real P-15 Component Execution
         # -------------------------------------------------------------------------
         transition_and_persist(
             target_state=ChangeState.DISCOVERING,
@@ -346,35 +476,30 @@ class ChangeSagaOrchestrator:
             payload_summary={"action": "discover_blast_radius"},
         )
 
-        # Execute Impact Scout Discovery
-        build_synthetic_billing_graph()
-        finding = ScanFinding(
-            finding_type=ScanFindingType.MIGRATION_DETECTED,
-            path="migrations/001_add_billing_column.sql",
-            reason="Detected schema migration for billing table",
-            source="repository_scanner",
-            confidence="DETERMINISTIC",
+        # Execute Impact Scout Discovery via real RepositoryScanner and GraphTraverser
+        scanner = RepositoryScanner()
+        scan_findings = scanner.scan_files(
+            changed_files=["migrations/001_add_billing_column.sql"],
+            all_files=[
+                "migrations/001_add_billing_column.sql",
+                "src/billing/service.py",
+                "schema/billing.sql",
+            ],
         )
-        dep_path = DependencyPath(
-            source_id="migrations/001_add_billing_column.sql",
-            target_id="service-billing",
-            path=("migrations/001_add_billing_column.sql", "service-billing"),
-            relations=("MIGRATES",),
-            total_hops=1,
+
+        graph = build_synthetic_billing_graph()
+        traverser = GraphTraverser()
+        impacted_assets = tuple(
+            traverser.find_downstream_impact(
+                graph, changed_node_ids={"billing-migration-001", "invoice-schema"}
+            )
         )
-        asset = ImpactedAsset(
-            asset_id="service-billing",
-            asset_type=GraphNodeType.BACKEND_SERVICE,
-            name="Billing Engine",
-            owner="finance-platform",
-            dependency_path=dep_path,
-            provenance="synthetic_billing_graph",
-        )
+
         merger = BlastRadiusMerger()
         blast_radius_artifact = merger.merge(
             change_id=change_id,
-            scan_findings=(finding,),
-            impacted_assets=(asset,),
+            scan_findings=scan_findings,
+            impacted_assets=impacted_assets,
             evidence_mode=evidence_mode.value,
         )
 
@@ -437,11 +562,11 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
-        # STAGE 2: Qualify (QUALIFYING)
+        # STAGE 2: Qualify (QUALIFYING) — Real P-12 Agent Registry / Capability Passport
         # -------------------------------------------------------------------------
         transition_and_persist(
             target_state=ChangeState.QUALIFYING,
@@ -452,11 +577,77 @@ class ChangeSagaOrchestrator:
             payload_summary={"action": "verify_agent_capabilities"},
         )
 
-        # Verify Capability Requirements
+        # Initialize registry if not supplied
+        active_registry = self.agent_registry
+        if active_registry is None:
+            active_registry = build_standard_demo_registry(tid, now=now)
+            self.agent_registry = active_registry
+
+        # Verify Capability Requirements via AgentRegistry & CapabilityPassport
         std_reqs = get_standard_demo_requirements()
-        for role, req in std_reqs.items():
-            if not req.required_capabilities:
-                raise ValueError(f"Role {role} missing capability qualifications")
+        qualification_failed = False
+        qualification_failure_reason = ""
+        verified_role_count = 0
+
+        evidence_verifier = (
+            getattr(active_registry, "_evidence_verifier", None) or QualificationEvidenceVerifier()
+        )
+
+        for role_id, req in std_reqs.items():
+            agent_id = f"agent-{role_id.replace('_', '-')}"
+            descriptor = active_registry.get_descriptor(agent_id, "1.0.0")
+            passport = active_registry.get_active_passport(tid, agent_id, "1.0.0")
+
+            if descriptor is None or passport is None:
+                qualification_failed = True
+                qualification_failure_reason = (
+                    f"No active qualified passport found for required role {role_id!r}"
+                )
+                break
+
+            val_res = PassportVerifier.verify(
+                passport=passport,
+                evidence_verifier=evidence_verifier,
+                requirement=req,
+                expected_revision="1.0.0",
+                now=now,
+            )
+            if not val_res.is_valid:
+                qualification_failed = True
+                qualification_failure_reason = (
+                    f"Passport validation failed for role {role_id!r}: {val_res.failure_reason}"
+                )
+                break
+
+            verified_role_count += 1
+
+        if qualification_failed:
+            transition_and_persist(
+                target_state=ChangeState.BLOCKED,
+                reason=f"Agent qualification failed closed: {qualification_failure_reason}",
+                producer_id=self.orchestrator_id,
+                producer_role="change_orchestrator",
+                producer_revision=self.orchestrator_revision,
+                payload_summary={
+                    "action": "agent_qualification_failed",
+                    "reason": qualification_failure_reason,
+                },
+            )
+            return SagaExecutionResult(
+                tenant_id=tid,
+                change_id=change_id,
+                correlation_id=correlation_id,
+                initial_state=ChangeState.RECEIVED,
+                final_state=ChangeState.BLOCKED,
+                is_completed=False,
+                autonomy_class=AutonomyClass.BLOCKED,
+                stopped_reason=f"QUALIFICATION_FAILED: {qualification_failure_reason}",
+                events_emitted=events_emitted,
+                tasks_executed=tasks_executed,
+                evidence_collected=evidence_collected,
+                checkpoints_created=checkpoints_created,
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
+            )
 
         tasks_executed += 1
         self.repository.create_task(
@@ -474,7 +665,7 @@ class ChangeSagaOrchestrator:
                 status=TaskStatus.COMPLETED,
                 started_at=now,
                 completed_at=now,
-                output_summary=f"Verified qualifications for {len(std_reqs)} agent roles",
+                output_summary=f"Verified qualifications for {verified_role_count} agent roles",
                 created_at=now,
                 updated_at=now,
             ),
@@ -512,11 +703,11 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
-        # STAGE 3: Rehearse (REHEARSING)
+        # STAGE 3: Rehearse (REHEARSING) — Real P-13 ShadowLabRunner
         # -------------------------------------------------------------------------
         transition_and_persist(
             target_state=ChangeState.REHEARSING,
@@ -526,32 +717,19 @@ class ChangeSagaOrchestrator:
             producer_revision="1.0.0",
             payload_summary={
                 "action": "shadowlab_rehearsal",
-                "scenario": "SCENARIO_NORMAL_MIGRATION",
+                "scenario": (
+                    rehearsal_scenario.scenario_id
+                    if rehearsal_scenario
+                    else "SCENARIO_NORMAL_MIGRATION"
+                ),
             },
         )
 
-        # Execute Rehearsal Scenario
-        scenario = get_standard_shadow_scenarios()["SCENARIO_NORMAL_MIGRATION"]
-        sim_logs = (
-            "INIT: ShadowLab sandbox container started",
-            "APPLY: Executing forward migration on synthetic DB double",
-            "VERIFY: Backward compatibility check passed",
-            "CLEANUP: Sandbox reverted",
+        # Execute Rehearsal Scenario using real ShadowLabRunner
+        scenario = (
+            rehearsal_scenario or get_standard_shadow_scenarios()["SCENARIO_NORMAL_MIGRATION"]
         )
-        rehearsal_digest = compute_simulation_digest(scenario.scenario_id, sim_logs)
-        _ = RehearsalOutcome(
-            scenario_id=scenario.scenario_id,
-            evidence_mode=ExecutionEvidenceMode.SIMULATION,
-            evidence_state=EvidenceState.SIMULATED,
-            passed=True,
-            steps_executed=4,
-            retries_attempted=0,
-            fault_recovered=True,
-            compensation_executed=False,
-            evidence_digest=rehearsal_digest,
-            simulation_logs=sim_logs,
-            details="Clean schema migration rehearsal succeeded",
-        )
+        rehearsal_outcome = ShadowLabRunner.run_scenario(scenario)
 
         tasks_executed += 1
         self.repository.create_task(
@@ -566,11 +744,11 @@ class ChangeSagaOrchestrator:
                 agent_role="shadowlab",
                 agent_revision="1.0.0",
                 action_class="REHEARSAL_SIMULATION",
-                status=TaskStatus.COMPLETED,
+                status=TaskStatus.COMPLETED if rehearsal_outcome.passed else TaskStatus.FAILED,
                 started_at=now,
                 completed_at=now,
-                output_summary=f"Rehearsal {scenario.scenario_id} completed successfully",
-                artifact_hashes=({"rehearsal_digest": rehearsal_digest},),
+                output_summary=f"Rehearsal {scenario.scenario_id}: {rehearsal_outcome.details}",
+                artifact_hashes=({"rehearsal_digest": rehearsal_outcome.evidence_digest},),
                 created_at=now,
                 updated_at=now,
             ),
@@ -585,12 +763,12 @@ class ChangeSagaOrchestrator:
                 change_id=change_id,
                 evidence_id=f"ev-rehearse-{change_id}",
                 subject="shadowlab_rehearsal",
-                state=EvidenceState.SIMULATED,
+                state=rehearsal_outcome.evidence_state,
                 collection_mode=ExecutionEvidenceMode.SIMULATION,
                 producer_kind=EvidenceProducerKind.SIMULATION,
                 agent_id="agent-shadowlab-runner",
                 agent_revision="1.0.0",
-                artifact_digests=(rehearsal_digest,),
+                artifact_digests=(rehearsal_outcome.evidence_digest,),
                 collected_at=now,
                 created_at=now,
             ),
@@ -609,11 +787,11 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
-        # STAGE 4: Ground (GROUNDED)
+        # STAGE 4: Ground (GROUNDED) — Epistemic Memory Trust & Deterministic Policy
         # -------------------------------------------------------------------------
         transition_and_persist(
             target_state=ChangeState.GROUNDED,
@@ -645,7 +823,32 @@ class ChangeSagaOrchestrator:
             change_id=change_id,
         )
         if policy_res.blocked_count > 0:
-            raise ValueError(f"Deterministic policy blocked change: {policy_res.findings}")
+            transition_and_persist(
+                target_state=ChangeState.BLOCKED,
+                reason=f"Deterministic policy blocked change: {policy_res.findings}",
+                producer_id="agent-policy-guardian",
+                producer_role="policy_guardian",
+                producer_revision="1.0.0",
+                payload_summary={
+                    "action": "policy_precheck_blocked",
+                    "findings": list(policy_res.findings),
+                },
+            )
+            return SagaExecutionResult(
+                tenant_id=tid,
+                change_id=change_id,
+                correlation_id=correlation_id,
+                initial_state=ChangeState.RECEIVED,
+                final_state=ChangeState.BLOCKED,
+                is_completed=False,
+                autonomy_class=AutonomyClass.BLOCKED,
+                stopped_reason="BLOCKED by deterministic policy pre-checks",
+                events_emitted=events_emitted,
+                tasks_executed=tasks_executed,
+                evidence_collected=evidence_collected,
+                checkpoints_created=checkpoints_created,
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
+            )
 
         tasks_executed += 1
         self.repository.create_task(
@@ -703,21 +906,44 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
-        # STAGE 5: Authorize (AUTHORIZED or AWAITING_AUTHORITY)
+        # STAGE 5: Authorize (AUTHORIZED / AWAITING_AUTHORITY / BLOCKED)
         # -------------------------------------------------------------------------
-        rev_class = force_reversibility_class or ReversibilityClass.REVERSIBLE_WITH_COMPENSATION
+        # Determine Reversibility Classification deterministically (zero caller overrides)
+        sample_sql_up = "ALTER TABLE billing_accounts ADD COLUMN payment_tier VARCHAR(32);"
+        sample_sql_down = "ALTER TABLE billing_accounts DROP COLUMN payment_tier;"
+        blast_score = (
+            min(1.0, len(blast_radius_artifact.impacted_assets) * 0.1)
+            if blast_radius_artifact.impacted_assets
+            else 0.2
+        )
+
+        rev_assessment = ReversibilityClassifier.classify_sql(
+            change_id=change_id,
+            sql_up=sample_sql_up,
+            sql_down=sample_sql_down,
+            blast_radius_score=blast_score,
+        )
+
+        rehearsal_status = (
+            RehearsalStatus.REHEARSAL_PASSED
+            if rehearsal_outcome.passed
+            else RehearsalStatus.REHEARSAL_FAILED
+        )
+
         policy_inputs = DeterministicPolicyInputs(
             change_id=change_id,
-            blast_radius_score=0.2,
+            blast_radius_score=blast_score,
             blast_radius_source="impact_scout",
-            blast_radius_reason="Synthetic billing graph blast radius scan",
-            reversibility_class=rev_class,
-            has_down_migration=True,
-            rollback_summary="Execute reverse SQL to drop newly added column",
+            blast_radius_reason=(
+                f"Impacted assets count: {len(blast_radius_artifact.impacted_assets)}"
+            ),
+            reversibility_class=rev_assessment.reversibility_class,
+            has_down_migration=rev_assessment.has_down_migration,
+            rollback_summary=rev_assessment.rollback_plan_summary,
             reversibility_source="reversibility_classifier",
             privilege_level=PrivilegeLevel.SCHEMA_MODIFY,
             privilege_source="migration_planner",
@@ -729,73 +955,103 @@ class ChangeSagaOrchestrator:
             evidence_source="impact_scout",
             novelty_tier=NoveltyTier.ROUTINE_KNOWN,
             novelty_source="novelty_classifier",
-            rehearsal_status=RehearsalStatus.REHEARSAL_PASSED,
-            rehearsal_digests=(rehearsal_digest,),
+            rehearsal_status=rehearsal_status,
+            rehearsal_digests=(rehearsal_outcome.evidence_digest,),
             rehearsal_source="shadowlab",
         )
 
-        gate_result = self.policy_gate.evaluate_inputs(policy_inputs, now=now)
+        gate_result = self.policy_gate.evaluate_inputs(
+            policy_inputs,
+            assessment=rev_assessment,
+            now=now,
+        )
         active_autonomy_class = gate_result.autonomy_class
 
-        # Check for Human Authority Requirement Boundary
-        if (
-            not gate_result.is_authorized
-            or gate_result.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
-        ):
-            active_approval_card = gate_result.compression_card
+        # Check for HARD BLOCKER (BLOCKED)
+        if gate_result.autonomy_class == AutonomyClass.BLOCKED:
             transition_and_persist(
-                target_state=ChangeState.AWAITING_AUTHORITY,
-                reason="Policy Gate determined Human Authority is required",
+                target_state=ChangeState.BLOCKED,
+                reason=f"Policy Guardian Gate issued hard blocker: {gate_result.decision_summary}",
                 producer_id="agent-policy-guardian",
                 producer_role="policy_guardian",
                 producer_revision="1.0.0",
                 payload_summary={
                     "autonomy_class": gate_result.autonomy_class.value,
-                    "reversibility_class": rev_class.value,
+                    "reversibility_class": rev_assessment.reversibility_class.value,
+                    "decision_summary": gate_result.decision_summary,
+                },
+            )
+            # Return BLOCKED result with zero approval card and zero execution tasks
+            return SagaExecutionResult(
+                tenant_id=tid,
+                change_id=change_id,
+                correlation_id=correlation_id,
+                initial_state=ChangeState.RECEIVED,
+                final_state=ChangeState.BLOCKED,
+                is_completed=False,
+                autonomy_class=AutonomyClass.BLOCKED,
+                stopped_reason=f"BLOCKED: {gate_result.decision_summary}",
+                events_emitted=events_emitted,
+                tasks_executed=tasks_executed,
+                evidence_collected=evidence_collected,
+                checkpoints_created=checkpoints_created,
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
+            )
+
+        # Check for HUMAN_AUTHORITY_REQUIRED
+        if (
+            gate_result.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+            and not gate_result.is_authorized
+        ):
+            active_approval_card = gate_result.compression_card
+            transition_and_persist(
+                target_state=ChangeState.AWAITING_AUTHORITY,
+                reason=(
+                    "Policy Gate determined Human Authority is required: "
+                    f"{gate_result.decision_summary}"
+                ),
+                producer_id="agent-policy-guardian",
+                producer_role="policy_guardian",
+                producer_revision="1.0.0",
+                payload_summary={
+                    "autonomy_class": gate_result.autonomy_class.value,
+                    "reversibility_class": rev_assessment.reversibility_class.value,
                     "decision_summary": gate_result.decision_summary,
                 },
             )
 
-            # Persist Approval Record
-            approval_card_id = f"card-{change_id}"
-            self.repository.create_approval(
-                tid,
-                change_id,
-                ApprovalRecord(
-                    tenant_id=tid,
-                    change_id=change_id,
-                    card_id=approval_card_id,
-                    authority_slot_ref="slot-production-schema-change",
-                    decision_question=(
-                        gate_result.compression_card.decision_question
-                        if gate_result.compression_card
-                        else "Approve schema modification for billing database?"
+            # Persist Approval Record derived strictly from compression card
+            if gate_result.compression_card is not None:
+                card = gate_result.compression_card
+                approval_card_id = f"card-{change_id}"
+                self.repository.create_approval(
+                    tid,
+                    change_id,
+                    ApprovalRecord(
+                        tenant_id=tid,
+                        change_id=change_id,
+                        card_id=approval_card_id,
+                        authority_slot_ref=card.authority_slot_ref,
+                        decision_question=card.decision_question,
+                        decision_options=card.decision_options,
+                        policy_reason=gate_result.decision_summary,
+                        action_scope=card.action_scope,
+                        completed_work_summary=(
+                            card.completed_work_summary or "Completed discovery and qualification"
+                        ),
+                        rehearsed_work_summary=(
+                            card.rehearsed_work_summary or "Rehearsal simulation recorded"
+                        ),
+                        remaining_decision_summary=(
+                            card.remaining_decision_summary
+                            or f"Authorize live execution under slot {card.authority_slot_ref}"
+                        ),
+                        card_created_at=now,
+                        resolution_status=ApprovalResolutionStatus.PENDING,
+                        created_at=now,
+                        updated_at=now,
                     ),
-                    decision_options=(
-                        gate_result.compression_card.decision_options
-                        if gate_result.compression_card
-                        else ("APPROVE", "REJECT")
-                    ),
-                    policy_reason=(
-                        "Organizational policy requires verified human authority "
-                        "for destructive/irreversible changes"
-                    ),
-                    action_scope="SCHEMA_MODIFY",
-                    completed_work_summary=(
-                        "Impact discovery and ShadowLab rehearsal passed cleanly"
-                    ),
-                    rehearsed_work_summary=(
-                        "Forward and backward schema migration tested on synthetic database double"
-                    ),
-                    remaining_decision_summary=(
-                        "Authorize Migration Engineer to generate and write migration artifacts"
-                    ),
-                    card_created_at=now,
-                    resolution_status=ApprovalResolutionStatus.PENDING,
-                    created_at=now,
-                    updated_at=now,
-                ),
-            )
+                )
 
             # Stop cleanly at AWAITING_AUTHORITY — zero execution and zero Release Steward mutation!
             return SagaExecutionResult(
@@ -814,10 +1070,10 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
-        # Autonomous Authorization Granted
+        # Autonomous Authorization Granted (AUTO_EXECUTE or REHEARSE_THEN_EXECUTE)
         transition_and_persist(
             target_state=ChangeState.AUTHORIZED,
             reason=f"Authorized under autonomy class {gate_result.autonomy_class.value}",
@@ -826,7 +1082,7 @@ class ChangeSagaOrchestrator:
             producer_revision="1.0.0",
             payload_summary={
                 "autonomy_class": gate_result.autonomy_class.value,
-                "reversibility_class": rev_class.value,
+                "reversibility_class": rev_assessment.reversibility_class.value,
                 "decision_summary": gate_result.decision_summary,
             },
         )
@@ -867,11 +1123,11 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
-        # STAGE 6: Execute (EXECUTING)
+        # STAGE 6: Execute (EXECUTING) — Real P-17 Migration Plan & Manifest
         # -------------------------------------------------------------------------
         transition_and_persist(
             target_state=ChangeState.EXECUTING,
@@ -963,11 +1219,11 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
-        # STAGE 7: Verify (VERIFYING)
+        # STAGE 7: Verify (VERIFYING) — Real P-18 Claims, Audit, Reconciliation
         # -------------------------------------------------------------------------
         transition_and_persist(
             target_state=ChangeState.VERIFYING,
@@ -998,10 +1254,11 @@ class ChangeSagaOrchestrator:
             claims=claims,
             evidence_store={
                 f"ev-rehearse-{change_id}": (
-                    "Rehearsal outcome: PASS with valid simulation digest"
+                    f"Rehearsal outcome: {rehearsal_outcome.evidence_state.value} "
+                    f"with digest {rehearsal_outcome.evidence_digest}"
                 ),
                 f"ev-execute-{change_id}": (
-                    "Execution manifest: Valid SHA-256 hashes for changed files"
+                    f"Execution manifest: Valid SHA-256 hash {file_manifest.manifest_hash}"
                 ),
             },
         )
@@ -1076,11 +1333,11 @@ class ChangeSagaOrchestrator:
                 tasks_executed=tasks_executed,
                 evidence_collected=evidence_collected,
                 checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest(),
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
-        # STAGE 8: Certify (CERTIFYING -> COMPLETE)
+        # STAGE 8: Certify (CERTIFYING -> COMPLETE) — Checkpoint & Complete
         # -------------------------------------------------------------------------
         transition_and_persist(
             target_state=ChangeState.CERTIFYING,
@@ -1175,5 +1432,5 @@ class ChangeSagaOrchestrator:
             tasks_executed=tasks_executed,
             evidence_collected=evidence_collected,
             checkpoints_created=checkpoints_created,
-            timeline_digest=self.timeline.compute_timeline_digest(),
+            timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
         )

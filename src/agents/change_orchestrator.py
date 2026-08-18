@@ -22,7 +22,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, ClassVar, Type
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    ClassVar,
+    Optional,
+    Sequence,
+    Type,
+)
 
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
@@ -307,6 +317,52 @@ class ChangeOrchestrator(BaseAgent):
             plan,
             force_strategy=ExecutionStrategy.SEQUENTIAL,
             branch_runner=branch_runner,
+        )
+
+    def run_lifecycle_saga(
+        self,
+        tenant_id: str,
+        request: ChangeRequest,
+        repository: Any,
+        event_bus: Any,
+        *,
+        evidence_mode: Any = None,
+        initial_memory_records: Sequence[Any] = (),
+        stop_at_state: Optional[ChangeState] = None,
+        now: Optional[datetime] = None,
+        timeline: Optional[Any] = None,
+        agent_registry: Optional[Any] = None,
+        policy_gate: Optional[Any] = None,
+    ) -> Any:
+        """Coordinate the durable change lifecycle saga via ChangeSagaOrchestrator.
+
+        ADK ChangeOrchestrator acts as routing coordinator and lifecycle invoker
+        without directly owning durable persistence. Authoritative state is owned
+        exclusively by SagaStateRepository.
+        """
+        from domain.contracts.evidence import ExecutionEvidenceMode
+        from src.orchestrator.orchestrator_saga import (
+            ChangeSagaOrchestrator,
+        )
+
+        active_mode = evidence_mode or ExecutionEvidenceMode.SIMULATION
+
+        saga_orchestrator = ChangeSagaOrchestrator(
+            repository=repository,
+            event_bus=event_bus,
+            orchestrator_id=self.agent_id,
+            orchestrator_revision=self.agent_revision,
+            timeline=timeline,
+            agent_registry=agent_registry,
+            policy_gate=policy_gate,
+        )
+        return saga_orchestrator.run_saga(
+            tenant_id=tenant_id,
+            request=request,
+            evidence_mode=active_mode,
+            initial_memory_records=initial_memory_records,
+            stop_at_state=stop_at_state,
+            now=now,
         )
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:

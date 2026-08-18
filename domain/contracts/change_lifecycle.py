@@ -187,22 +187,8 @@ def can_transition(
     current: ChangeState, target: ChangeState, *, retry_origin: Optional[ChangeState] = None
 ) -> bool:
     """Returns True if the transition from current to target is allowed."""
-    if not isinstance(current, ChangeState):
-        try:
-            if hasattr(current, "value") and current.value in ChangeState._value2member_map_:
-                current = ChangeState(current.value)
-            else:
-                return False
-        except Exception:
-            return False
-    if not isinstance(target, ChangeState):
-        try:
-            if hasattr(target, "value") and target.value in ChangeState._value2member_map_:
-                target = ChangeState(target.value)
-            else:
-                return False
-        except Exception:
-            return False
+    if not isinstance(current, ChangeState) or not isinstance(target, ChangeState):
+        return False
 
     # Check general transition legality
     if target not in ALLOWED_TRANSITIONS[current]:
@@ -212,17 +198,7 @@ def can_transition(
     if current == ChangeState.RETRY_SCHEDULED:
         # 1. retry_origin must be a ChangeState
         if not isinstance(retry_origin, ChangeState):
-            try:
-                if (
-                    retry_origin is not None
-                    and hasattr(retry_origin, "value")
-                    and retry_origin.value in ChangeState._value2member_map_
-                ):
-                    retry_origin = ChangeState(retry_origin.value)
-                else:
-                    return False
-            except Exception:
-                return False
+            return False
 
         # 2. retry_origin must be a valid retriable origin
         if retry_origin not in RETRY_RESUME_TARGETS:
@@ -246,21 +222,9 @@ def require_transition(
     Raises IllegalTransitionError if it is not.
     """
     if not isinstance(current, ChangeState):
-        try:
-            if hasattr(current, "value") and current.value in ChangeState._value2member_map_:
-                current = ChangeState(current.value)
-            else:
-                raise IllegalTransitionError(f"Invalid current state type: {type(current)}")
-        except Exception:
-            raise IllegalTransitionError(f"Invalid current state type: {type(current)}")
+        raise IllegalTransitionError(f"Invalid current state type: {type(current)}")
     if not isinstance(target, ChangeState):
-        try:
-            if hasattr(target, "value") and target.value in ChangeState._value2member_map_:
-                target = ChangeState(target.value)
-            else:
-                raise IllegalTransitionError(f"Invalid target state type: {type(target)}")
-        except Exception:
-            raise IllegalTransitionError(f"Invalid target state type: {type(target)}")
+        raise IllegalTransitionError(f"Invalid target state type: {type(target)}")
 
     if not can_transition(current, target, retry_origin=retry_origin):
         if current == ChangeState.RETRY_SCHEDULED and isinstance(retry_origin, ChangeState):
