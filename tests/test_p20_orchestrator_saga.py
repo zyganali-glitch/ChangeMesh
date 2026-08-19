@@ -57,8 +57,12 @@ from src.gate.reversibility import (
 )
 from src.orchestrator.in_memory_repository import InMemorySagaStateRepository
 from src.orchestrator.orchestrator_saga import (
+    CANONICAL_CONDITION_SPECS,
+    BoundedCriterionConditionSpec,
     ChangeSagaOrchestrator,
     build_standard_demo_registry,
+    get_canonical_condition_specs,
+    validate_criterion_condition_semantics,
 )
 from src.orchestrator.state_repository import (
     ApprovalResolutionStatus,
@@ -1303,3 +1307,243 @@ def test_p20_01_verification_fails_on_contradictory_criterion_description(
     # 4. Zero certification evidence produced
     evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
     assert not any(ref.subject == "saga_certification" for ref in evidence_refs)
+
+
+def test_p20_01_verification_fails_on_cross_condition_evidence_substitution_test_a(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """TEST A: Cross-condition evidence substitution fails closed at Stage 7.
+
+    Criterion:
+      description: "Rehearsal succeeds cleanly"
+      verification_method: "deterministic"
+      required_evidence_types: ["MIGRATION_EXECUTION"]
+
+    Expected:
+      - semantic condition resolves to REHEARSAL_SUCCEEDED;
+      - MIGRATION_EXECUTION is rejected as incapable evidence for that condition;
+      - final state FAILED;
+      - is_completed False;
+      - zero certification checkpoints;
+      - verify task FAILED;
+      - semantic fixture cannot override deterministic FAIL.
+    """
+    mismatched_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-cross-sub-01",
+                    description="Rehearsal succeeds cleanly",
+                    verification_method="deterministic",
+                    required_evidence_types=["MIGRATION_EXECUTION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(
+        tenant_id="tenant-prod-alpha",
+        request=mismatched_request,
+    )
+
+    # 1. State and completion
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+    assert "not capable of proving condition" in (result.stopped_reason or "")
+
+    # 2. Zero certification checkpoint
+    assert result.checkpoints_created == 0
+    persisted_change = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted_change is not None
+    assert persisted_change.state == ChangeState.FAILED
+
+    # 3. Verify task failed
+    tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
+    verify_task = next((t for t in tasks if t.agent_role == "evidence_auditor"), None)
+    assert verify_task is not None
+    assert verify_task.status == TaskStatus.FAILED
+    assert "Verification FAILED" in str(verify_task.output_summary)
+
+    # 4. Zero certification evidence produced
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "saga_certification" for ref in evidence_refs)
+
+
+def test_p20_01_verification_fails_on_reverse_cross_condition_evidence_substitution_test_b(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """TEST B: Reverse cross-condition substitution fails closed at Stage 7.
+
+    Criterion:
+      description: "Migration manifest contains deterministic file hashes"
+      verification_method: "deterministic"
+      required_evidence_types: ["REHEARSAL_SIMULATION"]
+
+    Expected:
+      same fail-closed result.
+    """
+    reverse_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-reverse-sub-01",
+                    description="Migration manifest contains deterministic file hashes",
+                    verification_method="deterministic",
+                    required_evidence_types=["REHEARSAL_SIMULATION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(
+        tenant_id="tenant-prod-alpha",
+        request=reverse_request,
+    )
+
+    # 1. State and completion
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+    assert "not capable of proving condition" in (result.stopped_reason or "")
+
+    # 2. Zero certification checkpoint
+    assert result.checkpoints_created == 0
+    persisted_change = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted_change is not None
+    assert persisted_change.state == ChangeState.FAILED
+
+    # 3. Verify task failed
+    tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
+    verify_task = next((t for t in tasks if t.agent_role == "evidence_auditor"), None)
+    assert verify_task is not None
+    assert verify_task.status == TaskStatus.FAILED
+    assert "Verification FAILED" in str(verify_task.output_summary)
+
+    # 4. Zero certification evidence produced
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "saga_certification" for ref in evidence_refs)
+
+
+def test_p20_01_verification_fails_on_database_state_laundering_test_c(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """TEST C: Database-state laundering fails closed at Stage 7.
+
+    Criterion:
+      description: "payment_tier is present in billing_accounts"
+      verification_method: "deterministic"
+      required_evidence_types: ["MIGRATION_EXECUTION"]
+
+    Expected:
+      - must NOT be interpreted as proof of MIGRATION_MANIFEST_SYNTHESIZED;
+      - FAILED / unproven;
+      - zero certification checkpoint.
+    """
+    laundering_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-db-laundering-001",
+                    description="payment_tier is present in billing_accounts",
+                    verification_method="deterministic",
+                    required_evidence_types=["MIGRATION_EXECUTION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(
+        tenant_id="tenant-prod-alpha",
+        request=laundering_request,
+    )
+
+    # 1. State and completion
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+
+    # 2. Zero certification checkpoint
+    assert result.checkpoints_created == 0
+    persisted_change = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted_change is not None
+    assert persisted_change.state == ChangeState.FAILED
+
+    # 3. Verify task failed
+    tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
+    verify_task = next((t for t in tasks if t.agent_role == "evidence_auditor"), None)
+    assert verify_task is not None
+    assert verify_task.status == TaskStatus.FAILED
+    assert "Verification FAILED" in str(verify_task.output_summary)
+
+    # 4. Zero certification evidence produced
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "saga_certification" for ref in evidence_refs)
+
+
+def test_p20_01_bounded_condition_spec_registry_and_validation() -> None:
+    """Verify BoundedCriterionConditionSpec registry completeness and strict matching."""
+    specs = get_canonical_condition_specs()
+    expected_conditions = {
+        "REHEARSAL_SUCCEEDED",
+        "MIGRATION_MANIFEST_SYNTHESIZED",
+        "BLAST_RADIUS_DISCOVERED",
+        "CAPABILITIES_QUALIFIED",
+        "EPISTEMIC_GROUNDED",
+    }
+    assert set(specs.keys()) == expected_conditions
+    assert CANONICAL_CONDITION_SPECS == specs
+
+    # Verify rehearsal spec
+    reh_spec = specs["REHEARSAL_SUCCEEDED"]
+    assert isinstance(reh_spec, BoundedCriterionConditionSpec)
+    assert reh_spec.canonical_evidence_type == "REHEARSAL_SIMULATION"
+    assert "REHEARSAL_SIMULATION" in reh_spec.allowed_evidence_types
+    assert EvidenceState.SIMULATED in reh_spec.allowed_evidence_states
+    assert ExecutionEvidenceMode.SIMULATION in reh_spec.allowed_evidence_modes
+
+    # Verify migration manifest spec
+    mig_spec = specs["MIGRATION_MANIFEST_SYNTHESIZED"]
+    assert mig_spec.canonical_evidence_type == "MIGRATION_EXECUTION"
+    assert "MIGRATION_EXECUTION" in mig_spec.allowed_evidence_types
+    assert EvidenceState.PASS in mig_spec.allowed_evidence_states
+
+    # Verify semantic validator behavior
+    # Valid rehearsal
+    valid_reh = SuccessCriterion(
+        schema_version="1.0.0",
+        criterion_id="c1",
+        description="Rehearsal completed cleanly with zero unhandled faults",
+        verification_method="deterministic",
+        required_evidence_types=["REHEARSAL_SIMULATION"],
+    )
+    is_valid, cond_id, _ = validate_criterion_condition_semantics(valid_reh)
+    assert is_valid is True
+    assert cond_id == "REHEARSAL_SUCCEEDED"
+
+    # Valid manifest
+    valid_mig = SuccessCriterion(
+        schema_version="1.0.0",
+        criterion_id="c2",
+        description="Migration manifest contains deterministic file hashes",
+        verification_method="deterministic",
+        required_evidence_types=["MIGRATION_EXECUTION"],
+    )
+    is_valid, cond_id, _ = validate_criterion_condition_semantics(valid_mig)
+    assert is_valid is True
+    assert cond_id == "MIGRATION_MANIFEST_SYNTHESIZED"
+
+    # Invalid database state assertion (laundering)
+    invalid_db = SuccessCriterion(
+        schema_version="1.0.0",
+        criterion_id="c3",
+        description="payment_tier is present in billing_accounts",
+        verification_method="deterministic",
+        required_evidence_types=["MIGRATION_EXECUTION"],
+    )
+    is_valid, cond_id, _ = validate_criterion_condition_semantics(invalid_db)
+    assert is_valid is False
+    assert cond_id is None

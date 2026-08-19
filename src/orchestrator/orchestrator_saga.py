@@ -382,8 +382,132 @@ class BoundedCriterionConditionSpec(BaseModel):
 
     condition_id: str
     description_summary: str
-    required_evidence_types: tuple[str, ...]
     bound_stage: str
+    canonical_evidence_type: str
+    required_evidence_types: tuple[str, ...]
+    allowed_evidence_types: tuple[str, ...]
+    allowed_evidence_states: tuple[EvidenceState, ...] = (EvidenceState.PASS,)
+    allowed_evidence_modes: tuple[ExecutionEvidenceMode, ...] = (
+        ExecutionEvidenceMode.SIMULATION,
+        ExecutionEvidenceMode.FIXTURE,
+    )
+    expected_subject: Optional[str] = None
+    expected_evidence_key_prefix: Optional[str] = None
+
+
+CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = {
+    "REHEARSAL_SUCCEEDED": BoundedCriterionConditionSpec(
+        condition_id="REHEARSAL_SUCCEEDED",
+        description_summary=(
+            "ShadowLab simulated rehearsal executed and completed cleanly with "
+            "zero unhandled faults"
+        ),
+        bound_stage="REHEARSING",
+        canonical_evidence_type="REHEARSAL_SIMULATION",
+        required_evidence_types=("REHEARSAL_SIMULATION",),
+        allowed_evidence_types=(
+            "REHEARSAL_SIMULATION",
+            "SHADOWLAB_REHEARSAL",
+            "REHEARSAL",
+        ),
+        allowed_evidence_states=(EvidenceState.SIMULATED, EvidenceState.PASS),
+        allowed_evidence_modes=(ExecutionEvidenceMode.SIMULATION,),
+        expected_subject="shadowlab_rehearsal",
+        expected_evidence_key_prefix="ev-rehearse-",
+    ),
+    "MIGRATION_MANIFEST_SYNTHESIZED": BoundedCriterionConditionSpec(
+        condition_id="MIGRATION_MANIFEST_SYNTHESIZED",
+        description_summary=(
+            "Deterministic migration DDL / manifest generated with valid file hashes"
+        ),
+        bound_stage="EXECUTING",
+        canonical_evidence_type="MIGRATION_EXECUTION",
+        required_evidence_types=("MIGRATION_EXECUTION",),
+        allowed_evidence_types=(
+            "MIGRATION_EXECUTION",
+            "MIGRATION_SYNTHESIS",
+            "DETERMINISTIC_MANIFEST",
+            "MANIFEST_GENERATION",
+            "ARTIFACT_GENERATION",
+        ),
+        allowed_evidence_states=(EvidenceState.PASS,),
+        allowed_evidence_modes=(
+            ExecutionEvidenceMode.SIMULATION,
+            ExecutionEvidenceMode.FIXTURE,
+        ),
+        expected_subject="migration_artifacts",
+        expected_evidence_key_prefix="ev-execute-",
+    ),
+    "BLAST_RADIUS_DISCOVERED": BoundedCriterionConditionSpec(
+        condition_id="BLAST_RADIUS_DISCOVERED",
+        description_summary=(
+            "Static analysis and blast radius calculation completed for target assets"
+        ),
+        bound_stage="DISCOVERING",
+        canonical_evidence_type="BLAST_RADIUS_ANALYSIS",
+        required_evidence_types=("BLAST_RADIUS_ANALYSIS",),
+        allowed_evidence_types=(
+            "BLAST_RADIUS_ANALYSIS",
+            "BLAST_RADIUS_ESTIMATION",
+            "AST_STATIC_ANALYSIS",
+            "DISCOVERY",
+        ),
+        allowed_evidence_states=(EvidenceState.PASS,),
+        allowed_evidence_modes=(
+            ExecutionEvidenceMode.SIMULATION,
+            ExecutionEvidenceMode.FIXTURE,
+        ),
+        expected_subject="blast_radius",
+        expected_evidence_key_prefix="ev-discover-",
+    ),
+    "CAPABILITIES_QUALIFIED": BoundedCriterionConditionSpec(
+        condition_id="CAPABILITIES_QUALIFIED",
+        description_summary=(
+            "Agent fleet capability passports verified against requirement specifications"
+        ),
+        bound_stage="QUALIFYING",
+        canonical_evidence_type="CAPABILITY_QUALIFICATION",
+        required_evidence_types=("CAPABILITY_QUALIFICATION",),
+        allowed_evidence_types=(
+            "CAPABILITY_QUALIFICATION",
+            "AGENT_QUALIFICATION",
+            "PASSPORT_VERIFICATION",
+        ),
+        allowed_evidence_states=(EvidenceState.PASS,),
+        allowed_evidence_modes=(
+            ExecutionEvidenceMode.SIMULATION,
+            ExecutionEvidenceMode.FIXTURE,
+        ),
+        expected_subject="capability_qualification",
+        expected_evidence_key_prefix="ev-qualify-",
+    ),
+    "EPISTEMIC_GROUNDED": BoundedCriterionConditionSpec(
+        condition_id="EPISTEMIC_GROUNDED",
+        description_summary=(
+            "Epistemic memory trust evaluation and deterministic policy pre-checks completed"
+        ),
+        bound_stage="GROUNDED",
+        canonical_evidence_type="EPISTEMIC_GROUNDING",
+        required_evidence_types=("EPISTEMIC_GROUNDING",),
+        allowed_evidence_types=(
+            "EPISTEMIC_GROUNDING",
+            "POLICY_PRECHECK",
+            "GROUNDING",
+        ),
+        allowed_evidence_states=(EvidenceState.PASS,),
+        allowed_evidence_modes=(
+            ExecutionEvidenceMode.SIMULATION,
+            ExecutionEvidenceMode.FIXTURE,
+        ),
+        expected_subject="epistemic_grounding",
+        expected_evidence_key_prefix="ev-ground-",
+    ),
+}
+
+
+def get_canonical_condition_specs() -> Mapping[str, BoundedCriterionConditionSpec]:
+    """Return immutable mapping of supported bounded criterion condition specs."""
+    return CANONICAL_CONDITION_SPECS
 
 
 def validate_criterion_condition_semantics(
@@ -419,6 +543,11 @@ def validate_criterion_condition_semantics(
         "executed against database",
         "production cluster",
         "live cluster",
+        "present in database",
+        "exists in database",
+        "exists in schema",
+        "present in billing_accounts",
+        "present in table",
     ]
     for term in unprovable_live_terms:
         if term in desc_lower:
@@ -493,51 +622,76 @@ def validate_criterion_condition_semantics(
 
     # Condition 2: MIGRATION_MANIFEST_SYNTHESIZED
     # Facts proven: Deterministic migration DDL / manifest generated and hashed for
-    # payment_tier addition
-    migration_keywords = [
+    # payment_tier addition. Requires explicit artifact/manifest/plan/ddl semantics.
+    manifest_keywords = [
         "manifest",
-        "migration",
-        "hashes",
-        "hash",
-        "synthes",
-        "artifact",
-        "payment_tier",
-        "billing_accounts",
+        "migration artifact",
+        "migration plan",
+        "ddl artifact",
+        "ddl script",
+        "migration script",
+        "deterministic manifest",
+        "file hashes",
+        "manifest hash",
+        "deterministic file hashes",
+        "migration ddl",
     ]
-    migration_positive = [
+    manifest_positive = [
         "contains",
         "deterministic",
         "valid",
         "generated",
         "synthesized",
         "created",
-        "present",
+        "synthes",
+        "generat",
         "hashes",
         "hash",
         "plan",
     ]
-    if any(k in desc_lower for k in migration_keywords) and any(
-        p in desc_lower for p in migration_positive
+    if any(k in desc_lower for k in manifest_keywords) and any(
+        p in desc_lower for p in manifest_positive
     ):
         matched_condition = "MIGRATION_MANIFEST_SYNTHESIZED"
 
     # Condition 3: BLAST_RADIUS_DISCOVERED
-    discovery_keywords = ["blast radius", "static analysis", "discovery", "impact"]
-    discovery_positive = ["calculated", "computed", "scanned", "complete", "completed", "done"]
+    discovery_keywords = ["blast radius", "static analysis", "discovery", "ast scan", "impact"]
+    discovery_positive = [
+        "calculated",
+        "computed",
+        "scanned",
+        "complete",
+        "completed",
+        "done",
+        "discovered",
+    ]
     if any(k in desc_lower for k in discovery_keywords) and any(
         p in desc_lower for p in discovery_positive
     ):
         matched_condition = "BLAST_RADIUS_DISCOVERED"
 
     # Condition 4: CAPABILITIES_QUALIFIED
-    qual_keywords = ["qualification", "passport", "capability", "capabilities", "agent"]
+    qual_keywords = [
+        "qualification",
+        "passport",
+        "capability",
+        "capabilities",
+        "agent qualification",
+        "passport verification",
+    ]
     qual_positive = ["verified", "qualified", "valid", "passed", "checked"]
     if any(k in desc_lower for k in qual_keywords) and any(p in desc_lower for p in qual_positive):
         matched_condition = "CAPABILITIES_QUALIFIED"
 
     # Condition 5: EPISTEMIC_GROUNDED
-    ground_keywords = ["grounding", "epistemic", "memory", "trust"]
-    ground_positive = ["grounded", "evaluated", "complete", "completed", "trusted"]
+    ground_keywords = [
+        "grounding",
+        "epistemic",
+        "memory trust",
+        "policy precheck",
+        "policy pre-check",
+    ]
+    ground_positive = ["grounded", "evaluated", "complete", "completed", "trusted", "passed"]
     if any(k in desc_lower for k in ground_keywords) and any(
         p in desc_lower for p in ground_positive
     ):
@@ -1715,6 +1869,8 @@ class ChangeSagaOrchestrator:
                     }
                 ),
                 "state": EvidenceState.PASS,
+                "mode": evidence_mode,
+                "subject": "blast_radius",
                 "summary": (
                     f"Blast radius calculated: {len(blast_radius_artifact.impacted_assets)} assets"
                 ),
@@ -1724,11 +1880,15 @@ class ChangeSagaOrchestrator:
                     {"CAPABILITY_QUALIFICATION", "AGENT_QUALIFICATION", "PASSPORT_VERIFICATION"}
                 ),
                 "state": EvidenceState.PASS,
+                "mode": evidence_mode,
+                "subject": "capability_qualification",
                 "summary": f"Verified qualifications for {verified_role_count} agent roles",
             },
             f"ev-rehearse-{change_id}": {
                 "types": frozenset({"REHEARSAL_SIMULATION", "SHADOWLAB_REHEARSAL", "REHEARSAL"}),
                 "state": rehearsal_outcome.evidence_state,
+                "mode": ExecutionEvidenceMode.SIMULATION,
+                "subject": "shadowlab_rehearsal",
                 "summary": (
                     f"Rehearsal outcome: {rehearsal_outcome.evidence_state.value} "
                     f"with digest {rehearsal_outcome.evidence_digest}"
@@ -1737,6 +1897,8 @@ class ChangeSagaOrchestrator:
             f"ev-ground-{change_id}": {
                 "types": frozenset({"EPISTEMIC_GROUNDING", "POLICY_PRECHECK", "GROUNDING"}),
                 "state": EvidenceState.PASS,
+                "mode": evidence_mode,
+                "subject": "epistemic_grounding",
                 "summary": (
                     f"Epistemic grounding complete: {len(trusted_memory_refs)} trusted memory refs"
                 ),
@@ -1752,6 +1914,8 @@ class ChangeSagaOrchestrator:
                     }
                 ),
                 "state": EvidenceState.PASS,
+                "mode": evidence_mode,
+                "subject": "migration_artifacts",
                 "summary": f"Execution manifest: Valid SHA-256 hash {file_manifest.manifest_hash}",
             },
         }
@@ -1795,34 +1959,86 @@ class ChangeSagaOrchestrator:
                     "by automated saga runtime"
                 )
 
-            # Machine-verifiable condition semantic validation
+            # 1. Machine-verifiable condition semantic validation
             # (fails closed on opposite / unproven / unknown criterion semantics)
             is_valid_cond, cond_id, cond_fail_reason = validate_criterion_condition_semantics(crit)
-            if not is_valid_cond:
+            spec: Optional[BoundedCriterionConditionSpec] = None
+            if not is_valid_cond or cond_id is None:
                 crit_failed = True
                 crit_reasons.append(cond_fail_reason)
-
-            # Match required evidence types against produced evidence catalog
-            for req_type in crit.required_evidence_types:
-                matched_key: Optional[str] = None
-                for ev_key, ev_info in produced_evidence_catalog.items():
-                    if req_type in ev_info["types"] or req_type.upper() in ev_info["types"]:
-                        matched_key = ev_key
-                        break
-                if matched_key is not None:
-                    if matched_key not in bound_keys:
-                        bound_keys.append(matched_key)
-                    ev_state = produced_evidence_catalog[matched_key]["state"]
-                    if ev_state not in (EvidenceState.PASS, EvidenceState.SIMULATED):
-                        crit_failed = True
-                        crit_reasons.append(
-                            f"Matched evidence {matched_key} has non-passing state: "
-                            f"{ev_state.value}"
-                        )
-                else:
+            else:
+                spec = CANONICAL_CONDITION_SPECS.get(cond_id)
+                if spec is None:
                     crit_failed = True
                     crit_reasons.append(
-                        f"Required evidence type {req_type!r} was not produced by this run"
+                        f"Resolved condition {cond_id!r} is not registered in "
+                        "canonical condition specs"
+                    )
+
+            # 2. Validate caller-supplied required_evidence_types against condition spec
+            if spec is not None:
+                if not crit.required_evidence_types:
+                    crit_failed = True
+                    crit_reasons.append(
+                        f"Criterion {crit.criterion_id!r} has no required_evidence_types specified"
+                    )
+                else:
+                    for req_type in crit.required_evidence_types:
+                        normalized_req = req_type.strip().upper()
+                        if (
+                            req_type not in spec.allowed_evidence_types
+                            and normalized_req not in spec.allowed_evidence_types
+                        ):
+                            allowed_list = list(spec.allowed_evidence_types)
+                            crit_failed = True
+                            crit_reasons.append(
+                                f"Required evidence type {req_type!r} is not capable of "
+                                f"proving condition {cond_id!r} (expected one of: {allowed_list})"
+                            )
+
+            # 3. Bind evidence ONLY from the resolved condition spec
+            if spec is not None and not crit_failed:
+                matched_evidence_found = False
+                for ev_key, ev_info in produced_evidence_catalog.items():
+                    key_match = spec.expected_evidence_key_prefix is None or ev_key.startswith(
+                        spec.expected_evidence_key_prefix
+                    )
+                    subject_match = (
+                        spec.expected_subject is None
+                        or ev_info.get("subject") == spec.expected_subject
+                    )
+                    type_match = any(t in spec.allowed_evidence_types for t in ev_info["types"])
+
+                    if key_match and subject_match and type_match:
+                        # Check evidence state
+                        ev_state = ev_info["state"]
+                        if ev_state not in spec.allowed_evidence_states:
+                            allowed_states_str = [s.value for s in spec.allowed_evidence_states]
+                            crit_failed = True
+                            crit_reasons.append(
+                                f"Bound evidence {ev_key} for condition {cond_id!r} has invalid "
+                                f"state: {ev_state.value} (allowed: {allowed_states_str})"
+                            )
+                        # Check evidence mode
+                        ev_mode = ev_info.get("mode")
+                        if ev_mode is not None and ev_mode not in spec.allowed_evidence_modes:
+                            allowed_modes_str = [m.value for m in spec.allowed_evidence_modes]
+                            crit_failed = True
+                            crit_reasons.append(
+                                f"Bound evidence {ev_key} for condition {cond_id!r} has invalid "
+                                f"mode: {ev_mode.value} (allowed: {allowed_modes_str})"
+                            )
+
+                        if not crit_failed:
+                            if ev_key not in bound_keys:
+                                bound_keys.append(ev_key)
+                            matched_evidence_found = True
+
+                if not matched_evidence_found and not crit_failed:
+                    crit_failed = True
+                    crit_reasons.append(
+                        f"No produced evidence found satisfying canonical condition {cond_id!r} "
+                        f"(expected type: {spec.canonical_evidence_type})"
                     )
 
             if not bound_keys and not crit_failed:

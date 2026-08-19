@@ -76,7 +76,7 @@ ChangeMesh is a new product/repository. Design benefits from ideas in owner's ea
 - **Reuse Method:** `IDEA_ONLY`
 - **ChangeMesh Target:** `src/orchestrator/state_repository.py`, `src/orchestrator/orchestrator_saga.py`, `src/orchestrator/saga_checkpoint.py`
 - **Competition Introduction Commit:** `9c95018d5e0de0924aac7f2a797ee8ef8e7eb54d` (P-10 state repo) / `4dd868657888ea7b11986ef5779a37635d2019fa` (P-20.01 saga orchestrator)
-- **Test Evidence:** `tests/test_p10_02_state_repository.py` (13 tests PASS), `tests/test_p20_orchestrator_saga.py` (38 tests PASS)
+- **Test Evidence:** `tests/test_p10_02_state_repository.py` (13 tests PASS), `tests/test_p20_orchestrator_saga.py` (42 tests PASS)
 - **Materially New Contribution:** Replaces simple file-based interview status syncing with a full Python 3.13 Google ADK + Cloud Pub/Sub + Firestore multi-tenant saga engine. Features 8 canonical lifecycle stages, strict enum type enforcement, optimistic concurrency versioning, persistence-first event emission ordering, automatic intake secret scanning, intent binding to synthetic fixtures (preventing fact laundering), exact bounded `ApprovalCompressionCard` projection, and clean stops at human authority boundaries. Zero UiPath runtime code, Action Center, Data Service, or Phase-0 interview models carry over.
 
 ## Mandatory final disclosure
