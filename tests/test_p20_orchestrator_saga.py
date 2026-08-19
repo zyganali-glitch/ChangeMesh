@@ -62,6 +62,7 @@ from src.orchestrator.orchestrator_saga import (
     ChangeSagaOrchestrator,
     build_standard_demo_registry,
     get_canonical_condition_specs,
+    normalize_criterion_statement,
     validate_criterion_condition_semantics,
 )
 from src.orchestrator.state_repository import (
@@ -1502,14 +1503,14 @@ def test_p20_01_bounded_condition_spec_registry_and_validation() -> None:
     assert isinstance(reh_spec, BoundedCriterionConditionSpec)
     assert reh_spec.canonical_evidence_type == "REHEARSAL_SIMULATION"
     assert "REHEARSAL_SIMULATION" in reh_spec.allowed_evidence_types
-    assert EvidenceState.SIMULATED in reh_spec.allowed_evidence_states
-    assert ExecutionEvidenceMode.SIMULATION in reh_spec.allowed_evidence_modes
+    assert reh_spec.allowed_evidence_states == (EvidenceState.SIMULATED,)
+    assert reh_spec.allowed_evidence_modes == (ExecutionEvidenceMode.SIMULATION,)
 
     # Verify migration manifest spec
     mig_spec = specs["MIGRATION_MANIFEST_SYNTHESIZED"]
     assert mig_spec.canonical_evidence_type == "MIGRATION_EXECUTION"
     assert "MIGRATION_EXECUTION" in mig_spec.allowed_evidence_types
-    assert EvidenceState.PASS in mig_spec.allowed_evidence_states
+    assert mig_spec.allowed_evidence_states == (EvidenceState.PASS,)
 
     # Verify semantic validator behavior
     # Valid rehearsal
@@ -1547,3 +1548,238 @@ def test_p20_01_bounded_condition_spec_registry_and_validation() -> None:
     is_valid, cond_id, _ = validate_criterion_condition_semantics(invalid_db)
     assert is_valid is False
     assert cond_id is None
+
+
+def test_p20_01_verification_fails_on_invalid_hashes_admission_test_a(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """TEST A: Invalid hashes statement fails condition admission at Stage 7.
+
+    Criterion:
+      description: "Migration manifest contains invalid hashes"
+      verification_method: "deterministic"
+      required_evidence_types: ["MIGRATION_EXECUTION"]
+
+    Expected:
+      - semantic condition admission fails (not in accepted statements allowlist);
+      - final state FAILED;
+      - is_completed False;
+      - 0 certification checkpoints;
+      - verify task FAILED;
+      - existing valid MIGRATION_EXECUTION evidence cannot make it PASS.
+    """
+    invalid_hash_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-invalid-hash-01",
+                    description="Migration manifest contains invalid hashes",
+                    verification_method="deterministic",
+                    required_evidence_types=["MIGRATION_EXECUTION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(
+        tenant_id="tenant-prod-alpha",
+        request=invalid_hash_request,
+    )
+
+    # 1. State and completion
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+    assert "does not match any supported bounded condition statement" in (
+        result.stopped_reason or ""
+    )
+
+    # 2. Zero certification checkpoint
+    assert result.checkpoints_created == 0
+    persisted_change = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted_change is not None
+    assert persisted_change.state == ChangeState.FAILED
+
+    # 3. Verify task failed
+    tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
+    verify_task = next((t for t in tasks if t.agent_role == "evidence_auditor"), None)
+    assert verify_task is not None
+    assert verify_task.status == TaskStatus.FAILED
+    assert "Verification FAILED" in str(verify_task.output_summary)
+
+    # 4. Zero certification evidence produced
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "saga_certification" for ref in evidence_refs)
+
+
+def test_p20_01_verification_fails_on_rehearsal_with_errors_admission_test_b(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """TEST B: Rehearsal with errors fails condition admission at Stage 7.
+
+    Criterion:
+      description: "Rehearsal completed with errors"
+      verification_method: "deterministic"
+      required_evidence_types: ["REHEARSAL_SIMULATION"]
+
+    Expected:
+      same fail-closed result.
+    """
+    errors_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-errors-01",
+                    description="Rehearsal completed with errors",
+                    verification_method="deterministic",
+                    required_evidence_types=["REHEARSAL_SIMULATION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(
+        tenant_id="tenant-prod-alpha",
+        request=errors_request,
+    )
+
+    # 1. State and completion
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+    assert "does not match any supported bounded condition statement" in (
+        result.stopped_reason or ""
+    )
+
+    # 2. Zero certification checkpoint
+    assert result.checkpoints_created == 0
+    persisted_change = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted_change is not None
+    assert persisted_change.state == ChangeState.FAILED
+
+    # 3. Verify task failed
+    tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
+    verify_task = next((t for t in tasks if t.agent_role == "evidence_auditor"), None)
+    assert verify_task is not None
+    assert verify_task.status == TaskStatus.FAILED
+    assert "Verification FAILED" in str(verify_task.output_summary)
+
+    # 4. Zero certification evidence produced
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "saga_certification" for ref in evidence_refs)
+
+
+def test_p20_01_verification_fails_on_accepted_prefix_with_contradictory_suffix_test_c(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """TEST C: Accepted prefix with contradictory suffix fails closed at Stage 7.
+
+    Criterion:
+      description: "Rehearsal completed cleanly with zero unhandled faults, but production failed"
+      verification_method: "deterministic"
+      required_evidence_types: ["REHEARSAL_SIMULATION"]
+
+    Expected:
+      - normalized full string is compared against accepted statements allowlist;
+      - does not match;
+      - FAIL CLOSED.
+    """
+    suffix_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-prefix-suffix-01",
+                    description=(
+                        "Rehearsal completed cleanly with zero unhandled faults, "
+                        "but production failed"
+                    ),
+                    verification_method="deterministic",
+                    required_evidence_types=["REHEARSAL_SIMULATION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(
+        tenant_id="tenant-prod-alpha",
+        request=suffix_request,
+    )
+
+    # 1. State and completion
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+
+    # 2. Zero certification checkpoint
+    assert result.checkpoints_created == 0
+    persisted_change = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted_change is not None
+    assert persisted_change.state == ChangeState.FAILED
+
+    # 3. Verify task failed
+    tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
+    verify_task = next((t for t in tasks if t.agent_role == "evidence_auditor"), None)
+    assert verify_task is not None
+    assert verify_task.status == TaskStatus.FAILED
+    assert "Verification FAILED" in str(verify_task.output_summary)
+
+    # 4. Zero certification evidence produced
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "saga_certification" for ref in evidence_refs)
+
+
+def test_p20_01_condition_registry_immutability_and_mutation_prevention() -> None:
+    """Verify CANONICAL_CONDITION_SPECS mapping and items are truly immutable."""
+    specs = get_canonical_condition_specs()
+    reh_spec = specs["REHEARSAL_SUCCEEDED"]
+
+    # 1. Assigning a new key raises TypeError
+    with pytest.raises(TypeError):
+        CANONICAL_CONDITION_SPECS["NEW_KEY"] = reh_spec  # type: ignore[index]
+
+    with pytest.raises(TypeError):
+        specs["NEW_KEY"] = reh_spec  # type: ignore[index]
+
+    # 2. Replacing an existing key raises TypeError
+    with pytest.raises(TypeError):
+        CANONICAL_CONDITION_SPECS["REHEARSAL_SUCCEEDED"] = reh_spec  # type: ignore[index]
+
+    with pytest.raises(TypeError):
+        specs["REHEARSAL_SUCCEEDED"] = reh_spec  # type: ignore[index]
+
+    # 3. Deleting an entry raises TypeError
+    with pytest.raises(TypeError):
+        del CANONICAL_CONDITION_SPECS["REHEARSAL_SUCCEEDED"]  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError):
+        del specs["REHEARSAL_SUCCEEDED"]  # type: ignore[attr-defined]
+
+    # 4. Individual BoundedCriterionConditionSpec instances are frozen
+    with pytest.raises((TypeError, Exception)):
+        reh_spec.condition_id = "MUTATED"  # type: ignore[misc]
+
+
+def test_p20_01_normalize_criterion_statement_behavior() -> None:
+    """Verify deterministic normalization: secrets, casefolding, punctuation, whitespace."""
+    # Secrets redaction
+    assert (
+        normalize_criterion_statement(
+            "Rehearsal succeeds with token ghp_1234567890abcdef1234567890abcdef"
+        )
+        == "rehearsal succeeds with token [redacted]"
+    )
+
+    # Casefolding and whitespace collapsing
+    assert (
+        normalize_criterion_statement("  Rehearsal   Succeeds   Cleanly  ")
+        == "rehearsal succeeds cleanly"
+    )
+
+    # Terminal punctuation stripping
+    assert (
+        normalize_criterion_statement("Rehearsal completed with zero unhandled faults.!?;")
+        == "rehearsal completed with zero unhandled faults"
+    )

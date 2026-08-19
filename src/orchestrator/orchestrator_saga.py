@@ -30,6 +30,7 @@ import logging
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from types import MappingProxyType
 from typing import Any, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict
@@ -386,6 +387,7 @@ class BoundedCriterionConditionSpec(BaseModel):
     canonical_evidence_type: str
     required_evidence_types: tuple[str, ...]
     allowed_evidence_types: tuple[str, ...]
+    accepted_statements: tuple[str, ...] = ()
     allowed_evidence_states: tuple[EvidenceState, ...] = (EvidenceState.PASS,)
     allowed_evidence_modes: tuple[ExecutionEvidenceMode, ...] = (
         ExecutionEvidenceMode.SIMULATION,
@@ -395,7 +397,7 @@ class BoundedCriterionConditionSpec(BaseModel):
     expected_evidence_key_prefix: Optional[str] = None
 
 
-CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = {
+_CANONICAL_CONDITION_SPECS_DICT: dict[str, BoundedCriterionConditionSpec] = {
     "REHEARSAL_SUCCEEDED": BoundedCriterionConditionSpec(
         condition_id="REHEARSAL_SUCCEEDED",
         description_summary=(
@@ -410,7 +412,18 @@ CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = {
             "SHADOWLAB_REHEARSAL",
             "REHEARSAL",
         ),
-        allowed_evidence_states=(EvidenceState.SIMULATED, EvidenceState.PASS),
+        accepted_statements=(
+            "rehearsal succeeds",
+            "rehearsal succeeds cleanly",
+            "rehearsal completed cleanly with zero unhandled faults",
+            "rehearsal completed with zero unhandled faults",
+            (
+                "shadowlab simulated rehearsal executed and completed cleanly with "
+                "zero unhandled faults"
+            ),
+            "rehearsal succeeds with token [redacted]",
+        ),
+        allowed_evidence_states=(EvidenceState.SIMULATED,),
         allowed_evidence_modes=(ExecutionEvidenceMode.SIMULATION,),
         expected_subject="shadowlab_rehearsal",
         expected_evidence_key_prefix="ev-rehearse-",
@@ -429,6 +442,14 @@ CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = {
             "DETERMINISTIC_MANIFEST",
             "MANIFEST_GENERATION",
             "ARTIFACT_GENERATION",
+        ),
+        accepted_statements=(
+            "migration manifest contains deterministic file hashes",
+            "deterministic migration manifest generated with valid file hashes",
+            "migration plan generated",
+            "ddl artifact generated",
+            "deterministic migration ddl and manifest generated with valid file hashes",
+            "migration manifest contains deterministic file hashes and ddl script",
         ),
         allowed_evidence_states=(EvidenceState.PASS,),
         allowed_evidence_modes=(
@@ -452,6 +473,13 @@ CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = {
             "AST_STATIC_ANALYSIS",
             "DISCOVERY",
         ),
+        accepted_statements=(
+            "static analysis and blast radius calculation completed for target assets",
+            "static analysis and blast radius calculation completed",
+            "blast radius calculation completed",
+            "blast radius analysis completed",
+            "blast radius discovered",
+        ),
         allowed_evidence_states=(EvidenceState.PASS,),
         allowed_evidence_modes=(
             ExecutionEvidenceMode.SIMULATION,
@@ -472,6 +500,13 @@ CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = {
             "CAPABILITY_QUALIFICATION",
             "AGENT_QUALIFICATION",
             "PASSPORT_VERIFICATION",
+        ),
+        accepted_statements=(
+            "agent fleet capability passports verified against requirement specifications",
+            "agent capability passports verified against requirement specifications",
+            "agent capabilities qualified",
+            "capability passports verified",
+            "capabilities qualified",
         ),
         allowed_evidence_states=(EvidenceState.PASS,),
         allowed_evidence_modes=(
@@ -494,6 +529,13 @@ CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = {
             "POLICY_PRECHECK",
             "GROUNDING",
         ),
+        accepted_statements=(
+            "epistemic memory trust evaluation and deterministic policy pre-checks completed",
+            "epistemic memory trust evaluation and policy pre-checks completed",
+            "epistemic grounding completed",
+            "epistemic grounded",
+            "memory trust evaluation completed",
+        ),
         allowed_evidence_states=(EvidenceState.PASS,),
         allowed_evidence_modes=(
             ExecutionEvidenceMode.SIMULATION,
@@ -504,205 +546,62 @@ CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = {
     ),
 }
 
+CANONICAL_CONDITION_SPECS: Mapping[str, BoundedCriterionConditionSpec] = MappingProxyType(
+    _CANONICAL_CONDITION_SPECS_DICT
+)
+
 
 def get_canonical_condition_specs() -> Mapping[str, BoundedCriterionConditionSpec]:
     """Return immutable mapping of supported bounded criterion condition specs."""
     return CANONICAL_CONDITION_SPECS
 
 
+def normalize_criterion_statement(text: str) -> str:
+    """Deterministically normalize a criterion statement for bounded condition admission.
+
+    Normalization steps:
+    1. Sanitize secrets first (e.g. ghp_* tokens become [REDACTED]).
+    2. Unicode-safe casefold.
+    3. Strip terminal punctuation (. ! ? ; : ,).
+    4. Collapse repeated whitespace and trim.
+    """
+    sanitized = sanitize_secrets_in_text(text)
+    folded = sanitized.casefold()
+    trimmed = folded.strip()
+    while trimmed and trimmed[-1] in {".", "!", "?", ";", ":", ","}:
+        trimmed = trimmed[:-1].strip()
+    normalized = re.sub(r"\s+", " ", trimmed).strip()
+    return normalized
+
+
 def validate_criterion_condition_semantics(
     criterion: SuccessCriterion,
 ) -> tuple[bool, Optional[str], str]:
-    """Validate if SuccessCriterion description matches a supported machine-verifiable condition.
+    """Validate if SuccessCriterion description matches an allowed bounded condition.
 
     A deterministic criterion may become PASS only when:
-    1. its requested condition is one of the explicitly supported machine-verifiable conditions
-       for this bounded operation; and
+    1. its requested condition matches an exact accepted statement in the bounded
+       statement allowlist for one of the canonical conditions; and
     2. the actual produced evidence required for that condition exists with the correct state/mode.
 
-    Unknown, contradictory, negated, or unprovable criterion semantics fail closed as unproven.
+    Unknown, arbitrary, contradictory, negated, unprovable, or modified criterion semantics
+    fail closed as unproven without fuzzy or model-based fallback.
     """
     desc_raw = criterion.description
-    desc_clean = desc_raw.strip()
-    desc_lower = desc_clean.lower()
+    normalized_desc = normalize_criterion_statement(desc_raw)
 
-    # 1. Reject unprovable live production / provider / real database application claims
-    unprovable_live_terms = [
-        "production deployment",
-        "deployed to production",
-        "live write",
-        "live_write",
-        "provider mutation",
-        "real deployment",
-        "remote github",
-        "remote repo",
-        "applied to database",
-        "applied to live",
-        "applied to billing_accounts",
-        "executed in database",
-        "executed against database",
-        "production cluster",
-        "live cluster",
-        "present in database",
-        "exists in database",
-        "exists in schema",
-        "present in billing_accounts",
-        "present in table",
-    ]
-    for term in unprovable_live_terms:
-        if term in desc_lower:
-            return (
-                False,
-                None,
-                f"Criterion requires live production/provider/database mutation {term!r} "
-                "not provable by local simulation run",
-            )
-
-    # 2. Reject explicit negation, contradiction, or opposite assertions
-    negation_contradiction_patterns = [
-        "not added",
-        "was not added",
-        "were not added",
-        "did not add",
-        "never added",
-        "without adding",
-        "avoid adding",
-        "must not add",
-        "should not add",
-        "not synthesized",
-        "was not synthesized",
-        "not generated",
-        "was not generated",
-        "failed to add",
-        "failed to generate",
-        "failed to synthesize",
-        "rehearsal failed",
-        "rehearsal did not pass",
-        "rehearsal was unsuccessful",
-        "rollback",
-        "rolled back",
-        "drop column",
-        "delete column",
-        "remove column",
-        "drop table",
-        "delete table",
-    ]
-    for pat in negation_contradiction_patterns:
-        if pat in desc_lower:
-            return (
-                False,
-                None,
-                f"Criterion asserts contradictory, negated, or opposite condition {pat!r} "
-                "contrary to bounded additive execution facts",
-            )
-
-    # 3. Match against explicitly supported machine-verifiable conditions for this bounded operation
     matched_condition: Optional[str] = None
-
-    # Condition 1: REHEARSAL_SUCCEEDED
-    # Facts proven: ShadowLab rehearsal simulation executed and completed cleanly / zero faults
-    rehearsal_keywords = ["rehearsal", "shadowlab", "simulation"]
-    rehearsal_positive = [
-        "succeed",
-        "succeeds",
-        "succeeded",
-        "clean",
-        "cleanly",
-        "pass",
-        "passed",
-        "zero unhandled faults",
-        "zero faults",
-        "completed",
-        "complete",
-    ]
-    if any(k in desc_lower for k in rehearsal_keywords) and any(
-        p in desc_lower for p in rehearsal_positive
-    ):
-        matched_condition = "REHEARSAL_SUCCEEDED"
-
-    # Condition 2: MIGRATION_MANIFEST_SYNTHESIZED
-    # Facts proven: Deterministic migration DDL / manifest generated and hashed for
-    # payment_tier addition. Requires explicit artifact/manifest/plan/ddl semantics.
-    manifest_keywords = [
-        "manifest",
-        "migration artifact",
-        "migration plan",
-        "ddl artifact",
-        "ddl script",
-        "migration script",
-        "deterministic manifest",
-        "file hashes",
-        "manifest hash",
-        "deterministic file hashes",
-        "migration ddl",
-    ]
-    manifest_positive = [
-        "contains",
-        "deterministic",
-        "valid",
-        "generated",
-        "synthesized",
-        "created",
-        "synthes",
-        "generat",
-        "hashes",
-        "hash",
-        "plan",
-    ]
-    if any(k in desc_lower for k in manifest_keywords) and any(
-        p in desc_lower for p in manifest_positive
-    ):
-        matched_condition = "MIGRATION_MANIFEST_SYNTHESIZED"
-
-    # Condition 3: BLAST_RADIUS_DISCOVERED
-    discovery_keywords = ["blast radius", "static analysis", "discovery", "ast scan", "impact"]
-    discovery_positive = [
-        "calculated",
-        "computed",
-        "scanned",
-        "complete",
-        "completed",
-        "done",
-        "discovered",
-    ]
-    if any(k in desc_lower for k in discovery_keywords) and any(
-        p in desc_lower for p in discovery_positive
-    ):
-        matched_condition = "BLAST_RADIUS_DISCOVERED"
-
-    # Condition 4: CAPABILITIES_QUALIFIED
-    qual_keywords = [
-        "qualification",
-        "passport",
-        "capability",
-        "capabilities",
-        "agent qualification",
-        "passport verification",
-    ]
-    qual_positive = ["verified", "qualified", "valid", "passed", "checked"]
-    if any(k in desc_lower for k in qual_keywords) and any(p in desc_lower for p in qual_positive):
-        matched_condition = "CAPABILITIES_QUALIFIED"
-
-    # Condition 5: EPISTEMIC_GROUNDED
-    ground_keywords = [
-        "grounding",
-        "epistemic",
-        "memory trust",
-        "policy precheck",
-        "policy pre-check",
-    ]
-    ground_positive = ["grounded", "evaluated", "complete", "completed", "trusted", "passed"]
-    if any(k in desc_lower for k in ground_keywords) and any(
-        p in desc_lower for p in ground_positive
-    ):
-        matched_condition = "EPISTEMIC_GROUNDED"
+    for cond_id, spec in CANONICAL_CONDITION_SPECS.items():
+        if normalized_desc in spec.accepted_statements:
+            matched_condition = cond_id
+            break
 
     if matched_condition is None:
         return (
             False,
             None,
-            f"Criterion description {criterion.description!r} does not match any explicitly "
-            "supported machine-verifiable condition for this bounded operation",
+            f"Criterion description {desc_raw!r} (normalized: {normalized_desc!r}) does not "
+            "match any supported bounded condition statement in canonical vocabulary",
         )
 
     return True, matched_condition, ""

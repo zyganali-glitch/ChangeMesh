@@ -10,6 +10,7 @@ from src.orchestrator.orchestrator_saga import (
     SagaExecutionResult,
     build_standard_demo_registry,
     get_canonical_condition_specs,
+    normalize_criterion_statement,
     sanitize_secrets_in_text,
     validate_criterion_condition_semantics,
     validate_supported_change_intent,
@@ -52,5 +53,6 @@ __all__ = [
     "BoundedCriterionConditionSpec",
     "CANONICAL_CONDITION_SPECS",
     "get_canonical_condition_specs",
+    "normalize_criterion_statement",
     "validate_criterion_condition_semantics",
 ]
