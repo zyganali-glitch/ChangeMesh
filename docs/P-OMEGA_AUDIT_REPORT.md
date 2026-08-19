@@ -2,7 +2,7 @@
 
 > **Scope:** P-20.00 Long-Running Orchestration Donor Preflight & P-20.01 Final Surgical Repair of End-to-End Saga Orchestrator across 8 Canonical Stages, Bounded Supported Billing Migration Contract, Intake Secret Boundary & Sanitization, Mode Honesty, Criteria Closure Verification Gates, and Donor Provenance Truth
 > **Date:** 2026-08-19
-> **Starting Remote Baseline SHA:** `c4d7bf4f963eafa0dd6884632b2b033edab10cf6`
+> **Starting Remote Baseline SHA:** `a7c67bfad708292ba2e49ae12004559af05e1c88`
 > **Canonical Branch:** `main`
 
 ---
@@ -11,7 +11,7 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Starting Remote Baseline SHA | **PASS** | `origin/main` baseline verified as `c4d7bf4f963eafa0dd6884632b2b033edab10cf6`. |
+| Starting Remote Baseline SHA | **PASS** | `origin/main` baseline verified as `a7c67bfad708292ba2e49ae12004559af05e1c88`. |
 | P-20.00 Donor Preflight & Manifest | **PASS** | `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md` Table 3 disambiguates source-observed interview/question progression vs ChangeMesh-native transformations; `UIPATH-STATE-001` set to `IMPLEMENTED_PENDING_PARITY` with introduction commit `9c95018d5e0de0924aac7f2a797ee8ef8e7eb54d` / `4dd868657888ea7b11986ef5779a37635d2019fa`; `QW-BUS-001` preserved at `APPROVED_FOR_IMPLEMENTATION`; `CCT-FLIGHT-001` verified; `tools/governance/donor_manifest_lint.py` passed (20 components valid, exit code `0`). |
 | Target Demo Repo Isolation | **PASS** | Synthetic repo `zyganali-glitch/changemesh-livewrite-demo` remains isolated from canonical `zyganali-glitch/ChangeMesh`. Zero mutations against canonical repository. Zero live GitHub mutations during P-20.01 tests. |
 | Bounded Operation Contract & Intent Binding | **PASS** | Supported P-20.01 workflow is bound strictly to `CANONICAL_SUPPORTED_OPERATION` (table `billing_accounts`, column `payment_tier VARCHAR(32)`). Requires required db target (`billing-db` or `billing_db`), positive additive semantics (`ADD COLUMN`), and rejects opposite/destructive keywords (`remove`, `delete`, `drop`, `rename`, `replace`, `disable`, `rollback`, `truncate`, `DROP TABLE`), explicit negation/opposition of ADD intent (`do not add`, `don't add`, `must not add`, etc.), unrelated operations (`timeout`, `rename`, `config`), and mixed targets, failing closed at intake to `ChangeState.BLOCKED` (0 tasks, 0 approval cards, 0 migration artifacts, preventing fact laundering). |
