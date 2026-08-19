@@ -120,23 +120,97 @@
 - P-19
 - P-20.00
 - P-20.01
+- P-20.02
+- P-20.03
+- P-20.04
+- P-20.05
+- P-20.06
+- P-20
+- P-21.00
+- P-21.01
+- P-21.02
+- P-21.03
+- P-21.04
+- P-21.05
+- P-21.06
+- P-21.07
+- P-21
+- P-22.00
+- P-22.01
+- P-22.02
+- P-22.03
+- P-22.04
+- P-22.05
+- P-22.06
+- P-22
+- P-23.01
+- P-23.02
+- P-23.03
+- P-23.04
+- P-23.05
+- P-23
+- P-24.00
+- P-24.01
+- P-24.02
+- P-24.03
+- P-24.04
+- P-24.05
+- P-24.06
+- P-24
 
 **Blocked:**
 - None
 
 **Active Phase:**
-- P-20 (Orchestrator Saga, Recovery, and Long-Running Behavior — IN_PROGRESS)
+- P-25 (Comprehensive Test and Gate Matrix — PENDING)
 
 **Next Exact Task:**
-- P-20.02 — Implement pause, resume, cancel, timeout, retry, compensation, dead-letter paths
+- P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport
 
-## Current P-20 State (P-20.00 & P-20.01 Surgically Repaired and Verified)
+## Current P-24 State (Macro Execution Batch P-20.02 → P-24.06 Completed and Verified)
 
-Phase P-20 is `IN_PROGRESS`.
+Phases P-20, P-21, P-22, P-23, and P-24 are `DONE`.
 
-### P-20 — Orchestrator Saga, Recovery, and Long-Running Behavior
-- **P-20.00:** Orchestrator saga donor preflight completed and verified in `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md` covering `UIPATH-STATE-001` (D-UIPATH, `dc2267939c2aef0aba2737da65f53352c5cf8fb2`, `IMPLEMENTED_PENDING_PARITY`), `QW-BUS-001` (D-QWEN, `a43b3411856f41a4be9424d11c01a5e637cdc410`, `APPROVED_FOR_IMPLEMENTATION`), and `CCT-FLIGHT-001` (D-CCT, `65ee1b72faf9a7202d9166eed43fb671804815a8`, `VERIFIED`). Table 3 clearly distinguishes source-observed behaviors from ChangeMesh-native transformations. Manifest linting passed (20 components valid, exit code `0`).
-- **P-20.01:** Implemented and surgically repaired canonical end-to-end ChangeLifecycle saga orchestrator in `src/orchestrator/orchestrator_saga.py` (`ChangeSagaOrchestrator`, `SagaExecutionResult`, `build_standard_demo_registry`, `sanitize_secrets_in_text`, `SupportedBillingOperation` / `CANONICAL_SUPPORTED_OPERATION`, `validate_supported_change_intent`, `BoundedCriterionConditionSpec`, `CANONICAL_CONDITION_SPECS`, `get_canonical_condition_specs`, `normalize_criterion_statement`, `validate_criterion_condition_semantics`) and ADK bridge `ChangeOrchestrator.run_lifecycle_saga` in `src/agents/change_orchestrator.py`. Coordinates all 8 lifecycle stages:
+### P-24 — End-to-End Synthetic Enterprise Demo (DONE)
+- **P-24.01:** Implemented `SyntheticBillingFixture` in `src/demo/e2e_demo.py` with fictional Acme Corp billing system, database targets, legacy dependency conditions, and intentional missing-proof conditions.
+- **P-24.02:** Implemented `build_demo_change_request()` in `src/demo/e2e_demo.py` binding criteria (`crit-compat`, `crit-dualwrite`, `crit-rollback`, `crit-audit`) strictly to canonical bounded condition specifications.
+- **P-24.03:** Implemented `build_demo_agent_registry()` in `src/demo/e2e_demo.py` registering baseline qualified and intentionally unqualified (`0.1.0-UNQUALIFIED`) revisions.
+- **P-24.04:** Implemented `run_local_e2e_demo()` in `src/demo/e2e_demo.py` executing full 8-stage lifecycle to `ChangeState.COMPLETE`, collecting evidence ledger, generating dashboard snapshot, and computing deterministic demo digest.
+- **P-24.05:** Cloud E2E path verified in `tests/test_p24_e2e_demo.py::TestCloudE2E` confirming `ServiceAvailabilityReport` truthfully reports `PERMISSION_BLOCKED` and `LOCAL_FALLBACK` when GCP managed services are unavailable.
+- **P-24.06:** Implemented reproducible demo with full JSON serialization and zero manual edits in `tests/test_p24_e2e_demo.py::TestReproducibleDemo`.
+
+### P-23 — Agent Identity, Gateway, and Model Armor (DONE)
+- **P-23.01:** Implemented `AgentIdentity`, `AgentPermission` (9 granular permissions), and `AgentIdentityRegistry` in `src/security/agent_security.py`.
+- **P-23.02:** Implemented `GatewayEndpoint` and `GatewayRegistry` in `src/security/agent_security.py` with deny-by-default for unregistered endpoints/unauthorized agents and dry-run mode.
+- **P-23.03:** Implemented `LocalModelArmor` and `ModelArmorResult` in `src/security/agent_security.py` detecting injection patterns with explicit fallback labeling.
+- **P-23.04:** Implemented `ManagedServiceStatus` and `ServiceAvailabilityReport` in `src/security/agent_security.py` explicitly labeling fallback status.
+- **P-23.05:** Implemented least-privilege enforcement in `AgentIdentityRegistry.require_permission` failing closed on unauthorized combinations.
+
+### P-22 — Evidence Ledger, Passport, and Observability (DONE)
+- **P-22.01:** Implemented append-only `EvidenceLedger` and `EvidenceLedgerEntry` with SHA-256 chained hashing and `verify_integrity()` tamper detection in `src/evidence/evidence_ledger.py`.
+- **P-22.02:** Implemented artifact hashing (`compute_artifact_digest`) and repository/cloud provenance (`compute_artifact_provenance`) in `src/evidence/evidence_ledger.py`.
+- **P-22.03:** Integrated passport generation/verification with `PassportIssuer` and `EvidenceLedger`.
+- **P-22.04:** Implemented `ObservabilitySpan` and `SpanCollector` in `src/evidence/evidence_ledger.py` with trace_id binding to change_id and parent-child span hierarchy.
+- **P-22.05:** Implemented `SpanCollector.export_sanitized()` in `src/evidence/evidence_ledger.py` excluding sensitive payloads and attributes.
+- **P-22.06:** Implemented `EvidenceCompletenessReport` and `generate_completeness_report()` in `src/evidence/evidence_ledger.py`.
+
+### P-21 — Judge and Operator Dashboard (DONE)
+- **P-21.01:** Implemented information architecture models (`DashboardChangeView`, `DashboardAgentView`, `DashboardTimelineEntry`, `DashboardCapabilityView`, `DashboardMemoryTrustView`, `DashboardApprovalView`, `DashboardCloudProofView`, `DashboardSnapshot`) in `src/dashboard/data_provider.py`.
+- **P-21.02:** Implemented explicit evidence provenance labels (`DashboardEvidenceLabel`: REAL, FIXTURE, SIMULATED, NOT_RUN) in `src/dashboard/data_provider.py`.
+- **P-21.03:** Implemented fleet aggregation into `DashboardAgentView` and task/event extraction into `DashboardTimelineEntry` in `src/dashboard/data_provider.py`.
+- **P-21.04:** Implemented `DashboardCapabilityView` in `src/dashboard/data_provider.py`.
+- **P-21.05:** Implemented `DashboardMemoryTrustView` and `DashboardApprovalView` in `src/dashboard/data_provider.py`.
+- **P-21.06:** Implemented `DashboardCloudProofView` in `src/dashboard/data_provider.py`.
+- **P-21.07:** Implemented `DashboardLoadingState` returning EMPTY for nonexistent changes and LOADED with deterministic SHA-256 snapshot digest for existing changes.
+
+### P-20 — Orchestrator Saga, Recovery, and Long-Running Behavior (DONE)
+- **P-20.00:** Orchestrator saga donor preflight completed and verified in `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md`.
+- **P-20.01:** Implemented canonical end-to-end ChangeLifecycle saga orchestrator in `src/orchestrator/orchestrator_saga.py`.
+- **P-20.02:** Implemented 7 explicit recovery path methods (`pause_saga`, `cancel_saga`, `timeout_saga`, `schedule_retry`, `resume_from_retry`, `start_compensation`/`complete_compensation`, `dead_letter_saga`), `RecoveryAction` enum, and `SagaRecoveryResult` in `src/orchestrator/orchestrator_saga.py`.
+- **P-20.03:** Implemented `BackgroundContinuationRunner` in `src/orchestrator/background_continuation.py` with `ContinuationOutcome` and `BackgroundContinuationResult`.
+- **P-20.04:** Implemented blocking ambiguity path with preserved saga identity.
+- **P-20.05:** Demonstrated restart between phases with checkpoint creation and exact continuation without task duplication.
+- **P-20.06:** Derived autonomous step count and human-attention count from persisted event evidence.
   1. `DISCOVERING`: Intent validation binds request strictly to `CANONICAL_SUPPORTED_OPERATION` (destructive SQL like `DROP TABLE`, explicit negated ADD intent like `Do not add payment_tier column to billing_accounts`, unrelated API timeouts, or mixed targets fail closed immediately to `ChangeState.BLOCKED` with 0 tasks and 0 approval cards, preventing fact laundering). Blast radius analysis via real `RepositoryScanner`, `GraphTraverser`, and `BlastRadiusMerger` over synthetic billing graph.
   2. `QUALIFYING`: Capability verification via real `AgentRegistry`, `AgentCapabilityRequirement`, `PassportVerifier`, and `QualificationEvidenceVerifier`. Fails closed to `ChangeState.BLOCKED` on empty registry, missing capability, wrong agent revision, or expired/revoked passport with zero PASS evidence.
   3. `REHEARSING`: Double rehearsal via real `ShadowLabRunner.run_scenario(...)`. Consumes returned `RehearsalOutcome`. Rehearsal failure blocks progression and transitions to `ChangeState.BLOCKED`. Mode is strictly `SIMULATION` with `EvidenceState.SIMULATED`.

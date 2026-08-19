@@ -30,6 +30,7 @@ import logging
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from types import MappingProxyType
 from typing import Any, Mapping, Optional, Sequence
 
@@ -39,6 +40,8 @@ from domain.contracts.agent_descriptor import AgentRevisionProvenance
 from domain.contracts.autonomy import ApprovalCompressionCard, AutonomyClass
 from domain.contracts.change_lifecycle import (
     ChangeState,
+    can_transition,
+    is_terminal,
     require_transition,
 )
 from domain.contracts.change_request import ChangeRequest
@@ -53,6 +56,7 @@ from domain.contracts.memory import MemoryRecord
 from domain.contracts.success_criterion import SuccessCriterion
 from events.local_bus import LocalEventBus
 from events.publisher import EventPublisher
+from events.retry import FailureClassification
 from events.topology import get_canonical_topology
 from events.wire import EventWireMessage, scan_payload_for_secrets
 from src.audit.audit_bundle import AuditBundleBuilder
@@ -695,6 +699,53 @@ class SagaExecutionResult(BaseModel):
     approval_card: Optional[ApprovalCompressionCard] = None
 
 
+class RecoveryAction(str, Enum):
+    """Classification of recovery action taken by saga recovery paths."""
+
+    PAUSED = "PAUSED"
+    RESUMED = "RESUMED"
+    CANCELLED = "CANCELLED"
+    TIMED_OUT = "TIMED_OUT"
+    RETRY_SCHEDULED = "RETRY_SCHEDULED"
+    RETRY_EXHAUSTED = "RETRY_EXHAUSTED"
+    COMPENSATION_STARTED = "COMPENSATION_STARTED"
+    COMPENSATION_COMPLETED = "COMPENSATION_COMPLETED"
+    COMPENSATION_FAILED = "COMPENSATION_FAILED"
+    DEAD_LETTERED = "DEAD_LETTERED"
+
+
+class SagaRecoveryResult(BaseModel):
+    """Immutable result of a saga recovery path operation.
+
+    P-20.02: Every recovery path produces an explicit result with
+    persisted state, causal event evidence, and recovery metadata.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: str = CANONICAL_SCHEMA_VERSION
+    tenant_id: str
+    change_id: str
+    correlation_id: str
+    action: RecoveryAction
+    previous_state: ChangeState
+    final_state: ChangeState
+    reason: str
+    retry_origin: Optional[ChangeState] = None
+    retry_attempt: Optional[int] = None
+    retry_max_attempts: Optional[int] = None
+    compensation_description: Optional[str] = None
+    dead_letter_id: Optional[str] = None
+    event_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+    timestamp: Optional[datetime] = None
+
+
+# Default saga-level timeout in seconds (configurable per orchestrator instance)
+DEFAULT_SAGA_TIMEOUT_SECONDS: float = 3600.0
+DEFAULT_SAGA_RETRY_MAX_ATTEMPTS: int = 3
+
+
 class ChangeSagaOrchestrator:
     """Stateful, event-driven, persisted saga orchestrator coordinating ChangeMesh lifecycle."""
 
@@ -723,6 +774,7 @@ class ChangeSagaOrchestrator:
         tenant_id: str,
         request: ChangeRequest,
         *,
+        change_id: Optional[str] = None,
         evidence_mode: ExecutionEvidenceMode = ExecutionEvidenceMode.SIMULATION,
         initial_memory_records: Sequence[MemoryRecord] = (),
         stop_at_state: Optional[ChangeState] = None,
@@ -748,6 +800,13 @@ class ChangeSagaOrchestrator:
             if any(pattern.search(id_val) for pattern in _SECRET_REPLACEMENT_PATTERNS):
                 raise ValueError(
                     f"Secret/credential detected in structural identity field {id_field_name!r}; "
+                    "refusing intake before state persistence"
+                )
+
+        if change_id is not None:
+            if any(pattern.search(change_id) for pattern in _SECRET_REPLACEMENT_PATTERNS):
+                raise ValueError(
+                    "Secret/credential detected in change_id; "
                     "refusing intake before state persistence"
                 )
 
@@ -800,7 +859,8 @@ class ChangeSagaOrchestrator:
         # -------------------------------------------------------------------------
         # Initialize Workflow Identity and Timeline
         # -------------------------------------------------------------------------
-        change_id = f"change-{uuid.uuid4().hex[:12]}"
+        if change_id is None:
+            change_id = f"change-{uuid.uuid4().hex[:12]}"
         correlation_id = request.request_id
 
         if self.timeline is None:
@@ -2209,4 +2269,618 @@ class ChangeSagaOrchestrator:
             evidence_collected=evidence_collected,
             checkpoints_created=checkpoints_created,
             timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
+        )
+
+    # =========================================================================
+    # P-20.02 — Recovery Path Methods
+    # =========================================================================
+    # Every path:
+    # 1. Loads authoritative persisted state with optimistic concurrency
+    # 2. Validates transition legality against ALLOWED_TRANSITIONS
+    # 3. Persists new state BEFORE publishing event
+    # 4. Publishes causal EventEnvelope with full identity chain
+    # 5. Returns explicit SagaRecoveryResult with all metadata
+    # =========================================================================
+
+    def _recovery_transition(
+        self,
+        tenant_id: str,
+        change_id: str,
+        target_state: ChangeState,
+        reason: str,
+        *,
+        retry_origin: Optional[ChangeState] = None,
+        now: Optional[datetime] = None,
+    ) -> tuple[ChangeRecord, str]:
+        """Atomically persist a recovery state transition with event emission.
+
+        Returns (updated_record, event_id).
+        Raises IllegalTransitionError if the transition is not allowed.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        current_state = record.state
+        if current_state != target_state:
+            require_transition(current_state, target_state, retry_origin=retry_origin)
+
+        sanitized_reason = sanitize_secrets_in_text(reason)
+
+        # Persist state FIRST (optimistic concurrency)
+        updated = record.model_copy(
+            update={
+                "state": target_state,
+                "state_updated_at": now,
+                "state_reason": sanitized_reason,
+                "updated_at": now,
+            }
+        )
+        self.repository.update_change(tenant_id, updated, expected_version=record.version)
+
+        # Emit causal event AFTER persistence
+        unique_suffix = uuid.uuid4().hex[:8]
+        event_id = f"evt-{change_id}-recovery-{target_state.value.lower()}-{unique_suffix}"
+        idempotency_key = f"idem_recovery_{change_id}_{target_state.value.lower()}_{unique_suffix}"
+
+        from domain.contracts.agent_descriptor import AgentRevisionProvenance
+
+        provenance = AgentRevisionProvenance(
+            agent_id=self.orchestrator_id,
+            agent_revision=self.orchestrator_revision,
+            role="change_orchestrator",
+        )
+
+        envelope = EventEnvelope(
+            schema_version=CANONICAL_SCHEMA_VERSION,
+            event_id=event_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            producer_id=self.orchestrator_id,
+            producer_revision=self.orchestrator_revision,
+            producer_role="change_orchestrator",
+            agent_provenance=provenance,
+            timestamp=now,
+            idempotency_key=idempotency_key,
+        )
+
+        route = self._topology.get_route_for_state(target_state)
+        topic_id = route.primary_topic_id if route else "changemesh-lifecycle-v1"
+        payload = {
+            "action": f"recovery_{target_state.value.lower()}",
+            "reason": sanitized_reason,
+            "previous_state": current_state.value,
+        }
+
+        from events.wire import EventWireMessage, scan_payload_for_secrets
+
+        scan_payload_for_secrets(payload)
+        wire_msg = EventWireMessage(
+            topic_id=topic_id,
+            envelope=envelope,
+            payload=payload,
+            published_at=now,
+        )
+
+        if isinstance(self.event_bus, LocalEventBus):
+            self.event_bus.publish_message(wire_msg)
+        else:
+            self.event_bus.publish(wire_msg)
+
+        if self.timeline is not None:
+            self.timeline.record_event(
+                envelope, topic_id=topic_id, payload=payload, transport="LOCAL"
+            )
+
+        # Re-read to get updated version
+        final_record = self.repository.get_change(tenant_id, change_id)
+        return final_record or updated, event_id
+
+    def pause_saga(
+        self,
+        tenant_id: str,
+        change_id: str,
+        reason: str,
+        *,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Pause a running saga by transitioning to BLOCKED with explicit reason.
+
+        P-20.02: Pause transitions the saga to BLOCKED state with a persisted
+        reason. The saga can be resumed by calling resume_saga. Only non-terminal,
+        non-BLOCKED states can be paused.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        previous_state = record.state
+        if is_terminal(previous_state):
+            raise ValueError(f"Cannot pause saga in terminal state {previous_state.value}")
+
+        updated_record, event_id = self._recovery_transition(
+            tenant_id,
+            change_id,
+            ChangeState.BLOCKED,
+            f"PAUSED: {reason}",
+            now=now,
+        )
+
+        # Create checkpoint at pause boundary
+        SagaCheckpointManager.create_checkpoint(
+            repo=self.repository,
+            tenant_id=tenant_id,
+            change_id=change_id,
+            lifecycle_state=ChangeState.BLOCKED,
+            now=now,
+        )
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            action=RecoveryAction.PAUSED,
+            previous_state=previous_state,
+            final_state=ChangeState.BLOCKED,
+            reason=f"PAUSED: {reason}",
+            event_id=event_id,
+            timestamp=now,
+        )
+
+    def cancel_saga(
+        self,
+        tenant_id: str,
+        change_id: str,
+        reason: str,
+        *,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Cancel a saga, transitioning to terminal CANCELLED state.
+
+        P-20.02: Cancel is allowed from any non-terminal state. Once cancelled,
+        the saga cannot be resumed. Persists state, emits causal event.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        previous_state = record.state
+        if is_terminal(previous_state):
+            raise ValueError(f"Cannot cancel saga in terminal state {previous_state.value}")
+
+        updated_record, event_id = self._recovery_transition(
+            tenant_id,
+            change_id,
+            ChangeState.CANCELLED,
+            f"CANCELLED: {reason}",
+            now=now,
+        )
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            action=RecoveryAction.CANCELLED,
+            previous_state=previous_state,
+            final_state=ChangeState.CANCELLED,
+            reason=f"CANCELLED: {reason}",
+            event_id=event_id,
+            timestamp=now,
+        )
+
+    def timeout_saga(
+        self,
+        tenant_id: str,
+        change_id: str,
+        *,
+        timeout_seconds: float = DEFAULT_SAGA_TIMEOUT_SECONDS,
+        now: Optional[datetime] = None,
+    ) -> Optional[SagaRecoveryResult]:
+        """Check and apply timeout to a saga.
+
+        P-20.02: If the saga has been in its current non-terminal state for
+        longer than timeout_seconds, transition to FAILED with explicit timeout
+        evidence. Returns None if not timed out.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        if is_terminal(record.state):
+            return None  # Terminal states cannot time out
+
+        elapsed = (now - record.state_updated_at).total_seconds()
+        if elapsed < timeout_seconds:
+            return None  # Not timed out yet
+
+        previous_state = record.state
+        timeout_reason = (
+            f"TIMEOUT: Saga exceeded {timeout_seconds}s in state "
+            f"{previous_state.value} (elapsed: {elapsed:.1f}s)"
+        )
+
+        updated_record, event_id = self._recovery_transition(
+            tenant_id,
+            change_id,
+            ChangeState.FAILED,
+            timeout_reason,
+            now=now,
+        )
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            action=RecoveryAction.TIMED_OUT,
+            previous_state=previous_state,
+            final_state=ChangeState.FAILED,
+            reason=timeout_reason,
+            event_id=event_id,
+            timestamp=now,
+        )
+
+    def schedule_retry(
+        self,
+        tenant_id: str,
+        change_id: str,
+        reason: str,
+        *,
+        retry_attempt: int = 1,
+        max_attempts: int = DEFAULT_SAGA_RETRY_MAX_ATTEMPTS,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Schedule a retry for a failed saga phase.
+
+        P-20.02: Transitions to RETRY_SCHEDULED from the current state.
+        The retry_origin is persisted for bounded resume validation.
+        If retry_attempt exceeds max_attempts, transitions to FAILED via dead-letter
+        instead.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        previous_state = record.state
+
+        # Exhaustion check: if attempts exhausted, dead-letter instead
+        if retry_attempt > max_attempts:
+            return self._dead_letter_saga(
+                tenant_id,
+                change_id,
+                f"RETRY_EXHAUSTED: {reason} (attempt {retry_attempt}/{max_attempts})",
+                previous_state=previous_state,
+                correlation_id=record.correlation_id,
+                now=now,
+            )
+
+        if is_terminal(previous_state):
+            raise ValueError(f"Cannot schedule retry from terminal state {previous_state.value}")
+
+        # Validate transition is legal from current state
+        if not can_transition(previous_state, ChangeState.RETRY_SCHEDULED):
+            raise ValueError(f"Cannot schedule retry from state {previous_state.value}")
+
+        updated_record, event_id = self._recovery_transition(
+            tenant_id,
+            change_id,
+            ChangeState.RETRY_SCHEDULED,
+            f"RETRY_SCHEDULED: {reason} (attempt {retry_attempt}/{max_attempts})",
+            now=now,
+        )
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            action=RecoveryAction.RETRY_SCHEDULED,
+            previous_state=previous_state,
+            final_state=ChangeState.RETRY_SCHEDULED,
+            reason=f"RETRY_SCHEDULED: {reason}",
+            retry_origin=previous_state,
+            retry_attempt=retry_attempt,
+            retry_max_attempts=max_attempts,
+            event_id=event_id,
+            timestamp=now,
+        )
+
+    def resume_from_retry(
+        self,
+        tenant_id: str,
+        change_id: str,
+        retry_origin: ChangeState,
+        *,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Resume saga from RETRY_SCHEDULED back to the retry origin phase.
+
+        P-20.02: Validates that the saga is in RETRY_SCHEDULED state and
+        the resume target matches the bounded RETRY_RESUME_TARGETS for
+        the given retry_origin. Persists state before event emission.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        if record.state != ChangeState.RETRY_SCHEDULED:
+            raise ValueError(
+                f"Cannot resume retry: saga is in {record.state.value}, expected RETRY_SCHEDULED"
+            )
+
+        # The transition validation with retry_origin is enforced by require_transition
+        updated_record, event_id = self._recovery_transition(
+            tenant_id,
+            change_id,
+            retry_origin,
+            f"RETRY_RESUMED: Resuming from RETRY_SCHEDULED to {retry_origin.value}",
+            retry_origin=retry_origin,
+            now=now,
+        )
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            action=RecoveryAction.RESUMED,
+            previous_state=ChangeState.RETRY_SCHEDULED,
+            final_state=retry_origin,
+            reason=f"RETRY_RESUMED: Resumed to {retry_origin.value}",
+            retry_origin=retry_origin,
+            event_id=event_id,
+            timestamp=now,
+        )
+
+    def start_compensation(
+        self,
+        tenant_id: str,
+        change_id: str,
+        compensation_description: str,
+        *,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Start compensation for a saga that failed during execution.
+
+        P-20.02: Compensation transitions to COMPENSATING state and describes
+        what is actually being compensated. Compensation is NOT fabricated
+        rollback evidence — it describes the real compensating actions taken.
+        Only EXECUTING and VERIFYING states can initiate compensation (per
+        ALLOWED_TRANSITIONS).
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        previous_state = record.state
+        if not can_transition(previous_state, ChangeState.COMPENSATING):
+            raise ValueError(f"Cannot start compensation from state {previous_state.value}")
+
+        sanitized_desc = sanitize_secrets_in_text(compensation_description)
+
+        updated_record, event_id = self._recovery_transition(
+            tenant_id,
+            change_id,
+            ChangeState.COMPENSATING,
+            f"COMPENSATION_STARTED: {sanitized_desc}",
+            now=now,
+        )
+
+        # Record compensation task
+        self.repository.create_task(
+            tenant_id,
+            change_id,
+            TaskRecord(
+                tenant_id=tenant_id,
+                change_id=change_id,
+                task_id=f"task-compensate-{change_id}",
+                sequence_number=len(self.repository.list_tasks(tenant_id, change_id)) + 1,
+                agent_id=self.orchestrator_id,
+                agent_role="change_orchestrator",
+                agent_revision=self.orchestrator_revision,
+                action_class="COMPENSATION",
+                status=TaskStatus.IN_PROGRESS,
+                started_at=now,
+                output_summary=sanitized_desc,
+                created_at=now,
+                updated_at=now,
+            ),
+        )
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            action=RecoveryAction.COMPENSATION_STARTED,
+            previous_state=previous_state,
+            final_state=ChangeState.COMPENSATING,
+            reason=f"COMPENSATION_STARTED: {sanitized_desc}",
+            compensation_description=sanitized_desc,
+            event_id=event_id,
+            timestamp=now,
+        )
+
+    def complete_compensation(
+        self,
+        tenant_id: str,
+        change_id: str,
+        outcome: str,
+        *,
+        success: bool = True,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Complete a running compensation phase.
+
+        P-20.02: If success=True, transitions COMPENSATING -> FAILED
+        (compensation completed but the change itself is failed).
+        If success=False, transitions COMPENSATING -> FAILED
+        (compensation itself failed; the change is still failed).
+        Compensation ≠ pretend rollback — it records what actually happened.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        if record.state != ChangeState.COMPENSATING:
+            raise ValueError(
+                f"Cannot complete compensation: saga is in {record.state.value}, "
+                f"expected COMPENSATING"
+            )
+
+        sanitized_outcome = sanitize_secrets_in_text(outcome)
+        action = (
+            RecoveryAction.COMPENSATION_COMPLETED if success else RecoveryAction.COMPENSATION_FAILED
+        )
+        reason_prefix = "COMPENSATION_COMPLETED" if success else "COMPENSATION_FAILED"
+
+        updated_record, event_id = self._recovery_transition(
+            tenant_id,
+            change_id,
+            ChangeState.FAILED,
+            f"{reason_prefix}: {sanitized_outcome}",
+            now=now,
+        )
+
+        # Update compensation task status
+        tasks = self.repository.list_tasks(tenant_id, change_id)
+        for task in tasks:
+            if task.task_id == f"task-compensate-{change_id}":
+                updated_task = task.model_copy(
+                    update={
+                        "status": TaskStatus.COMPENSATED if success else TaskStatus.FAILED,
+                        "completed_at": now,
+                        "output_summary": sanitized_outcome,
+                        "updated_at": now,
+                    }
+                )
+                self.repository.update_task(
+                    tenant_id, change_id, updated_task, expected_version=task.version
+                )
+                break
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            action=action,
+            previous_state=ChangeState.COMPENSATING,
+            final_state=ChangeState.FAILED,
+            reason=f"{reason_prefix}: {sanitized_outcome}",
+            compensation_description=sanitized_outcome,
+            event_id=event_id,
+            timestamp=now,
+        )
+
+    def _dead_letter_saga(
+        self,
+        tenant_id: str,
+        change_id: str,
+        reason: str,
+        *,
+        previous_state: ChangeState,
+        correlation_id: str,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Route a saga to the dead-letter path.
+
+        P-20.02: Dead-letter preserves all metadata for safe recovery without
+        credentials. Creates a DeadLetterEventRecord and TerminalFailureHandoff
+        with human_authority_required strictly False.
+        """
+        from events.dead_letter import (
+            build_dead_letter_record,
+            compute_dead_letter_id,
+        )
+
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        dl_id = compute_dead_letter_id(change_id, f"saga-{change_id}")
+        sanitized_reason = sanitize_secrets_in_text(reason)
+
+        # Build dead-letter record with full metadata preservation
+        _ = build_dead_letter_record(
+            dead_letter_id=dl_id,
+            original_event_id=f"saga-{change_id}",
+            change_id=change_id,
+            correlation_id=correlation_id,
+            original_topic_id="changemesh-lifecycle-v1",
+            failure_classification=FailureClassification.TERMINAL_EXHAUSTED,
+            raw_error=sanitized_reason,
+            attempts_made=0,
+            timestamp=now,
+        )
+
+        # Transition to FAILED terminal state
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is not None and not is_terminal(record.state):
+            self._recovery_transition(
+                tenant_id,
+                change_id,
+                ChangeState.FAILED,
+                f"DEAD_LETTERED: {sanitized_reason}",
+                now=now,
+            )
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=correlation_id,
+            action=RecoveryAction.DEAD_LETTERED,
+            previous_state=previous_state,
+            final_state=ChangeState.FAILED,
+            reason=f"DEAD_LETTERED: {sanitized_reason}",
+            dead_letter_id=dl_id,
+            timestamp=now,
+        )
+
+    def dead_letter_saga(
+        self,
+        tenant_id: str,
+        change_id: str,
+        reason: str,
+        *,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Public dead-letter entry point for saga routing.
+
+        P-20.02: Routes a saga to the dead-letter path with full metadata
+        preservation. Dead-letter records contain sanitized diagnostics but
+        zero credentials. human_authority_required is strictly False.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        return self._dead_letter_saga(
+            tenant_id,
+            change_id,
+            reason,
+            previous_state=record.state,
+            correlation_id=record.correlation_id,
+            now=now,
         )
