@@ -188,7 +188,7 @@ last_reviewed: '2026-08-09T10:20:00Z'
 
 ```yaml
 component_id: UIPATH-STATE-001
-status: VERIFIED
+status: IMPLEMENTED_PENDING_PARITY
 donor_id: D-UIPATH
 repository: zyganali-glitch/universal-agent-os-uipath
 source_commit: dc2267939c2aef0aba2737da65f53352c5cf8fb2
@@ -217,7 +217,7 @@ required_tests:
 - compensation
 - no UiPath dependency carry-over
 - unauthorized state transition (security test)
-competition_introduction_commit: 4b66d381e7d8aaae1616cb62d34452fb11d15b32
+competition_introduction_commit: 9c95018d5e0de0924aac7f2a797ee8ef8e7eb54d
 evidence:
 - source inspection
 - P-04.00 architecture preflight PASS

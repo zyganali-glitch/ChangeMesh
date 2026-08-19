@@ -279,10 +279,10 @@ def test_p20_01_secret_minimization_and_adversarial_credential_sanitization(
     adversarial_request = ChangeRequest(
         schema_version="1.0.0",
         request_id="req-p20-adv-001",
-        title=f"Add column {dummy_gh_token} token in title",
+        title=f"Add column payment_tier {dummy_gh_token} token in title",
         description=(
             f"Adversarial request with {bearer_token} "
-            f"and password='{raw_password}' to table billing_accounts"
+            f"and password='{raw_password}' to table billing_accounts for payment_tier column"
         ),
         target_systems=["billing-db"],
         data_classification=DataClassLevel.INTERNAL,
@@ -895,3 +895,273 @@ def test_p20_01_deterministic_state_override_prevention(
     assert recon.disagreement_detected is True
     assert recon.authority_of_deterministic == "DETERMINISTIC_CODE"
     assert recon.authority_of_semantic == "GEMINI_SEMANTIC_JUDGMENT"
+
+
+def test_p20_01_intent_validation_rejects_unrelated_api_timeout(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify unrelated API timeout modification fails closed at intake."""
+    req = sample_change_request.model_copy(
+        update={
+            "title": "Increase billing API timeout",
+            "description": "Increase timeout for billing API endpoint to 60s",
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=req)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "UNSUPPORTED_OPERATION" in (result.stopped_reason or "")
+    assert len(repo.list_tasks("tenant-prod-alpha", result.change_id)) == 0
+    assert repo.list_approvals("tenant-prod-alpha", result.change_id) == []
+
+
+def test_p20_01_intent_validation_rejects_unrelated_schema_operation(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify unrelated schema operation (different table/column) fails closed at intake."""
+    req = sample_change_request.model_copy(
+        update={
+            "title": "Add discount_code column to invoices table",
+            "description": "ALTER TABLE invoices ADD COLUMN discount_code VARCHAR(32);",
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=req)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "UNSUPPORTED_OPERATION" in (result.stopped_reason or "")
+
+
+def test_p20_01_intent_validation_rejects_mixed_targets(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify mixed target systems (one valid, one unauthorized) fail closed at intake."""
+    req = sample_change_request.model_copy(
+        update={"target_systems": ["billing-db", "prod-payroll"]}
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=req)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert "unsupported targets" in (result.stopped_reason or "").lower()
+    assert "prod-payroll" in (result.stopped_reason or "")
+
+
+def test_p20_01_verification_fails_on_unprovable_production_deployment_criterion(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify saga fails at Stage 7 (VERIFYING -> FAILED) on unprovable prod deployment."""
+    unprovable_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-prod-deploy",
+                    description="Real production deployment completed to live cluster",
+                    verification_method="deterministic",
+                    required_evidence_types=["PRODUCTION_DEPLOYMENT"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=unprovable_request)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+    assert result.checkpoints_created == 0
+    persisted = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted is not None
+    assert persisted.state == ChangeState.FAILED
+
+
+def test_p20_01_verification_fails_on_unprovable_live_write_mutation_criterion(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify saga fails at Stage 7 when criterion requires live write provider mutation."""
+    unprovable_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-live-write",
+                    description="Live write provider mutation committed to remote GitHub repo",
+                    verification_method="deterministic",
+                    required_evidence_types=["LIVE_WRITE"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=unprovable_request)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+
+
+def test_p20_01_verification_fails_on_absent_evidence_type(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify saga fails at Stage 7 when criterion requires an evidence type absent here."""
+    absent_ev_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-external-telemetry",
+                    description="External telemetry stream verified",
+                    verification_method="deterministic",
+                    required_evidence_types=["EXTERNAL_TELEMETRY"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=absent_ev_request)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+
+
+def test_p20_01_verification_fails_on_unsupported_manual_method(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify saga fails at Stage 7 when criterion specifies unsupported manual method."""
+    manual_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-manual-signoff",
+                    description="Manual human sign-off completed",
+                    verification_method="manual",
+                    required_evidence_types=["REHEARSAL_SIMULATION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=manual_request)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+    assert "manual" in (result.stopped_reason or "").lower()
+
+
+def test_p20_01_mode_honesty_rejects_recorded_cloud(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify RECORDED_CLOUD mode is rejected before state persistence on local saga."""
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+
+    with pytest.raises(ValueError, match="RECORDED_CLOUD mode cannot be claimed"):
+        orchestrator.run_saga(
+            tenant_id="tenant-prod-alpha",
+            request=sample_change_request,
+            evidence_mode=ExecutionEvidenceMode.RECORDED_CLOUD,
+        )
+
+    assert repo.list_changes("tenant-prod-alpha") == []
+    assert len(bus.published_history) == 0
+
+
+def test_p20_01_intake_secret_in_tenant_id_fails_closed(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify secret token pattern in tenant_id raises ValueError before state persistence."""
+    gh_prefix = "ghp_"
+    dummy_secret = gh_prefix + ("1234567890abcdef" * 3)[:36]
+
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    with pytest.raises(ValueError, match="Secret/credential detected in tenant_id"):
+        orchestrator.run_saga(
+            tenant_id=f"tenant-{dummy_secret}",
+            request=sample_change_request,
+        )
+
+    assert len(bus.published_history) == 0
+
+
+def test_p20_01_intake_secret_in_criterion_structural_fields_fails_closed(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify secret pattern in criterion structural fields raises ValueError at intake."""
+    gh_prefix = "ghp_"
+    dummy_secret = gh_prefix + ("1234567890abcdef" * 3)[:36]
+
+    bad_crit_id_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id=f"crit-{dummy_secret}",
+                    description="Valid description",
+                    verification_method="deterministic",
+                    required_evidence_types=["REHEARSAL_SIMULATION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    with pytest.raises(ValueError, match="Secret/credential detected in success criterion"):
+        orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=bad_crit_id_request)
+
+    bad_ev_type_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-01",
+                    description="Valid description",
+                    verification_method="deterministic",
+                    required_evidence_types=[f"EVID-{dummy_secret}"],
+                )
+            ]
+        }
+    )
+    with pytest.raises(ValueError, match="Secret/credential detected in success criterion"):
+        orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=bad_ev_type_request)
+
+    assert repo.list_changes("tenant-prod-alpha") == []
+    assert len(bus.published_history) == 0
+
+
+def test_p20_01_secret_in_criterion_description_is_sanitized(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify secret in criterion description is sanitized with [REDACTED] in audit claims."""
+    gh_prefix = "ghp_"
+    dummy_secret = gh_prefix + ("1234567890abcdef" * 3)[:36]
+
+    secret_crit_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-01",
+                    description=f"Rehearsal succeeds with token {dummy_secret}",
+                    verification_method="deterministic",
+                    required_evidence_types=["REHEARSAL_SIMULATION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=secret_crit_request)
+
+    assert result.is_completed is True
+    # Verify raw secret never appears in any task summary or wire message
+    for msg in bus.published_history:
+        assert dummy_secret not in msg.to_bytes().decode("utf-8")
+    for task in repo.list_tasks("tenant-prod-alpha", result.change_id):
+        assert dummy_secret not in str(task.output_summary)

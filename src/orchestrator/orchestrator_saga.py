@@ -49,12 +49,13 @@ from domain.contracts.evidence import (
     ExecutionEvidenceMode,
 )
 from domain.contracts.memory import MemoryRecord
+from domain.contracts.success_criterion import SuccessCriterion
 from events.local_bus import LocalEventBus
 from events.publisher import EventPublisher
 from events.topology import get_canonical_topology
 from events.wire import EventWireMessage, scan_payload_for_secrets
 from src.audit.audit_bundle import AuditBundleBuilder
-from src.audit.claim_derivation import ClaimDerivationEngine
+from src.audit.claim_derivation import ClaimDerivationEngine, ClaimType, NeutralClaim
 from src.audit.reconciliation import DeterministicReconciler
 from src.audit.semantic_auditor import SemanticAuditor
 from src.evidence.pubsub_timeline import CausalEventTimeline
@@ -147,16 +148,56 @@ def sanitize_secrets_in_text(text: str) -> str:
     return result
 
 
+class SupportedBillingOperation(BaseModel):
+    """Canonical specification of the supported synthetic additive billing migration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation_name: str = "ADD_COLUMN_PAYMENT_TIER"
+    allowed_targets: tuple[str, ...] = (
+        "billing-db",
+        "payment-service",
+        "billing_db",
+        "billing-api",
+    )
+    table_name: str = "billing_accounts"
+    column_name: str = "payment_tier"
+    column_type: str = "VARCHAR(32)"
+    source_schema: str = "billing_accounts_v1"
+    target_schema: str = "billing_accounts_v2"
+    sql_up: str = "ALTER TABLE billing_accounts ADD COLUMN payment_tier VARCHAR(32);"
+    sql_down: str = "ALTER TABLE billing_accounts DROP COLUMN payment_tier;"
+    migration_file: str = "migrations/001_add_billing_column.sql"
+    supporting_files: tuple[str, ...] = (
+        "migrations/001_add_billing_column.sql",
+        "src/billing/service.py",
+        "schema/billing.sql",
+    )
+    impacted_node_ids: tuple[str, ...] = ("billing-migration-001", "invoice-schema")
+
+
+CANONICAL_SUPPORTED_OPERATION = SupportedBillingOperation()
+
+
 def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]:
     """Validate that the incoming ChangeRequest matches the supported synthetic billing operation.
 
-    If the request describes an unsupported, destructive, or unrelated operation (e.g. DROP TABLE),
-    fails closed immediately to prevent executing an unrelated fixture (fact laundering).
+    Fails closed immediately if the request targets unsupported systems, describes
+    destructive actions, unrelated schema/API/config modifications, or fails to match
+    the canonical synthetic payment_tier addition on billing_accounts.
     """
-    allowed_targets = {"billing-db", "payment-service", "billing_db", "billing-api"}
     req_targets = set(request.target_systems)
-    if not req_targets or not req_targets.intersection(allowed_targets):
-        return False, "Target systems do not match supported synthetic billing targets"
+    if not req_targets:
+        return False, "Target systems cannot be empty"
+
+    allowed = set(CANONICAL_SUPPORTED_OPERATION.allowed_targets)
+    if not req_targets.issubset(allowed):
+        unsupported = sorted(list(req_targets - allowed))
+        return (
+            False,
+            f"Target systems contain unsupported targets: {unsupported}. "
+            f"All requested targets must belong to supported set: {sorted(list(allowed))}",
+        )
 
     text = (request.title + " " + request.description).lower()
 
@@ -169,27 +210,62 @@ def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]
         "truncate",
         "drop schema",
         "drop view",
+        "alter table drop",
     ]
     for kw in destructive_keywords:
         if kw in text:
-            msg = (
-                f"Destructive operation {kw.upper()!r} is not supported in additive billing fixture"
+            return (
+                False,
+                (
+                    f"Destructive operation {kw.upper()!r} is not supported in "
+                    "additive billing fixture"
+                ),
             )
-            return False, msg
 
-    # Check if it matches supported additive billing migration
-    supported_indicators = [
-        "payment_tier",
-        "add column",
-        "billing_accounts",
-        "billing",
-        "additive",
-        "tier",
+    # Reject unrelated configuration, API, timeout, indexing, or distinct domain operations
+    unrelated_keywords = [
+        "timeout",
+        "api timeout",
+        "connection pool",
+        "rename table",
+        "rename column",
+        "cache",
+        "endpoint",
+        "discount_code",
+        "discount",
+        "tax_rate",
+        "payroll",
+        "invoice",
+        "customer_id",
+        "user_table",
+        "index",
     ]
-    if not any(ind in text for ind in supported_indicators):
+    for kw in unrelated_keywords:
+        if kw in text:
+            return (
+                False,
+                (
+                    f"Unrelated operation/configuration {kw!r} is not supported in "
+                    "additive billing fixture"
+                ),
+            )
+
+    # Require explicit table and column match for the supported bounded operation
+    table_match = (
+        "billing_accounts" in text or "billing accounts" in text or "billing account" in text
+    )
+    column_match = "payment_tier" in text or "payment tier" in text
+    action_match = any(
+        act in text
+        for act in ["add", "add column", "alter table", "column addition", "migration", "additive"]
+    )
+
+    if not (table_match and column_match and action_match):
         return (
             False,
-            "Change request intent does not match supported synthetic billing migration fixture",
+            "Change request intent does not match supported additive billing migration "
+            f"(table: {CANONICAL_SUPPORTED_OPERATION.table_name}, "
+            f"column: {CANONICAL_SUPPORTED_OPERATION.column_name})",
         )
 
     return True, ""
@@ -320,11 +396,15 @@ class ChangeSagaOrchestrator:
         """Execute the end-to-end ChangeMesh lifecycle saga synchronously and deterministically."""
         if now is None:
             now = datetime.now(timezone.utc)
-        tid = validate_tenant_id(tenant_id)
-
         # -------------------------------------------------------------------------
         # Pre-Persistence Intake Secret Boundary (Fail Closed on Credentials in Identity/Structure)
         # -------------------------------------------------------------------------
+        if any(pattern.search(tenant_id) for pattern in _SECRET_REPLACEMENT_PATTERNS):
+            raise ValueError(
+                "Secret/credential detected in tenant_id; refusing intake before state persistence"
+            )
+        tid = validate_tenant_id(tenant_id)
+
         for id_field_name, id_val in [
             ("request_id", request.request_id),
             ("requested_by", request.requested_by),
@@ -342,11 +422,30 @@ class ChangeSagaOrchestrator:
                     "refusing intake before state persistence"
                 )
 
-        # Enforce Mode Honesty: Local saga operations cannot be LIVE_WRITE without provider write
-        if evidence_mode == ExecutionEvidenceMode.LIVE_WRITE:
+        for crit in request.success_criteria:
+            for crit_field_name, crit_val in [
+                ("criterion_id", crit.criterion_id),
+                ("verification_method", crit.verification_method),
+            ]:
+                if any(pattern.search(crit_val) for pattern in _SECRET_REPLACEMENT_PATTERNS):
+                    raise ValueError(
+                        "Secret/credential detected in success criterion structural field "
+                        f"{crit_field_name!r}; refusing intake before state persistence"
+                    )
+            for ev_type in crit.required_evidence_types:
+                if any(pattern.search(ev_type) for pattern in _SECRET_REPLACEMENT_PATTERNS):
+                    raise ValueError(
+                        "Secret/credential detected in success criterion required_evidence_types; "
+                        "refusing intake before state persistence"
+                    )
+
+        # Enforce Mode Honesty: Local saga operations support only FIXTURE or SIMULATION
+        if evidence_mode not in (ExecutionEvidenceMode.FIXTURE, ExecutionEvidenceMode.SIMULATION):
             raise ValueError(
-                "LIVE_WRITE mode cannot be claimed for local saga execution without real "
-                "credential-backed external provider mutation"
+                f"{evidence_mode.value} mode cannot be claimed for local saga execution. "
+                "Local saga supports only FIXTURE or SIMULATION modes; LIVE_WRITE requires real "
+                "credential-backed provider mutations, and RECORDED_CLOUD requires an "
+                "authenticated canonical replay provenance artifact."
             )
 
         # -------------------------------------------------------------------------
@@ -579,19 +678,15 @@ class ChangeSagaOrchestrator:
         # Execute Impact Scout Discovery via real RepositoryScanner and GraphTraverser
         scanner = RepositoryScanner()
         scan_findings = scanner.scan_files(
-            changed_files=["migrations/001_add_billing_column.sql"],
-            all_files=[
-                "migrations/001_add_billing_column.sql",
-                "src/billing/service.py",
-                "schema/billing.sql",
-            ],
+            changed_files=[CANONICAL_SUPPORTED_OPERATION.migration_file],
+            all_files=list(CANONICAL_SUPPORTED_OPERATION.supporting_files),
         )
 
         graph = build_synthetic_billing_graph()
         traverser = GraphTraverser()
         impacted_assets = tuple(
             traverser.find_downstream_impact(
-                graph, changed_node_ids={"billing-migration-001", "invoice-schema"}
+                graph, changed_node_ids=set(CANONICAL_SUPPORTED_OPERATION.impacted_node_ids)
             )
         )
 
@@ -915,9 +1010,9 @@ class ChangeSagaOrchestrator:
         # Evaluate Deterministic Policy Pre-checks
         policy_checker = DeterministicPolicyChecker()
         policy_res = policy_checker.evaluate(
-            input_text="ALTER TABLE billing_accounts ADD COLUMN payment_tier VARCHAR(32);",
+            input_text=CANONICAL_SUPPORTED_OPERATION.sql_up,
             tool_ids=["tool-migration-planner", "tool-artifact-generator"],
-            target_paths=["synthetic/migrations/001_add_billing_column.sql"],
+            target_paths=[f"synthetic/{CANONICAL_SUPPORTED_OPERATION.migration_file}"],
             action_type="SCHEMA_MIGRATION",
             data_classification=request.data_classification.value,
             change_id=change_id,
@@ -1013,8 +1108,8 @@ class ChangeSagaOrchestrator:
         # STAGE 5: Authorize (AUTHORIZED / AWAITING_AUTHORITY / BLOCKED)
         # -------------------------------------------------------------------------
         # Determine Reversibility Classification deterministically (zero caller overrides)
-        sample_sql_up = "ALTER TABLE billing_accounts ADD COLUMN payment_tier VARCHAR(32);"
-        sample_sql_down = "ALTER TABLE billing_accounts DROP COLUMN payment_tier;"
+        sample_sql_up = CANONICAL_SUPPORTED_OPERATION.sql_up
+        sample_sql_down = CANONICAL_SUPPORTED_OPERATION.sql_down
         blast_score = (
             min(1.0, len(blast_radius_artifact.impacted_assets) * 0.1)
             if blast_radius_artifact.impacted_assets
@@ -1235,10 +1330,10 @@ class ChangeSagaOrchestrator:
         mig_gen = MigrationPlanGenerator()
         mig_plan = mig_gen.generate_plan(
             change_id=change_id,
-            source_schema="billing_accounts_v1",
-            target_schema="billing_accounts_v2",
-            column_additions=["payment_tier"],
-            table_name="billing_accounts",
+            source_schema=CANONICAL_SUPPORTED_OPERATION.source_schema,
+            target_schema=CANONICAL_SUPPORTED_OPERATION.target_schema,
+            column_additions=[CANONICAL_SUPPORTED_OPERATION.column_name],
+            table_name=CANONICAL_SUPPORTED_OPERATION.table_name,
         )
 
         manifest_gen = ManifestGenerator()
@@ -1246,9 +1341,7 @@ class ChangeSagaOrchestrator:
             change_id=change_id,
             plan_id=mig_plan.plan_id,
             file_contents={
-                "migrations/001_add_billing_column.sql": (
-                    "ALTER TABLE billing_accounts ADD COLUMN payment_tier VARCHAR(32);"
-                )
+                CANONICAL_SUPPORTED_OPERATION.migration_file: (CANONICAL_SUPPORTED_OPERATION.sql_up)
             },
         )
 
@@ -1327,53 +1420,251 @@ class ChangeSagaOrchestrator:
             payload_summary={"action": "audit_and_reconcile"},
         )
 
-        # Derive Claims & Build Audit Bundle from request success criteria
-        claim_engine = ClaimDerivationEngine()
+        # Catalog produced evidence records from earlier stages in this run
+        produced_evidence_catalog: dict[str, dict[str, Any]] = {
+            f"ev-discover-{change_id}": {
+                "types": frozenset(
+                    {
+                        "BLAST_RADIUS_ANALYSIS",
+                        "BLAST_RADIUS_ESTIMATION",
+                        "AST_STATIC_ANALYSIS",
+                        "DISCOVERY",
+                    }
+                ),
+                "state": EvidenceState.PASS,
+                "summary": (
+                    f"Blast radius calculated: "
+                    f"{len(blast_radius_artifact.impacted_assets)} assets"
+                ),
+            },
+            f"ev-qualify-{change_id}": {
+                "types": frozenset(
+                    {"CAPABILITY_QUALIFICATION", "AGENT_QUALIFICATION", "PASSPORT_VERIFICATION"}
+                ),
+                "state": EvidenceState.PASS,
+                "summary": f"Verified qualifications for {verified_role_count} agent roles",
+            },
+            f"ev-rehearse-{change_id}": {
+                "types": frozenset({"REHEARSAL_SIMULATION", "SHADOWLAB_REHEARSAL", "REHEARSAL"}),
+                "state": rehearsal_outcome.evidence_state,
+                "summary": (
+                    f"Rehearsal outcome: {rehearsal_outcome.evidence_state.value} "
+                    f"with digest {rehearsal_outcome.evidence_digest}"
+                ),
+            },
+            f"ev-ground-{change_id}": {
+                "types": frozenset({"EPISTEMIC_GROUNDING", "POLICY_PRECHECK", "GROUNDING"}),
+                "state": EvidenceState.PASS,
+                "summary": (
+                    f"Epistemic grounding complete: "
+                    f"{len(trusted_memory_refs)} trusted memory refs"
+                ),
+            },
+            f"ev-execute-{change_id}": {
+                "types": frozenset(
+                    {
+                        "MIGRATION_EXECUTION",
+                        "MIGRATION_SYNTHESIS",
+                        "DETERMINISTIC_MANIFEST",
+                        "MANIFEST_GENERATION",
+                        "ARTIFACT_GENERATION",
+                    }
+                ),
+                "state": EvidenceState.PASS,
+                "summary": f"Execution manifest: Valid SHA-256 hash {file_manifest.manifest_hash}",
+            },
+        }
+
+        # Effective criteria: from request or standard defaults
         if request.success_criteria:
-            criteria_inputs = [
-                {"id": crit.criterion_id, "statement": crit.description}
-                for crit in request.success_criteria
-            ]
+            effective_criteria = list(request.success_criteria)
         else:
-            criteria_inputs = [
-                {"id": "crit-01", "statement": "Rehearsal completed with zero unhandled faults."},
-                {
-                    "id": "crit-02",
-                    "statement": "Migration manifest contains deterministic file hashes.",
-                },
+            effective_criteria = [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-rehearsal",
+                    description="Rehearsal completed with zero unhandled faults.",
+                    verification_method="deterministic",
+                    required_evidence_types=["REHEARSAL_SIMULATION"],
+                ),
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-manifest",
+                    description="Migration manifest contains deterministic file hashes.",
+                    verification_method="deterministic",
+                    required_evidence_types=["MIGRATION_EXECUTION"],
+                ),
             ]
-        claims = claim_engine.derive_claims(
-            success_criteria=criteria_inputs,
-            evidence_refs=[f"ev-rehearse-{change_id}", f"ev-execute-{change_id}"],
-        )
+
+        supported_methods = frozenset({"deterministic", "automated", "semantic", "model_assisted"})
+        criterion_deterministic_state: dict[str, str] = {}
+        criterion_bound_evidence: dict[str, list[str]] = {}
+        verification_failures: list[str] = []
+
+        for crit in effective_criteria:
+            bound_keys: list[str] = []
+            method = crit.verification_method.strip().lower()
+            crit_failed = False
+            crit_reasons: list[str] = []
+
+            if method not in supported_methods:
+                crit_failed = True
+                crit_reasons.append(
+                    f"Verification method {crit.verification_method!r} is not supported "
+                    "by automated saga runtime"
+                )
+
+            desc_lower = crit.description.lower()
+            if any(
+                term in desc_lower
+                for term in [
+                    "production deployment",
+                    "live write",
+                    "live_write",
+                    "provider mutation",
+                    "real deployment",
+                ]
+            ):
+                crit_failed = True
+                crit_reasons.append(
+                    "Criterion requires live production/provider action not satisfied "
+                    "by local simulation run"
+                )
+
+            # Match required evidence types against produced evidence catalog
+            for req_type in crit.required_evidence_types:
+                matched_key: Optional[str] = None
+                for ev_key, ev_info in produced_evidence_catalog.items():
+                    if req_type in ev_info["types"] or req_type.upper() in ev_info["types"]:
+                        matched_key = ev_key
+                        break
+                if matched_key is not None:
+                    if matched_key not in bound_keys:
+                        bound_keys.append(matched_key)
+                    ev_state = produced_evidence_catalog[matched_key]["state"]
+                    if ev_state not in (EvidenceState.PASS, EvidenceState.SIMULATED):
+                        crit_failed = True
+                        crit_reasons.append(
+                            f"Matched evidence {matched_key} has non-passing state: "
+                            f"{ev_state.value}"
+                        )
+                else:
+                    crit_failed = True
+                    crit_reasons.append(
+                        f"Required evidence type {req_type!r} was not produced by this run"
+                    )
+
+            if not bound_keys and not crit_failed:
+                crit_failed = True
+                crit_reasons.append("No capable evidence records could be bound to criterion")
+
+            criterion_bound_evidence[crit.criterion_id] = bound_keys
+            if crit_failed:
+                criterion_deterministic_state[crit.criterion_id] = "FAIL"
+                verification_failures.extend([f"[{crit.criterion_id}] {r}" for r in crit_reasons])
+            else:
+                criterion_deterministic_state[crit.criterion_id] = "PASS"
+
+        # Build NeutralClaims with ONLY bound evidence keys
+        claims_list = []
+        evidence_store_for_bundle: dict[str, str] = {}
+        for i, crit in enumerate(effective_criteria):
+            bound_keys = criterion_bound_evidence[crit.criterion_id]
+            for k in bound_keys:
+                if k in produced_evidence_catalog:
+                    evidence_store_for_bundle[k] = produced_evidence_catalog[k]["summary"]
+            claims_list.append(
+                NeutralClaim(
+                    claim_id=f"claim_{i}",
+                    claim_type=ClaimType.MISSION_CLAIM,
+                    statement=sanitize_secrets_in_text(crit.description),
+                    evidence_keys=tuple(bound_keys),
+                    source_criterion_id=crit.criterion_id,
+                )
+            )
+
+        claims = tuple(claims_list)
+        claim_engine = ClaimDerivationEngine()
+        violations = claim_engine.validate_neutrality(claims)
+        if violations:
+            raise ValueError(f"Claim neutrality violations detected: {violations}")
 
         bundle_builder = AuditBundleBuilder()
         audit_bundle = bundle_builder.build_bundle(
             change_id=change_id,
             claims=claims,
-            evidence_store={
-                f"ev-rehearse-{change_id}": (
-                    f"Rehearsal outcome: {rehearsal_outcome.evidence_state.value} "
-                    f"with digest {rehearsal_outcome.evidence_digest}"
-                ),
-                f"ev-execute-{change_id}": (
-                    f"Execution manifest: Valid SHA-256 hash {file_manifest.manifest_hash}"
-                ),
-            },
+            evidence_store=evidence_store_for_bundle,
         )
 
         auditor = SemanticAuditor()
         audit_report = auditor.audit_claims(audit_bundle, use_live_gemini=False)
 
         reconciler = DeterministicReconciler()
-        for res in audit_report.results:
+        reconciliation_results = []
+        for i, res in enumerate(audit_report.results):
+            crit = effective_criteria[i]
+            det_state = criterion_deterministic_state[crit.criterion_id]
             recon_res = reconciler.reconcile(
                 audit_result=res,
-                deterministic_state="PASS",
+                deterministic_state=det_state,
                 change_id=change_id,
             )
             if not recon_res.deterministic_state_preserved:
                 raise ValueError("Semantic audit failed to preserve deterministic state!")
+            reconciliation_results.append(recon_res)
+
+        # Check if verification passed
+        if verification_failures:
+            failure_summary = "; ".join(verification_failures)
+            transition_and_persist(
+                target_state=ChangeState.FAILED,
+                reason=f"Verification failed: {failure_summary}",
+                producer_id="agent-evidence-auditor",
+                producer_role="evidence_auditor",
+                producer_revision="1.0.0",
+                payload_summary={
+                    "action": "verification_failed",
+                    "failures": verification_failures,
+                    "supports_count": audit_report.supports_count,
+                    "insufficient_count": audit_report.insufficient_count,
+                },
+            )
+            tasks_executed += 1
+            self.repository.create_task(
+                tid,
+                change_id,
+                TaskRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    task_id=f"task-verify-{change_id}",
+                    sequence_number=tasks_executed,
+                    agent_id="agent-evidence-auditor",
+                    agent_role="evidence_auditor",
+                    agent_revision="1.0.0",
+                    action_class="EVIDENCE_AUDIT_RECONCILIATION",
+                    status=TaskStatus.FAILED,
+                    started_at=now,
+                    completed_at=now,
+                    output_summary=f"Verification FAILED: {failure_summary}",
+                    created_at=now,
+                    updated_at=now,
+                ),
+            )
+            return SagaExecutionResult(
+                tenant_id=tid,
+                change_id=change_id,
+                correlation_id=correlation_id,
+                initial_state=ChangeState.RECEIVED,
+                final_state=ChangeState.FAILED,
+                is_completed=False,
+                autonomy_class=active_autonomy_class,
+                stopped_reason=f"VERIFICATION_FAILED: {failure_summary}",
+                events_emitted=events_emitted,
+                tasks_executed=tasks_executed,
+                evidence_collected=evidence_collected,
+                checkpoints_created=checkpoints_created,
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
+            )
 
         tasks_executed += 1
         self.repository.create_task(

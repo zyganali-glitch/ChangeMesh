@@ -68,15 +68,15 @@ ChangeMesh is a new product/repository. Design benefits from ideas in owner's ea
 - **Materially New Contribution:** Python-native causal event timeline implementing Kahn's topological sort algorithm over `causation_id` links, proving causal parent events precede child events regardless of network arrival sequence or wall-clock timestamp skew. Causally unlinked concurrent events are deterministically tie-broken by `(timestamp, event_id)`. Ingest-level payload secret sanitization and fail-closed validation, canonical JSON round-trip serialization with restart continuity, and deterministic SHA-256 timeline digest computation (`compute_timeline_digest()`). Zero Codex event models, frontend styling, or Google Cloud SDK types in core evidence timeline.
 
 ### UIPATH-STATE-001 — Lifecycle Saga State Machine & Progression
-- **Status:** `VERIFIED`
+- **Status:** `IMPLEMENTED_PENDING_PARITY`
 - **Donor ID:** `D-UIPATH` (`zyganali-glitch/universal-agent-os-uipath`)
 - **Immutable Donor SHA:** `dc2267939c2aef0aba2737da65f53352c5cf8fb2`
 - **Source Paths:** `backend/sync_markdown_to_uipath.py`, `tests/test_phase0_interview.py`
 - **License State:** `VERIFIED_COMPATIBLE` (owner-authored)
 - **Reuse Method:** `IDEA_ONLY`
 - **ChangeMesh Target:** `src/orchestrator/state_repository.py`, `src/orchestrator/orchestrator_saga.py`, `src/orchestrator/saga_checkpoint.py`
-- **Competition Introduction Commit:** `4b66d381e7d8aaae1616cb62d34452fb11d15b32` (P-10 state repo) / `9abeaab13f9ccccf465d54c8a7953c345a0ab708` (P-20.01 saga orchestrator)
-- **Test Evidence:** `tests/test_p10_02_state_repository.py` (13 tests PASS), `tests/test_p20_orchestrator_saga.py` (23 tests PASS)
+- **Competition Introduction Commit:** `9c95018d5e0de0924aac7f2a797ee8ef8e7eb54d` (P-10 state repo) / `4dd86866181f08cbbe62c82305ca7960ea5cb224` (P-20.01 saga orchestrator)
+- **Test Evidence:** `tests/test_p10_02_state_repository.py` (13 tests PASS), `tests/test_p20_orchestrator_saga.py` (34 tests PASS)
 - **Materially New Contribution:** Replaces simple file-based interview status syncing with a full Python 3.13 Google ADK + Cloud Pub/Sub + Firestore multi-tenant saga engine. Features 8 canonical lifecycle stages, strict enum type enforcement, optimistic concurrency versioning, persistence-first event emission ordering, automatic intake secret scanning, intent binding to synthetic fixtures (preventing fact laundering), exact bounded `ApprovalCompressionCard` projection, and clean stops at human authority boundaries. Zero UiPath runtime code, Action Center, Data Service, or Phase-0 interview models carry over.
 
 ## Mandatory final disclosure
