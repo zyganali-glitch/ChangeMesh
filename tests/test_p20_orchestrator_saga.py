@@ -953,6 +953,60 @@ def test_p20_01_intent_validation_rejects_mixed_targets(
     assert "prod-payroll" in (result.stopped_reason or "")
 
 
+def test_p20_01_intent_validation_rejects_missing_required_database_target(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify request targeting only ancillary systems without required billing-db fails closed."""
+    req = sample_change_request.model_copy(
+        update={
+            "target_systems": ["payment-service"],
+            "title": "Add payment_tier column",
+            "description": "Add payment_tier column to billing_accounts",
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=req)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "UNSUPPORTED_OPERATION" in (result.stopped_reason or "")
+    assert "required database target" in (result.stopped_reason or "").lower()
+    # 0 migration artifacts, 0 human-authority escape, 0 execution
+    assert len(repo.list_tasks("tenant-prod-alpha", result.change_id)) == 0
+    assert repo.list_approvals("tenant-prod-alpha", result.change_id) == []
+    assert result.tasks_executed == 0
+    assert result.checkpoints_created == 0
+
+
+def test_p20_01_intent_validation_rejects_opposite_remove_action(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify opposite/destructive remove action is rejected with 0 artifacts and 0 escape."""
+    req = sample_change_request.model_copy(
+        update={
+            "title": "Remove payment_tier column",
+            "description": "Remove payment_tier from billing_accounts migration",
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(tenant_id="tenant-prod-alpha", request=req)
+
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "UNSUPPORTED_OPERATION" in (result.stopped_reason or "")
+    assert (
+        "contradictory" in (result.stopped_reason or "").lower()
+        or "remove" in (result.stopped_reason or "").lower()
+    )
+    # 0 migration artifacts, 0 approval escape, 0 execution
+    assert len(repo.list_tasks("tenant-prod-alpha", result.change_id)) == 0
+    assert repo.list_approvals("tenant-prod-alpha", result.change_id) == []
+    assert result.tasks_executed == 0
+    assert result.checkpoints_created == 0
+
+
 def test_p20_01_verification_fails_on_unprovable_production_deployment_criterion(
     repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
 ) -> None:

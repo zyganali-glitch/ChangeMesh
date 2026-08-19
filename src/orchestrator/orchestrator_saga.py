@@ -160,6 +160,10 @@ class SupportedBillingOperation(BaseModel):
         "billing_db",
         "billing-api",
     )
+    required_db_targets: tuple[str, ...] = (
+        "billing-db",
+        "billing_db",
+    )
     table_name: str = "billing_accounts"
     column_name: str = "payment_tier"
     column_type: str = "VARCHAR(32)"
@@ -182,9 +186,10 @@ CANONICAL_SUPPORTED_OPERATION = SupportedBillingOperation()
 def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]:
     """Validate that the incoming ChangeRequest matches the supported synthetic billing operation.
 
-    Fails closed immediately if the request targets unsupported systems, describes
-    destructive actions, unrelated schema/API/config modifications, or fails to match
-    the canonical synthetic payment_tier addition on billing_accounts.
+    Fails closed immediately if the request targets unsupported systems, lacks the
+    required database target for the schema mutation, describes
+    contradictory/opposite/destructive actions, unrelated schema/API/config modifications,
+    or fails to match the canonical synthetic payment_tier addition on billing_accounts.
     """
     req_targets = set(request.target_systems)
     if not req_targets:
@@ -197,6 +202,14 @@ def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]
             False,
             f"Target systems contain unsupported targets: {unsupported}. "
             f"All requested targets must belong to supported set: {sorted(list(allowed))}",
+        )
+
+    required_db_targets = set(CANONICAL_SUPPORTED_OPERATION.required_db_targets)
+    if not (req_targets & required_db_targets):
+        return (
+            False,
+            "Target systems must include the required database target 'billing-db' "
+            f"(or 'billing_db') for schema mutation; got {sorted(list(req_targets))}",
         )
 
     text = (request.title + " " + request.description).lower()
@@ -222,13 +235,31 @@ def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]
                 ),
             )
 
+    # Reject contradictory/opposite operations
+    opposite_keywords = [
+        "remove",
+        "delete",
+        "drop",
+        "rename",
+        "replace",
+        "disable",
+        "rollback",
+    ]
+    for kw in opposite_keywords:
+        if kw in text:
+            return (
+                False,
+                (
+                    f"Contradictory/opposite operation {kw.upper()!r} is not supported in "
+                    "additive billing fixture (canonical operation requires ADD COLUMN)"
+                ),
+            )
+
     # Reject unrelated configuration, API, timeout, indexing, or distinct domain operations
     unrelated_keywords = [
         "timeout",
         "api timeout",
         "connection pool",
-        "rename table",
-        "rename column",
         "cache",
         "endpoint",
         "discount_code",
@@ -255,10 +286,16 @@ def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]
         "billing_accounts" in text or "billing accounts" in text or "billing account" in text
     )
     column_match = "payment_tier" in text or "payment tier" in text
-    action_match = any(
-        act in text
-        for act in ["add", "add column", "alter table", "column addition", "migration", "additive"]
-    )
+
+    # Require explicit positive additive semantics (reject generic 'migration' alone)
+    positive_additive_keywords = [
+        "add column",
+        "add",
+        "addition",
+        "additive",
+        "adding",
+    ]
+    action_match = any(act in text for act in positive_additive_keywords)
 
     if not (table_match and column_match and action_match):
         return (
@@ -1433,8 +1470,7 @@ class ChangeSagaOrchestrator:
                 ),
                 "state": EvidenceState.PASS,
                 "summary": (
-                    f"Blast radius calculated: "
-                    f"{len(blast_radius_artifact.impacted_assets)} assets"
+                    f"Blast radius calculated: {len(blast_radius_artifact.impacted_assets)} assets"
                 ),
             },
             f"ev-qualify-{change_id}": {
@@ -1456,8 +1492,7 @@ class ChangeSagaOrchestrator:
                 "types": frozenset({"EPISTEMIC_GROUNDING", "POLICY_PRECHECK", "GROUNDING"}),
                 "state": EvidenceState.PASS,
                 "summary": (
-                    f"Epistemic grounding complete: "
-                    f"{len(trusted_memory_refs)} trusted memory refs"
+                    f"Epistemic grounding complete: {len(trusted_memory_refs)} trusted memory refs"
                 ),
             },
             f"ev-execute-{change_id}": {

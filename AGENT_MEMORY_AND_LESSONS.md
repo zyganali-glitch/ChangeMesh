@@ -385,3 +385,19 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `src/orchestrator/orchestrator_saga.py`, `src/agents/change_orchestrator.py`, `tests/test_p20_orchestrator_saga.py`, `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md`.
 - Reusable beyond this task: Yes (all saga orchestrators, event-driven workflows, and authority boundaries).
 - Status: `ACTIVE`
+
+### LESSON-20260819-07 — Bounded Operation Target Validation and Opposite-Intent Action Fail-Closed Binding
+- Date/time: 2026-08-19
+- Active task: P-20.00 / P-20.01 Final Closure Repair
+- Symptom: (1) Requests targeting only ancillary systems (`target_systems=["payment-service"]`) could be admitted for the schema migration without targeting the required database (`billing-db`); (2) Generic action matching on terms like `"migration"` permitted opposite-action text (e.g. `"Remove payment_tier from billing_accounts migration"`) to match the positive `ADD COLUMN` operation.
+- Root cause: (1) Target check only validated subset of allowed targets rather than enforcing presence of the mandatory mutation target; (2) Action matching accepted generic words without requiring explicit positive additive semantics or checking for contradictory/opposite action keywords.
+- Incorrect approach: Allowing subset-only target matching and generic action tokens; attempting complex NLP parsing for bounded synthetic operations.
+- Correct approach:
+  1. Enforce that `request.target_systems` must contain at least one required database target (`billing-db` or `billing_db`).
+  2. Reject opposite/contradictory keywords (`remove`, `delete`, `drop`, `rename`, `replace`, `disable`, `rollback`, `truncate`) and destructive keywords (`drop table`, etc.) explicitly.
+  3. Require explicit positive additive keywords (`add column`, `add`, `addition`, `additive`, `adding`) and reject generic action tokens (`migration`, `alter table`) alone.
+- Prevention rule: Bounded fixture operations must require their mandatory mutation targets and fail closed on opposite/contradictory action semantics.
+- Tests/evidence: `tests/test_p20_orchestrator_saga.py` (36 passed); canonical unit suite (1348 passed, 1 warning).
+- Affected files: `src/orchestrator/orchestrator_saga.py`, `tests/test_p20_orchestrator_saga.py`, `docs/COMPONENT_PROVENANCE.md`, `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md`, `docs/P-OMEGA_AUDIT_REPORT.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, `README.md`.
+- Reusable beyond this task: Yes (all bounded fixture operations, intent binding validators, and synthetic demo workflows).
+- Status: `ACTIVE`

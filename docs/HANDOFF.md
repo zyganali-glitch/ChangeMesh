@@ -153,8 +153,8 @@ Phase P-20 is `IN_PROGRESS`.
 - **Mode Honesty:** Local stages are strictly labeled `SIMULATION` or `FIXTURE`; claiming `LIVE_WRITE` or `RECORDED_CLOUD` for local execution without real external mutation raises `ValueError` before state persistence. Zero fake `LIVE_WRITE` / `RECORDED_CLOUD` PASS evidence.
 - **Contract Type Safety:** `domain/contracts/change_lifecycle.py` restored to strict `isinstance(..., ChangeState)` type checks.
 - **ADK Bridge:** `ChangeOrchestrator.run_lifecycle_saga` coordinates the saga without making ADK agent the durable state owner.
-- **Test Evidence:** Dedicated 34-test suite `tests/test_p20_orchestrator_saga.py` passes 34 tests (100% PASS).
-- **Canonical Unit Baseline:** Unit test suite passes 1346 tests (1 warning). Lint, format, and type checks all pass with 0 errors.
+- **Test Evidence:** Dedicated 36-test suite `tests/test_p20_orchestrator_saga.py` passes 36 tests (100% PASS).
+- **Canonical Unit Baseline:** Unit test suite passes 1348 tests (1 warning). Lint, format, and type checks all pass with 0 errors.
 
 ### P-15 — Impact Scout (DONE)
 - **P-15.00:** Impact Scout donor preflight verified CS-BLAST-001 (D-CONTEXTSEAL, `0dc924db9d82037d2e813548bdee27af5f180889`) and GL-CONFLICT-001 (D-GITLAB, `3c4a412b6040d8a8154c15325943c409be9105f2`). ADAPTED reuse method confirmed.
