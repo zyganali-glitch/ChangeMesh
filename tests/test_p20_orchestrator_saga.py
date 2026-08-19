@@ -1219,3 +1219,87 @@ def test_p20_01_secret_in_criterion_description_is_sanitized(
         assert dummy_secret not in msg.to_bytes().decode("utf-8")
     for task in repo.list_tasks("tenant-prod-alpha", result.change_id):
         assert dummy_secret not in str(task.output_summary)
+
+
+def test_p20_01_intent_validation_rejects_negated_add_operation(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify deterministic fail-closed rejection of explicit negation of the ADD operation."""
+    negated_request = sample_change_request.model_copy(
+        update={
+            "description": "Do not add payment_tier column to billing_accounts",
+            "target_systems": ["billing-db"],
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(
+        tenant_id="tenant-prod-alpha",
+        request=negated_request,
+    )
+
+    # 1. State and Autonomy
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.BLOCKED
+    assert result.autonomy_class == AutonomyClass.BLOCKED
+    assert "UNSUPPORTED_OPERATION" in (result.stopped_reason or "")
+
+    # 2. 0 tasks, 0 approvals, 0 checkpoints, 0 migration artifacts
+    assert result.tasks_executed == 0
+    assert len(repo.list_tasks("tenant-prod-alpha", result.change_id)) == 0
+    assert repo.list_approvals("tenant-prod-alpha", result.change_id) == []
+    assert result.approval_card is None
+    assert result.checkpoints_created == 0
+
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "migration_artifacts" for ref in evidence_refs)
+
+    # 3. Persisted ChangeRecord reflects BLOCKED
+    persisted = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted is not None
+    assert persisted.state == ChangeState.BLOCKED
+
+
+def test_p20_01_verification_fails_on_contradictory_criterion_description(
+    repo: InMemorySagaStateRepository, bus: LocalEventBus, sample_change_request: ChangeRequest
+) -> None:
+    """Verify contradictory/negated criterion fails deterministically at Stage 7."""
+    contradictory_request = sample_change_request.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-contradictory-001",
+                    description="payment_tier column was NOT added to billing_accounts",
+                    verification_method="deterministic",
+                    required_evidence_types=["MIGRATION_EXECUTION"],
+                )
+            ]
+        }
+    )
+    orchestrator = ChangeSagaOrchestrator(repository=repo, event_bus=bus)
+    result = orchestrator.run_saga(
+        tenant_id="tenant-prod-alpha",
+        request=contradictory_request,
+    )
+
+    # 1. Saga does NOT COMPLETE; final state = FAILED under existing verification-failure path
+    assert result.is_completed is False
+    assert result.final_state == ChangeState.FAILED
+    assert "VERIFICATION_FAILED" in (result.stopped_reason or "")
+
+    # 2. 0 certification checkpoint
+    assert result.checkpoints_created == 0
+    persisted_change = repo.get_change("tenant-prod-alpha", result.change_id)
+    assert persisted_change is not None
+    assert persisted_change.state == ChangeState.FAILED
+
+    # 3. Verify task failed
+    tasks = repo.list_tasks("tenant-prod-alpha", result.change_id)
+    verify_task = next((t for t in tasks if t.agent_role == "evidence_auditor"), None)
+    assert verify_task is not None
+    assert verify_task.status == TaskStatus.FAILED
+    assert "Verification FAILED" in str(verify_task.output_summary)
+
+    # 4. Zero certification evidence produced
+    evidence_refs = repo.list_evidence_refs("tenant-prod-alpha", result.change_id)
+    assert not any(ref.subject == "saga_certification" for ref in evidence_refs)

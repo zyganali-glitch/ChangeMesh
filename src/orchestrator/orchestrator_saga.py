@@ -255,6 +255,73 @@ def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]
                 ),
             )
 
+    # Reject explicit negation/opposition of the additive operation (fail closed)
+    negated_add_patterns = [
+        "do not add",
+        "don't add",
+        "dont add",
+        "must not add",
+        "should not add",
+        "shall not add",
+        "cannot add",
+        "can not add",
+        "without adding",
+        "avoid adding",
+        "refrain from adding",
+        "prohibit adding",
+        "prevent adding",
+        "never add",
+        "not add",
+        "not adding",
+        "do not alter",
+        "don't alter",
+        "dont alter",
+        "must not alter",
+        "should not alter",
+        "without altering",
+        "avoid altering",
+        "never alter",
+        "not alter",
+        "do not include",
+        "don't include",
+        "dont include",
+        "must not include",
+        "should not include",
+        "without including",
+        "avoid including",
+        "never include",
+        "not include",
+        "do not create",
+        "don't create",
+        "dont create",
+        "must not create",
+        "should not create",
+        "without creating",
+        "avoid creating",
+        "never create",
+        "not create",
+    ]
+    for pat in negated_add_patterns:
+        if pat in text:
+            return (
+                False,
+                (
+                    f"Negated/opposed additive operation {pat!r} is not supported in "
+                    "additive billing fixture (canonical operation requires affirmative ADD COLUMN)"
+                ),
+            )
+
+    negated_add_regex = re.compile(
+        r"\b(?:do\s+not|don['’]?t|dont|must\s+not|should\s+not|shall\s+not|can(?:not|\s+not)|without|avoid|refrain\s+from|prohibit|prevent|never|not)\s+(?:add|adding|addition|alter|altering|include|including|create|creating)\b",
+        re.IGNORECASE,
+    )
+    if negated_add_regex.search(text):
+        return (
+            False,
+            "Negated/opposed additive operation is not supported in additive billing fixture "
+            "(canonical operation requires affirmative ADD COLUMN)",
+        )
+
     # Reject unrelated configuration, API, timeout, indexing, or distinct domain operations
     unrelated_keywords = [
         "timeout",
@@ -306,6 +373,185 @@ def validate_supported_change_intent(request: ChangeRequest) -> tuple[bool, str]
         )
 
     return True, ""
+
+
+class BoundedCriterionConditionSpec(BaseModel):
+    """Specification of a machine-verifiable condition supported by the bounded saga."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    condition_id: str
+    description_summary: str
+    required_evidence_types: tuple[str, ...]
+    bound_stage: str
+
+
+def validate_criterion_condition_semantics(
+    criterion: SuccessCriterion,
+) -> tuple[bool, Optional[str], str]:
+    """Validate if SuccessCriterion description matches a supported machine-verifiable condition.
+
+    A deterministic criterion may become PASS only when:
+    1. its requested condition is one of the explicitly supported machine-verifiable conditions
+       for this bounded operation; and
+    2. the actual produced evidence required for that condition exists with the correct state/mode.
+
+    Unknown, contradictory, negated, or unprovable criterion semantics fail closed as unproven.
+    """
+    desc_raw = criterion.description
+    desc_clean = desc_raw.strip()
+    desc_lower = desc_clean.lower()
+
+    # 1. Reject unprovable live production / provider / real database application claims
+    unprovable_live_terms = [
+        "production deployment",
+        "deployed to production",
+        "live write",
+        "live_write",
+        "provider mutation",
+        "real deployment",
+        "remote github",
+        "remote repo",
+        "applied to database",
+        "applied to live",
+        "applied to billing_accounts",
+        "executed in database",
+        "executed against database",
+        "production cluster",
+        "live cluster",
+    ]
+    for term in unprovable_live_terms:
+        if term in desc_lower:
+            return (
+                False,
+                None,
+                f"Criterion requires live production/provider/database mutation {term!r} "
+                "not provable by local simulation run",
+            )
+
+    # 2. Reject explicit negation, contradiction, or opposite assertions
+    negation_contradiction_patterns = [
+        "not added",
+        "was not added",
+        "were not added",
+        "did not add",
+        "never added",
+        "without adding",
+        "avoid adding",
+        "must not add",
+        "should not add",
+        "not synthesized",
+        "was not synthesized",
+        "not generated",
+        "was not generated",
+        "failed to add",
+        "failed to generate",
+        "failed to synthesize",
+        "rehearsal failed",
+        "rehearsal did not pass",
+        "rehearsal was unsuccessful",
+        "rollback",
+        "rolled back",
+        "drop column",
+        "delete column",
+        "remove column",
+        "drop table",
+        "delete table",
+    ]
+    for pat in negation_contradiction_patterns:
+        if pat in desc_lower:
+            return (
+                False,
+                None,
+                f"Criterion asserts contradictory, negated, or opposite condition {pat!r} "
+                "contrary to bounded additive execution facts",
+            )
+
+    # 3. Match against explicitly supported machine-verifiable conditions for this bounded operation
+    matched_condition: Optional[str] = None
+
+    # Condition 1: REHEARSAL_SUCCEEDED
+    # Facts proven: ShadowLab rehearsal simulation executed and completed cleanly / zero faults
+    rehearsal_keywords = ["rehearsal", "shadowlab", "simulation"]
+    rehearsal_positive = [
+        "succeed",
+        "succeeds",
+        "succeeded",
+        "clean",
+        "cleanly",
+        "pass",
+        "passed",
+        "zero unhandled faults",
+        "zero faults",
+        "completed",
+        "complete",
+    ]
+    if any(k in desc_lower for k in rehearsal_keywords) and any(
+        p in desc_lower for p in rehearsal_positive
+    ):
+        matched_condition = "REHEARSAL_SUCCEEDED"
+
+    # Condition 2: MIGRATION_MANIFEST_SYNTHESIZED
+    # Facts proven: Deterministic migration DDL / manifest generated and hashed for
+    # payment_tier addition
+    migration_keywords = [
+        "manifest",
+        "migration",
+        "hashes",
+        "hash",
+        "synthes",
+        "artifact",
+        "payment_tier",
+        "billing_accounts",
+    ]
+    migration_positive = [
+        "contains",
+        "deterministic",
+        "valid",
+        "generated",
+        "synthesized",
+        "created",
+        "present",
+        "hashes",
+        "hash",
+        "plan",
+    ]
+    if any(k in desc_lower for k in migration_keywords) and any(
+        p in desc_lower for p in migration_positive
+    ):
+        matched_condition = "MIGRATION_MANIFEST_SYNTHESIZED"
+
+    # Condition 3: BLAST_RADIUS_DISCOVERED
+    discovery_keywords = ["blast radius", "static analysis", "discovery", "impact"]
+    discovery_positive = ["calculated", "computed", "scanned", "complete", "completed", "done"]
+    if any(k in desc_lower for k in discovery_keywords) and any(
+        p in desc_lower for p in discovery_positive
+    ):
+        matched_condition = "BLAST_RADIUS_DISCOVERED"
+
+    # Condition 4: CAPABILITIES_QUALIFIED
+    qual_keywords = ["qualification", "passport", "capability", "capabilities", "agent"]
+    qual_positive = ["verified", "qualified", "valid", "passed", "checked"]
+    if any(k in desc_lower for k in qual_keywords) and any(p in desc_lower for p in qual_positive):
+        matched_condition = "CAPABILITIES_QUALIFIED"
+
+    # Condition 5: EPISTEMIC_GROUNDED
+    ground_keywords = ["grounding", "epistemic", "memory", "trust"]
+    ground_positive = ["grounded", "evaluated", "complete", "completed", "trusted"]
+    if any(k in desc_lower for k in ground_keywords) and any(
+        p in desc_lower for p in ground_positive
+    ):
+        matched_condition = "EPISTEMIC_GROUNDED"
+
+    if matched_condition is None:
+        return (
+            False,
+            None,
+            f"Criterion description {criterion.description!r} does not match any explicitly "
+            "supported machine-verifiable condition for this bounded operation",
+        )
+
+    return True, matched_condition, ""
 
 
 def build_standard_demo_registry(
@@ -1549,22 +1795,12 @@ class ChangeSagaOrchestrator:
                     "by automated saga runtime"
                 )
 
-            desc_lower = crit.description.lower()
-            if any(
-                term in desc_lower
-                for term in [
-                    "production deployment",
-                    "live write",
-                    "live_write",
-                    "provider mutation",
-                    "real deployment",
-                ]
-            ):
+            # Machine-verifiable condition semantic validation
+            # (fails closed on opposite / unproven / unknown criterion semantics)
+            is_valid_cond, cond_id, cond_fail_reason = validate_criterion_condition_semantics(crit)
+            if not is_valid_cond:
                 crit_failed = True
-                crit_reasons.append(
-                    "Criterion requires live production/provider action not satisfied "
-                    "by local simulation run"
-                )
+                crit_reasons.append(cond_fail_reason)
 
             # Match required evidence types against produced evidence catalog
             for req_type in crit.required_evidence_types:

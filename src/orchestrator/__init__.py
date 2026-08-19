@@ -4,10 +4,12 @@ Provides saga state persistence, multi-agent coordination, and recovery.
 """
 
 from src.orchestrator.orchestrator_saga import (
+    BoundedCriterionConditionSpec,
     ChangeSagaOrchestrator,
     SagaExecutionResult,
     build_standard_demo_registry,
     sanitize_secrets_in_text,
+    validate_criterion_condition_semantics,
     validate_supported_change_intent,
 )
 from src.orchestrator.state_repository import (
@@ -45,4 +47,6 @@ __all__ = [
     "build_standard_demo_registry",
     "sanitize_secrets_in_text",
     "validate_supported_change_intent",
+    "BoundedCriterionConditionSpec",
+    "validate_criterion_condition_semantics",
 ]
