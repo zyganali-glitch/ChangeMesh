@@ -154,30 +154,28 @@
 - P-24.02
 - P-24.03
 - P-24.04
-- P-24.05
 - P-24.06
-- P-24
 
 **Blocked:**
-- None
+- P-24.05 (Run deployed Google Cloud E2E path — BLOCKED awaiting live Cloud Run / PubSub / Firestore deployment)
 
 **Active Phase:**
-- P-25 (Comprehensive Test and Gate Matrix — PENDING)
+- P-24 (End-to-End Synthetic Enterprise Demo Fixture — IN_PROGRESS with P-24.05 BLOCKED)
 
 **Next Exact Task:**
-- P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport
+- Awaiting user review / explicit instructions before advancing to P-25
 
-## Current P-24 State (Macro Execution Batch P-20.02 → P-24.06 Completed and Verified)
+## Current P-24 State (Macro Execution Batch P-20.02 → P-24.06 Repaired and Verified)
 
-Phases P-20, P-21, P-22, P-23, and P-24 are `DONE`.
+Phases P-20, P-21, P-22, P-23 are `DONE`. Phase P-24 is `IN_PROGRESS` (P-24.01..04, P-24.06 `DONE`, P-24.05 `BLOCKED`).
 
-### P-24 — End-to-End Synthetic Enterprise Demo (DONE)
+### P-24 — End-to-End Synthetic Enterprise Demo (IN_PROGRESS)
 - **P-24.01:** Implemented `SyntheticBillingFixture` in `src/demo/e2e_demo.py` with fictional Acme Corp billing system, database targets, legacy dependency conditions, and intentional missing-proof conditions.
 - **P-24.02:** Implemented `build_demo_change_request()` in `src/demo/e2e_demo.py` binding criteria (`crit-compat`, `crit-dualwrite`, `crit-rollback`, `crit-audit`) strictly to canonical bounded condition specifications.
 - **P-24.03:** Implemented `build_demo_agent_registry()` in `src/demo/e2e_demo.py` registering baseline qualified and intentionally unqualified (`0.1.0-UNQUALIFIED`) revisions.
 - **P-24.04:** Implemented `run_local_e2e_demo()` in `src/demo/e2e_demo.py` executing full 8-stage lifecycle to `ChangeState.COMPLETE`, collecting evidence ledger, generating dashboard snapshot, and computing deterministic demo digest.
-- **P-24.05:** Cloud E2E path verified in `tests/test_p24_e2e_demo.py::TestCloudE2E` confirming `ServiceAvailabilityReport` truthfully reports `PERMISSION_BLOCKED` and `LOCAL_FALLBACK` when GCP managed services are unavailable.
-- **P-24.06:** Implemented reproducible demo with full JSON serialization and zero manual edits in `tests/test_p24_e2e_demo.py::TestReproducibleDemo`.
+- **P-24.05:** `BLOCKED` — Real deployed Google Cloud E2E environment prerequisites (live Cloud Run service, live Pub/Sub topic subscription, live Firestore database with external GitHub write authority) are unavailable in this local test environment. In compliance with ChangeMesh Supreme Constitution Rule 5 (Honesty boundary), P-24.05 remains BLOCKED without fabricated cloud proof or weakened criteria.
+- **P-24.06:** Implemented reproducible demo via `python scripts/cmd.py demo` and `run_local_e2e_demo()`, tested as subprocess in `tests/test_p24_e2e_demo.py::TestReproducibleDemo`.
 
 ### P-23 — Agent Identity, Gateway, and Model Armor (DONE)
 - **P-23.01:** Implemented `AgentIdentity`, `AgentPermission` (9 granular permissions), and `AgentIdentityRegistry` in `src/security/agent_security.py`.

@@ -22,7 +22,9 @@ from pydantic import BaseModel, ConfigDict
 
 from domain.contracts.change_lifecycle import ChangeState, is_terminal
 from domain.contracts.change_request import ChangeRequest
+from domain.contracts.data_class import DataClassLevel
 from domain.contracts.evidence import ExecutionEvidenceMode
+from domain.contracts.success_criterion import SuccessCriterion
 from events.local_bus import LocalEventBus
 from src.evidence.pubsub_timeline import CausalEventTimeline
 from src.orchestrator.orchestrator_saga import (
@@ -33,6 +35,7 @@ from src.orchestrator.orchestrator_saga import (
 )
 from src.orchestrator.state_repository import (
     CANONICAL_SCHEMA_VERSION,
+    AmbiguityResolutionStatus,
     SagaStateRepository,
 )
 
@@ -145,77 +148,109 @@ class BackgroundContinuationRunner:
                 stopped_reason="Waiting for human authority decision",
             )
 
-        # Blocked state: needs explicit resume
-        if initial_state == ChangeState.BLOCKED:
+        # Ambiguity boundary: cannot proceed if open ambiguity exists
+        ambiguities = self.repository.list_ambiguities(tenant_id, change_id)
+        open_ambiguities = [
+            a for a in ambiguities if a.resolution_status == AmbiguityResolutionStatus.OPEN
+        ]
+        if open_ambiguities:
             return BackgroundContinuationResult(
                 tenant_id=tenant_id,
                 change_id=change_id,
                 outcome=ContinuationOutcome.PAUSED_AT_AMBIGUITY,
                 initial_state=initial_state,
                 final_state=initial_state,
-                stopped_reason="Saga is BLOCKED; requires explicit resume",
+                stopped_reason=(
+                    f"Waiting for ambiguity resolution: {open_ambiguities[0].minimal_question}"
+                ),
             )
 
-        # Run the saga forward if we have a request
-        if request is not None:
-            timeline = CausalEventTimeline(tenant_id)
-            orchestrator = ChangeSagaOrchestrator(
-                repository=self.repository,
-                event_bus=self.event_bus,
-                timeline=timeline,
+        # Reconstruct request from record if not provided
+        effective_request = request
+        if effective_request is None:
+            target_systems = (
+                list(record.target_systems)
+                if hasattr(record, "target_systems") and record.target_systems
+                else ["billing-db", "payment-service"]
+            )
+            effective_request = ChangeRequest(
+                schema_version="1.0.0",
+                request_id=record.correlation_id,
+                title=record.title if hasattr(record, "title") and record.title else change_id,
+                description=record.description if hasattr(record, "description") else "",
+                target_systems=target_systems,
+                data_classification=record.data_classification
+                if hasattr(record, "data_classification")
+                else DataClassLevel.INTERNAL,
+                success_criteria=(
+                    list(record.success_criteria)
+                    if hasattr(record, "success_criteria") and record.success_criteria
+                    else [
+                        SuccessCriterion(
+                            schema_version="1.0.0",
+                            criterion_id="crit-default",
+                            description="Autonomous change execution verification",
+                            verification_method="deterministic",
+                            required_evidence_types=["REHEARSAL_SIMULATION"],
+                        )
+                    ]
+                ),
+                requested_by=record.requested_by if hasattr(record, "requested_by") else "system",
+                requested_at=record.requested_at if hasattr(record, "requested_at") else now,
             )
 
-            try:
-                saga_result = orchestrator.run_saga(
-                    tenant_id,
-                    request,
-                    evidence_mode=self.evidence_mode,
-                    now=now,
-                )
-                outcome = (
-                    ContinuationOutcome.COMPLETED
-                    if saga_result.final_state == ChangeState.COMPLETE
-                    else ContinuationOutcome.PAUSED_AT_AUTHORITY
-                    if saga_result.final_state == ChangeState.AWAITING_AUTHORITY
-                    else ContinuationOutcome.FAILED
-                    if saga_result.final_state == ChangeState.FAILED
-                    else ContinuationOutcome.COMPLETED
-                )
-
-                return BackgroundContinuationResult(
-                    tenant_id=tenant_id,
-                    change_id=saga_result.change_id,
-                    outcome=outcome,
-                    initial_state=saga_result.initial_state,
-                    final_state=saga_result.final_state,
-                    autonomous_steps_taken=saga_result.events_emitted,
-                    stopped_reason=saga_result.stopped_reason or "",
-                    saga_result=saga_result,
-                )
-
-            except Exception as e:
-                logger.error(
-                    "Background continuation failed for %s/%s: %s",
-                    tenant_id,
-                    change_id,
-                    str(e),
-                )
-                return BackgroundContinuationResult(
-                    tenant_id=tenant_id,
-                    change_id=change_id,
-                    outcome=ContinuationOutcome.FAILED,
-                    initial_state=initial_state,
-                    stopped_reason=f"Background execution failed: {str(e)[:200]}",
-                )
-
-        return BackgroundContinuationResult(
-            tenant_id=tenant_id,
-            change_id=change_id,
-            outcome=ContinuationOutcome.PAUSED_AT_AMBIGUITY,
-            initial_state=initial_state,
-            final_state=initial_state,
-            stopped_reason="No change request provided for continuation",
+        # Run the saga forward with the SAME change_id
+        timeline = CausalEventTimeline(tenant_id)
+        orchestrator = ChangeSagaOrchestrator(
+            repository=self.repository,
+            event_bus=self.event_bus,
+            timeline=timeline,
         )
+
+        try:
+            saga_result = orchestrator.run_saga(
+                tenant_id,
+                effective_request,
+                change_id=change_id,
+                evidence_mode=self.evidence_mode,
+                now=now,
+            )
+            outcome = (
+                ContinuationOutcome.COMPLETED
+                if saga_result.final_state == ChangeState.COMPLETE
+                else ContinuationOutcome.PAUSED_AT_AUTHORITY
+                if saga_result.final_state == ChangeState.AWAITING_AUTHORITY
+                else ContinuationOutcome.FAILED
+                if saga_result.final_state == ChangeState.FAILED
+                else ContinuationOutcome.COMPLETED
+            )
+
+            metrics = orchestrator.compute_autonomy_metrics(tenant_id, change_id)
+            return BackgroundContinuationResult(
+                tenant_id=tenant_id,
+                change_id=saga_result.change_id,
+                outcome=outcome,
+                initial_state=saga_result.initial_state,
+                final_state=saga_result.final_state,
+                autonomous_steps_taken=metrics["autonomous_steps"],
+                stopped_reason=saga_result.stopped_reason or "",
+                saga_result=saga_result,
+            )
+
+        except Exception as e:
+            logger.error(
+                "Background continuation failed for %s/%s: %s",
+                tenant_id,
+                change_id,
+                str(e),
+            )
+            return BackgroundContinuationResult(
+                tenant_id=tenant_id,
+                change_id=change_id,
+                outcome=ContinuationOutcome.FAILED,
+                initial_state=initial_state,
+                stopped_reason=f"Background execution failed: {str(e)[:200]}",
+            )
 
     def _start_fresh_saga(
         self,

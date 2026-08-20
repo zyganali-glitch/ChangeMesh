@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from domain.contracts.change_lifecycle import ChangeState
 from src.orchestrator.state_repository import (
+    AmbiguityRecord,
     ApprovalRecord,
     ApprovalResolutionStatus,
     ChangeRecord,
@@ -859,6 +860,94 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
         )
 
     # ------------------------------------------------------------------------
+    # Ambiguity Operations (P-20.04)
+    # ------------------------------------------------------------------------
+
+    def create_ambiguity(
+        self, tenant_id: str, change_id: str, ambiguity: AmbiguityRecord
+    ) -> AmbiguityRecord:
+        tid = validate_tenant_id(tenant_id)
+        if ambiguity.tenant_id != tid or ambiguity.change_id != change_id:
+            raise TenantIsolationError(
+                "Ambiguity tenant_id or change_id mismatch with operation path"
+            )
+        scan_for_secrets(ambiguity.model_dump())
+        doc_ref = (
+            self._db.collection("tenants")
+            .document(tid)
+            .collection("changes")
+            .document(change_id)
+            .collection("ambiguities")
+            .document(ambiguity.question_id)
+        )
+        if doc_ref.get().exists:
+            raise PersistenceSchemaError(
+                f"Ambiguity question {ambiguity.question_id!r} already exists"
+            )
+        doc_ref.set(_to_firestore_dict(ambiguity.model_dump()))
+        return ambiguity
+
+    def get_ambiguity(
+        self, tenant_id: str, change_id: str, question_id: str
+    ) -> Optional[AmbiguityRecord]:
+        tid = validate_tenant_id(tenant_id)
+        doc_ref = (
+            self._db.collection("tenants")
+            .document(tid)
+            .collection("changes")
+            .document(change_id)
+            .collection("ambiguities")
+            .document(question_id)
+        )
+        snap = doc_ref.get()
+        if not snap.exists:
+            return None
+        return AmbiguityRecord(**_from_firestore_dict(snap.to_dict()))
+
+    def list_ambiguities(self, tenant_id: str, change_id: str) -> List[AmbiguityRecord]:
+        tid = validate_tenant_id(tenant_id)
+        col_ref = (
+            self._db.collection("tenants")
+            .document(tid)
+            .collection("changes")
+            .document(change_id)
+            .collection("ambiguities")
+        )
+        docs = col_ref.stream()
+        results = [AmbiguityRecord(**_from_firestore_dict(d.to_dict())) for d in docs]
+        return sorted(results, key=lambda a: a.created_at)
+
+    def update_ambiguity(
+        self,
+        tenant_id: str,
+        change_id: str,
+        ambiguity: AmbiguityRecord,
+        expected_version: int,
+    ) -> AmbiguityRecord:
+        tid = validate_tenant_id(tenant_id)
+        if ambiguity.tenant_id != tid or ambiguity.change_id != change_id:
+            raise TenantIsolationError(
+                "Ambiguity tenant_id or change_id mismatch with operation path"
+            )
+        scan_for_secrets(ambiguity.model_dump())
+        doc_ref = (
+            self._db.collection("tenants")
+            .document(tid)
+            .collection("changes")
+            .document(change_id)
+            .collection("ambiguities")
+            .document(ambiguity.question_id)
+        )
+        doc_path = f"/tenants/{tid}/changes/{change_id}/ambiguities/{ambiguity.question_id}"
+        return self._atomic_cas_update(
+            doc_ref=doc_ref,
+            expected_version=expected_version,
+            candidate_dict=ambiguity.model_dump(),
+            document_path=doc_path,
+            record_class=AmbiguityRecord,
+        )
+
+    # ------------------------------------------------------------------------
     # Teardown / Cascading Deletion (P-10.05)
     # ------------------------------------------------------------------------
 
@@ -875,6 +964,7 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
             "idempotency_reservations",
             "evidence_refs",
             "approvals",
+            "ambiguities",
         ]:
             sub_docs = change_ref.collection(subcol_name).stream()
             for doc in sub_docs:

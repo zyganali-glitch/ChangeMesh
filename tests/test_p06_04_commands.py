@@ -49,7 +49,7 @@ def test_unknown_command_fails_closed():
 
 def test_future_commands_fail_closed_cli():
     """Verify that deferred commands fail closed with NOT_RUN via CLI."""
-    for command_name in ["e2e", "demo", "deploy", "teardown"]:
+    for command_name in ["e2e", "deploy", "teardown"]:
         result = run_cli(command_name)
         assert result.returncode != 0, f"Deferred command '{command_name}' did not exit non-zero"
         assert "NOT_RUN" in result.stdout, (
@@ -61,9 +61,13 @@ def test_future_commands_fail_closed_cli():
 def test_future_commands_fail_closed_direct():
     """Verify that deferred command functions return non-zero exit code directly."""
     assert cmd.e2e_cmd() == 1
-    assert cmd.demo_cmd() == 1
     assert cmd.deploy_cmd() == 1
     assert cmd.teardown_cmd() == 1
+
+
+def test_demo_command_runs_successfully():
+    """Verify that demo command runs successfully (implemented in P-24.06)."""
+    assert cmd.demo_cmd() == 0
 
 
 def test_integration_default_fails_closed_cli():

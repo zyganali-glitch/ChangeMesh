@@ -1,6 +1,12 @@
 import argparse
 import subprocess
 import sys
+from pathlib import Path
+
+# Ensure repository root is on sys.path
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def run_command(args, env=None, check=False):
@@ -59,8 +65,21 @@ def e2e_cmd(args=None):
 
 
 def demo_cmd(args=None):
-    print("Demo command: NOT_RUN. (Owning phase P-24 pending)")
-    return 1
+    print("Running ChangeMesh Synthetic Enterprise E2E Demo...")
+    try:
+        from src.demo.e2e_demo import run_local_e2e_demo
+
+        result = run_local_e2e_demo()
+        print(f"Demo complete: change_id={result.change_id}")
+        print(f"Final state: {result.final_state.value}")
+        print(f"Demo digest: {result.demo_digest}")
+        print(f"Tasks executed: {result.saga_result.tasks_executed}")
+        print(f"Autonomous steps: {result.saga_result.autonomous_steps}")
+        print(f"Human attention count: {result.saga_result.human_attention_count}")
+        return 0
+    except Exception as e:
+        print(f"Demo failed: {e}", file=sys.stderr)
+        return 1
 
 
 def deploy_cmd(args=None):

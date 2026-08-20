@@ -84,6 +84,8 @@ from src.migration.plan_generator import MigrationPlanGenerator
 from src.orchestrator.saga_checkpoint import SagaCheckpointManager
 from src.orchestrator.state_repository import (
     CANONICAL_SCHEMA_VERSION,
+    AmbiguityRecord,
+    AmbiguityResolutionStatus,
     ApprovalRecord,
     ApprovalResolutionStatus,
     ChangeRecord,
@@ -695,6 +697,8 @@ class SagaExecutionResult(BaseModel):
     tasks_executed: int
     evidence_collected: int
     checkpoints_created: int
+    autonomous_steps: int = 0
+    human_attention_count: int = 0
     timeline_digest: Optional[str] = None
     approval_card: Optional[ApprovalCompressionCard] = None
 
@@ -744,6 +748,22 @@ class SagaRecoveryResult(BaseModel):
 # Default saga-level timeout in seconds (configurable per orchestrator instance)
 DEFAULT_SAGA_TIMEOUT_SECONDS: float = 3600.0
 DEFAULT_SAGA_RETRY_MAX_ATTEMPTS: int = 3
+
+STAGE_ORDER: Mapping[ChangeState, int] = MappingProxyType(
+    {
+        ChangeState.RECEIVED: 0,
+        ChangeState.DISCOVERING: 1,
+        ChangeState.QUALIFYING: 2,
+        ChangeState.REHEARSING: 3,
+        ChangeState.GROUNDED: 4,
+        ChangeState.AWAITING_AUTHORITY: 5,
+        ChangeState.AUTHORIZED: 6,
+        ChangeState.EXECUTING: 7,
+        ChangeState.VERIFYING: 8,
+        ChangeState.CERTIFYING: 9,
+        ChangeState.COMPLETE: 10,
+    }
+)
 
 
 class ChangeSagaOrchestrator:
@@ -877,11 +897,78 @@ class ChangeSagaOrchestrator:
         last_event_id: Optional[str] = None
         event_seq = 0
         events_emitted = 0
-        tasks_executed = 0
-        evidence_collected = 0
-        checkpoints_created = 0
         active_autonomy_class: Optional[AutonomyClass] = None
         active_approval_card: Optional[ApprovalCompressionCard] = None
+
+        # Check for existing change record
+        existing_record = self.repository.get_change(tid, change_id)
+        existing_tasks = self.repository.list_tasks(tid, change_id) if existing_record else []
+        existing_checkpoints = (
+            self.repository.list_checkpoints(tid, change_id) if existing_record else []
+        )
+        existing_evidence = (
+            self.repository.list_evidence_refs(tid, change_id) if existing_record else []
+        )
+
+        tasks_executed = len(existing_tasks)
+        evidence_collected = len(existing_evidence)
+        checkpoints_created = len(existing_checkpoints)
+
+        def build_saga_result(
+            final_state: ChangeState,
+            *,
+            initial_state: ChangeState = ChangeState.RECEIVED,
+            is_completed: bool = False,
+            autonomy_class: Optional[AutonomyClass] = None,
+            stopped_reason: Optional[str] = None,
+            approval_card: Optional[ApprovalCompressionCard] = None,
+        ) -> SagaExecutionResult:
+            metrics = self.compute_autonomy_metrics(tid, change_id)
+            return SagaExecutionResult(
+                tenant_id=tid,
+                change_id=change_id,
+                correlation_id=correlation_id,
+                initial_state=initial_state,
+                final_state=final_state,
+                is_completed=is_completed,
+                autonomy_class=autonomy_class,
+                stopped_reason=stopped_reason,
+                events_emitted=events_emitted,
+                tasks_executed=tasks_executed,
+                evidence_collected=evidence_collected,
+                checkpoints_created=checkpoints_created,
+                autonomous_steps=metrics["autonomous_steps"],
+                human_attention_count=metrics["human_attention_count"],
+                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
+                approval_card=approval_card,
+            )
+
+        if existing_record is not None:
+            current_state = existing_record.state
+            if is_terminal(existing_record.state):
+                return build_saga_result(
+                    existing_record.state,
+                    initial_state=existing_record.state,
+                    is_completed=(existing_record.state == ChangeState.COMPLETE),
+                    autonomy_class=existing_record.autonomy_class,
+                    stopped_reason=existing_record.state_reason,
+                )
+            if existing_record.state == ChangeState.AWAITING_AUTHORITY:
+                approvals = self.repository.list_approvals(tid, change_id)
+                resolved = [
+                    a for a in approvals if a.resolution_status == ApprovalResolutionStatus.RESOLVED
+                ]
+                if not resolved:
+                    return build_saga_result(
+                        ChangeState.AWAITING_AUTHORITY,
+                        initial_state=ChangeState.AWAITING_AUTHORITY,
+                        is_completed=False,
+                        autonomy_class=existing_record.autonomy_class,
+                        stopped_reason=(
+                            "Awaiting verified human authority decision; execution halted cleanly"
+                        ),
+                        approval_card=active_approval_card,
+                    )
 
         # -------------------------------------------------------------------------
         # Event Emission & State Persistence Helper (Persistence-Before-Publish)
@@ -909,8 +996,8 @@ class ChangeSagaOrchestrator:
             }
 
             # 2. Persist authoritative state in repository FIRST (optimistic concurrency)
-            existing_record = self.repository.get_change(tid, change_id)
-            if existing_record is None:
+            existing_rec = self.repository.get_change(tid, change_id)
+            if existing_rec is None:
                 new_record = ChangeRecord(
                     tenant_id=tid,
                     change_id=change_id,
@@ -930,17 +1017,17 @@ class ChangeSagaOrchestrator:
                 )
                 self.repository.create_change(tid, new_record)
             else:
-                updated_record = existing_record.model_copy(
+                updated_record = existing_rec.model_copy(
                     update={
                         "state": target_state,
                         "state_updated_at": now,
                         "state_reason": sanitized_reason,
-                        "autonomy_class": active_autonomy_class or existing_record.autonomy_class,
+                        "autonomy_class": active_autonomy_class or existing_rec.autonomy_class,
                         "updated_at": now,
                     }
                 )
                 self.repository.update_change(
-                    tid, updated_record, expected_version=existing_record.version
+                    tid, updated_record, expected_version=existing_rec.version
                 )
 
             # 3. Only after persistence succeeds, publish wire message & update timeline
@@ -996,35 +1083,50 @@ class ChangeSagaOrchestrator:
             current_state = target_state
             return envelope
 
+        def advance_to_state(
+            target_state: ChangeState,
+            reason: str,
+            producer_id: str,
+            producer_role: str,
+            producer_revision: str,
+            payload_summary: Mapping[str, Any],
+        ) -> Optional[EventEnvelope]:
+            nonlocal current_state
+            if current_state == target_state:
+                return None
+            if STAGE_ORDER.get(current_state, 0) < STAGE_ORDER.get(target_state, 0):
+                return transition_and_persist(
+                    target_state,
+                    reason,
+                    producer_id,
+                    producer_role,
+                    producer_revision,
+                    payload_summary,
+                )
+            return None
+
         # -------------------------------------------------------------------------
         # STAGE 0: Intake & Initial State (RECEIVED)
         # -------------------------------------------------------------------------
-        transition_and_persist(
-            target_state=ChangeState.RECEIVED,
-            reason="Change request received and admitted",
-            producer_id=self.orchestrator_id,
-            producer_role="change_orchestrator",
-            producer_revision=self.orchestrator_revision,
-            payload_summary={
-                "intent": clean_description,
-                "targets": list(request.target_systems),
-            },
-        )
+        if existing_record is None:
+            transition_and_persist(
+                target_state=ChangeState.RECEIVED,
+                reason="Change request received and admitted",
+                producer_id=self.orchestrator_id,
+                producer_role="change_orchestrator",
+                producer_revision=self.orchestrator_revision,
+                payload_summary={
+                    "intent": clean_description,
+                    "targets": list(request.target_systems),
+                },
+            )
 
         if stop_at_state == ChangeState.RECEIVED:
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 stopped_reason="Stopped at requested state RECEIVED",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
@@ -1032,37 +1134,30 @@ class ChangeSagaOrchestrator:
         # -------------------------------------------------------------------------
         is_supported_intent, unsupported_reason = validate_supported_change_intent(request)
         if not is_supported_intent:
-            transition_and_persist(
-                target_state=ChangeState.BLOCKED,
-                reason=f"UNSUPPORTED_OPERATION: {unsupported_reason}",
-                producer_id=self.orchestrator_id,
-                producer_role="change_orchestrator",
-                producer_revision=self.orchestrator_revision,
-                payload_summary={
-                    "action": "unsupported_change_intent_blocked",
-                    "reason": unsupported_reason,
-                },
-            )
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            if current_state != ChangeState.BLOCKED:
+                transition_and_persist(
+                    target_state=ChangeState.BLOCKED,
+                    reason=f"UNSUPPORTED_OPERATION: {unsupported_reason}",
+                    producer_id=self.orchestrator_id,
+                    producer_role="change_orchestrator",
+                    producer_revision=self.orchestrator_revision,
+                    payload_summary={
+                        "action": "unsupported_change_intent_blocked",
+                        "reason": unsupported_reason,
+                    },
+                )
+            return build_saga_result(
+                ChangeState.BLOCKED,
                 initial_state=ChangeState.RECEIVED,
-                final_state=ChangeState.BLOCKED,
                 is_completed=False,
                 autonomy_class=AutonomyClass.BLOCKED,
                 stopped_reason=f"UNSUPPORTED_OPERATION: {unsupported_reason}",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
         # STAGE 1: Discover (DISCOVERING) — Real P-15 Component Execution
         # -------------------------------------------------------------------------
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.DISCOVERING,
             reason="Beginning impact discovery and blast-radius analysis",
             producer_id="agent-impact-scout",
@@ -1094,72 +1189,68 @@ class ChangeSagaOrchestrator:
             evidence_mode=evidence_mode.value,
         )
 
-        # Persist Discover Task & Evidence
-        tasks_executed += 1
-        self.repository.create_task(
-            tid,
-            change_id,
-            TaskRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                task_id=f"task-discover-{change_id}",
-                sequence_number=tasks_executed,
-                agent_id="agent-impact-scout",
-                agent_role="impact_scout",
-                agent_revision="1.0.0",
-                action_class="BLAST_RADIUS_ANALYSIS",
-                status=TaskStatus.COMPLETED,
-                started_at=now,
-                completed_at=now,
-                output_summary=(
-                    f"Blast radius calculated: {len(blast_radius_artifact.impacted_assets)} assets"
+        # Persist Discover Task & Evidence if not already present
+        if self.repository.get_task(tid, change_id, f"task-discover-{change_id}") is None:
+            tasks_executed += 1
+            self.repository.create_task(
+                tid,
+                change_id,
+                TaskRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    task_id=f"task-discover-{change_id}",
+                    sequence_number=tasks_executed,
+                    agent_id="agent-impact-scout",
+                    agent_role="impact_scout",
+                    agent_revision="1.0.0",
+                    action_class="BLAST_RADIUS_ANALYSIS",
+                    status=TaskStatus.COMPLETED,
+                    started_at=now,
+                    completed_at=now,
+                    output_summary=(
+                        "Blast radius calculated: "
+                        f"{len(blast_radius_artifact.impacted_assets)} assets"
+                    ),
+                    artifact_hashes=({"blast_radius_digest": blast_radius_artifact.digest},),
+                    created_at=now,
+                    updated_at=now,
                 ),
-                artifact_hashes=({"blast_radius_digest": blast_radius_artifact.digest},),
-                created_at=now,
-                updated_at=now,
-            ),
-        )
+            )
 
-        evidence_collected += 1
-        self.repository.create_evidence_ref(
-            tid,
-            change_id,
-            EvidenceRefRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                evidence_id=f"ev-discover-{change_id}",
-                subject="blast_radius",
-                state=EvidenceState.PASS,
-                collection_mode=evidence_mode,
-                producer_kind=EvidenceProducerKind.AGENT,
-                agent_id="agent-impact-scout",
-                agent_revision="1.0.0",
-                artifact_digests=(blast_radius_artifact.digest,),
-                collected_at=now,
-                created_at=now,
-            ),
-        )
+        if self.repository.get_evidence_ref(tid, change_id, f"ev-discover-{change_id}") is None:
+            evidence_collected += 1
+            self.repository.create_evidence_ref(
+                tid,
+                change_id,
+                EvidenceRefRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    evidence_id=f"ev-discover-{change_id}",
+                    subject="blast_radius",
+                    state=EvidenceState.PASS,
+                    collection_mode=evidence_mode,
+                    producer_kind=EvidenceProducerKind.AGENT,
+                    agent_id="agent-impact-scout",
+                    agent_revision="1.0.0",
+                    artifact_digests=(blast_radius_artifact.digest,),
+                    collected_at=now,
+                    created_at=now,
+                ),
+            )
 
         if stop_at_state == ChangeState.DISCOVERING:
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 stopped_reason="Stopped at requested state DISCOVERING",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         # STAGE 2: Qualify (QUALIFYING) — Real P-12 Agent Registry / Capability Passport
         # -------------------------------------------------------------------------
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.QUALIFYING,
             reason="Verifying agent fleet qualifications and capability requirements",
             producer_id=self.orchestrator_id,
@@ -1224,83 +1315,69 @@ class ChangeSagaOrchestrator:
                     "reason": qualification_failure_reason,
                 },
             )
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                ChangeState.BLOCKED,
                 initial_state=ChangeState.RECEIVED,
-                final_state=ChangeState.BLOCKED,
                 is_completed=False,
                 autonomy_class=AutonomyClass.BLOCKED,
                 stopped_reason=f"QUALIFICATION_FAILED: {qualification_failure_reason}",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
-        tasks_executed += 1
-        self.repository.create_task(
-            tid,
-            change_id,
-            TaskRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                task_id=f"task-qualify-{change_id}",
-                sequence_number=tasks_executed,
-                agent_id=self.orchestrator_id,
-                agent_role="qualifier",
-                agent_revision=self.orchestrator_revision,
-                action_class="CAPABILITY_QUALIFICATION",
-                status=TaskStatus.COMPLETED,
-                started_at=now,
-                completed_at=now,
-                output_summary=f"Verified qualifications for {verified_role_count} agent roles",
-                created_at=now,
-                updated_at=now,
-            ),
-        )
+        if self.repository.get_task(tid, change_id, f"task-qualify-{change_id}") is None:
+            tasks_executed += 1
+            self.repository.create_task(
+                tid,
+                change_id,
+                TaskRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    task_id=f"task-qualify-{change_id}",
+                    sequence_number=tasks_executed,
+                    agent_id=self.orchestrator_id,
+                    agent_role="qualifier",
+                    agent_revision=self.orchestrator_revision,
+                    action_class="CAPABILITY_QUALIFICATION",
+                    status=TaskStatus.COMPLETED,
+                    started_at=now,
+                    completed_at=now,
+                    output_summary=f"Verified qualifications for {verified_role_count} agent roles",
+                    created_at=now,
+                    updated_at=now,
+                ),
+            )
 
-        evidence_collected += 1
-        self.repository.create_evidence_ref(
-            tid,
-            change_id,
-            EvidenceRefRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                evidence_id=f"ev-qualify-{change_id}",
-                subject="capability_qualification",
-                state=EvidenceState.PASS,
-                collection_mode=evidence_mode,
-                producer_kind=EvidenceProducerKind.AGENT,
-                agent_id=self.orchestrator_id,
-                agent_revision=self.orchestrator_revision,
-                collected_at=now,
-                created_at=now,
-            ),
-        )
+        if self.repository.get_evidence_ref(tid, change_id, f"ev-qualify-{change_id}") is None:
+            evidence_collected += 1
+            self.repository.create_evidence_ref(
+                tid,
+                change_id,
+                EvidenceRefRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    evidence_id=f"ev-qualify-{change_id}",
+                    subject="capability_qualification",
+                    state=EvidenceState.PASS,
+                    collection_mode=evidence_mode,
+                    producer_kind=EvidenceProducerKind.AGENT,
+                    agent_id=self.orchestrator_id,
+                    agent_revision=self.orchestrator_revision,
+                    collected_at=now,
+                    created_at=now,
+                ),
+            )
 
         if stop_at_state == ChangeState.QUALIFYING:
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 stopped_reason="Stopped at requested state QUALIFYING",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
         # STAGE 3: Rehearse (REHEARSING) — Real P-13 ShadowLabRunner
         # -------------------------------------------------------------------------
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.REHEARSING,
             reason="Executing ShadowLab simulated twin rehearsal",
             producer_id="agent-shadowlab-runner",
@@ -1322,69 +1399,63 @@ class ChangeSagaOrchestrator:
         )
         rehearsal_outcome = ShadowLabRunner.run_scenario(scenario)
 
-        tasks_executed += 1
-        self.repository.create_task(
-            tid,
-            change_id,
-            TaskRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                task_id=f"task-rehearse-{change_id}",
-                sequence_number=tasks_executed,
-                agent_id="agent-shadowlab-runner",
-                agent_role="shadowlab",
-                agent_revision="1.0.0",
-                action_class="REHEARSAL_SIMULATION",
-                status=TaskStatus.COMPLETED if rehearsal_outcome.passed else TaskStatus.FAILED,
-                started_at=now,
-                completed_at=now,
-                output_summary=f"Rehearsal {scenario.scenario_id}: {rehearsal_outcome.details}",
-                artifact_hashes=({"rehearsal_digest": rehearsal_outcome.evidence_digest},),
-                created_at=now,
-                updated_at=now,
-            ),
-        )
+        if self.repository.get_task(tid, change_id, f"task-rehearse-{change_id}") is None:
+            tasks_executed += 1
+            self.repository.create_task(
+                tid,
+                change_id,
+                TaskRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    task_id=f"task-rehearse-{change_id}",
+                    sequence_number=tasks_executed,
+                    agent_id="agent-shadowlab-runner",
+                    agent_role="shadowlab",
+                    agent_revision="1.0.0",
+                    action_class="REHEARSAL_SIMULATION",
+                    status=TaskStatus.COMPLETED if rehearsal_outcome.passed else TaskStatus.FAILED,
+                    started_at=now,
+                    completed_at=now,
+                    output_summary=f"Rehearsal {scenario.scenario_id}: {rehearsal_outcome.details}",
+                    artifact_hashes=({"rehearsal_digest": rehearsal_outcome.evidence_digest},),
+                    created_at=now,
+                    updated_at=now,
+                ),
+            )
 
-        evidence_collected += 1
-        self.repository.create_evidence_ref(
-            tid,
-            change_id,
-            EvidenceRefRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                evidence_id=f"ev-rehearse-{change_id}",
-                subject="shadowlab_rehearsal",
-                state=rehearsal_outcome.evidence_state,
-                collection_mode=ExecutionEvidenceMode.SIMULATION,
-                producer_kind=EvidenceProducerKind.SIMULATION,
-                agent_id="agent-shadowlab-runner",
-                agent_revision="1.0.0",
-                artifact_digests=(rehearsal_outcome.evidence_digest,),
-                collected_at=now,
-                created_at=now,
-            ),
-        )
+        if self.repository.get_evidence_ref(tid, change_id, f"ev-rehearse-{change_id}") is None:
+            evidence_collected += 1
+            self.repository.create_evidence_ref(
+                tid,
+                change_id,
+                EvidenceRefRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    evidence_id=f"ev-rehearse-{change_id}",
+                    subject="shadowlab_rehearsal",
+                    state=rehearsal_outcome.evidence_state,
+                    collection_mode=ExecutionEvidenceMode.SIMULATION,
+                    producer_kind=EvidenceProducerKind.SIMULATION,
+                    agent_id="agent-shadowlab-runner",
+                    agent_revision="1.0.0",
+                    artifact_digests=(rehearsal_outcome.evidence_digest,),
+                    collected_at=now,
+                    created_at=now,
+                ),
+            )
 
         if stop_at_state == ChangeState.REHEARSING:
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 stopped_reason="Stopped at requested state REHEARSING",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
         # STAGE 4: Ground (GROUNDED) — Epistemic Memory Trust & Deterministic Policy
         # -------------------------------------------------------------------------
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.GROUNDED,
             reason="Grounding change in epistemic memory trust and deterministic policy rules",
             producer_id="agent-memory-trust",
@@ -1425,79 +1496,66 @@ class ChangeSagaOrchestrator:
                     "findings": list(policy_res.findings),
                 },
             )
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                ChangeState.BLOCKED,
                 initial_state=ChangeState.RECEIVED,
-                final_state=ChangeState.BLOCKED,
                 is_completed=False,
                 autonomy_class=AutonomyClass.BLOCKED,
                 stopped_reason="BLOCKED by deterministic policy pre-checks",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
-        tasks_executed += 1
-        self.repository.create_task(
-            tid,
-            change_id,
-            TaskRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                task_id=f"task-ground-{change_id}",
-                sequence_number=tasks_executed,
-                agent_id="agent-memory-trust",
-                agent_role="memory_trust",
-                agent_revision="1.0.0",
-                action_class="EPISTEMIC_GROUNDING",
-                status=TaskStatus.COMPLETED,
-                started_at=now,
-                completed_at=now,
-                output_summary=(
-                    f"Epistemic grounding complete: {len(trusted_memory_refs)} trusted memory refs"
+        if self.repository.get_task(tid, change_id, f"task-ground-{change_id}") is None:
+            tasks_executed += 1
+            self.repository.create_task(
+                tid,
+                change_id,
+                TaskRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    task_id=f"task-ground-{change_id}",
+                    sequence_number=tasks_executed,
+                    agent_id="agent-memory-trust",
+                    agent_role="memory_trust",
+                    agent_revision="1.0.0",
+                    action_class="EPISTEMIC_GROUNDING",
+                    status=TaskStatus.COMPLETED,
+                    started_at=now,
+                    completed_at=now,
+                    output_summary=(
+                        "Epistemic grounding complete: "
+                        f"{len(trusted_memory_refs)} trusted memory refs"
+                    ),
+                    created_at=now,
+                    updated_at=now,
                 ),
-                created_at=now,
-                updated_at=now,
-            ),
-        )
+            )
 
-        evidence_collected += 1
-        self.repository.create_evidence_ref(
-            tid,
-            change_id,
-            EvidenceRefRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                evidence_id=f"ev-ground-{change_id}",
-                subject="epistemic_grounding",
-                state=EvidenceState.PASS,
-                collection_mode=evidence_mode,
-                producer_kind=EvidenceProducerKind.AGENT,
-                agent_id="agent-memory-trust",
-                agent_revision="1.0.0",
-                collected_at=now,
-                created_at=now,
-            ),
-        )
+        if self.repository.get_evidence_ref(tid, change_id, f"ev-ground-{change_id}") is None:
+            evidence_collected += 1
+            self.repository.create_evidence_ref(
+                tid,
+                change_id,
+                EvidenceRefRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    evidence_id=f"ev-ground-{change_id}",
+                    subject="epistemic_grounding",
+                    state=EvidenceState.PASS,
+                    collection_mode=evidence_mode,
+                    producer_kind=EvidenceProducerKind.AGENT,
+                    agent_id="agent-memory-trust",
+                    agent_revision="1.0.0",
+                    collected_at=now,
+                    created_at=now,
+                ),
+            )
 
         if stop_at_state == ChangeState.GROUNDED:
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 stopped_reason="Stopped at requested state GROUNDED",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
@@ -1573,20 +1631,12 @@ class ChangeSagaOrchestrator:
                 },
             )
             # Return BLOCKED result with zero approval card and zero execution tasks
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                ChangeState.BLOCKED,
                 initial_state=ChangeState.RECEIVED,
-                final_state=ChangeState.BLOCKED,
                 is_completed=False,
                 autonomy_class=AutonomyClass.BLOCKED,
                 stopped_reason=f"BLOCKED: {gate_result.decision_summary}",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # Check for HUMAN_AUTHORITY_REQUIRED
@@ -1595,7 +1645,7 @@ class ChangeSagaOrchestrator:
             and not gate_result.is_authorized
         ):
             active_approval_card = gate_result.compression_card
-            transition_and_persist(
+            advance_to_state(
                 target_state=ChangeState.AWAITING_AUTHORITY,
                 reason=(
                     "Policy Gate determined Human Authority is required: "
@@ -1611,54 +1661,48 @@ class ChangeSagaOrchestrator:
                 },
             )
 
-            # Persist Approval Record derived strictly from compression card
+            # Persist Approval Record derived strictly from compression card if not existing
             if gate_result.compression_card is not None:
-                card = gate_result.compression_card
-                self.repository.create_approval(
-                    tid,
-                    change_id,
-                    ApprovalRecord(
-                        tenant_id=tid,
-                        change_id=change_id,
-                        card_id=card.card_id,
-                        authority_slot_ref=card.authority_slot_ref,
-                        decision_question=card.decision_question,
-                        decision_options=card.decision_options,
-                        policy_reason=card.policy_reason,
-                        action_scope=card.action_scope,
-                        completed_work_summary=card.completed_work_summary,
-                        rehearsed_work_summary=card.rehearsed_work_summary,
-                        remaining_decision_summary=card.remaining_decision_summary,
-                        evidence_refs=card.evidence_refs,
-                        card_created_at=card.created_at,
-                        resolution_status=ApprovalResolutionStatus.PENDING,
-                        created_at=now,
-                        updated_at=now,
-                    ),
-                )
+                existing_approvals = self.repository.list_approvals(tid, change_id)
+                if not existing_approvals:
+                    card = gate_result.compression_card
+                    self.repository.create_approval(
+                        tid,
+                        change_id,
+                        ApprovalRecord(
+                            tenant_id=tid,
+                            change_id=change_id,
+                            card_id=card.card_id,
+                            authority_slot_ref=card.authority_slot_ref,
+                            decision_question=card.decision_question,
+                            decision_options=card.decision_options,
+                            policy_reason=card.policy_reason,
+                            action_scope=card.action_scope,
+                            completed_work_summary=card.completed_work_summary,
+                            rehearsed_work_summary=card.rehearsed_work_summary,
+                            remaining_decision_summary=card.remaining_decision_summary,
+                            evidence_refs=card.evidence_refs,
+                            card_created_at=card.created_at,
+                            resolution_status=ApprovalResolutionStatus.PENDING,
+                            created_at=now,
+                            updated_at=now,
+                        ),
+                    )
 
             # Stop cleanly at AWAITING_AUTHORITY — zero execution and zero Release Steward mutation!
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 autonomy_class=active_autonomy_class,
                 approval_card=active_approval_card,
                 stopped_reason=(
                     "Awaiting verified human authority decision; execution halted cleanly"
                 ),
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # Autonomous Authorization Granted (AUTO_EXECUTE or REHEARSE_THEN_EXECUTE)
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.AUTHORIZED,
             reason=f"Authorized under autonomy class {gate_result.autonomy_class.value}",
             producer_id="agent-policy-guardian",
@@ -1671,49 +1715,42 @@ class ChangeSagaOrchestrator:
             },
         )
 
-        tasks_executed += 1
-        self.repository.create_task(
-            tid,
-            change_id,
-            TaskRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                task_id=f"task-authorize-{change_id}",
-                sequence_number=tasks_executed,
-                agent_id="agent-policy-guardian",
-                agent_role="policy_guardian",
-                agent_revision="1.0.0",
-                action_class="AUTHORIZATION_GATE",
-                status=TaskStatus.COMPLETED,
-                started_at=now,
-                completed_at=now,
-                output_summary=f"Authorized autonomously as {gate_result.autonomy_class.value}",
-                created_at=now,
-                updated_at=now,
-            ),
-        )
+        if self.repository.get_task(tid, change_id, f"task-authorize-{change_id}") is None:
+            tasks_executed += 1
+            self.repository.create_task(
+                tid,
+                change_id,
+                TaskRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    task_id=f"task-authorize-{change_id}",
+                    sequence_number=tasks_executed,
+                    agent_id="agent-policy-guardian",
+                    agent_role="policy_guardian",
+                    agent_revision="1.0.0",
+                    action_class="AUTHORIZATION_GATE",
+                    status=TaskStatus.COMPLETED,
+                    started_at=now,
+                    completed_at=now,
+                    output_summary=f"Authorized autonomously as {gate_result.autonomy_class.value}",
+                    created_at=now,
+                    updated_at=now,
+                ),
+            )
 
         if stop_at_state == ChangeState.AUTHORIZED:
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 autonomy_class=active_autonomy_class,
                 stopped_reason="Stopped at requested state AUTHORIZED",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
         # STAGE 6: Execute (EXECUTING) — Real P-17 Migration Plan & Manifest
         # -------------------------------------------------------------------------
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.EXECUTING,
             reason="Executing change synthesis and artifact generation",
             producer_id="agent-migration-engineer",
@@ -1741,73 +1778,67 @@ class ChangeSagaOrchestrator:
             },
         )
 
-        tasks_executed += 1
-        self.repository.create_task(
-            tid,
-            change_id,
-            TaskRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                task_id=f"task-execute-{change_id}",
-                sequence_number=tasks_executed,
-                agent_id="agent-migration-engineer",
-                agent_role="migration_engineer",
-                agent_revision="1.0.0",
-                action_class="MIGRATION_EXECUTION",
-                status=TaskStatus.COMPLETED,
-                started_at=now,
-                completed_at=now,
-                output_summary=(
-                    f"Synthesized migration with {len(mig_plan.steps)} steps and "
-                    f"{len(file_manifest.entries)} files"
+        if self.repository.get_task(tid, change_id, f"task-execute-{change_id}") is None:
+            tasks_executed += 1
+            self.repository.create_task(
+                tid,
+                change_id,
+                TaskRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    task_id=f"task-execute-{change_id}",
+                    sequence_number=tasks_executed,
+                    agent_id="agent-migration-engineer",
+                    agent_role="migration_engineer",
+                    agent_revision="1.0.0",
+                    action_class="MIGRATION_EXECUTION",
+                    status=TaskStatus.COMPLETED,
+                    started_at=now,
+                    completed_at=now,
+                    output_summary=(
+                        f"Synthesized migration with {len(mig_plan.steps)} steps and "
+                        f"{len(file_manifest.entries)} files"
+                    ),
+                    artifact_hashes=({"manifest_hash": file_manifest.manifest_hash},),
+                    created_at=now,
+                    updated_at=now,
                 ),
-                artifact_hashes=({"manifest_hash": file_manifest.manifest_hash},),
-                created_at=now,
-                updated_at=now,
-            ),
-        )
+            )
 
-        evidence_collected += 1
-        self.repository.create_evidence_ref(
-            tid,
-            change_id,
-            EvidenceRefRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                evidence_id=f"ev-execute-{change_id}",
-                subject="migration_artifacts",
-                state=EvidenceState.PASS,
-                collection_mode=evidence_mode,
-                producer_kind=EvidenceProducerKind.AGENT,
-                agent_id="agent-migration-engineer",
-                agent_revision="1.0.0",
-                artifact_digests=(file_manifest.manifest_hash,),
-                collected_at=now,
-                created_at=now,
-            ),
-        )
+        if self.repository.get_evidence_ref(tid, change_id, f"ev-execute-{change_id}") is None:
+            evidence_collected += 1
+            self.repository.create_evidence_ref(
+                tid,
+                change_id,
+                EvidenceRefRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    evidence_id=f"ev-execute-{change_id}",
+                    subject="migration_artifacts",
+                    state=EvidenceState.PASS,
+                    collection_mode=evidence_mode,
+                    producer_kind=EvidenceProducerKind.AGENT,
+                    agent_id="agent-migration-engineer",
+                    agent_revision="1.0.0",
+                    artifact_digests=(file_manifest.manifest_hash,),
+                    collected_at=now,
+                    created_at=now,
+                ),
+            )
 
         if stop_at_state == ChangeState.EXECUTING:
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 autonomy_class=active_autonomy_class,
                 stopped_reason="Stopped at requested state EXECUTING",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
         # STAGE 7: Verify (VERIFYING) — Real P-18 Claims, Audit, Reconciliation
         # -------------------------------------------------------------------------
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.VERIFYING,
             reason="Executing independent evidence audit and deterministic reconciliation",
             producer_id="agent-evidence-auditor",
@@ -2075,6 +2106,37 @@ class ChangeSagaOrchestrator:
                     "insufficient_count": audit_report.insufficient_count,
                 },
             )
+            if self.repository.get_task(tid, change_id, f"task-verify-{change_id}") is None:
+                tasks_executed += 1
+                self.repository.create_task(
+                    tid,
+                    change_id,
+                    TaskRecord(
+                        tenant_id=tid,
+                        change_id=change_id,
+                        task_id=f"task-verify-{change_id}",
+                        sequence_number=tasks_executed,
+                        agent_id="agent-evidence-auditor",
+                        agent_role="evidence_auditor",
+                        agent_revision="1.0.0",
+                        action_class="EVIDENCE_AUDIT_RECONCILIATION",
+                        status=TaskStatus.FAILED,
+                        started_at=now,
+                        completed_at=now,
+                        output_summary=f"Verification FAILED: {failure_summary}",
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                )
+            return build_saga_result(
+                ChangeState.FAILED,
+                initial_state=ChangeState.RECEIVED,
+                is_completed=False,
+                autonomy_class=active_autonomy_class,
+                stopped_reason=f"VERIFICATION_FAILED: {failure_summary}",
+            )
+
+        if self.repository.get_task(tid, change_id, f"task-verify-{change_id}") is None:
             tasks_executed += 1
             self.repository.create_task(
                 tid,
@@ -2088,94 +2150,51 @@ class ChangeSagaOrchestrator:
                     agent_role="evidence_auditor",
                     agent_revision="1.0.0",
                     action_class="EVIDENCE_AUDIT_RECONCILIATION",
-                    status=TaskStatus.FAILED,
+                    status=TaskStatus.COMPLETED,
                     started_at=now,
                     completed_at=now,
-                    output_summary=f"Verification FAILED: {failure_summary}",
+                    output_summary=(
+                        "Audit completed: "
+                        f"{audit_report.supports_count} supported claims reconciled"
+                    ),
                     created_at=now,
                     updated_at=now,
                 ),
             )
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
-                initial_state=ChangeState.RECEIVED,
-                final_state=ChangeState.FAILED,
-                is_completed=False,
-                autonomy_class=active_autonomy_class,
-                stopped_reason=f"VERIFICATION_FAILED: {failure_summary}",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
+
+        if self.repository.get_evidence_ref(tid, change_id, f"ev-verify-{change_id}") is None:
+            evidence_collected += 1
+            self.repository.create_evidence_ref(
+                tid,
+                change_id,
+                EvidenceRefRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    evidence_id=f"ev-verify-{change_id}",
+                    subject="audit_reconciliation",
+                    state=EvidenceState.PASS,
+                    collection_mode=evidence_mode,
+                    producer_kind=EvidenceProducerKind.AGENT,
+                    agent_id="agent-evidence-auditor",
+                    agent_revision="1.0.0",
+                    collected_at=now,
+                    created_at=now,
+                ),
             )
 
-        tasks_executed += 1
-        self.repository.create_task(
-            tid,
-            change_id,
-            TaskRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                task_id=f"task-verify-{change_id}",
-                sequence_number=tasks_executed,
-                agent_id="agent-evidence-auditor",
-                agent_role="evidence_auditor",
-                agent_revision="1.0.0",
-                action_class="EVIDENCE_AUDIT_RECONCILIATION",
-                status=TaskStatus.COMPLETED,
-                started_at=now,
-                completed_at=now,
-                output_summary=(
-                    f"Audit completed: {audit_report.supports_count} supported claims reconciled"
-                ),
-                created_at=now,
-                updated_at=now,
-            ),
-        )
-
-        evidence_collected += 1
-        self.repository.create_evidence_ref(
-            tid,
-            change_id,
-            EvidenceRefRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                evidence_id=f"ev-verify-{change_id}",
-                subject="audit_reconciliation",
-                state=EvidenceState.PASS,
-                collection_mode=evidence_mode,
-                producer_kind=EvidenceProducerKind.AGENT,
-                agent_id="agent-evidence-auditor",
-                agent_revision="1.0.0",
-                collected_at=now,
-                created_at=now,
-            ),
-        )
-
         if stop_at_state == ChangeState.VERIFYING:
-            return SagaExecutionResult(
-                tenant_id=tid,
-                change_id=change_id,
-                correlation_id=correlation_id,
+            return build_saga_result(
+                current_state,
                 initial_state=ChangeState.RECEIVED,
-                final_state=current_state,
                 is_completed=False,
                 autonomy_class=active_autonomy_class,
                 stopped_reason="Stopped at requested state VERIFYING",
-                events_emitted=events_emitted,
-                tasks_executed=tasks_executed,
-                evidence_collected=evidence_collected,
-                checkpoints_created=checkpoints_created,
-                timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
             )
 
         # -------------------------------------------------------------------------
         # STAGE 8: Certify (CERTIFYING -> COMPLETE) — Checkpoint & Complete
         # -------------------------------------------------------------------------
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.CERTIFYING,
             reason="Certifying complete proof-carrying change evidence package",
             producer_id=self.orchestrator_id,
@@ -2203,30 +2222,31 @@ class ChangeSagaOrchestrator:
             now=now,
         )
 
-        tasks_executed += 1
-        self.repository.create_task(
-            tid,
-            change_id,
-            TaskRecord(
-                tenant_id=tid,
-                change_id=change_id,
-                task_id=f"task-certify-{change_id}",
-                sequence_number=tasks_executed,
-                agent_id=self.orchestrator_id,
-                agent_role="change_orchestrator",
-                agent_revision=self.orchestrator_revision,
-                action_class="SAGA_CERTIFICATION",
-                status=TaskStatus.COMPLETED,
-                started_at=now,
-                completed_at=now,
-                output_summary="Certified complete evidence package",
-                created_at=now,
-                updated_at=now,
-            ),
-        )
+        if self.repository.get_task(tid, change_id, f"task-certify-{change_id}") is None:
+            tasks_executed += 1
+            self.repository.create_task(
+                tid,
+                change_id,
+                TaskRecord(
+                    tenant_id=tid,
+                    change_id=change_id,
+                    task_id=f"task-certify-{change_id}",
+                    sequence_number=tasks_executed,
+                    agent_id=self.orchestrator_id,
+                    agent_role="change_orchestrator",
+                    agent_revision=self.orchestrator_revision,
+                    action_class="SAGA_CERTIFICATION",
+                    status=TaskStatus.COMPLETED,
+                    started_at=now,
+                    completed_at=now,
+                    output_summary="Certified complete evidence package",
+                    created_at=now,
+                    updated_at=now,
+                ),
+            )
 
         # Final Transition to COMPLETE
-        transition_and_persist(
+        advance_to_state(
             target_state=ChangeState.COMPLETE,
             reason="Change saga completed successfully with all verification gates passed",
             producer_id=self.orchestrator_id,
@@ -2255,20 +2275,12 @@ class ChangeSagaOrchestrator:
             )
             self.repository.update_change(tid, updated_final, expected_version=final_record.version)
 
-        return SagaExecutionResult(
-            tenant_id=tid,
-            change_id=change_id,
-            correlation_id=correlation_id,
+        return build_saga_result(
+            ChangeState.COMPLETE,
             initial_state=ChangeState.RECEIVED,
-            final_state=ChangeState.COMPLETE,
             is_completed=True,
             autonomy_class=active_autonomy_class,
             stopped_reason=None,
-            events_emitted=events_emitted,
-            tasks_executed=tasks_executed,
-            evidence_collected=evidence_collected,
-            checkpoints_created=checkpoints_created,
-            timeline_digest=self.timeline.compute_timeline_digest() if self.timeline else None,
         )
 
     # =========================================================================
@@ -2387,11 +2399,12 @@ class ChangeSagaOrchestrator:
         *,
         now: Optional[datetime] = None,
     ) -> SagaRecoveryResult:
-        """Pause a running saga by transitioning to BLOCKED with explicit reason.
+        """Pause a running saga while preserving its exact lifecycle state.
 
-        P-20.02: Pause transitions the saga to BLOCKED state with a persisted
-        reason. The saga can be resumed by calling resume_saga. Only non-terminal,
-        non-BLOCKED states can be paused.
+        P-20.02: Resumable pause preserves tenant_id, change_id, correlation_id,
+        exact paused lifecycle state, completed tasks, idempotency/write state,
+        and explicit pause reason. Terminal states cannot be paused.
+        Does NOT transition to terminal BLOCKED state.
         """
         if now is None:
             now = datetime.now(timezone.utc)
@@ -2400,35 +2413,195 @@ class ChangeSagaOrchestrator:
         if record is None:
             raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
 
-        previous_state = record.state
-        if is_terminal(previous_state):
-            raise ValueError(f"Cannot pause saga in terminal state {previous_state.value}")
+        current_state = record.state
+        if is_terminal(current_state):
+            raise ValueError(f"Cannot pause saga in terminal state {current_state.value}")
 
-        updated_record, event_id = self._recovery_transition(
-            tenant_id,
-            change_id,
-            ChangeState.BLOCKED,
-            f"PAUSED: {reason}",
-            now=now,
+        sanitized_reason = sanitize_secrets_in_text(reason)
+        full_reason = f"PAUSED: {sanitized_reason}"
+
+        # Update change record state_reason without changing state
+        updated = record.model_copy(
+            update={
+                "state_reason": full_reason,
+                "updated_at": now,
+            }
         )
+        self.repository.update_change(tenant_id, updated, expected_version=record.version)
 
         # Create checkpoint at pause boundary
-        SagaCheckpointManager.create_checkpoint(
+        tasks = self.repository.list_tasks(tenant_id, change_id)
+        completed_task_ids = tuple(
+            t.task_id for t in tasks if t.status in (TaskStatus.COMPLETED, TaskStatus.COMPENSATED)
+        )
+        pending_task_ids = tuple(
+            t.task_id for t in tasks if t.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
+        )
+        cp = SagaCheckpointManager.create_checkpoint(
             repo=self.repository,
             tenant_id=tenant_id,
             change_id=change_id,
-            lifecycle_state=ChangeState.BLOCKED,
+            lifecycle_state=current_state,
+            completed_task_ids=completed_task_ids,
+            pending_task_ids=pending_task_ids,
             now=now,
         )
+
+        # Emit causal event for pause
+        unique_suffix = uuid.uuid4().hex[:8]
+        event_id = f"evt-{change_id}-recovery-paused-{unique_suffix}"
+        idempotency_key = f"idem_recovery_{change_id}_paused_{unique_suffix}"
+        provenance = AgentRevisionProvenance(
+            agent_id=self.orchestrator_id,
+            agent_revision=self.orchestrator_revision,
+            role="change_orchestrator",
+        )
+        envelope = EventEnvelope(
+            schema_version=CANONICAL_SCHEMA_VERSION,
+            event_id=event_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            producer_id=self.orchestrator_id,
+            producer_revision=self.orchestrator_revision,
+            producer_role="change_orchestrator",
+            agent_provenance=provenance,
+            timestamp=now,
+            idempotency_key=idempotency_key,
+        )
+        route = self._topology.get_route_for_state(current_state)
+        topic_id = route.primary_topic_id if route else "changemesh-lifecycle-v1"
+        payload = {
+            "action": "recovery_paused",
+            "reason": full_reason,
+            "paused_state": current_state.value,
+            "checkpoint_id": cp.checkpoint_id,
+        }
+        scan_payload_for_secrets(payload)
+        wire_msg = EventWireMessage(
+            topic_id=topic_id,
+            envelope=envelope,
+            payload=payload,
+            published_at=now,
+        )
+        if isinstance(self.event_bus, LocalEventBus):
+            self.event_bus.publish_message(wire_msg)
+        else:
+            self.event_bus.publish(wire_msg)
+
+        if self.timeline is not None:
+            self.timeline.record_event(
+                envelope, topic_id=topic_id, payload=payload, transport="LOCAL"
+            )
 
         return SagaRecoveryResult(
             tenant_id=tenant_id,
             change_id=change_id,
             correlation_id=record.correlation_id,
             action=RecoveryAction.PAUSED,
-            previous_state=previous_state,
-            final_state=ChangeState.BLOCKED,
-            reason=f"PAUSED: {reason}",
+            previous_state=current_state,
+            final_state=current_state,
+            reason=full_reason,
+            event_id=event_id,
+            timestamp=now,
+        )
+
+    def resume_saga(
+        self,
+        tenant_id: str,
+        change_id: str,
+        *,
+        checkpoint_id: Optional[str] = None,
+        now: Optional[datetime] = None,
+    ) -> SagaRecoveryResult:
+        """Resume a paused saga from durable state/checkpoint.
+
+        P-20.02: Resume continues the SAME saga without duplicating tasks,
+        approvals, or external writes. Terminal states cannot be resumed.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        if is_terminal(record.state):
+            raise ValueError(f"Cannot resume saga in terminal state {record.state.value}")
+
+        # Restore from checkpoint
+        resume_ctx = SagaCheckpointManager.resume_from_checkpoint(
+            repo=self.repository,
+            tenant_id=tenant_id,
+            change_id=change_id,
+            checkpoint_id=checkpoint_id,
+            now=now,
+        )
+
+        sanitized_reason = (
+            f"RESUMED: Resumed from checkpoint {resume_ctx.resumed_from_checkpoint_id}"
+        )
+        updated = record.model_copy(
+            update={
+                "state_reason": sanitized_reason,
+                "updated_at": now,
+            }
+        )
+        self.repository.update_change(tenant_id, updated, expected_version=record.version)
+
+        # Emit causal event for resume
+        unique_suffix = uuid.uuid4().hex[:8]
+        event_id = f"evt-{change_id}-recovery-resumed-{unique_suffix}"
+        idempotency_key = f"idem_recovery_{change_id}_resumed_{unique_suffix}"
+        provenance = AgentRevisionProvenance(
+            agent_id=self.orchestrator_id,
+            agent_revision=self.orchestrator_revision,
+            role="change_orchestrator",
+        )
+        envelope = EventEnvelope(
+            schema_version=CANONICAL_SCHEMA_VERSION,
+            event_id=event_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            producer_id=self.orchestrator_id,
+            producer_revision=self.orchestrator_revision,
+            producer_role="change_orchestrator",
+            agent_provenance=provenance,
+            timestamp=now,
+            idempotency_key=idempotency_key,
+        )
+        route = self._topology.get_route_for_state(record.state)
+        topic_id = route.primary_topic_id if route else "changemesh-lifecycle-v1"
+        payload = {
+            "action": "recovery_resumed",
+            "reason": sanitized_reason,
+            "current_state": record.state.value,
+            "resumed_from_checkpoint_id": resume_ctx.resumed_from_checkpoint_id,
+        }
+        scan_payload_for_secrets(payload)
+        wire_msg = EventWireMessage(
+            topic_id=topic_id,
+            envelope=envelope,
+            payload=payload,
+            published_at=now,
+        )
+        if isinstance(self.event_bus, LocalEventBus):
+            self.event_bus.publish_message(wire_msg)
+        else:
+            self.event_bus.publish(wire_msg)
+
+        if self.timeline is not None:
+            self.timeline.record_event(
+                envelope, topic_id=topic_id, payload=payload, transport="LOCAL"
+            )
+
+        return SagaRecoveryResult(
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            action=RecoveryAction.RESUMED,
+            previous_state=record.state,
+            final_state=record.state,
+            reason=sanitized_reason,
             event_id=event_id,
             timestamp=now,
         )
@@ -2537,16 +2710,15 @@ class ChangeSagaOrchestrator:
         change_id: str,
         reason: str,
         *,
-        retry_attempt: int = 1,
+        retry_attempt: Optional[int] = None,
         max_attempts: int = DEFAULT_SAGA_RETRY_MAX_ATTEMPTS,
         now: Optional[datetime] = None,
     ) -> SagaRecoveryResult:
         """Schedule a retry for a failed saga phase.
 
         P-20.02: Transitions to RETRY_SCHEDULED from the current state.
-        The retry_origin is persisted for bounded resume validation.
-        If retry_attempt exceeds max_attempts, transitions to FAILED via dead-letter
-        instead.
+        The retry_origin and attempt count are durably persisted.
+        If retry_attempt exceeds max_attempts, routes to dead-letter instead.
         """
         if now is None:
             now = datetime.now(timezone.utc)
@@ -2557,29 +2729,62 @@ class ChangeSagaOrchestrator:
 
         previous_state = record.state
 
+        if is_terminal(previous_state):
+            raise ValueError(f"Cannot schedule retry from terminal state {previous_state.value}")
+
+        if not can_transition(previous_state, ChangeState.RETRY_SCHEDULED):
+            raise ValueError(f"Cannot schedule retry from state {previous_state.value}")
+
+        # Derive durable attempt count from existing checkpoints
+        checkpoints = self.repository.list_checkpoints(tenant_id, change_id)
+        retry_cps = [
+            cp
+            for cp in checkpoints
+            if cp.lifecycle_state_at_checkpoint == ChangeState.RETRY_SCHEDULED
+        ]
+        durable_attempt = len(retry_cps) + 1
+        actual_attempt = (
+            retry_attempt
+            if retry_attempt is not None and retry_attempt >= durable_attempt
+            else durable_attempt
+        )
+
         # Exhaustion check: if attempts exhausted, dead-letter instead
-        if retry_attempt > max_attempts:
+        if actual_attempt > max_attempts:
             return self._dead_letter_saga(
                 tenant_id,
                 change_id,
-                f"RETRY_EXHAUSTED: {reason} (attempt {retry_attempt}/{max_attempts})",
+                f"RETRY_EXHAUSTED: {reason} (attempt {actual_attempt}/{max_attempts})",
                 previous_state=previous_state,
                 correlation_id=record.correlation_id,
                 now=now,
             )
 
-        if is_terminal(previous_state):
-            raise ValueError(f"Cannot schedule retry from terminal state {previous_state.value}")
-
-        # Validate transition is legal from current state
-        if not can_transition(previous_state, ChangeState.RETRY_SCHEDULED):
-            raise ValueError(f"Cannot schedule retry from state {previous_state.value}")
+        sanitized_reason = sanitize_secrets_in_text(reason)
+        state_reason_str = (
+            f"RETRY_SCHEDULED: origin={previous_state.value} "
+            f"attempt={actual_attempt}/{max_attempts} reason={sanitized_reason}"
+        )
 
         updated_record, event_id = self._recovery_transition(
             tenant_id,
             change_id,
             ChangeState.RETRY_SCHEDULED,
-            f"RETRY_SCHEDULED: {reason} (attempt {retry_attempt}/{max_attempts})",
+            state_reason_str,
+            now=now,
+        )
+
+        # Create checkpoint at retry boundary
+        tasks = self.repository.list_tasks(tenant_id, change_id)
+        completed_task_ids = tuple(
+            t.task_id for t in tasks if t.status in (TaskStatus.COMPLETED, TaskStatus.COMPENSATED)
+        )
+        SagaCheckpointManager.create_checkpoint(
+            repo=self.repository,
+            tenant_id=tenant_id,
+            change_id=change_id,
+            lifecycle_state=ChangeState.RETRY_SCHEDULED,
+            completed_task_ids=completed_task_ids,
             now=now,
         )
 
@@ -2590,9 +2795,9 @@ class ChangeSagaOrchestrator:
             action=RecoveryAction.RETRY_SCHEDULED,
             previous_state=previous_state,
             final_state=ChangeState.RETRY_SCHEDULED,
-            reason=f"RETRY_SCHEDULED: {reason}",
+            reason=state_reason_str,
             retry_origin=previous_state,
-            retry_attempt=retry_attempt,
+            retry_attempt=actual_attempt,
             retry_max_attempts=max_attempts,
             event_id=event_id,
             timestamp=now,
@@ -2602,7 +2807,7 @@ class ChangeSagaOrchestrator:
         self,
         tenant_id: str,
         change_id: str,
-        retry_origin: ChangeState,
+        retry_origin: Optional[ChangeState] = None,
         *,
         now: Optional[datetime] = None,
     ) -> SagaRecoveryResult:
@@ -2610,7 +2815,7 @@ class ChangeSagaOrchestrator:
 
         P-20.02: Validates that the saga is in RETRY_SCHEDULED state and
         the resume target matches the bounded RETRY_RESUME_TARGETS for
-        the given retry_origin. Persists state before event emission.
+        the given retry_origin. Derives retry origin from durable state if not passed.
         """
         if now is None:
             now = datetime.now(timezone.utc)
@@ -2624,13 +2829,29 @@ class ChangeSagaOrchestrator:
                 f"Cannot resume retry: saga is in {record.state.value}, expected RETRY_SCHEDULED"
             )
 
-        # The transition validation with retry_origin is enforced by require_transition
+        # Derive durable retry origin if not passed or verify
+        derived_origin: Optional[ChangeState] = None
+        if record.state_reason and "origin=" in record.state_reason:
+            match = re.search(r"origin=([A-Z_]+)", record.state_reason)
+            if match:
+                try:
+                    derived_origin = ChangeState(match.group(1))
+                except ValueError:
+                    pass
+
+        target_origin = retry_origin or derived_origin
+        if target_origin is None:
+            raise ValueError("No retry_origin specified or found in durable recovery metadata")
+
+        # Validate that the transition from RETRY_SCHEDULED to target_origin is legal
+        require_transition(record.state, target_origin, retry_origin=target_origin)
+
         updated_record, event_id = self._recovery_transition(
             tenant_id,
             change_id,
-            retry_origin,
-            f"RETRY_RESUMED: Resuming from RETRY_SCHEDULED to {retry_origin.value}",
-            retry_origin=retry_origin,
+            target_origin,
+            f"RETRY_RESUMED: Resuming from RETRY_SCHEDULED to {target_origin.value}",
+            retry_origin=target_origin,
             now=now,
         )
 
@@ -2640,9 +2861,9 @@ class ChangeSagaOrchestrator:
             correlation_id=record.correlation_id,
             action=RecoveryAction.RESUMED,
             previous_state=ChangeState.RETRY_SCHEDULED,
-            final_state=retry_origin,
-            reason=f"RETRY_RESUMED: Resumed to {retry_origin.value}",
-            retry_origin=retry_origin,
+            final_state=target_origin,
+            reason=f"RETRY_RESUMED: Resumed to {target_origin.value}",
+            retry_origin=target_origin,
             event_id=event_id,
             timestamp=now,
         )
@@ -2806,11 +3027,11 @@ class ChangeSagaOrchestrator:
 
         P-20.02: Dead-letter preserves all metadata for safe recovery without
         credentials. Creates a DeadLetterEventRecord and TerminalFailureHandoff
-        with human_authority_required strictly False.
+        in ProcessLocalDeadLetterState with human_authority_required strictly False.
         """
         from events.dead_letter import (
-            build_dead_letter_record,
             compute_dead_letter_id,
+            get_default_dead_letter_state,
         )
 
         if now is None:
@@ -2819,8 +3040,8 @@ class ChangeSagaOrchestrator:
         dl_id = compute_dead_letter_id(change_id, f"saga-{change_id}")
         sanitized_reason = sanitize_secrets_in_text(reason)
 
-        # Build dead-letter record with full metadata preservation
-        _ = build_dead_letter_record(
+        dl_state = get_default_dead_letter_state()
+        dl_record, is_new = dl_state.get_or_create(
             dead_letter_id=dl_id,
             original_event_id=f"saga-{change_id}",
             change_id=change_id,
@@ -2843,6 +3064,50 @@ class ChangeSagaOrchestrator:
                 now=now,
             )
 
+        # Emit wire event on dead letter topic
+        unique_suffix = uuid.uuid4().hex[:8]
+        event_id = f"evt-{change_id}-dead-letter-{unique_suffix}"
+        idempotency_key = f"idem_recovery_{change_id}_dl_{unique_suffix}"
+        provenance = AgentRevisionProvenance(
+            agent_id=self.orchestrator_id,
+            agent_revision=self.orchestrator_revision,
+            role="change_orchestrator",
+        )
+        envelope = EventEnvelope(
+            schema_version=CANONICAL_SCHEMA_VERSION,
+            event_id=event_id,
+            change_id=change_id,
+            correlation_id=correlation_id,
+            producer_id=self.orchestrator_id,
+            producer_revision=self.orchestrator_revision,
+            producer_role="change_orchestrator",
+            agent_provenance=provenance,
+            timestamp=now,
+            idempotency_key=idempotency_key,
+        )
+        payload = {
+            "action": "dead_letter_recorded",
+            "dead_letter_id": dl_id,
+            "reason": sanitized_reason,
+            "previous_state": previous_state.value,
+        }
+        scan_payload_for_secrets(payload)
+        wire_msg = EventWireMessage(
+            topic_id="changemesh-dead-letter-v1",
+            envelope=envelope,
+            payload=payload,
+            published_at=now,
+        )
+        if isinstance(self.event_bus, LocalEventBus):
+            self.event_bus.publish_message(wire_msg)
+        else:
+            self.event_bus.publish(wire_msg)
+
+        if self.timeline is not None:
+            self.timeline.record_event(
+                envelope, topic_id="changemesh-dead-letter-v1", payload=payload, transport="LOCAL"
+            )
+
         return SagaRecoveryResult(
             tenant_id=tenant_id,
             change_id=change_id,
@@ -2852,6 +3117,7 @@ class ChangeSagaOrchestrator:
             final_state=ChangeState.FAILED,
             reason=f"DEAD_LETTERED: {sanitized_reason}",
             dead_letter_id=dl_id,
+            event_id=event_id,
             timestamp=now,
         )
 
@@ -2884,3 +3150,142 @@ class ChangeSagaOrchestrator:
             correlation_id=record.correlation_id,
             now=now,
         )
+
+    # ------------------------------------------------------------------------
+    # P-20.04: Ambiguity Question Path
+    # ------------------------------------------------------------------------
+
+    def raise_ambiguity_question(
+        self,
+        tenant_id: str,
+        change_id: str,
+        question: Optional[str] = None,
+        *,
+        minimal_question: Optional[str] = None,
+        expected_options: Sequence[str] = (),
+        irreducible_reason: str = "Ambiguity cannot be resolved by deterministic policy or memory",
+        now: Optional[datetime] = None,
+    ) -> AmbiguityRecord:
+        """Raise a single blocking ambiguity question.
+
+        P-20.04: Exactly one minimal question asked only when necessary.
+        Pauses the saga at its current state without converting to terminal BLOCKED.
+        """
+        resolved_question = minimal_question or question
+        if not resolved_question:
+            raise ValueError("question or minimal_question must be provided")
+
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        record = self.repository.get_change(tenant_id, change_id)
+        if record is None:
+            raise ValueError(f"Change {change_id!r} not found in tenant {tenant_id!r}")
+
+        if is_terminal(record.state):
+            raise ValueError(
+                f"Cannot raise ambiguity question on terminal saga in {record.state.value}"
+            )
+
+        sanitized_question = sanitize_secrets_in_text(resolved_question)
+        sanitized_reason = sanitize_secrets_in_text(irreducible_reason)
+        question_id = f"q-{uuid.uuid4().hex[:8]}"
+
+        ambiguity = AmbiguityRecord(
+            schema_version=CANONICAL_SCHEMA_VERSION,
+            tenant_id=tenant_id,
+            change_id=change_id,
+            correlation_id=record.correlation_id,
+            question_id=question_id,
+            question=sanitized_question,
+            expected_options=tuple(expected_options),
+            irreducible_reason=sanitized_reason,
+            paused_state=record.state,
+            paused_context={"state_reason": record.state_reason or ""},
+            resolution_status=AmbiguityResolutionStatus.UNRESOLVED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        saved = self.repository.create_ambiguity(tenant_id, change_id, ambiguity)
+
+        # Pause saga at current state with ambiguity context
+        self.pause_saga(tenant_id, change_id, f"AMBIGUITY: {sanitized_question}", now=now)
+
+        return saved
+
+    def resolve_ambiguity_question(
+        self,
+        tenant_id: str,
+        change_id: str,
+        question_id: str,
+        answer: str,
+        *,
+        now: Optional[datetime] = None,
+    ) -> AmbiguityRecord:
+        """Resolve a blocking ambiguity question and resume the same saga.
+
+        P-20.04: Answering resumes the exact same saga/change_id without
+        duplicating tasks or approvals.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        ambiguity = self.repository.get_ambiguity(tenant_id, change_id, question_id)
+        if ambiguity is None:
+            raise ValueError(f"Ambiguity question {question_id!r} not found")
+
+        if ambiguity.resolution_status == AmbiguityResolutionStatus.RESOLVED:
+            return ambiguity
+
+        sanitized_answer = sanitize_secrets_in_text(answer)
+        updated = ambiguity.model_copy(
+            update={
+                "resolved_answer": sanitized_answer,
+                "resolution_status": AmbiguityResolutionStatus.RESOLVED,
+                "resolved_at": now,
+                "updated_at": now,
+            }
+        )
+        saved = self.repository.update_ambiguity(
+            tenant_id, change_id, updated, expected_version=ambiguity.version
+        )
+
+        # Resume saga from checkpoint
+        self.resume_saga(tenant_id, change_id, now=now)
+
+        return saved
+
+    # ------------------------------------------------------------------------
+    # P-20.06: Autonomy & Human Attention Metrics
+    # ------------------------------------------------------------------------
+
+    def compute_autonomy_metrics(
+        self,
+        tenant_id: str,
+        change_id: str,
+    ) -> dict[str, int]:
+        """Derive autonomous steps and human attention counts from persisted records.
+
+        P-20.06:
+        - autonomous_steps: automated tasks completed without human authority.
+        - human_attention_count: actual approval cards requiring human decision +
+          actual ambiguity questions raised.
+        """
+        tasks = self.repository.list_tasks(tenant_id, change_id)
+        approvals = self.repository.list_approvals(tenant_id, change_id)
+        ambiguities = self.repository.list_ambiguities(tenant_id, change_id)
+
+        # Autonomous tasks: completed automated tasks
+        auto_tasks = [
+            t for t in tasks if t.status in (TaskStatus.COMPLETED, TaskStatus.COMPENSATED)
+        ]
+        autonomous_steps = len(auto_tasks)
+
+        # Human attention count: approval cards + ambiguity questions
+        human_attention_count = len(approvals) + len(ambiguities)
+
+        return {
+            "autonomous_steps": max(autonomous_steps, 0),
+            "human_attention_count": max(human_attention_count, 0),
+        }

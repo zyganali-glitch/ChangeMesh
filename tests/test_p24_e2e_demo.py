@@ -177,3 +177,13 @@ class TestReproducibleDemo:
     def test_demo_fixture_id_in_result(self):
         result = run_local_e2e_demo(now=NOW)
         assert result.fixture_id == "fixture-acme-billing-v1"
+
+    def test_cmd_demo_subprocess(self):
+        import subprocess
+        import sys
+
+        cmd = [sys.executable, "scripts/cmd.py", "demo"]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        assert proc.returncode == 0
+        assert "Demo complete:" in proc.stdout
+        assert "Final state: COMPLETE" in proc.stdout

@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 
 from domain.contracts.change_lifecycle import ChangeState
 from src.orchestrator.state_repository import (
+    AmbiguityRecord,
     ApprovalRecord,
     ApprovalResolutionStatus,
     ChangeRecord,
@@ -46,6 +47,7 @@ class InMemorySagaStateRepository(SagaStateRepository):
         ] = {}
         self._evidence_refs: Dict[str, Dict[str, Dict[str, EvidenceRefRecord]]] = {}
         self._approvals: Dict[str, Dict[str, Dict[str, ApprovalRecord]]] = {}
+        self._ambiguities: Dict[str, Dict[str, Dict[str, AmbiguityRecord]]] = {}
         self._passports: Dict[str, Dict[str, PassportRecord]] = {}
 
     def _now(self) -> datetime:
@@ -68,6 +70,7 @@ class InMemorySagaStateRepository(SagaStateRepository):
             self._idempotency_reservations[tid] = {}
             self._evidence_refs[tid] = {}
             self._approvals[tid] = {}
+            self._ambiguities[tid] = {}
             self._passports[tid] = {}
             return tenant
 
@@ -115,6 +118,10 @@ class InMemorySagaStateRepository(SagaStateRepository):
             if tid not in self._approvals:
                 self._approvals[tid] = {}
             self._approvals[tid][change.change_id] = {}
+
+            if tid not in self._ambiguities:
+                self._ambiguities[tid] = {}
+            self._ambiguities[tid][change.change_id] = {}
 
             return change
 
@@ -529,6 +536,75 @@ class InMemorySagaStateRepository(SagaStateRepository):
             return updated
 
     # ------------------------------------------------------------------------
+    # Ambiguity Operations (P-20.04)
+    # ------------------------------------------------------------------------
+
+    def create_ambiguity(
+        self, tenant_id: str, change_id: str, ambiguity: AmbiguityRecord
+    ) -> AmbiguityRecord:
+        with self._lock:
+            tid = validate_tenant_id(tenant_id)
+            if ambiguity.tenant_id != tid or ambiguity.change_id != change_id:
+                raise TenantIsolationError(
+                    "Ambiguity tenant_id or change_id mismatch with operation path"
+                )
+            scan_for_secrets(ambiguity.model_dump())
+            if tid not in self._ambiguities:
+                self._ambiguities[tid] = {}
+            if change_id not in self._ambiguities[tid]:
+                self._ambiguities[tid][change_id] = {}
+            if ambiguity.question_id in self._ambiguities[tid][change_id]:
+                raise PersistenceSchemaError(
+                    f"Ambiguity question {ambiguity.question_id!r} already exists"
+                )
+            self._ambiguities[tid][change_id][ambiguity.question_id] = ambiguity
+            return ambiguity
+
+    def get_ambiguity(
+        self, tenant_id: str, change_id: str, question_id: str
+    ) -> Optional[AmbiguityRecord]:
+        with self._lock:
+            tid = validate_tenant_id(tenant_id)
+            return self._ambiguities.get(tid, {}).get(change_id, {}).get(question_id)
+
+    def list_ambiguities(self, tenant_id: str, change_id: str) -> List[AmbiguityRecord]:
+        with self._lock:
+            tid = validate_tenant_id(tenant_id)
+            records = list(self._ambiguities.get(tid, {}).get(change_id, {}).values())
+            return sorted(records, key=lambda a: a.created_at)
+
+    def update_ambiguity(
+        self,
+        tenant_id: str,
+        change_id: str,
+        ambiguity: AmbiguityRecord,
+        expected_version: int,
+    ) -> AmbiguityRecord:
+        with self._lock:
+            tid = validate_tenant_id(tenant_id)
+            if ambiguity.tenant_id != tid or ambiguity.change_id != change_id:
+                raise TenantIsolationError(
+                    "Ambiguity tenant_id or change_id mismatch with operation path"
+                )
+            scan_for_secrets(ambiguity.model_dump())
+            current = self.get_ambiguity(tid, change_id, ambiguity.question_id)
+            if current is None:
+                raise DocumentNotFoundError(f"Ambiguity {ambiguity.question_id!r} not found")
+            if current.version != expected_version:
+                doc_p = f"/tenants/{tid}/changes/{change_id}/ambiguities/{ambiguity.question_id}"
+                raise OptimisticConcurrencyError(
+                    f"Version conflict on ambiguity {ambiguity.question_id!r}: "
+                    f"expected {expected_version}, found {current.version}",
+                    document_path=doc_p,
+                    expected_version=expected_version,
+                    actual_version=current.version,
+                )
+            new_version = current.version + 1
+            updated = ambiguity.model_copy(update={"version": new_version})
+            self._ambiguities[tid][change_id][ambiguity.question_id] = updated
+            return updated
+
+    # ------------------------------------------------------------------------
     # Teardown / Cascading Deletion (P-10.05)
     # ------------------------------------------------------------------------
 
@@ -558,6 +634,9 @@ class InMemorySagaStateRepository(SagaStateRepository):
             if tid in self._approvals and change_id in self._approvals[tid]:
                 count += len(self._approvals[tid][change_id])
                 del self._approvals[tid][change_id]
+            if tid in self._ambiguities and change_id in self._ambiguities[tid]:
+                count += len(self._ambiguities[tid][change_id])
+                del self._ambiguities[tid][change_id]
             return count
 
     def delete_tenant_cascade(self, tenant_id: str) -> int:
@@ -585,4 +664,5 @@ class InMemorySagaStateRepository(SagaStateRepository):
             self._idempotency_reservations.pop(tid, None)
             self._evidence_refs.pop(tid, None)
             self._approvals.pop(tid, None)
+            self._ambiguities.pop(tid, None)
             return count

@@ -1882,7 +1882,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-24 — End-to-End Synthetic Enterprise Demo Fixture
 
-**Phase status:** `DONE`
+**Phase status:** `IN_PROGRESS`
 
 ## P-24.01 — Build synthetic billing system with intentional legacy dependency/missing-proof conditions
 
@@ -1930,12 +1930,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-24.05 — Run deployed Google Cloud E2E path
 
-- **Status:** `DONE`
+- **Status:** `BLOCKED`
 - **Required action:** Run deployed Google Cloud E2E path.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
-- **Acceptance criteria:** Cloud revision, Gemini, events, state, trace, real draft PR linked; honest SIMULATED / LOCAL_FALLBACK labels when GCP unavailable.
+- **Acceptance criteria:** Cloud revision, Gemini, events, state, trace, real draft PR linked.
 - **Required evidence:** Cloud evidence bundle.
-- **Evidence:** Validated in `tests/test_p24_e2e_demo.py::TestCloudE2E` confirming `ServiceAvailabilityReport` truthfully reports `PERMISSION_BLOCKED` and `LOCAL_FALLBACK` without fabricated cloud proof.
+- **Evidence:** Real deployed Google Cloud E2E environment prerequisites (live Cloud Run service, live Pub/Sub topic subscription, live Firestore database with external GitHub write authority) are unavailable in this local test environment. In compliance with ChangeMesh Supreme Constitution Rule 5 (Honesty boundary), P-24.05 remains BLOCKED without fabricated cloud proof or weakened criteria.
 - **Mandatory documentation sync:** Submission manifest.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 

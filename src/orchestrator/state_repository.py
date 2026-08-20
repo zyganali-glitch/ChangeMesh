@@ -422,6 +422,57 @@ class ApprovalRecord(BaseModel):
         return v
 
 
+class AmbiguityResolutionStatus(str, Enum):
+    UNRESOLVED = "UNRESOLVED"
+    OPEN = "UNRESOLVED"
+    RESOLVED = "RESOLVED"
+    CANCELLED = "CANCELLED"
+
+
+class AmbiguityRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: str = CANONICAL_SCHEMA_VERSION
+    tenant_id: str
+    change_id: str
+    correlation_id: str
+    question_id: str
+    question: str
+    expected_options: Tuple[str, ...] = ()
+    irreducible_reason: str
+    paused_state: ChangeState
+    paused_context: Dict[str, Any] = Field(default_factory=dict)
+    resolution_status: AmbiguityResolutionStatus = AmbiguityResolutionStatus.UNRESOLVED
+    resolved_answer: Optional[str] = None
+    resolved_at: Optional[UtcDateTime] = None
+    version: int = 1
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
+    ttl_expires_at: Optional[UtcDateTime] = None
+
+    @property
+    def minimal_question(self) -> str:
+        return self.question
+
+    @field_validator("tenant_id")
+    @classmethod
+    def _validate_tid(cls, v: str) -> str:
+        return validate_tenant_id(v)
+
+    @field_validator(
+        "change_id",
+        "correlation_id",
+        "question_id",
+        "question",
+        "irreducible_reason",
+    )
+    @classmethod
+    def _not_blank(cls, v: str, info) -> str:
+        if not v or not v.strip():
+            raise ValueError(f"{info.field_name} must not be blank")
+        return v
+
+
 class PassportRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -650,4 +701,34 @@ class SagaStateRepository(ABC):
         expected_version: int,
     ) -> IdempotencyReservationRecord:
         """Update an idempotency reservation with compare-and-set version check."""
+        pass
+
+    @abstractmethod
+    def create_ambiguity(
+        self, tenant_id: str, change_id: str, ambiguity: AmbiguityRecord
+    ) -> AmbiguityRecord:
+        """Persist an ambiguity record under ambiguities/{question_id}."""
+        pass
+
+    @abstractmethod
+    def get_ambiguity(
+        self, tenant_id: str, change_id: str, question_id: str
+    ) -> Optional[AmbiguityRecord]:
+        """Fetch an ambiguity record by ID."""
+        pass
+
+    @abstractmethod
+    def list_ambiguities(self, tenant_id: str, change_id: str) -> List[AmbiguityRecord]:
+        """List all ambiguity records for a change."""
+        pass
+
+    @abstractmethod
+    def update_ambiguity(
+        self,
+        tenant_id: str,
+        change_id: str,
+        ambiguity: AmbiguityRecord,
+        expected_version: int,
+    ) -> AmbiguityRecord:
+        """Update an ambiguity record with atomic compare-and-set version check."""
         pass

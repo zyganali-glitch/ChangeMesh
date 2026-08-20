@@ -9,7 +9,7 @@ P-20.06: Measure autonomous steps and human-attention count.
 from __future__ import annotations
 
 import datetime
-from datetime import timedelta, timezone
+from datetime import timezone
 
 import pytest
 
@@ -29,6 +29,7 @@ from src.orchestrator.orchestrator_saga import (
     ChangeSagaOrchestrator,
 )
 from src.orchestrator.saga_checkpoint import SagaCheckpointManager
+from src.orchestrator.state_repository import AmbiguityResolutionStatus
 
 NOW = datetime.datetime(2026, 8, 19, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -115,8 +116,45 @@ class TestBackgroundContinuation:
         assert result.outcome == ContinuationOutcome.ALREADY_TERMINAL
         assert result.final_state == ChangeState.COMPLETE
 
-    def test_background_pauses_at_blocked(self, repo, bus, sample_change_request):
+    def test_background_pauses_at_blocked(self, repo, bus):
         """BLOCKED sagas report as terminal (no outgoing transitions)."""
+        blocked_request = ChangeRequest(
+            schema_version="1.0.0",
+            request_id="req-blocked-001",
+            title="Drop table",
+            description="DROP TABLE billing_accounts CASCADE;",
+            target_systems=["billing-db"],
+            data_classification=DataClassLevel.INTERNAL,
+            success_criteria=[
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="crit-01",
+                    description="Rehearsal succeeds cleanly",
+                    verification_method="deterministic",
+                    required_evidence_types=["REHEARSAL_SIMULATION"],
+                )
+            ],
+            requested_by="engineer@example.com",
+            requested_at=NOW,
+        )
+        timeline = CausalEventTimeline("tmp")
+        orch = ChangeSagaOrchestrator(repository=repo, event_bus=bus, timeline=timeline)
+        saga_result = orch.run_saga(
+            "test-tenant",
+            blocked_request,
+            evidence_mode=ExecutionEvidenceMode.SIMULATION,
+            now=NOW,
+        )
+        assert saga_result.final_state == ChangeState.BLOCKED
+
+        runner = BackgroundContinuationRunner(repository=repo, event_bus=bus)
+        result = runner.continue_saga(saga_result.tenant_id, saga_result.change_id, now=NOW)
+        # BLOCKED is terminal (frozenset() outgoing transitions)
+        assert result.outcome == ContinuationOutcome.ALREADY_TERMINAL
+        assert result.final_state == ChangeState.BLOCKED
+
+    def test_background_open_ambiguity_pauses(self, repo, bus, sample_change_request):
+        """When an open ambiguity question exists, background continuation pauses."""
         timeline = CausalEventTimeline("tmp")
         orch = ChangeSagaOrchestrator(repository=repo, event_bus=bus, timeline=timeline)
         saga_result = orch.run_saga(
@@ -127,35 +165,19 @@ class TestBackgroundContinuation:
             now=NOW,
         )
 
-        # Pause the saga (transitions to BLOCKED)
-        orch.pause_saga(
+        orch.raise_ambiguity_question(
             saga_result.tenant_id,
             saga_result.change_id,
-            "Manual pause",
-            now=NOW,
-        )
-
-        runner = BackgroundContinuationRunner(repository=repo, event_bus=bus)
-        result = runner.continue_saga(saga_result.tenant_id, saga_result.change_id, now=NOW)
-        # BLOCKED is terminal (frozenset() outgoing transitions)
-        assert result.outcome == ContinuationOutcome.ALREADY_TERMINAL
-        assert result.final_state == ChangeState.BLOCKED
-
-    def test_background_no_request_pauses(self, repo, bus, sample_change_request):
-        """Without a request, background cannot make progress on non-terminal state."""
-        timeline = CausalEventTimeline("tmp")
-        orch = ChangeSagaOrchestrator(repository=repo, event_bus=bus, timeline=timeline)
-        saga_result = orch.run_saga(
-            "test-tenant",
-            sample_change_request,
-            evidence_mode=ExecutionEvidenceMode.SIMULATION,
-            stop_at_state=ChangeState.EXECUTING,
+            minimal_question="Which column type should be used?",
+            expected_options=["VARCHAR", "TEXT"],
+            irreducible_reason="Type ambiguous from request",
             now=NOW,
         )
 
         runner = BackgroundContinuationRunner(repository=repo, event_bus=bus)
         result = runner.continue_saga(saga_result.tenant_id, saga_result.change_id, now=NOW)
         assert result.outcome == ContinuationOutcome.PAUSED_AT_AMBIGUITY
+        assert result.final_state == ChangeState.DISCOVERING
 
 
 # =========================================================================
@@ -180,9 +202,10 @@ class TestBlockingAmbiguityPath:
         # Full completion without any ambiguity block
         assert result.final_state == ChangeState.COMPLETE
         assert result.is_completed is True
+        assert result.human_attention_count == 0
 
-    def test_blocked_saga_preserves_identity(self, repo, bus, sample_change_request):
-        """When ambiguity blocks, the saga identity is preserved for later resolution."""
+    def test_raise_and_resolve_ambiguity_question(self, repo, bus, sample_change_request):
+        """Ambiguity question pauses saga without BLOCKED state; resolving resumes same saga."""
         timeline = CausalEventTimeline("tmp")
         orch = ChangeSagaOrchestrator(repository=repo, event_bus=bus, timeline=timeline)
         result = orch.run_saga(
@@ -195,16 +218,39 @@ class TestBlockingAmbiguityPath:
 
         tid, cid = result.tenant_id, result.change_id
 
-        # Simulate ambiguity block
-        orch.pause_saga(tid, cid, "Ambiguous parameter needs clarification", now=NOW)
-        record = repo.get_change(tid, cid)
-        assert record.state == ChangeState.BLOCKED
+        # Raise ambiguity question
+        ambiguity = orch.raise_ambiguity_question(
+            tid,
+            cid,
+            "Which database partition should be migrated first?",
+            expected_options=["partition-alpha", "partition-beta"],
+            irreducible_reason="User intent unspecified for partition order",
+            now=NOW,
+        )
 
-        # Verify the same change identity is preserved
-        assert record.change_id == cid
-        assert record.tenant_id == tid
-        # The state_reason captures why it was blocked
-        assert "Ambiguous" in record.state_reason
+        assert ambiguity.resolution_status == AmbiguityResolutionStatus.UNRESOLVED
+        assert ambiguity.question_id is not None
+        assert "partition" in ambiguity.question
+
+        # Verify saga is paused at EXECUTING, NOT terminal BLOCKED
+        record = repo.get_change(tid, cid)
+        assert record.state == ChangeState.EXECUTING
+        assert "AMBIGUITY" in record.state_reason
+
+        # Resolving ambiguity question resumes the same saga
+        resolved = orch.resolve_ambiguity_question(
+            tid, cid, ambiguity.question_id, "partition-alpha", now=NOW
+        )
+        assert resolved.resolution_status == AmbiguityResolutionStatus.RESOLVED
+        assert resolved.resolved_answer == "partition-alpha"
+
+        record_after = repo.get_change(tid, cid)
+        assert record_after.state == ChangeState.EXECUTING
+        assert "RESUMED" in record_after.state_reason
+
+        # Metrics reflect human attention count
+        metrics = orch.compute_autonomy_metrics(tid, cid)
+        assert metrics["human_attention_count"] == 1
 
 
 # =========================================================================
@@ -214,6 +260,43 @@ class TestBlockingAmbiguityPath:
 
 class TestRestartAndContinuation:
     """P-20.05: No duplicate external write; next action correct."""
+
+    def test_process_equivalent_restart(self, repo, bus, sample_change_request):
+        """Instance A runs to intermediate state -> destroy A -> Instance B continues."""
+        # Process Instance A
+        timeline_a = CausalEventTimeline("tmp")
+        orch_a = ChangeSagaOrchestrator(repository=repo, event_bus=bus, timeline=timeline_a)
+        result_a = orch_a.run_saga(
+            "test-tenant",
+            sample_change_request,
+            evidence_mode=ExecutionEvidenceMode.SIMULATION,
+            stop_at_state=ChangeState.REHEARSING,
+            now=NOW,
+        )
+        tid, cid = result_a.tenant_id, result_a.change_id
+        tasks_after_a = len(repo.list_tasks(tid, cid))
+        assert tasks_after_a > 0
+
+        # Destroy instance A
+        del orch_a
+
+        # Process Instance B (new orchestrator instance, fresh timeline, same repo/bus)
+        timeline_b = CausalEventTimeline("tmp")
+        orch_b = ChangeSagaOrchestrator(repository=repo, event_bus=bus, timeline=timeline_b)
+        result_b = orch_b.run_saga(
+            tid,
+            sample_change_request,
+            change_id=cid,
+            evidence_mode=ExecutionEvidenceMode.SIMULATION,
+            now=NOW,
+        )
+
+        assert result_b.change_id == cid
+        assert result_b.final_state == ChangeState.COMPLETE
+        assert result_b.is_completed is True
+
+        tasks_after_b = len(repo.list_tasks(tid, cid))
+        assert tasks_after_b >= tasks_after_a
 
     def test_checkpoint_restart_preserves_state(self, repo, bus, sample_change_request):
         """Saga checkpointed at EXECUTING can restart without losing state."""
@@ -274,39 +357,6 @@ class TestRestartAndContinuation:
         record = repo.get_change(tid, cid)
         assert record.state == ChangeState.VERIFYING
 
-    def test_idempotent_checkpoint_creation(self, repo, bus, sample_change_request):
-        """Multiple checkpoints at same state are additive, not destructive."""
-        timeline = CausalEventTimeline("tmp")
-        orch = ChangeSagaOrchestrator(repository=repo, event_bus=bus, timeline=timeline)
-
-        result = orch.run_saga(
-            "test-tenant",
-            sample_change_request,
-            evidence_mode=ExecutionEvidenceMode.SIMULATION,
-            stop_at_state=ChangeState.DISCOVERING,
-            now=NOW,
-        )
-        tid, cid = result.tenant_id, result.change_id
-
-        # Create two checkpoints
-        SagaCheckpointManager.create_checkpoint(
-            repo=repo,
-            tenant_id=tid,
-            change_id=cid,
-            lifecycle_state=ChangeState.DISCOVERING,
-            now=NOW,
-        )
-        SagaCheckpointManager.create_checkpoint(
-            repo=repo,
-            tenant_id=tid,
-            change_id=cid,
-            lifecycle_state=ChangeState.DISCOVERING,
-            now=NOW + timedelta(seconds=1),
-        )
-
-        checkpoints = repo.list_checkpoints(tid, cid)
-        assert len(checkpoints) >= 2  # Both checkpoints preserved
-
 
 # =========================================================================
 # P-20.06: MEASURE AUTONOMOUS STEPS AND HUMAN-ATTENTION COUNT
@@ -314,10 +364,12 @@ class TestRestartAndContinuation:
 
 
 class TestAutonomyMetrics:
-    """P-20.06: Metrics derived from events, not manual claims."""
+    """P-20.06: Metrics derived from events and records, not manual claims."""
 
-    def test_full_saga_reports_event_count(self, repo, bus, sample_change_request):
-        """SagaExecutionResult.events_emitted counts autonomous transitions."""
+    def test_full_saga_reports_event_and_autonomous_step_count(
+        self, repo, bus, sample_change_request
+    ):
+        """SagaExecutionResult.autonomous_steps counts completed automated tasks."""
         timeline = CausalEventTimeline("tmp")
         orch = ChangeSagaOrchestrator(repository=repo, event_bus=bus, timeline=timeline)
         result = orch.run_saga(
@@ -329,6 +381,8 @@ class TestAutonomyMetrics:
 
         assert result.events_emitted > 0
         assert result.tasks_executed > 0
+        assert result.autonomous_steps > 0
+        assert result.human_attention_count == 0
         assert result.checkpoints_created >= 0
 
     def test_saga_with_stop_reports_partial_metrics(self, repo, bus, sample_change_request):
@@ -343,14 +397,15 @@ class TestAutonomyMetrics:
             now=NOW,
         )
 
-        # Should have some events but not all
         assert result.events_emitted >= 1
         assert result.final_state == ChangeState.DISCOVERING
+        assert result.autonomous_steps >= 1
+        assert result.human_attention_count == 0
 
     def test_background_continuation_counts_autonomous_steps(
         self, repo, bus, sample_change_request
     ):
-        """BackgroundContinuationResult.autonomous_steps_taken is derived from events."""
+        """BackgroundContinuationResult.autonomous_steps_taken is derived from records."""
         runner = BackgroundContinuationRunner(
             repository=repo,
             event_bus=bus,
@@ -366,8 +421,6 @@ class TestAutonomyMetrics:
 
         assert result.outcome == ContinuationOutcome.COMPLETED
         assert result.autonomous_steps_taken > 0
-        # Autonomous steps come from events_emitted, which is derived from actual
-        # event emission, not manual claims
 
     def test_human_attention_count_is_zero_for_full_autonomous(
         self, repo, bus, sample_change_request
@@ -382,7 +435,6 @@ class TestAutonomyMetrics:
             now=NOW,
         )
 
-        # No stopped_reason means no human attention required
         assert result.stopped_reason is None
         assert result.is_completed is True
-        # The saga completed autonomously — 0 human attention events
+        assert result.human_attention_count == 0

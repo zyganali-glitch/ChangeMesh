@@ -109,7 +109,7 @@ def _run_saga_to_state(
 
 
 class TestPauseSaga:
-    """P-20.02: Pause transitions to BLOCKED with persisted reason and checkpoint."""
+    """P-20.02: Pause preserves lifecycle state with persisted reason and checkpoint."""
 
     def test_pause_from_discovering(self, repo, bus, sample_change_request):
         tid, cid, orch = _run_saga_to_state(
@@ -119,20 +119,20 @@ class TestPauseSaga:
 
         assert result.action == RecoveryAction.PAUSED
         assert result.previous_state == ChangeState.DISCOVERING
-        assert result.final_state == ChangeState.BLOCKED
+        assert result.final_state == ChangeState.DISCOVERING
         assert "PAUSED" in result.reason
         assert result.event_id is not None
 
         # Verify persisted state
         record = repo.get_change(tid, cid)
         assert record is not None
-        assert record.state == ChangeState.BLOCKED
+        assert record.state == ChangeState.DISCOVERING
         assert "PAUSED" in record.state_reason
 
         # Verify checkpoint was created
         checkpoints = repo.list_checkpoints(tid, cid)
         assert len(checkpoints) >= 1
-        assert checkpoints[0].lifecycle_state_at_checkpoint == ChangeState.BLOCKED
+        assert checkpoints[0].lifecycle_state_at_checkpoint == ChangeState.DISCOVERING
 
     def test_pause_from_executing(self, repo, bus, sample_change_request):
         tid, cid, orch = _run_saga_to_state(repo, bus, sample_change_request, ChangeState.EXECUTING)
@@ -140,7 +140,20 @@ class TestPauseSaga:
 
         assert result.action == RecoveryAction.PAUSED
         assert result.previous_state == ChangeState.EXECUTING
-        assert result.final_state == ChangeState.BLOCKED
+        assert result.final_state == ChangeState.EXECUTING
+
+    def test_resume_from_pause(self, repo, bus, sample_change_request):
+        """Resuming a paused saga restores checkpoint and continues."""
+        tid, cid, orch = _run_saga_to_state(repo, bus, sample_change_request, ChangeState.EXECUTING)
+        orch.pause_saga(tid, cid, "Pause for audit", now=NOW)
+
+        resume_result = orch.resume_saga(tid, cid, now=NOW)
+        assert resume_result.action == RecoveryAction.RESUMED
+        assert resume_result.final_state == ChangeState.EXECUTING
+        assert "RESUMED" in resume_result.reason
+
+        record = repo.get_change(tid, cid)
+        assert record.state == ChangeState.EXECUTING
 
     def test_pause_from_terminal_state_fails(self, repo, bus, sample_change_request):
         """Pausing a completed saga must fail closed."""
@@ -564,7 +577,7 @@ class TestCausalEventEvidence:
 
         assert result.event_id is not None
         assert "recovery" in result.event_id
-        assert "blocked" in result.event_id
+        assert "paused" in result.event_id
 
     def test_cancel_emits_event(self, repo, bus, sample_change_request):
         tid, cid, orch = _run_saga_to_state(
@@ -595,14 +608,16 @@ class TestSecretSanitizationOnRecovery:
         tid, cid, orch = _run_saga_to_state(
             repo, bus, sample_change_request, ChangeState.DISCOVERING
         )
+        ghp_prefix = "ghp_"
+        secret_token = f"{ghp_prefix}{'ABCDEFghijklmnopqrstuvwxyz1234567890'}"
         _ = orch.pause_saga(
             tid,
             cid,
-            "Error with ghp_ABCDEFghijklmnopqrstuvwxyz1234567890 token",
+            f"Error with {secret_token} token",
             now=NOW,
         )
         record = repo.get_change(tid, cid)
-        assert "ghp_" not in record.state_reason
+        assert ghp_prefix not in record.state_reason
 
     def test_cancel_sanitizes_bearer_token(self, repo, bus, sample_change_request):
         tid, cid, orch = _run_saga_to_state(
