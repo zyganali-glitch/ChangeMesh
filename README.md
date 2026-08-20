@@ -18,7 +18,7 @@
 > - **Canonical command interface (P-06.04):** `IMPLEMENTED` (`DONE` — `scripts/cmd.py`, strict fail-closed safety guards for format, lint, type-check, unit, integration, e2e, demo, deploy, teardown)
 > - **P-06 Local Environment and Dependency Freeze Phase:** `IMPLEMENTED` (`DONE` — P-06.01 through P-06.05 complete; clean checkout reproduction verified via [`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](docs/P-06.05_CLEAN_CHECKOUT_LOG.md))
 > - **P-07 Google ADK Agent Skeleton and Fleet Phase:** `IMPLEMENTED` (`DONE` — P-07.01 Change Orchestrator ADK skeleton, P-07.02 six specialized ADK agent definitions with bounded tool/instruction contracts, P-07.03 deterministic local routing/delegation, P-07.04 multi-agent branch coordination & sequential fallback, and P-07.05 exact agent revision metadata provenance across domain contracts and execution traces)
-> - **Runtime product and agent fleet implementation:** Phases P-00 through P-19 are complete (`DONE`). Phase P-20 (Orchestrator Saga, Recovery, and Long-Running Behavior) is `IN_PROGRESS` with P-20.01 (End-to-End Saga Orchestrator across 8 lifecycle stages) `IMPLEMENTED` and `VERIFIED`.
+> - **Runtime product and agent fleet implementation:** Phases P-00 through P-24 are complete (`DONE`). Phase P-25 (Comprehensive Test and Gate Matrix) is `IN_PROGRESS` with P-25.00 (`docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md`) `DONE` and P-25.01 (`tests/test_p25_01_comprehensive_unit.py`, 73 tests, 1556 canonical unit tests passing, 0 failures, 0 errors) `DONE`.
 >
 > Remaining features must remain labeled `PLANNED`, `IN_PROGRESS`, `PASS`, `FAIL`, `NOT_RUN`, `SIMULATED`, `BLOCKED`, or `QUARANTINED` according to real evidence. A planned feature must never be presented as implemented.
 
