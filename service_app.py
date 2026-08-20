@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
-from domain.contracts.change_lifecycle import ChangeState
 from src.core.gemini_client import CANONICAL_MODEL_ID
 from src.demo.e2e_demo import run_local_e2e_demo
 
@@ -43,7 +42,9 @@ class ChangeMeshServiceHandler(BaseHTTPRequestHandler):
                     "canonical_model": CANONICAL_MODEL_ID,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "environment": {
-                        "project": os.environ.get("GOOGLE_CLOUD_PROJECT", "project-af5e1c99-3bc4-424f-b53"),
+                        "project": os.environ.get(
+                            "GOOGLE_CLOUD_PROJECT", "project-af5e1c99-3bc4-424f-b53"
+                        ),
                         "region": os.environ.get("GOOGLE_CLOUD_LOCATION", "europe-west3"),
                     },
                 },

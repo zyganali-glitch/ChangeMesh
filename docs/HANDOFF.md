@@ -157,15 +157,27 @@
 - P-24.05
 - P-24.06
 - P-24
+- P-25.00
+- P-25.01
 
 **Blocked:**
 - None
 
 **Active Phase:**
-- P-25 (Comprehensive Test and Gate Matrix — PENDING)
+- P-25 (Comprehensive Test and Gate Matrix — IN_PROGRESS)
 
-**Next Exact Task:**
-- P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport
+**Active Task:**
+- P-25.02 — Create integration tests for ADK, Gemini parser, Pub/Sub, Firestore, GitHub, available managed adapters (PENDING)
+
+## Current P-25 State (P-25.01 Comprehensive Unit Test Matrix Completed)
+
+- **P-25.00:** Test-suite donor preflight completed (`DONE`). Cleanroom test-matrix strategy verified.
+- **P-25.01:** Comprehensive unit test suite `tests/test_p25_01_comprehensive_unit.py` implemented and verified (21/21 tests passed, 1504 total unit tests passed, 0 failures, 0 errors).
+  - `TestDomainSchemasComprehensive`: `EventEnvelope` immutability, extra-forbidden enforcement, blank field rejection, `ChangeRecord` validation and extra-forbidden strictness, `AmbiguityRecord` lifecycle from OPEN to RESOLVED, and machine conventions (secret key redaction, canonical JSON byte sorting, SHA-256 validation, UTC normalization).
+  - `TestStateTransitionsAndLifecycleComprehensive`: All 16 `ChangeState` terminal vs non-terminal invariants, canonical forward progression, human authority branching (`GROUNDED -> AWAITING_AUTHORITY -> AUTHORIZED -> EXECUTING`), illegal backward/skip transition fail-closed errors, and Saga repository CAS optimistic concurrency conflict detection.
+  - `TestPolicyEngineAndReversibilityComprehensive`: `DeterministicPolicyChecker` secret detection (RSA private keys) vs clean DDL evaluation, `InjectionDetector` prompt injection indicator detection, `ReversibilityClassifier` additive vs destructive SQL classification, and `PolicyGuardianGate` autonomous vs human authority mapping.
+  - `TestMemoryTrustEngineComprehensive`: `MemoryRecord` typed contracts, `MemoryTrustEvaluator` freshness scoring and STALE_EXPIRED decay, `MemoryQuarantineEngine` prompt injection quarantine, and `MemorySupersessionManager` non-destructive supersession linking.
+  - `TestCapabilityPassportAndEvidenceLedgerComprehensive`: `InMemoryAgentRegistry` descriptor registration and lookup, `PassportIssuer` and `PassportVerifier` issuance from registered qualification evidence, revision mismatch rejection, and `EvidenceLedger` SHA-256 hash chaining with negative cryptographic tamper detection.
 
 ## Current P-24 State (Macro Execution Batch P-20.02 → P-24.06 Completed and Verified with Live Cloud Run & Cloud E2E)
 

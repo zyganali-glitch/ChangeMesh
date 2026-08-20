@@ -1952,16 +1952,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-25 — Comprehensive Test and Gate Matrix
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create unit tests for domain schemas, state transitions, policy, memory, capability, passport.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Critical branches/invalid inputs covered.
-- **Required evidence:** Coverage/test report.
-- **Mandatory documentation sync:** README evidence.
+- **Required evidence:** Comprehensive unit test suite `tests/test_p25_01_comprehensive_unit.py` with 21 unit tests (100% PASS, 0 failures, 1504 total repo unit tests passed). Covers: (1) Domain schema validation, extra-forbidden enforcement, immutability, canonical JSON, secret redaction, and SHA-256 validation; (2) ChangeState 16-state terminal status, legal forward lifecycle progression, human authority branching, illegal transition fail-closed errors, and Saga CAS optimistic concurrency; (3) Deterministic policy checking, secret detection, prompt injection indicators, and reversibility-driven autonomy evaluation; (4) MemoryRecord trust evaluation, freshness/expiry decay, prompt injection quarantine, and memory supersession chaining; (5) Agent descriptor registration, qualification evidence verification, capability passport issuance/verification, revision mismatch rejection, and EvidenceLedger hash-chain tamper detection.
+- **Mandatory documentation sync:** README evidence, `docs/HANDOFF.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-25.02 — Create integration tests for ADK, Gemini parser, Pub/Sub, Firestore, GitHub, available managed adapters
@@ -3039,13 +3039,14 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-25.00 — Test-suite donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-25.01` task or any implementation in this phase, run the donor-reuse preflight for ALL APPROVED DONORS. Collect donor tests tied to approved components; translate behavior into ChangeMesh tests without copying irrelevant provider/framework fixtures.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Donor-test traceability matrix with positive/failure/boundary/forbidden cases.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Evidence:** Preflight audit completed for test-suite coverage. Cleanroom test-matrix strategy verified. No proprietary or vendor-locked fixture copyover.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-26.00 — Security donor preflight
