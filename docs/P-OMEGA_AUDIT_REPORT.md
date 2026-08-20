@@ -1,10 +1,11 @@
-# P-Ω Whole-Repository Integrity Audit — P-25.00 Test-Suite Donor Preflight Closure & Verification
+# P-Ω Whole-Repository Integrity Audit — P-25.00 Test-Suite Donor Preflight Closure & Evidence Verification
 
 > **Scope:** P-25.00 Test-Suite Donor Preflight Closure, Donor Manifest (§3.1) Preflight Reference, 7 Donor Provenance Verification across 20 Components, Count Reconciliation (43 Gap Register rows / 60 expanded atomic test obligations), Read-Only Donor Auditor Verification, and P-25.01 Active Test Suite Assessment.<br>
 > **Date:** 2026-08-20<br>
-> **Canonical Baseline SHA:** `e7ba3d7145c77d9aa98ad24e431053d16bf32867`<br>
+> **Audited Repository Baseline SHA:** `0fabe050bc0125895949f32fd9acd6400c2db88a`<br>
 > **Canonical Branch:** `main`<br>
-> **Ancestry:** `9afef11` → `2d6795f` → `6bdce72` → `036128e` → `0b810e1` → `e7ba3d7`
+> **Ancestry:** `9afef11` → `2d6795f` → `6bdce72` → `036128e` → `0b810e1` → `e7ba3d7` → `0fabe05`<br>
+> **Evidence Persistence Note:** This P-Ω audit document records the audited baseline `0fabe050bc0125895949f32fd9acd6400c2db88a`. The resulting Git commit containing this report is a direct docs-only child of `0fabe05` and does not claim to have audited itself.
 
 ---
 
@@ -12,10 +13,10 @@
 
 | Check | Result | Evidence |
 |---|---|---|
-| Canonical Remote HEAD | **PASS** | `origin/main` verified at `e7ba3d7145c77d9aa98ad24e431053d16bf32867`. |
-| P-25.00 Preflight Artifact | **PASS** | `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md` complete, verified, status synchronized to `DONE`. |
+| Audited Repository Baseline | **PASS** | Audited repository baseline verified at `0fabe050bc0125895949f32fd9acd6400c2db88a` (contains completed P-25.00 preflight, donor manifest §3.1 reference, reconciled counts, Master Plan, and HANDOFF status). |
+| P-25.00 Preflight Artifact | **PASS** | `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md` complete, verified, status synchronized to `DONE`, entry baseline relabeled to `e7ba3d7145c77d9aa98ad24e431053d16bf32867`. |
 | Donor Manifest & Registry | **PASS** | All 7 donors / 20 components verified in `docs/DONOR_REUSE_MANIFEST.md`; §3.1 references `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md`. |
-| Donor Manifest Lint | **PASS** | `tools/governance/donor_manifest_lint.py` passes with 20 valid components (exit code `0`). |
+| Donor Manifest Lint | **PASS** | `tools/governance/donor_manifest_lint.py` passes with 20 valid components (exit code `0`, SHASUM `1dcb457304013ba4399122d0fb7bbf3ec667d6ffe716fe012488decc985703f9`). |
 | P-DΩ Preflight Protocol (P-DΩ.01–08) | **PASS** | P-DΩ.01–P-DΩ.08 verified under preflight applicability rules; 0 moving-ref drift; 0 blocking findings. |
 | Read-Only Donor Reuse Auditor | **PASS** | Independent adversarial audit (`donor-reuse-auditor`) returned `PASS` (0 blockers, 0 warnings, zero donor repository mutations). |
 | Deterministic Count Parity | **PASS** | Reconciled across all surfaces: 43 Gap Register rows (41 for P-25.01, 2 for P-25.05) / 60 expanded atomic test obligations (52 for P-25.01, 8 for P-25.05). |
@@ -33,11 +34,11 @@
 
 | Command | Exit Code | Result | Details |
 |---|---|---|---|
-| `uv run python tools/governance/donor_manifest_lint.py` | `0` | **PASS** | 20 components valid; SHASUM valid |
+| `uv run python tools/governance/donor_manifest_lint.py` | `0` | **PASS** | 20 components valid; SHASUM `1dcb457304013ba4399122d0fb7bbf3ec667d6ffe716fe012488decc985703f9` |
 | `uv run python scripts/cmd.py format` | `0` | **PASS** | 183 files checked: 0 violations |
 | `uv run python scripts/cmd.py lint` | `0` | **PASS** | Ruff check: 0 violations |
 | `uv run python scripts/cmd.py type-check` | `0` | **PASS** | Mypy: 0 type violations across 141 source files |
-| `uv run python scripts/cmd.py unit` | `1` | **FAIL** | 1503 passed, 1 failed (`test_tracked_files_contain_no_secrets`), 1 warning in 10.91s |
+| `uv run python scripts/cmd.py unit` | `1` | **FAIL** | 1503 passed, 1 failed (`test_tracked_files_contain_no_secrets`), 1 warning in 10.20s |
 | `git diff --check` | `0` | **PASS** | Zero whitespace or conflict issues |
 
 ---
@@ -51,18 +52,32 @@
 | 3. Implementation ↔ README | **PASS** | README claims match frozen charter and current execution state. |
 | 4. Master Plan ↔ Repository | **PASS** | Master Plan records P-25.00 as `DONE`, P-25.01 as `IN_PROGRESS`, P-25.02 as `PENDING`. |
 | 5. Claims ↔ Evidence | **PASS** | All preflight claims backed by `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md` and `docs/DONOR_REUSE_MANIFEST.md`. |
-| 6. Local ↔ GitHub ↔ Cloud Revision | **PASS** | Working tree grounded on canonical SHA `e7ba3d7145c77d9aa98ad24e431053d16bf32867`. |
+| 6. Local ↔ GitHub ↔ Cloud Revision | **PASS** | Audited repository tree grounded on baseline SHA `0fabe050bc0125895949f32fd9acd6400c2db88a`. |
 | 7. English ↔ Turkish Surfaces | **PASS** | Bilingual governance and consistency maintained. |
 | 8. Demo ↔ Actual Runtime | **PASS** | Local and live demo verification artifacts remain intact and unchanged. |
 | 9. Devpost Narrative ↔ Frozen Tag | **PASS** | Fully consistent with frozen project charter and verified evidence. |
 
 ---
 
-## 4. Final Honest Task-Closure State
+## 4. Final Verdict and Task-Closure State
+
+### 4.1 Verdict Differentiation
+
+- **WHOLE-REPOSITORY P-Ω TEST VERDICT:** `FAIL`<br>
+  The whole-repository test gate fails due to:
+  1. `tests/test_p06_03_config_safety.py::test_tracked_files_contain_no_secrets` failing because of the RSA private key literal in active test file `tests/test_p25_01_comprehensive_unit.py`.
+  2. Baseline GCP fixture errors in `tests/test_gcp_access.py` when run without live cloud arguments.
+  Per ChangeMesh Constitution §5 and P-Ω invariants, known test failures are never hidden or rewritten as PASS.
+
+- **P-25.00 TASK-LOCAL CLOSURE ELIGIBILITY:** `PASS`<br>
+  P-25.00 is a pure preflight specification and traceability task with zero runtime or test code modifications. Its required artifacts (`docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md`), donor registry entry (`docs/DONOR_REUSE_MANIFEST.md` §3.1), count reconciliation (43 Gap Register rows / 60 atomic test obligations), and read-only donor audit are fully completed and verified on baseline `0fabe050bc0125895949f32fd9acd6400c2db88a`. The active unit test failure belongs strictly to P-25.01 and does not falsify P-25.00 donor-preflight evidence.
+
+### 4.2 State Summary
 
 - **Audit Character:** P-Ω repository integrity audit (not external independent certification).
 - **P-25.00 State:** `DONE` (Test-Suite Donor Preflight complete, manifest updated, counts reconciled, P-DΩ verified).
 - **P-25.01 State:** `IN_PROGRESS` (Active implementation contains 21 tests; unit failure on secret scan and 41 Gap Register rows / 52 expanded atomic test obligations block P-25.01 closure).
+- **P-25.02 State:** `PENDING` (Zero implementation leakage).
 - **Phase P-25 Status:** `IN_PROGRESS`.
 - **Unit Suite State:** `FAIL — 1 failed (RSA secret scan in active P-25.01 test file), 1503 passed, 1 warning` (honestly reported).
 - **Next Exact Master Plan Task:** `P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport`.
