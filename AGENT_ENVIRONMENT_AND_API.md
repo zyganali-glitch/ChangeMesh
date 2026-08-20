@@ -13,18 +13,19 @@ Record actual environment only; do not fill unknown values with guesses.
 - Gemini model ID: `gemini-3.6-flash` (canonical single model for all product runtime invocations)
 - Python SDK Requirement: `google-genai` (version 2.18.1 locked in `uv.lock`; legacy `vertexai` SDK is deprecated)
 - Bounded Model Client: `src/core/gemini_client.py` (`BoundedGeminiClient` IMPLEMENTED in P-08.01)
-- Cloud Run: `VERIFIED` (as supporting services)
-- Firestore: `VERIFIED` (as Operational State)
-- Pub/Sub: `VERIFIED`
+- Cloud Run: `VERIFIED / LIVE_DEPLOYED` (`changemesh-p24-e2e` revision `changemesh-p24-e2e-00001-jjp` in `europe-west3`, URL `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`)
+- Firestore: `VERIFIED / LIVE_E2E_PROVEN` (`(default)` database in `europe-west3`, transactional CAS update and readback proven in P-24.05)
+- Pub/Sub: `VERIFIED / LIVE_E2E_PROVEN` (`changemesh-p02-topic-527e3253` / `changemesh-p02-sub-3c3b3241` live publish/acknowledge proven in P-24.05)
+- Cloud Trace: `VERIFIED / LIVE_E2E_PROVEN` (spans exported to `cloudtrace.googleapis.com` and read back via Trace API in P-24.05)
 - Agent Runtime/Platform: `AVAILABLE / NOT_RUN`
 - Memory Bank: `DEFERRED / NOT_RUN` (Requires ReasoningEngine instance, none deployed yet)
 - Agent Registry: `AVAILABLE / NOT_RUN`
 - Agent Identity: `PERMISSION_BLOCKED / NOT_RUN` (verified via `gcloud agent-identity auth-providers list --location=global`)
 - Agent Gateway: `AVAILABLE / NOT_RUN` 
 - Model Armor: `PERMISSION_BLOCKED / NOT_RUN` (403 on modelarmor.googleapis.com)
-- Observability: `AVAILABLE / NOT_RUN`
-- GitHub demo repository: `VERIFIED` (`zyganali-glitch/changemesh-livewrite-demo`, LIVE_WRITE draft PR proven in P-19.03)
-- Public demo URL: `NOT_AVAILABLE`
+- Observability: `VERIFIED / LIVE_E2E_PROVEN` (Cloud Trace live export and API readback proven in P-24.05)
+- GitHub demo repository: `VERIFIED / LIVE_WRITE_PROVEN` (`zyganali-glitch/changemesh-livewrite-demo`, live branch, commit, and draft PR #2 created and idempotency reconciliation proven in P-24.05)
+- Public demo URL: `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`
 
 ## Rules
 

@@ -117,6 +117,14 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
         def _step(txn: Any) -> Dict[str, Any]:
             if hasattr(txn, "get") and callable(txn.get):
                 snapshot = txn.get(doc_ref)
+                if hasattr(snapshot, "__next__"):
+                    try:
+                        snapshot = next(snapshot)
+                    except StopIteration:
+                        raise DocumentNotFoundError(
+                            f"Document at {document_path} not found",
+                            document_path=document_path,
+                        )
             elif hasattr(doc_ref, "get") and callable(doc_ref.get):
                 try:
                     snapshot = doc_ref.get(transaction=txn)
@@ -727,6 +735,11 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
         def _step(txn: Any) -> Dict[str, Any]:
             if hasattr(txn, "get") and callable(txn.get):
                 snapshot = txn.get(doc_ref)
+                if hasattr(snapshot, "__next__"):
+                    try:
+                        snapshot = next(snapshot)
+                    except StopIteration:
+                        snapshot = None
             elif hasattr(doc_ref, "get") and callable(doc_ref.get):
                 try:
                     snapshot = doc_ref.get(transaction=txn)
@@ -741,7 +754,7 @@ class GoogleFirestoreSagaRepository(SagaStateRepository):
                     "(fail-closed: non-atomic read is strictly prohibited)"
                 )
 
-            if snapshot.exists:
+            if snapshot is not None and getattr(snapshot, "exists", False):
                 raise PersistenceSchemaError(
                     f"Reservation {reservation.reservation_id!r} already exists at {doc_path}"
                 )

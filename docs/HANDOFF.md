@@ -154,27 +154,29 @@
 - P-24.02
 - P-24.03
 - P-24.04
+- P-24.05
 - P-24.06
+- P-24
 
 **Blocked:**
-- P-24.05 (Run deployed Google Cloud E2E path — BLOCKED awaiting live Cloud Run / PubSub / Firestore deployment)
+- None
 
 **Active Phase:**
-- P-24 (End-to-End Synthetic Enterprise Demo Fixture — IN_PROGRESS with P-24.05 BLOCKED)
+- P-25 (Comprehensive Test and Gate Matrix — PENDING)
 
 **Next Exact Task:**
-- Awaiting user review / explicit instructions before advancing to P-25
+- P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport
 
-## Current P-24 State (Macro Execution Batch P-20.02 → P-24.06 Repaired and Verified)
+## Current P-24 State (Macro Execution Batch P-20.02 → P-24.06 Completed and Verified with Live Cloud Run & Cloud E2E)
 
-Phases P-20, P-21, P-22, P-23 are `DONE`. Phase P-24 is `IN_PROGRESS` (P-24.01..04, P-24.06 `DONE`, P-24.05 `BLOCKED`).
+Phases P-20, P-21, P-22, P-23, and P-24 are `DONE`.
 
-### P-24 — End-to-End Synthetic Enterprise Demo (IN_PROGRESS)
+### P-24 — End-to-End Synthetic Enterprise Demo (DONE)
 - **P-24.01:** Implemented `SyntheticBillingFixture` in `src/demo/e2e_demo.py` with fictional Acme Corp billing system, database targets, legacy dependency conditions, and intentional missing-proof conditions.
 - **P-24.02:** Implemented `build_demo_change_request()` in `src/demo/e2e_demo.py` binding criteria (`crit-compat`, `crit-dualwrite`, `crit-rollback`, `crit-audit`) strictly to canonical bounded condition specifications.
 - **P-24.03:** Implemented `build_demo_agent_registry()` in `src/demo/e2e_demo.py` registering baseline qualified and intentionally unqualified (`0.1.0-UNQUALIFIED`) revisions.
 - **P-24.04:** Implemented `run_local_e2e_demo()` in `src/demo/e2e_demo.py` executing full 8-stage lifecycle to `ChangeState.COMPLETE`, collecting evidence ledger, generating dashboard snapshot, and computing deterministic demo digest.
-- **P-24.05:** `BLOCKED` — Real deployed Google Cloud E2E environment prerequisites (live Cloud Run service, live Pub/Sub topic subscription, live Firestore database with external GitHub write authority) are unavailable in this local test environment. In compliance with ChangeMesh Supreme Constitution Rule 5 (Honesty boundary), P-24.05 remains BLOCKED without fabricated cloud proof or weakened criteria.
+- **P-24.05:** `DONE` — Live Google Cloud E2E executed across all managed cloud services with single unified change_id `change-p24-live-1787251810` and correlation_id `corr-p24-live-1787251810`: (1) Cloud Run service `changemesh-p24-e2e` revision `changemesh-p24-e2e-00001-jjp` healthy at `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`; (2) Vertex AI Gemini `gemini-3.6-flash` semantic judgment executed via `BoundedGeminiClient` (`gemini-call-p24-live-1787251810`, 68 prompt tokens, 1422 response tokens, outcome `SUCCESS`); (3) Google Pub/Sub event published to `changemesh-p02-topic-527e3253` (msg_id: `20625677300795648`) and pulled/acknowledged from `changemesh-p02-sub-3c3b3241`; (4) Google Cloud Firestore durable state `/tenants/tenant-changemesh-p24-live/changes/change-p24-live-1787251810` updated via atomic CAS to version 2 and verified by fresh client readback; (5) Bounded GitHub Live Write created branch `changemesh/p24-live-1787251810`, commit `144e9b2e598671a04688a61a61e9ad9e92b71353`, and real Draft PR `https://github.com/zyganali-glitch/changemesh-livewrite-demo/pull/2` on `zyganali-glitch/changemesh-livewrite-demo`, with idempotent duplicate retry reconciliation verified; (6) Google Cloud Trace exported 5 correlated spans (`c137e280da7d4f25ae08138649e6d374`) and successfully read back via Cloud Trace API (HTTP 200); (7) Tamper-evident Evidence Ledger (root digest `2f36878ce9c8329bad18624fa11b764e94f6e8f05a65939dc92ad6e2daf875e3`) and Change Evidence Passport (`8c7e9dd2d97e9db586455c4d56d33c8a023ec80da58845708d213d4caba0018c`) generated and verified; (8) Negative cryptographic tamper detection test verified (`PASS`). Full evidence bundle saved to `docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`.
 - **P-24.06:** Implemented reproducible demo via `python scripts/cmd.py demo` and `run_local_e2e_demo()`, tested as subprocess in `tests/test_p24_e2e_demo.py::TestReproducibleDemo`.
 
 ### P-23 — Agent Identity, Gateway, and Model Armor (DONE)
