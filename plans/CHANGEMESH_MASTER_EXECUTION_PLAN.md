@@ -1956,7 +1956,8 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport
 
-- **Status:** `DONE`
+- **Status:** `IN_PROGRESS`
+- **Note:** Implementation exists (`tests/test_p25_01_comprehensive_unit.py`, 21 tests, 1503 total passed). Closure gated on P-25.00 preflight completion. P-25.00 preflight (this task) identified 37 additional test gaps that must be addressed before P-25.01 can be independently verified as DONE. The existing 21 tests are retained and NOT modified by P-25.00.
 - **Required action:** Create unit tests for domain schemas, state transitions, policy, memory, capability, passport.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Critical branches/invalid inputs covered.
@@ -3028,7 +3029,8 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-24.00 — Demo fixture donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
+- **Evidence:** Preflight report completed in `docs/P-24.00_SYNTHETIC_DEMO_DONOR_PREFLIGHT.md`. All 6 demo-relevant donors inspected. P-DΩ PASS.
 - **Required action:** Before the existing `P-24.01` task or any implementation in this phase, run the donor-reuse preflight for D-CONTEXTSEAL, D-CCT, D-ZEROKIT, D-UIPATH, D-GITLAB, D-QWEN. Inspect donor fixtures only to derive failure shapes and evidence patterns; create a new fictional billing fixture without donor customer/project names.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Fixture originality matrix and synthetic-data declaration.
@@ -3046,7 +3048,7 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
-- **Evidence:** Preflight audit completed for test-suite coverage. Cleanroom test-matrix strategy verified. No proprietary or vendor-locked fixture copyover.
+- **Evidence:** Preflight report completed in `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md`. All 7 approved donors (D-UAOS, D-UIPATH, D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-QWEN, D-GITLAB) inspected across 20 components. Donor-test traceability matrix produced with positive/failure/boundary/forbidden/security cases. 43 gaps identified for P-25.01/P-25.05 follow-up. P-DΩ.01–P-DΩ.08 all PASS under preflight applicability rules. Read-only donor-reuse auditor: PASS — 0 blocking findings.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-26.00 — Security donor preflight

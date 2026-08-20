@@ -158,7 +158,6 @@
 - P-24.06
 - P-24
 - P-25.00
-- P-25.01
 
 **Blocked:**
 - None
@@ -167,12 +166,13 @@
 - P-25 (Comprehensive Test and Gate Matrix — IN_PROGRESS)
 
 **Active Task:**
-- P-25.02 — Create integration tests for ADK, Gemini parser, Pub/Sub, Firestore, GitHub, available managed adapters (PENDING)
+- P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport (IN_PROGRESS — implementation exists with 21 tests; P-25.00 preflight identified 37 additional test gaps to address)
 
-## Current P-25 State (P-25.01 Comprehensive Unit Test Matrix Completed)
+## Current P-25 State (P-25.00 Test-Suite Donor Preflight Completed)
 
-- **P-25.00:** Test-suite donor preflight completed (`DONE`). Cleanroom test-matrix strategy verified.
-- **P-25.01:** Comprehensive unit test suite `tests/test_p25_01_comprehensive_unit.py` implemented and verified (21/21 tests passed, 1504 total unit tests passed, 0 failures, 0 errors).
+- **P-25.00:** `DONE` — Test-suite donor preflight completed in `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md`. All 7 approved donors inspected across 20 components. Donor-test traceability matrix produced. 43 gaps identified (37 for P-25.01, 6 for P-25.05). P-DΩ.01–P-DΩ.08 all PASS. Read-only donor-reuse auditor: PASS.
+- **P-25.01:** `IN_PROGRESS` — Existing implementation (`tests/test_p25_01_comprehensive_unit.py`, 21 tests, 1503 total passed). Closure gated on addressing the 37 test gaps identified by P-25.00 preflight. The existing 21 tests are retained.
+- **P-25.02:** `PENDING` — Integration tests for ADK, Gemini parser, Pub/Sub, Firestore, GitHub adapters.
   - `TestDomainSchemasComprehensive`: `EventEnvelope` immutability, extra-forbidden enforcement, blank field rejection, `ChangeRecord` validation and extra-forbidden strictness, `AmbiguityRecord` lifecycle from OPEN to RESOLVED, and machine conventions (secret key redaction, canonical JSON byte sorting, SHA-256 validation, UTC normalization).
   - `TestStateTransitionsAndLifecycleComprehensive`: All 16 `ChangeState` terminal vs non-terminal invariants, canonical forward progression, human authority branching (`GROUNDED -> AWAITING_AUTHORITY -> AUTHORIZED -> EXECUTING`), illegal backward/skip transition fail-closed errors, and Saga repository CAS optimistic concurrency conflict detection.
   - `TestPolicyEngineAndReversibilityComprehensive`: `DeterministicPolicyChecker` secret detection (RSA private keys) vs clean DDL evaluation, `InjectionDetector` prompt injection indicator detection, `ReversibilityClassifier` additive vs destructive SQL classification, and `PolicyGuardianGate` autonomous vs human authority mapping.
