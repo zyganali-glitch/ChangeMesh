@@ -166,12 +166,12 @@
 - P-25 (Comprehensive Test and Gate Matrix — IN_PROGRESS)
 
 **Active Task:**
-- P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport (IN_PROGRESS — implementation exists with 21 tests; P-25.00 preflight identified 37 additional test gaps to address)
+- P-25.01 — Create unit tests for domain schemas, state transitions, policy, memory, capability, passport (IN_PROGRESS — implementation exists with 21 tests; P-25.00 preflight identified 41 Gap Register rows / 52 expanded atomic test obligations to address)
 
 ## Current P-25 State (P-25.00 Test-Suite Donor Preflight Completed)
 
-- **P-25.00:** `DONE` — Test-suite donor preflight completed in `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md`. All 7 approved donors inspected across 20 components. Donor-test traceability matrix produced. 43 gaps identified (37 for P-25.01, 6 for P-25.05). P-DΩ.01–P-DΩ.08 all PASS. Read-only donor-reuse auditor: PASS.
-- **P-25.01:** `IN_PROGRESS` — Existing implementation (`tests/test_p25_01_comprehensive_unit.py`, 21 tests, 1503 total passed). Closure gated on addressing the 37 test gaps identified by P-25.00 preflight. The existing 21 tests are retained.
+- **P-25.00:** `DONE` — Test-suite donor preflight completed in `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md` and registered in `docs/DONOR_REUSE_MANIFEST.md` §3.1. All 7 approved donors inspected across 20 components. Donor-test traceability matrix produced. 43 Gap Register rows identified (60 expanded atomic test obligations: 41 gap rows / 52 test cases for P-25.01, 2 gap rows / 8 test cases for P-25.05). P-DΩ.01–P-DΩ.08 all PASS under preflight applicability rules. Read-only donor-reuse auditor: PASS (0 blockers, 0 warnings).
+- **P-25.01:** `IN_PROGRESS` — Existing implementation (`tests/test_p25_01_comprehensive_unit.py`, 21 tests, 1503 passed, 1 failed due to test-fixture RSA marker scan in secret check). Closure gated on addressing the 41 Gap Register rows (52 expanded atomic test obligations) identified by P-25.00 preflight. The existing 21 tests are retained.
 - **P-25.02:** `PENDING` — Integration tests for ADK, Gemini parser, Pub/Sub, Firestore, GitHub adapters.
   - `TestDomainSchemasComprehensive`: `EventEnvelope` immutability, extra-forbidden enforcement, blank field rejection, `ChangeRecord` validation and extra-forbidden strictness, `AmbiguityRecord` lifecycle from OPEN to RESOLVED, and machine conventions (secret key redaction, canonical JSON byte sorting, SHA-256 validation, UTC normalization).
   - `TestStateTransitionsAndLifecycleComprehensive`: All 16 `ChangeState` terminal vs non-terminal invariants, canonical forward progression, human authority branching (`GROUNDED -> AWAITING_AUTHORITY -> AUTHORIZED -> EXECUTING`), illegal backward/skip transition fail-closed errors, and Saga repository CAS optimistic concurrency conflict detection.

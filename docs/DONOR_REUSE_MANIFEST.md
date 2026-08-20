@@ -51,6 +51,17 @@ A blank or inferred field is invalid. Unknown license, source pin, source path, 
 | `D-QWEN` | `gitlab.com/zyganali/universal-agent-os-qwen` | `a43b3411856f41a4be9424d11c01a5e637cdc410` | hybrid recall, freshness/importance/decay, shared memory bus | no Qwen runtime dependency, Phase-0 carry-over, or memory-as-truth |
 | `D-GITLAB` | `gitlab.com/zyganali/universal-agent-os-gitlab-edition` | `3c4a412b6040d8a8154c15325943c409be9105f2` | real MR overlap/blast-radius, ownership/conflict context, unavailable-tool honesty | no GitLab Duo/Orbit dependency in GitHub-first MVP or fabricated GraphQL evidence |
 
+### 3.1 Donor Preflight Verification Registry
+
+| Preflight Task | Scope & Objective | Preflight Evidence Report | Status |
+|---|---|---|---|
+| P-04.00 | Architecture & donor convergence preflight | `docs/P-04.00_ARCHITECTURE_DONOR_PREFLIGHT.md` | `PASS` |
+| P-08.00 | Gemini boundary & model armor donor preflight | `docs/P-08.00_GEMINI_DONOR_PREFLIGHT.md` | `PASS` |
+| P-10.00 | Saga persistence & state repository donor preflight | `docs/P-10.00_SAGA_PERSISTENCE_DONOR_PREFLIGHT.md` | `PASS` |
+| P-20.00 | Long-running orchestration saga donor preflight | `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md` | `PASS` |
+| P-24.00 | Synthetic enterprise demo donor preflight | `docs/P-24.00_SYNTHETIC_DEMO_DONOR_PREFLIGHT.md` | `PASS` |
+| **P-25.00 — Test-suite donor preflight** | Comprehensive test-suite traceability matrix across all 7 donors (20 components) | `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md` | `PASS` |
+
 ## 4. Component record schema
 
 Every component record must contain:
