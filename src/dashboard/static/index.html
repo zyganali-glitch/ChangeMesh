@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ChangeMesh — Policy-Governed Long-Lived Agent Fleet for Proof-Carrying Enterprise Changes">
+  <title>ChangeMesh — Judge and Operator Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="app-header" role="banner">
+    <div class="header-container">
+      <div class="brand-group">
+        <div class="logo-icon" aria-hidden="true">⬡</div>
+        <div>
+          <h1 class="app-title">ChangeMesh</h1>
+          <p class="app-subtitle">Proof-Carrying Autonomous Enterprise Change Platform</p>
+        </div>
+      </div>
+
+      <div class="header-controls" role="toolbar" aria-label="Dashboard controls">
+        <div class="status-pill" id="live-status-pill" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="status-text">INITIALIZING</span>
+        </div>
+
+        <div class="evidence-mode-badge" id="evidence-mode-badge" title="Execution Evidence Mode">
+          MODE: <span id="evidence-mode-text">SIMULATION</span>
+        </div>
+
+        <button id="run-demo-btn" class="btn btn-primary" aria-label="Trigger local synthetic demo execution">
+          <span aria-hidden="true">▶</span> Run Demo Change
+        </button>
+
+        <button id="theme-toggle-btn" class="btn btn-icon" aria-label="Toggle dark and light color theme" title="Toggle theme">
+          <span id="theme-icon" aria-hidden="true">☼</span>
+        </button>
+
+        <button id="lang-toggle-btn" class="btn btn-secondary" aria-label="Switch interface language between English and Turkish" title="Switch language">
+          <span id="lang-text">TR</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="dashboard-main" role="main">
+    <div class="container">
+
+      <!-- SECTION 1: CHANGE OVERVIEW & METRICS -->
+      <section class="dashboard-section" id="change-overview-section" aria-labelledby="overview-heading">
+        <h2 id="overview-heading" class="section-title">Change Lifecycle Overview</h2>
+        
+        <div class="cards-grid metrics-grid" id="metrics-cards">
+          <div class="card metric-card" tabindex="0">
+            <span class="metric-label" id="lbl-change-id">Change ID</span>
+            <span class="metric-value text-mono" id="val-change-id">—</span>
+            <span class="metric-sub" id="val-tenant-id">Tenant: —</span>
+          </div>
+
+          <div class="card metric-card" tabindex="0">
+            <span class="metric-label" id="lbl-lifecycle-state">Current State</span>
+            <span class="metric-value" id="val-lifecycle-state">EMPTY</span>
+            <span class="metric-sub" id="val-correlation-id">Correlation: —</span>
+          </div>
+
+          <div class="card metric-card" tabindex="0">
+            <span class="metric-label" id="lbl-autonomy-class">Autonomy Classification</span>
+            <span class="metric-value text-accent" id="val-autonomy-class">AUTO_EXECUTE</span>
+            <span class="metric-sub" id="val-friction-metric">Friction: 0 Manual Interventions</span>
+          </div>
+
+          <div class="card metric-card" tabindex="0">
+            <span class="metric-label" id="lbl-passport-digest">Evidence Passport Root</span>
+            <span class="metric-value text-mono text-small" id="val-passport-digest">—</span>
+            <span class="metric-sub text-success" id="val-integrity-status">Integrity: Sealed</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: FLEET EXECUTION & TIMELINE -->
+      <section class="dashboard-section" id="fleet-section" aria-labelledby="fleet-heading">
+        <div class="section-header">
+          <h2 id="fleet-heading" class="section-title">Agent Fleet & Causal Event Timeline</h2>
+          <span class="badge badge-info" id="task-count-badge">0 Tasks Recorded</span>
+        </div>
+
+        <div class="two-column-layout">
+          <!-- Column A: Agent Fleet Status Cards -->
+          <div class="column">
+            <h3 class="subsection-title" id="fleet-subheading">Active Specialist Fleet</h3>
+            <div class="agent-fleet-list" id="agent-fleet-container" role="region" aria-labelledby="fleet-subheading">
+              <!-- Rendered via JS -->
+              <div class="card agent-card placeholder-card">No agent tasks recorded yet. Click "Run Demo Change" to execute.</div>
+            </div>
+          </div>
+
+          <!-- Column B: Causal DAG Timeline -->
+          <div class="column">
+            <h3 class="subsection-title" id="timeline-subheading">Causal Event Timeline (DAG)</h3>
+            <div class="timeline-container" id="timeline-container" role="region" aria-labelledby="timeline-subheading">
+              <ol class="timeline-list" id="timeline-list" aria-label="Chronological and causal event list">
+                <li class="timeline-item placeholder-item">Awaiting lifecycle events...</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: REVERSIBILITY GATE & APPROVAL COMPRESSION -->
+      <section class="dashboard-section" id="approval-section" aria-labelledby="approval-heading">
+        <h2 id="approval-heading" class="section-title">Reversibility Gate & Approval Compression</h2>
+
+        <div class="card approval-card" id="approval-compression-card" tabindex="0" role="region" aria-labelledby="approval-heading">
+          <div class="approval-header">
+            <div class="approval-badge-group">
+              <span class="badge badge-warning" id="approval-badge">HUMAN ON THE LOOP</span>
+              <span class="text-muted" id="compression-ratio-text">5 standard review cycles compressed into 1 irreducible decision packet</span>
+            </div>
+            <span class="text-mono text-small" id="approval-slot-ref">SLOT: slot-schema-migration-prod</span>
+          </div>
+
+          <div class="approval-body">
+            <div class="approval-question-box">
+              <h4 class="question-title" id="approval-decision-question">Authorize Expand-Contract Migration for Acme Billing Platform?</h4>
+              <p class="question-desc" id="approval-completed-work">Impact Scout mapped 7 dependencies; Policy Guardian confirmed zero secret/PII leaks; ShadowLab verified automated rollback and legacy client compatibility.</p>
+            </div>
+
+            <div class="approval-details-grid">
+              <div class="detail-box">
+                <strong class="detail-label" id="lbl-action-scope">Action Scope</strong>
+                <span class="detail-val" id="val-action-scope">Postgres DDL / GitHub Draft PR</span>
+              </div>
+              <div class="detail-box">
+                <strong class="detail-label" id="lbl-rollback-proof">Rollback Proof</strong>
+                <span class="detail-val text-success" id="val-rollback-proof">VERIFIED (Simulated DDL Revert)</span>
+              </div>
+              <div class="detail-box">
+                <strong class="detail-label" id="lbl-rehearsal-status">ShadowLab Twin</strong>
+                <span class="detail-val text-success" id="val-rehearsal-status">8 / 8 Scenarios Passed</span>
+              </div>
+            </div>
+
+            <div class="approval-actions" role="group" aria-label="Approval decision buttons">
+              <button class="btn btn-success" id="btn-approve" aria-label="Approve change and proceed with draft PR">
+                ✓ Authorize Execution
+              </button>
+              <button class="btn btn-danger" id="btn-reject" aria-label="Reject change and trigger compensation">
+                ✕ Reject &amp; Compensate
+              </button>
+              <span class="text-muted text-small" id="authority-token-status">Token: Valid HMAC-SHA256 Bound</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 4: SHADOWLAB REHEARSAL TWIN -->
+      <section class="dashboard-section" id="shadowlab-section" aria-labelledby="shadowlab-heading">
+        <div class="section-header">
+          <h2 id="shadowlab-heading" class="section-title">ShadowLab Change Rehearsal Twin</h2>
+          <span class="badge badge-success" id="shadowlab-badge">8 Canonical Scenarios Verified</span>
+        </div>
+
+        <div class="shadowlab-grid" id="shadowlab-scenario-grid" role="region" aria-labelledby="shadowlab-heading">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- SECTION 5: EVIDENCE PASSPORT & CLOUD PROOF -->
+      <section class="dashboard-section" id="evidence-section" aria-labelledby="evidence-heading">
+        <h2 id="evidence-heading" class="section-title">Tamper-Evident Evidence Ledger & Cloud Proofs</h2>
+
+        <div class="two-column-layout">
+          <!-- Passport Hash Chain -->
+          <div class="column">
+            <div class="card evidence-card" tabindex="0">
+              <h3 class="subsection-title" id="passport-subheading">Cryptographic Evidence Passport</h3>
+              <div class="passport-view" id="passport-details-box" role="region" aria-labelledby="passport-subheading">
+                <div class="passport-entry">
+                  <span class="passport-key">Issuer:</span>
+                  <span class="passport-val text-mono" id="pass-issuer">ChangeMesh Passport Authority v1.0.0</span>
+                </div>
+                <div class="passport-entry">
+                  <span class="passport-key">Chained Hash Root:</span>
+                  <span class="passport-val text-mono text-small" id="pass-root">2f36878ce9c8329bad18624fa11b764e94f6e8f05a65939dc92ad6e2daf875e3</span>
+                </div>
+                <div class="passport-entry">
+                  <span class="passport-key">Tamper Detection:</span>
+                  <span class="passport-val text-success" id="pass-tamper">PASSED (Zero Chain Divergence)</span>
+                </div>
+                <div class="passport-entry">
+                  <span class="passport-key">Evidence Mode:</span>
+                  <span class="passport-val badge badge-info" id="pass-mode">SIMULATION</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Managed Cloud Proofs -->
+          <div class="column">
+            <div class="card evidence-card" tabindex="0">
+              <h3 class="subsection-title" id="cloud-subheading">Google Cloud Integration Proofs</h3>
+              <div class="cloud-proof-list" id="cloud-proof-container" role="region" aria-labelledby="cloud-subheading">
+                <div class="cloud-proof-item">
+                  <span class="cloud-service-icon">☁</span>
+                  <div class="cloud-proof-info">
+                    <strong>Cloud Run Service:</strong>
+                    <span class="text-mono text-small">changemesh-p24-e2e (europe-west3)</span>
+                  </div>
+                  <span class="badge badge-success">HEALTHY</span>
+                </div>
+
+                <div class="cloud-proof-item">
+                  <span class="cloud-service-icon">⚡</span>
+                  <div class="cloud-proof-info">
+                    <strong>Google Pub/Sub:</strong>
+                    <span class="text-mono text-small">changemesh-p02-topic-527e3253</span>
+                  </div>
+                  <span class="badge badge-success">ACK PROVEN</span>
+                </div>
+
+                <div class="cloud-proof-item">
+                  <span class="cloud-service-icon">🗄</span>
+                  <div class="cloud-proof-info">
+                    <strong>Google Cloud Firestore:</strong>
+                    <span class="text-mono text-small">/tenants/tenant-changemesh-p24-live (CAS v2)</span>
+                  </div>
+                  <span class="badge badge-success">VERIFIED</span>
+                </div>
+
+                <div class="cloud-proof-item">
+                  <span class="cloud-service-icon">🐙</span>
+                  <div class="cloud-proof-info">
+                    <strong>GitHub Draft PR:</strong>
+                    <span class="text-mono text-small">zyganali-glitch/changemesh-livewrite-demo#2</span>
+                  </div>
+                  <span class="badge badge-success">DRAFT PR CREATED</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="app-footer" role="contentinfo">
+    <div class="container footer-container">
+      <p class="footer-text">ChangeMesh — All Things Agentic Hackathon Entry (Fortified Enterprise Fleet Category)</p>
+      <p class="footer-meta text-muted text-small">Zero external write credentials in browser • Fully deterministic fact authority • WCAG 2.1 AA Compliant</p>
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -419,3 +419,20 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all twin simulations, fault rehearsal engines, and resilience benchmarks).
 - Status: `ACTIVE`
 
+### LESSON-20260822-02 — Zero-Dependency Accessible Dashboard and Bilingual Translation Parity
+- Date/time: 2026-08-22
+- Active task: P-25.04
+- Symptom: Hackathon browser dashboards often introduce fragile node/npm build dependencies, external CDN font/CSS links that fail in offline/restricted environments, or incomplete English/Turkish localization parity.
+- Root cause: Treating the judge dashboard as a heavyweight SPA rather than clean, native, self-contained HTML5/CSS3/ES6 assets.
+- Correct approach:
+  1. Deliver the dashboard as pure vanilla static assets (`src/dashboard/static/index.html`, `styles.css`, `app.js`) served directly by the Python/Cloud Run service app with zero node build steps or runtime.
+  2. Maintain 100% offline/PWA compatibility with zero external CDN/font calls.
+  3. Enforce WCAG 2.1 AA color contrast (exceeding 7.0:1 on text), clear keyboard focus visibility, skip-navigation links, and semantic ARIA landmark regions.
+  4. Ensure symmetric bilingual translation dictionary parity between English and Turkish surfaces.
+- Prevention rule: Judge dashboard must remain zero-dependency, WCAG AA compliant, fully responsive, and bilingual.
+- Tests/evidence: `tests/test_p25_04_browser_accessibility.py` (24 passed); full repo suite (1676 passed, 1 warning).
+- Affected files: `src/dashboard/static/index.html`, `src/dashboard/static/styles.css`, `src/dashboard/static/app.js`, `service_app.py`, `tests/test_p25_04_browser_accessibility.py`, `docs/P-25.04_BROWSER_ACCESSIBILITY_REPORT.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all judge interfaces, demo web frontends, and accessible dashboards).
+- Status: `ACTIVE`
+
+

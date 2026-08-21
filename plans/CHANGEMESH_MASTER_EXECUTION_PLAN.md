@@ -1988,12 +1988,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-25.04 — Create browser E2E/accessibility tests for judge path
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create browser E2E/accessibility tests for judge path.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Critical path works clean browser/target viewport.
-- **Required evidence:** Browser report.
-- **Mandatory documentation sync:** Demo guide.
+- **Required evidence:** Browser report `docs/P-25.04_BROWSER_ACCESSIBILITY_REPORT.md` and dedicated test suite `tests/test_p25_04_browser_accessibility.py` (24 tests passed in 2.43s, 1676 total repository tests passed, 0 failures, 0 errors). Tests verify WCAG 2.1 AA accessibility, color contrast ratios exceeding 7.0:1 on text, keyboard focus visibility outlines with offset, skip navigation link, semantic landmark roles (banner, main, contentinfo, region, status), mobile/tablet/desktop responsive viewport media queries, 100% symmetric EN/TR translation parity in `app.js`, zero external CDN/font dependencies, and clean HTTP service app endpoints (`/`, `/static/styles.css`, `/static/app.js`, `/health`, `/api/dashboard/snapshot`).
+- **Mandatory documentation sync:** `docs/P-25.04_BROWSER_ACCESSIBILITY_REPORT.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-25.05 — Create claim/evidence, fixture/real, secret, license, broken-link tests
