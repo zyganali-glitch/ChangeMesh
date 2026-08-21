@@ -19,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.demo.e2e_demo import run_local_e2e_demo
+from src.demo.e2e_demo import run_local_e2e_demo  # noqa: E402
 
 
 def benchmark_e2e_demo(iterations: int = 5) -> dict[str, Any]:

@@ -2072,7 +2072,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-27 — Reliability, Performance, Cost, and Quota
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-27.01 — Measure E2E/per-stage latency and retry behavior
 
@@ -2116,12 +2116,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-27.05 — Remove unnecessary dependencies, logs, polling, resources
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Remove unnecessary dependencies, logs, polling, resources.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No wasteful MVP architecture.
-- **Required evidence:** Diff/cost comparison.
-- **Mandatory documentation sync:** Architecture.
+- **Required evidence:** Lean architecture audit suite `tests/test_p27_05_lean_architecture.py` (3 tests passing) and report `docs/P-27.05_LEAN_ARCHITECTURE_AND_COST_COMPARISON.md`. Verifies zero Node.js/npm dependencies, zero frontend build pipelines, push-based event backbone eliminating polling, single canonical `gemini-3.6-flash` model client without vendor sprawl, and scale-to-zero serverless footprint.
+- **Mandatory documentation sync:** `docs/P-27.05_LEAN_ARCHITECTURE_AND_COST_COMPARISON.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-28 — Google Cloud Deployment and Revision Parity

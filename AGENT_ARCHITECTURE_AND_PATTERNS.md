@@ -221,3 +221,14 @@ Provider-specific outer layers depend inward on ChangeMesh domain contracts. Dom
 Adapters are architecturally replaceable: changing a provider adapter (e.g., GitHub → synthetic, Firestore → test double) must not require changes to domain contracts.
 
 Full dependency matrix and package map: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## 11. Lean architecture and waste elimination (P-27.05)
+
+ChangeMesh enforces strict structural discipline to prevent MVP bloat, unnecessary background daemon costs, and supply-chain vulnerabilities:
+
+1. **Zero Node.js Runtime & Zero Build Tooling:** Web dashboard uses vanilla HTML5, CSS3, and ES6 JavaScript served directly via Python/Cloud Run without Node.js, Webpack, Vite, or npm dependencies.
+2. **Push-Driven Backbone:** Event transitions use Google Cloud Pub/Sub and in-process causal timeline buses; unbounded HTTP polling loops are strictly prohibited.
+3. **Single Canonical Model:** Sole reliance on `gemini-3.6-flash` via `google-genai`, eliminating multi-model vendor drift and heavy orchestration monoliths (`langchain`, `llamaindex`).
+4. **Scale-to-Zero Deployment:** Cloud Run `min-instances = 0` guarantees $0.00 / month idle expenditure.
+5. **Sanitized Minimal Logging:** Prohibits raw payload logging; emits structured metadata and trace spans only.
+

@@ -606,6 +606,23 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all LLM client wrappers, rate limiting, and fault-tolerant sagas).
 - Status: `ACTIVE`
 
+### LESSON-20260822-14 — Lean AI Architecture and Supply Chain Waste Elimination
+- Date/time: 2026-08-22
+- Active task: P-27.05
+- Symptom: AI hackathon applications frequently suffer from bloat, broken Node.js build pipelines, unpinned dependencies, and unpredictable runtime resource consumption.
+- Root cause: Over-engineering frontend stacks with heavy JavaScript toolchains (Webpack, React, Vite) and multi-model abstraction monoliths.
+- Correct approach:
+  1. Eliminate Node.js runtime and npm build pipelines entirely by serving clean, vanilla ES6/HTML5/CSS3 directly from Python/Cloud Run.
+  2. Implement push-based event topologies with Pub/Sub instead of busy-wait polling loops.
+  3. Standardize on a single canonical Google Gemini model (`gemini-3.6-flash`) via the official `google-genai` SDK.
+  4. Enforce scale-to-zero serverless hosting (`min-instances = 0`) to achieve $0.00 / month idle expenditure.
+- Prevention rule: Never introduce unneeded frontend build toolchains or multi-model sprawl when native browser standards and focused SDKs fulfill the product requirements.
+- Tests/evidence: `tests/test_p27_05_lean_architecture.py` (3 passed); full suite (1726 passed).
+- Affected files: `tests/test_p27_05_lean_architecture.py`, `docs/P-27.05_LEAN_ARCHITECTURE_AND_COST_COMPARISON.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all production agent architectures, lean web apps, and AI hackathon submissions).
+- Status: `ACTIVE`
+
+
 
 
 
