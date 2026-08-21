@@ -683,6 +683,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all microservice API testing, container readiness probes, and cloud demo verification).
 - Status: `ACTIVE`
 
+### LESSON-20260822-19 — Post-Judging Teardown Protocols and Evidence Preservation
+- Date/time: 2026-08-22
+- Active task: P-28.05
+- Symptom: De-provisioning hackathon cloud infrastructure can accidentally wipe benchmark logs or create dangling resources incurring unwanted recurring costs.
+- Root cause: Absence of clear boundaries between ephemeral compute/test states and immutable proof packs.
+- Correct approach:
+  1. Enforce Cloud Run `min-instances = 0` to ensure automatic scale-to-zero when traffic ceases.
+  2. Commit immutable evidence packs (`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`, `docs/P-28.03_REVISION_PROVENANCE_BINDING.json`) directly into version control.
+  3. Define declarative teardown scripts in `deploy/budget_and_retention_config.json` that purge transient database collections without mutating canonical files.
+- Prevention rule: Never couple evidence availability to persistent live compute; store proof as immutable repo artifacts while allowing compute to scale to zero.
+- Tests/evidence: `tests/test_p28_05_teardown_verification.py` (3 passed); full suite (1736 passed).
+- Affected files: `tests/test_p28_05_teardown_verification.py`, `docs/P-28.05_TEARDOWN_IDLE_VERIFICATION_REPORT.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all hackathon submissions, cloud cost containment, and serverless lifecycle management).
+- Status: `ACTIVE`
+
+
 
 
 

@@ -2170,12 +2170,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-28.05 — Verify teardown/low-cost idle mode
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Verify teardown/low-cost idle mode.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Resources safely disabled after judging while recorded proof retained.
-- **Required evidence:** Teardown test.
-- **Mandatory documentation sync:** Environment, handoff.
+- **Required evidence:** Teardown verification report `docs/P-28.05_TEARDOWN_IDLE_VERIFICATION_REPORT.md` and test suite `tests/test_p28_05_teardown_verification.py` (3 tests passing). Verifies Cloud Run scale-to-zero enforcement (`min_instances=0`), automated teardown declarations in `deploy/budget_and_retention_config.json`, and safe preservation of immutable evidence packs (`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`, `docs/P-28.03_REVISION_PROVENANCE_BINDING.json`).
+- **Mandatory documentation sync:** `docs/P-28.05_TEARDOWN_IDLE_VERIFICATION_REPORT.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-28.06 — Record sanitized console/log/trace evidence
