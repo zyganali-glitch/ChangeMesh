@@ -2204,12 +2204,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-29.02 — Define initial commercial customer profile/paid problem around schema/API assurance
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define initial commercial customer profile/paid problem around schema/API assurance.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Problem specific/budget-bearing; no invented traction.
-- **Required evidence:** ICP brief.
-- **Mandatory documentation sync:** Devpost future.
+- **Required evidence:** ICP and paid problem brief `docs/P-29.02_IDEAL_CUSTOMER_PROFILE_BRIEF.md` and test suite `tests/test_p29_02_icp_brief.py` (3 tests passing). Identifies VP Platform / Head of Infrastructure personas in regulated B2B SaaS/FinTech, quantifies schema breaking change downtime costs, articulates ShadowLab ROI, and provides honest MVP maturity disclosures with zero invented traction.
+- **Mandatory documentation sync:** `docs/P-29.02_IDEAL_CUSTOMER_PROFILE_BRIEF.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-29.03 — Define deployment/privacy models: hosted control plane, customer-hosted runner, fully private

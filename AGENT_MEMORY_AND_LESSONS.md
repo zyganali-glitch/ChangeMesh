@@ -728,6 +728,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all enterprise SaaS, agentic control planes, and SOC2 compliant data architectures).
 - Status: `ACTIVE`
 
+### LESSON-20260822-22 — Ideal Customer Profile (ICP) Scoping and Honest Commercial Traction
+- Date/time: 2026-08-22
+- Active task: P-29.02
+- Symptom: AI competition projects often present vague, generic buyer profiles ("for all developers") and invent fictitious enterprise customer traction or inflated ARR claims.
+- Root cause: Conflating speculative marketing copy with grounded enterprise commercial analysis.
+- Correct approach:
+  1. Define a precise, budget-bearing buyer persona: VP of Platform Engineering / Head of Infrastructure in regulated industries (FinTech, B2B SaaS).
+  2. Quantify real financial pain points: $100k+ downtime costs per breaking schema migration incident.
+  3. Clearly separate MVP developer-preview maturity from future commercial production goals with explicit zero-invented-traction disclosures.
+- Prevention rule: Every commercial productization brief must identify specific budget holders and provide strict non-traction disclosures.
+- Tests/evidence: `docs/P-29.02_IDEAL_CUSTOMER_PROFILE_BRIEF.md`, `tests/test_p29_02_icp_brief.py` (3 passed); full suite (1745 passed).
+- Affected files: `docs/P-29.02_IDEAL_CUSTOMER_PROFILE_BRIEF.md`, `tests/test_p29_02_icp_brief.py`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all commercial briefs, GTM plans, and investor/judge pitches).
+- Status: `ACTIVE`
+
+
 
 
 
