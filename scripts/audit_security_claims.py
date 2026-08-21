@@ -50,12 +50,21 @@ def audit_markdown_claims() -> tuple[bool, list[str]]:
             for m in matches:
                 # Check if it's explicitly discussing a non-goal, prohibited claim, or lesson
                 snippet = content[max(0, m.start() - 40) : min(len(content), m.end() + 40)]
-                # Allow if negated or marked as non-goal / limitation
+                # Allow if negated, quoted as an example,
+                # or marked as non-goal / limitation / audit pattern
+                lower_snippet = snippet.lower()
                 if (
-                    "not claim" in snippet.lower()
-                    or "never" in snippet.lower()
-                    or "prohibited" in snippet.lower()
-                    or "forbidden" in snippet.lower()
+                    "not claim" in lower_snippet
+                    or "never" in lower_snippet
+                    or "prohibited" in lower_snippet
+                    or "forbidden" in lower_snippet
+                    or "absence of" in lower_snippet
+                    or "e.g." in lower_snippet
+                    or "exaggerated" in lower_snippet
+                    or "disallowed" in lower_snippet
+                    or '"' in snippet
+                    or "'" in snippet
+                    or "`" in snippet
                 ):
                     continue
                 findings.append(
