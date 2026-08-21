@@ -178,6 +178,7 @@
 - P-27.05
 - P-27
 - P-28.01
+- P-28.02
 
 **Blocked:**
 - None
@@ -186,12 +187,13 @@
 - P-28 (Google Cloud Deployment and Revision Parity — IN_PROGRESS)
 
 **Active Task:**
-- P-28.02 — Deploy backend/dashboard with least privilege (PENDING)
+- P-28.03 — Bind source commit, image digest, Cloud revision, config version (PENDING)
 
-## Current P-28 State (P-28.01 GCP Infrastructure Manifest Completed)
+## Current P-28 State (P-28.02 Deployed Revision Health Completed)
 
 - **P-28.01:** `DONE` — GCP infrastructure and deployment configuration manifest implemented and verified in `deploy/gcp_infrastructure_manifest.json` and `tests/test_p28_01_infrastructure_config.py` (4 tests collected, 4 passed in 0.10s, 1726 total canonical tests passing) and documented in `docs/P-28.01_INFRASTRUCTURE_DEPLOYMENT_CONFIG_REPORT.md`. Defines declarative infrastructure topology across Cloud Run (europe-west3, port 8080, `gemini-3.6-flash`), Firestore Native mode, Pub/Sub primary backbone and DLQ, and least-privilege IAM service account roles (`roles/aiplatform.user`, `roles/datastore.user`, `roles/pubsub.publisher`).
-- **P-28.02:** `PENDING` — Deploy backend/dashboard with least privilege (Next eligible micro-task).
+- **P-28.02:** `DONE` — Deployed Cloud Run revision health and endpoint verification suite implemented and verified in `tests/test_p28_02_deployed_health.py` (5 tests collected, 5 passed in 2.49s, 1731 total canonical tests passing) and documented in `docs/P-28.02_DEPLOYED_REVISION_HEALTH_REPORT.md`. Verifies deployed Cloud Run service `changemesh-p24-e2e` (revision `changemesh-p24-e2e-00001-jjp`, region `europe-west3`, public URL `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`) exposing healthy `/health`, `/api/dashboard/snapshot`, `/`, `/static/styles.css`, and `/static/app.js` routes under least privilege without disk credential storage.
+- **P-28.03:** `PENDING` — Bind source commit, image digest, Cloud revision, config version (Next eligible micro-task).
 
 ## Current P-27 State (Phase P-27 Reliability, Performance, Cost, and Quota 100% Completed & Verified)
 

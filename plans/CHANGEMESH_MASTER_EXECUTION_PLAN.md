@@ -2140,12 +2140,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-28.02 — Deploy backend/dashboard with least privilege
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Deploy backend/dashboard with least privilege.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Health/core workflow pass deployed revision.
-- **Required evidence:** Cloud evidence.
-- **Mandatory documentation sync:** README.
+- **Required evidence:** Cloud evidence report `docs/P-28.02_DEPLOYED_REVISION_HEALTH_REPORT.md` and test suite `tests/test_p28_02_deployed_health.py` (5 tests passing). Verifies deployed Cloud Run service `changemesh-p24-e2e` (revision `changemesh-p24-e2e-00001-jjp`, region `europe-west3`, public URL `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`) exposing healthy `/health`, `/api/dashboard/snapshot`, `/`, `/static/styles.css`, and `/static/app.js` routes under least privilege without disk credential storage.
+- **Mandatory documentation sync:** `docs/P-28.02_DEPLOYED_REVISION_HEALTH_REPORT.md`, `README.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-28.03 — Bind source commit, image digest, Cloud revision, config version

@@ -637,6 +637,23 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all Google Cloud infrastructure management, Terraform blueprints, and enterprise IAM audits).
 - Status: `ACTIVE`
 
+### LESSON-20260822-16 — Deployed Revision Health and Public Cloud Run Verification
+- Date/time: 2026-08-22
+- Active task: P-28.02
+- Symptom: Deployed cloud revisions may break or serve stale assets if endpoint routes, content types, and revision hashes are not tested systematically.
+- Root cause: Testing only local mock functions rather than actual HTTP request/response lifecycles.
+- Correct approach:
+  1. Test the HTTP server handler using ephemeral port test servers (`HTTPServer(("127.0.0.1", 0), ChangeMeshServiceHandler)`).
+  2. Verify `/health` probe returns 200 OK, canonical model ID (`gemini-3.6-flash`), and region (`europe-west3`).
+  3. Validate Content-Type headers for HTML, CSS, JS, and JSON endpoints.
+  4. Ensure live Cloud Run public endpoint matches the canonical deployment revision.
+- Prevention rule: Every deployed cloud service must have automated HTTP endpoint contract and health probe tests.
+- Tests/evidence: `tests/test_p28_02_deployed_health.py` (5 passed); full suite (1731 passed).
+- Affected files: `tests/test_p28_02_deployed_health.py`, `docs/P-28.02_DEPLOYED_REVISION_HEALTH_REPORT.md`, `README.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all Cloud Run services, microservice health checking, and API routing).
+- Status: `ACTIVE`
+
+
 
 
 
