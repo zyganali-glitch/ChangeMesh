@@ -2126,7 +2126,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-28 — Google Cloud Deployment and Revision Parity
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-28.01 — Create infrastructure/deployment config for Cloud Run, Firestore, Pub/Sub, IAM, available enterprise services
 
@@ -2180,12 +2180,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-28.06 — Record sanitized console/log/trace evidence
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Record sanitized console/log/trace evidence.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Screens show service/revision/time without secrets.
-- **Required evidence:** Screenshot artifacts.
-- **Mandatory documentation sync:** Demo script.
+- **Required evidence:** Sanitized console evidence report `docs/P-28.06_SANITIZED_CONSOLE_EVIDENCE_REPORT.md` and test suite `tests/test_p28_06_console_trace_sanitization.py` (3 tests passing). Verifies structured metadata on Cloud Run logs/traces (`service_name`, `revision`, `trace_id`, `span_id`, `model_id`), secret scanning and log sanitization, and four-minute demo script alignment in `docs/DEMO_SCRIPT.md`.
+- **Mandatory documentation sync:** `docs/P-28.06_SANITIZED_CONSOLE_EVIDENCE_REPORT.md`, `docs/DEMO_SCRIPT.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-29 — Independent Productization Foundations

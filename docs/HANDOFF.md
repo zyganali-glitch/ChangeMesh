@@ -182,24 +182,26 @@
 - P-28.03
 - P-28.04
 - P-28.05
+- P-28.06
+- P-28
 
 **Blocked:**
 - None
 
 **Active Phase:**
-- P-28 (Google Cloud Deployment and Revision Parity — IN_PROGRESS)
+- P-29 (Independent Productization Foundations — IN_PROGRESS)
 
 **Active Task:**
-- P-28.06 — Record sanitized console/log/trace evidence (PENDING)
+- P-29.01 — Define post-hackathon separation between control plane, adapters, policy packs, customer data plane (PENDING)
 
-## Current P-28 State (P-28.05 Teardown and Low-Cost Idle Mode Completed)
+## Current P-28 State (Phase P-28 Google Cloud Deployment and Revision Parity 100% Completed & Verified)
 
 - **P-28.01:** `DONE` — GCP infrastructure and deployment configuration manifest implemented and verified in `deploy/gcp_infrastructure_manifest.json` and `tests/test_p28_01_infrastructure_config.py` (4 tests collected, 4 passed in 0.10s, 1726 total canonical tests passing) and documented in `docs/P-28.01_INFRASTRUCTURE_DEPLOYMENT_CONFIG_REPORT.md`. Defines declarative infrastructure topology across Cloud Run (europe-west3, port 8080, `gemini-3.6-flash`), Firestore Native mode, Pub/Sub primary backbone and DLQ, and least-privilege IAM service account roles (`roles/aiplatform.user`, `roles/datastore.user`, `roles/pubsub.publisher`).
 - **P-28.02:** `DONE` — Deployed Cloud Run revision health and endpoint verification suite implemented and verified in `tests/test_p28_02_deployed_health.py` (5 tests collected, 5 passed in 2.49s, 1731 total canonical tests passing) and documented in `docs/P-28.02_DEPLOYED_REVISION_HEALTH_REPORT.md`. Verifies deployed Cloud Run service `changemesh-p24-e2e` (revision `changemesh-p24-e2e-00001-jjp`, region `europe-west3`, public URL `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`) exposing healthy `/health`, `/api/dashboard/snapshot`, `/`, `/static/styles.css`, and `/static/app.js` routes under least privilege without disk credential storage.
 - **P-28.03:** `DONE` — Revision provenance and deployment binding artifact implemented and verified in `docs/P-28.03_REVISION_PROVENANCE_BINDING.json` and `tests/test_p28_03_revision_provenance.py` (3 tests collected, 3 passed in 0.09s, 1731 total canonical tests passing) and synchronized in `docs/SUBMISSION_MANIFEST.md`. Binds source Git commit `51076beee4eb10412bfefcf4876a67ca90273e9c`, container image digest `europe-west3-docker.pkg.dev/project-af5e1c99-3bc4-424f-b53/changemesh/backend@sha256:d8c520efebcbb2b9d29ef199e4f0d6118d3fe7c88b22a08a287968db8cbf42e1`, deployed Cloud Run revision `changemesh-p24-e2e-00001-jjp`, canonical model ID `gemini-3.6-flash`, and submission manifest cross-references.
 - **P-28.04:** `DONE` — Cloud Run deployed E2E service execution suite implemented and verified in `tests/test_p28_04_deployed_e2e.py` (2 tests collected, 2 passed in 2.45s, 1733 total canonical tests passing) and documented in `docs/P-28.04_DEPLOYED_E2E_CLOUD_REPORT.md`. Verifies end-to-end execution of the multi-agent change saga through deployed `/run` and `/run-e2e` HTTP endpoints returning complete status, `fixture-acme-billing-v1`, deterministic `demo_digest`, and terminal state `COMPLETE`.
 - **P-28.05:** `DONE` — Post-judging teardown and scale-to-zero verification suite implemented and verified in `tests/test_p28_05_teardown_verification.py` (3 tests collected, 3 passed in 0.09s, 1736 total canonical tests passing) and documented in `docs/P-28.05_TEARDOWN_IDLE_VERIFICATION_REPORT.md`. Verifies Cloud Run scale-to-zero enforcement (`min_instances=0`), automated teardown declarations in `deploy/budget_and_retention_config.json`, and safe preservation of immutable evidence packs (`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`, `docs/P-28.03_REVISION_PROVENANCE_BINDING.json`).
-- **P-28.06:** `PENDING` — Record sanitized console/log/trace evidence (Next eligible micro-task).
+- **P-28.06:** `DONE` — Sanitized console evidence report and test suite implemented and verified in `tests/test_p28_06_console_trace_sanitization.py` (3 tests collected, 3 passed in 0.43s, 1739 total canonical tests passing) and documented in `docs/P-28.06_SANITIZED_CONSOLE_EVIDENCE_REPORT.md`. Verifies structured metadata on Cloud Run logs/traces (`service_name`, `revision`, `trace_id`, `span_id`, `model_id`), secret scanning and log sanitization, and four-minute demo script alignment in `docs/DEMO_SCRIPT.md`. Phase P-28 is officially closed.
 
 ## Current P-27 State (Phase P-27 Reliability, Performance, Cost, and Quota 100% Completed & Verified)
 

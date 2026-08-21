@@ -698,6 +698,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all hackathon submissions, cloud cost containment, and serverless lifecycle management).
 - Status: `ACTIVE`
 
+### LESSON-20260822-20 — Sanitized Log/Trace Telemetry and Demo Script Alignment
+- Date/time: 2026-08-22
+- Active task: P-28.06
+- Symptom: Demo video recordings, screenshots, and live console logs can inadvertently expose credentials, bearer tokens, or internal URLs.
+- Root cause: Relying on unstructured `print()` or unredacted JSON logging during demo execution.
+- Correct approach:
+  1. Emit structured log entries and OpenTelemetry/Cloud Trace spans with strict pre-serialization secret scrubbing (`sanitize_secrets_in_text` and `scan_payload_for_secrets`).
+  2. Structure the demo script (`docs/DEMO_SCRIPT.md`) with explicit timing timestamps and mode labels (`SIMULATION`, `LIVE_WRITE`, `RECORDED_CLOUD`).
+  3. Validate absence of secrets in all demo walkthrough documentation and logs via automated pytest suites.
+- Prevention rule: Every public log, trace, and walkthrough artifact must pass automated secret scanning before recording demo footage.
+- Tests/evidence: `docs/P-28.06_SANITIZED_CONSOLE_EVIDENCE_REPORT.md`, `tests/test_p28_06_console_trace_sanitization.py` (3 passed); full suite (1739 passed).
+- Affected files: `docs/P-28.06_SANITIZED_CONSOLE_EVIDENCE_REPORT.md`, `tests/test_p28_06_console_trace_sanitization.py`, `docs/DEMO_SCRIPT.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all video demo scripts, public log exports, and OpenTelemetry trace sanitization).
+- Status: `ACTIVE`
+
+
 
 
 
