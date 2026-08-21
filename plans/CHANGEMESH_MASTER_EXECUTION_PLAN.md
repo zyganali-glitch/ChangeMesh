@@ -2190,16 +2190,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-29 — Independent Productization Foundations
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-29.01 — Define post-hackathon separation between control plane, adapters, policy packs, customer data plane
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define post-hackathon separation between control plane, adapters, policy packs, customer data plane.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Path avoids locking customer data into demo architecture.
-- **Required evidence:** Product architecture note.
-- **Mandatory documentation sync:** README future.
+- **Required evidence:** Product architecture note `docs/P-29.01_PRODUCT_ARCHITECTURE_SEPARATION.md` and test suite `tests/test_p29_01_product_architecture.py` (3 tests passing). Establishes 4-plane architectural decoupling across Control Plane, Adapter Plane, Policy Pack Plane, and Customer Data Plane with zero-custody customer data guarantees.
+- **Mandatory documentation sync:** `docs/P-29.01_PRODUCT_ARCHITECTURE_SEPARATION.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-29.02 — Define initial commercial customer profile/paid problem around schema/API assurance

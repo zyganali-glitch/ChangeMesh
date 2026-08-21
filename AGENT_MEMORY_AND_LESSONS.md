@@ -713,6 +713,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all video demo scripts, public log exports, and OpenTelemetry trace sanitization).
 - Status: `ACTIVE`
 
+### LESSON-20260822-21 — 4-Plane Enterprise Product Architecture and Zero-Custody Boundaries
+- Date/time: 2026-08-22
+- Active task: P-29.01
+- Symptom: Enterprise customers resist multi-agent platforms that require uploading raw database schemas or private business records into a hosted multi-tenant cloud control plane.
+- Root cause: Monolithic demo architectures coupling orchestration logic directly to local storage or cloud databases.
+- Correct approach:
+  1. Decouple the system into four explicit planes: Control Plane (managed orchestrator), Adapter Plane (edge runner sidecars), Policy Pack Plane (compiled deterministic rules), and Customer Data Plane (customer VPC).
+  2. Enforce zero-custody boundaries: the control plane processes only cryptographic fingerprints, change descriptors, and verification digests.
+  3. Ensure execution sidecars run within the customer's private cloud network.
+- Prevention rule: Every commercial enterprise agent architecture must guarantee zero custody of raw customer data.
+- Tests/evidence: `docs/P-29.01_PRODUCT_ARCHITECTURE_SEPARATION.md`, `tests/test_p29_01_product_architecture.py` (3 passed); full suite (1742 passed).
+- Affected files: `docs/P-29.01_PRODUCT_ARCHITECTURE_SEPARATION.md`, `tests/test_p29_01_product_architecture.py`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all enterprise SaaS, agentic control planes, and SOC2 compliant data architectures).
+- Status: `ACTIVE`
+
+
 
 
 

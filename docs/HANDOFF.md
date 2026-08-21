@@ -184,6 +184,7 @@
 - P-28.05
 - P-28.06
 - P-28
+- P-29.01
 
 **Blocked:**
 - None
@@ -192,7 +193,12 @@
 - P-29 (Independent Productization Foundations — IN_PROGRESS)
 
 **Active Task:**
-- P-29.01 — Define post-hackathon separation between control plane, adapters, policy packs, customer data plane (PENDING)
+- P-29.02 — Define initial commercial customer profile/paid problem around schema/API assurance (PENDING)
+
+## Current P-29 State (P-29.01 Product Architecture Separation Completed)
+
+- **P-29.01:** `DONE` — Post-hackathon product architecture separation note implemented and verified in `docs/P-29.01_PRODUCT_ARCHITECTURE_SEPARATION.md` and `tests/test_p29_01_product_architecture.py` (3 tests collected, 3 passed in 0.10s, 1742 total canonical tests passing). Defines clean 4-plane architectural decoupling across Control Plane, Adapter Plane, Policy Pack Plane, and Customer Data Plane with strict zero-custody customer data guarantees.
+- **P-29.02:** `PENDING` — Define initial commercial customer profile/paid problem around schema/API assurance (Next eligible micro-task).
 
 ## Current P-28 State (Phase P-28 Google Cloud Deployment and Revision Parity 100% Completed & Verified)
 
