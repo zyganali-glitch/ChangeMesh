@@ -743,6 +743,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all commercial briefs, GTM plans, and investor/judge pitches).
 - Status: `ACTIVE`
 
+### LESSON-20260822-23 — 3-Tier Deployment Models and Zero-Ingress VPC Architecture
+- Date/time: 2026-08-22
+- Active task: P-29.03
+- Symptom: Enterprise security teams reject SaaS platforms requiring inbound firewall openings or direct database connection strings into customer VPCs.
+- Root cause: Assuming all customers can use public multi-tenant SaaS.
+- Correct approach:
+  1. Codify three explicit deployment tiers: Model A (Multi-tenant SaaS), Model B (Hybrid VPC Runner), and Model C (Air-Gapped Sovereign Cloud).
+  2. Implement an outbound-only runner architecture for Model B: the runner in the customer VPC dials outbound to the control plane, eliminating inbound attack vectors.
+  3. Ensure payload minimization carries only AST diffs and cryptographic evidence digests.
+- Prevention rule: Hybrid deployment architectures must use outbound-only agent connections and zero inbound VPC firewall openings.
+- Tests/evidence: `docs/P-29.03_DEPLOYMENT_PRIVACY_MODELS_ADR.md`, `tests/test_p29_03_privacy_models.py` (3 passed); full suite (1748 passed).
+- Affected files: `docs/P-29.03_DEPLOYMENT_PRIVACY_MODELS_ADR.md`, `tests/test_p29_03_privacy_models.py`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all enterprise hybrid architectures, customer runner daemons, and SOC2/HIPAA compliance architectures).
+- Status: `ACTIVE`
+
+
 
 
 

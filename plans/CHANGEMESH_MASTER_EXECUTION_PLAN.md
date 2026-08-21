@@ -2214,12 +2214,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-29.03 — Define deployment/privacy models: hosted control plane, customer-hosted runner, fully private
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define deployment/privacy models: hosted control plane, customer-hosted runner, fully private.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Tradeoffs/security boundaries explicit.
-- **Required evidence:** ADR.
-- **Mandatory documentation sync:** Architecture.
+- **Required evidence:** Architecture Decision Record `docs/P-29.03_DEPLOYMENT_PRIVACY_MODELS_ADR.md` (ADR-008) and test suite `tests/test_p29_03_privacy_models.py` (3 tests passing). Establishes 3 deployment tiers (Model A Hosted SaaS, Model B Hybrid VPC Runner, Model C Fully Private Air-Gapped) with explicit zero-ingress outbound connection patterns and fail-closed isolation.
+- **Mandatory documentation sync:** `docs/P-29.03_DEPLOYMENT_PRIVACY_MODELS_ADR.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-29.04 — Define extensibility contract for change types, tools, scenarios, policies

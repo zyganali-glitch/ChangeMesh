@@ -186,6 +186,7 @@
 - P-28
 - P-29.01
 - P-29.02
+- P-29.03
 
 **Blocked:**
 - None
@@ -194,13 +195,14 @@
 - P-29 (Independent Productization Foundations — IN_PROGRESS)
 
 **Active Task:**
-- P-29.03 — Define deployment/privacy models: hosted control plane, customer-hosted runner, fully private (PENDING)
+- P-29.04 — Define extensibility contract for change types, tools, scenarios, policies (PENDING)
 
-## Current P-29 State (P-29.02 Ideal Customer Profile Brief Completed)
+## Current P-29 State (P-29.03 Deployment & Privacy Models ADR Completed)
 
 - **P-29.01:** `DONE` — Post-hackathon product architecture separation note implemented and verified in `docs/P-29.01_PRODUCT_ARCHITECTURE_SEPARATION.md` and `tests/test_p29_01_product_architecture.py` (3 tests collected, 3 passed in 0.10s, 1742 total canonical tests passing). Defines clean 4-plane architectural decoupling across Control Plane, Adapter Plane, Policy Pack Plane, and Customer Data Plane with strict zero-custody customer data guarantees.
 - **P-29.02:** `DONE` — Ideal Customer Profile and commercial problem brief implemented and verified in `docs/P-29.02_IDEAL_CUSTOMER_PROFILE_BRIEF.md` and `tests/test_p29_02_icp_brief.py` (3 tests collected, 3 passed in 0.10s, 1745 total canonical tests passing). Identifies VP Platform / Head of Infrastructure personas in regulated B2B SaaS/FinTech, quantifies schema breaking change downtime costs, articulates ShadowLab ROI, and provides honest MVP maturity disclosures with zero invented traction.
-- **P-29.03:** `PENDING` — Define deployment/privacy models: hosted control plane, customer-hosted runner, fully private (Next eligible micro-task).
+- **P-29.03:** `DONE` — Architecture Decision Record `docs/P-29.03_DEPLOYMENT_PRIVACY_MODELS_ADR.md` (ADR-008) and test suite `tests/test_p29_03_privacy_models.py` (3 tests collected, 3 passed in 0.10s, 1748 total canonical tests passing). Establishes 3 deployment tiers (Model A Hosted SaaS, Model B Hybrid VPC Runner, Model C Fully Private Air-Gapped) with explicit zero-ingress outbound connection patterns and fail-closed isolation.
+- **P-29.04:** `PENDING` — Define extensibility contract for change types, tools, scenarios, policies (Next eligible micro-task).
 
 ## Current P-28 State (Phase P-28 Google Cloud Deployment and Revision Parity 100% Completed & Verified)
 
