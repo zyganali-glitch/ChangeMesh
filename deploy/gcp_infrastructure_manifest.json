@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "manifest_version": "1.0.0",
+  "project_id": "project-af5e1c99-3bc4-424f-b53",
+  "canonical_region": "europe-west3",
+  "gemini_location": "global",
+  "canonical_model_id": "gemini-3.6-flash",
+  "services": {
+    "cloud_run": {
+      "service_name": "changemesh-backend",
+      "region": "europe-west3",
+      "port": 8080,
+      "memory": "512Mi",
+      "cpu": "1",
+      "min_instances": 0,
+      "max_instances": 3,
+      "concurrency": 80,
+      "timeout_seconds": 300,
+      "service_account": "changemesh-sa@project-af5e1c99-3bc4-424f-b53.iam.gserviceaccount.com",
+      "environment_variables": {
+        "GOOGLE_CLOUD_PROJECT": "project-af5e1c99-3bc4-424f-b53",
+        "GOOGLE_CLOUD_REGION": "europe-west3",
+        "GEMINI_MODEL": "gemini-3.6-flash",
+        "APP_ENV": "production"
+      }
+    },
+    "firestore": {
+      "database_id": "(default)",
+      "location": "europe-west3",
+      "mode": "FIRESTORE_NATIVE",
+      "concurrency_mode": "OPTIMISTIC_CONCURRENCY",
+      "collections": [
+        "changemesh_tenants",
+        "changemesh_saga_state",
+        "changemesh_checkpoints",
+        "changemesh_evidence_ledger"
+      ]
+    },
+    "pubsub": {
+      "topics": [
+        {
+          "name": "projects/project-af5e1c99-3bc4-424f-b53/topics/changemesh-p02-topic-527e3253",
+          "purpose": "Primary Event Backbone"
+        },
+        {
+          "name": "projects/project-af5e1c99-3bc4-424f-b53/topics/changemesh-dlq",
+          "purpose": "Dead Letter Queue"
+        },
+        {
+          "name": "projects/project-af5e1c99-3bc4-424f-b53/topics/changemesh-billing-alerts",
+          "purpose": "Budget and Quota Monitoring"
+        }
+      ],
+      "subscriptions": [
+        {
+          "name": "projects/project-af5e1c99-3bc4-424f-b53/subscriptions/changemesh-p02-sub-3c3b3241",
+          "topic": "projects/project-af5e1c99-3bc4-424f-b53/topics/changemesh-p02-topic-527e3253",
+          "ack_deadline_seconds": 30,
+          "retain_acked_messages": false
+        }
+      ]
+    },
+    "iam": {
+      "service_account": "changemesh-sa@project-af5e1c99-3bc4-424f-b53.iam.gserviceaccount.com",
+      "roles": [
+        "roles/aiplatform.user",
+        "roles/datastore.user",
+        "roles/pubsub.publisher",
+        "roles/pubsub.subscriber",
+        "roles/cloudtrace.agent",
+        "roles/logging.logWriter"
+      ]
+    }
+  }
+}

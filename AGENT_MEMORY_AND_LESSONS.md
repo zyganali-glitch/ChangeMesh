@@ -622,6 +622,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all production agent architectures, lean web apps, and AI hackathon submissions).
 - Status: `ACTIVE`
 
+### LESSON-20260822-15 — Declarative Cloud Topology and Least-Privilege IAM Scoping
+- Date/time: 2026-08-22
+- Active task: P-28.01
+- Symptom: Multi-service cloud deployments frequently develop regional drift (e.g. databases in one region, compute in another) or accumulate overly permissive IAM roles (`roles/owner` or `roles/editor`).
+- Root cause: Ad-hoc manual console provisioning without an immutable JSON infrastructure blueprint.
+- Correct approach:
+  1. Maintain a single declarative manifest (`deploy/gcp_infrastructure_manifest.json`) codifying all target resource IDs, regions (`europe-west3`), ports (8080), and memory/CPU limits.
+  2. Scope IAM roles strictly to least privilege: `aiplatform.user`, `datastore.user`, `pubsub.publisher`, `pubsub.subscriber`, and `cloudtrace.agent`.
+  3. Validate manifest syntax and role restrictions through automated pytest regression suites.
+- Prevention rule: Every cloud deployment must possess a declarative infrastructure manifest with validated least-privilege IAM bindings.
+- Tests/evidence: `deploy/gcp_infrastructure_manifest.json`, `tests/test_p28_01_infrastructure_config.py` (4 passed); full suite (1726 passed).
+- Affected files: `deploy/gcp_infrastructure_manifest.json`, `tests/test_p28_01_infrastructure_config.py`, `docs/P-28.01_INFRASTRUCTURE_DEPLOYMENT_CONFIG_REPORT.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all Google Cloud infrastructure management, Terraform blueprints, and enterprise IAM audits).
+- Status: `ACTIVE`
+
+
 
 
 

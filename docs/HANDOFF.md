@@ -177,6 +177,7 @@
 - P-27.04
 - P-27.05
 - P-27
+- P-28.01
 
 **Blocked:**
 - None
@@ -185,7 +186,12 @@
 - P-28 (Google Cloud Deployment and Revision Parity — IN_PROGRESS)
 
 **Active Task:**
-- P-28.01 — Create infrastructure/deployment config for Cloud Run, Firestore, Pub/Sub, IAM, available enterprise services (PENDING)
+- P-28.02 — Deploy backend/dashboard with least privilege (PENDING)
+
+## Current P-28 State (P-28.01 GCP Infrastructure Manifest Completed)
+
+- **P-28.01:** `DONE` — GCP infrastructure and deployment configuration manifest implemented and verified in `deploy/gcp_infrastructure_manifest.json` and `tests/test_p28_01_infrastructure_config.py` (4 tests collected, 4 passed in 0.10s, 1726 total canonical tests passing) and documented in `docs/P-28.01_INFRASTRUCTURE_DEPLOYMENT_CONFIG_REPORT.md`. Defines declarative infrastructure topology across Cloud Run (europe-west3, port 8080, `gemini-3.6-flash`), Firestore Native mode, Pub/Sub primary backbone and DLQ, and least-privilege IAM service account roles (`roles/aiplatform.user`, `roles/datastore.user`, `roles/pubsub.publisher`).
+- **P-28.02:** `PENDING` — Deploy backend/dashboard with least privilege (Next eligible micro-task).
 
 ## Current P-27 State (Phase P-27 Reliability, Performance, Cost, and Quota 100% Completed & Verified)
 

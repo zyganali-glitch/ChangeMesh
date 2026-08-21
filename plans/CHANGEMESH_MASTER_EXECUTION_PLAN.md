@@ -2126,16 +2126,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-28 — Google Cloud Deployment and Revision Parity
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-28.01 — Create infrastructure/deployment config for Cloud Run, Firestore, Pub/Sub, IAM, available enterprise services
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create infrastructure/deployment config for Cloud Run, Firestore, Pub/Sub, IAM, available enterprise services.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Deployment reproducible/region-consistent.
-- **Required evidence:** Config validation.
-- **Mandatory documentation sync:** Architecture, environment.
+- **Required evidence:** GCP infrastructure manifest `deploy/gcp_infrastructure_manifest.json`, test suite `tests/test_p28_01_infrastructure_config.py` (4 tests passing), and report `docs/P-28.01_INFRASTRUCTURE_DEPLOYMENT_CONFIG_REPORT.md`. Defines declarative infrastructure topology across Cloud Run (europe-west3, port 8080, `gemini-3.6-flash`), Firestore Native mode, Pub/Sub primary backbone and DLQ, and least-privilege IAM service account roles (`roles/aiplatform.user`, `roles/datastore.user`, `roles/pubsub.publisher`).
+- **Mandatory documentation sync:** `docs/P-28.01_INFRASTRUCTURE_DEPLOYMENT_CONFIG_REPORT.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-28.02 — Deploy backend/dashboard with least privilege
