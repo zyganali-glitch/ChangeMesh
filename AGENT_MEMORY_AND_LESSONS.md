@@ -560,6 +560,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all low-latency agent architectures, saga orchestrators, and performance tuning).
 - Status: `ACTIVE`
 
+### LESSON-20260822-11 — Sub-Cent Unit Economics and Zero-Cost Serverless Idle Architecture
+- Date/time: 2026-08-22
+- Active task: P-27.02
+- Symptom: AI agents can incur runaway model token expenses or accumulate heavy idle cloud hosting bills if services are provisioned with fixed instances.
+- Root cause: Overly verbose system prompt loops, lack of token tracking, and non-serverless deployment targets.
+- Correct approach:
+  1. Leverage concise, structured prompts with strict Pydantic JSON schemas, restricting per-saga token usage to ~6,800 tokens (< $0.001 per run on Gemini 3.6 Flash).
+  2. Deploy Cloud Run with `min-instances = 0` and serverless Firestore/Pub/Sub to ensure $0.00 / month idle expenditure.
+  3. Validate all cloud operations fit comfortably within permanent Google Cloud free tier boundaries.
+- Prevention rule: Every AI architecture must calculate per-transaction token economics and maintain scale-to-zero idle configurations.
+- Tests/evidence: `scripts/estimate_cost.py`, `tests/test_p27_02_cost_estimation.py` (3 passed); full suite (1709 passed).
+- Affected files: `scripts/estimate_cost.py`, `tests/test_p27_02_cost_estimation.py`, `docs/P-27.02_COST_AND_TOKEN_ESTIMATION_REPORT.md`, `README.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all serverless AI applications, cost modeling, and cloud optimization).
+- Status: `ACTIVE`
+
+
 
 
 

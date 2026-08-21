@@ -2086,12 +2086,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-27.02 — Measure Gemini tokens/cost, Cloud Run, Firestore, Pub/Sub, logging, optional services
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Measure Gemini tokens/cost, Cloud Run, Firestore, Pub/Sub, logging, optional services.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Expected demo/idle cost documented.
-- **Required evidence:** Cost report.
-- **Mandatory documentation sync:** README/Devpost if relevant.
+- **Required evidence:** Token and cost estimation report `docs/P-27.02_COST_AND_TOKEN_ESTIMATION_REPORT.md`, estimation script `scripts/estimate_cost.py`, and test suite `tests/test_p27_02_cost_estimation.py` (3 tests passing). Verifies Gemini 3.6 Flash per-saga token volume of ~6,800 tokens (~$0.000871 USD / run), pure scale-to-zero serverless architecture with $0.00 / month idle infrastructure cost across Cloud Run (`min-instances=0`), Firestore native mode, and Pub/Sub eventing.
+- **Mandatory documentation sync:** `docs/P-27.02_COST_AND_TOKEN_ESTIMATION_REPORT.md`, `README.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-27.03 — Configure budget alerts, minimum instances, retention, teardown

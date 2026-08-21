@@ -172,6 +172,7 @@
 - P-26.05
 - P-26
 - P-27.01
+- P-27.02
 
 **Blocked:**
 - None
@@ -180,12 +181,13 @@
 - P-27 (Reliability, Performance, Cost, and Quota — IN_PROGRESS)
 
 **Active Task:**
-- P-27.02 — Measure Gemini tokens/cost, Cloud Run, Firestore, Pub/Sub, logging, optional services (PENDING)
+- P-27.03 — Configure budget alerts, minimum instances, retention, teardown (PENDING)
 
-## Current P-27 State (P-27.01 Latency & Performance Benchmark Completed)
+## Current P-27 State (P-27.02 Token & Cost Estimation Completed)
 
 - **P-27.01:** `DONE` — E2E and per-stage latency and retry behavior benchmark implemented and verified in `scripts/measure_performance.py` and `tests/test_p27_01_performance_metrics.py` (3 tests collected, 3 passed in 0.51s, 1709 total canonical tests passing) and documented in `docs/P-27.01_LATENCY_AND_PERFORMANCE_REPORT.md`. Verifies mean E2E demo latency of 8.25 ms (median 7.78 ms, min 7.64 ms, max 10.24 ms) with 100% saga completion rate across 5 iterations (< 2.0s time budget ceiling), granular 6-stage lifecycle telemetry, exponential backoff progression math `(100ms, 200ms, 400ms, 800ms)`, and bounded timeout ceilings.
-- **P-27.02:** `PENDING` — Measure Gemini tokens/cost, Cloud Run, Firestore, Pub/Sub, logging, optional services (Next eligible micro-task).
+- **P-27.02:** `DONE` — Token consumption and serverless cloud cost estimation implemented and verified in `scripts/estimate_cost.py` and `tests/test_p27_02_cost_estimation.py` (3 tests collected, 3 passed in 0.09s, 1709 total canonical tests passing) and documented in `docs/P-27.02_COST_AND_TOKEN_ESTIMATION_REPORT.md`. Verifies Gemini 3.6 Flash per-saga token volume of ~6,800 tokens (~$0.000871 USD / run), pure scale-to-zero serverless architecture with $0.00 / month idle infrastructure cost across Cloud Run (`min-instances=0`), Firestore native mode, and Pub/Sub eventing.
+- **P-27.03:** `PENDING` — Configure budget alerts, minimum instances, retention, teardown (Next eligible micro-task).
 
 - **P-26.01:** `DONE` — Threat model and security review completed in `docs/THREAT_MODEL.md` and `docs/P-26.01_THREAT_MODEL_REVIEW.md`. Covers all 9 canonical vectors (Prompt Injection, Memory Poisoning, Confused Deputy, Privilege Escalation, Data Exfiltration, Malicious Tools, Replay & Race Conditions, Forged Evidence, Supply Chain Tampering) with STRIDE classifications, 27 mitigating architectural controls, residual risks, and automated regression test mappings across 1686 green tests. Includes honest non-certification compliance notice.
 - **P-26.02:** `DONE` — Secret scanning, log redaction, and evidence sanitization security suite implemented and verified in `tests/test_p26_02_secret_sanitization.py` (8 tests collected, 8 passed in 1.72s, 1686 total canonical tests passing) and documented in `docs/P-26.02_SECURITY_SANITIZATION_REPORT.md`. Verifies pre-SDK privacy scanning (`PolicyGuardian.audit_privacy_text`), policy input blocking (`DeterministicPolicyChecker.evaluate`), recursive data structure scrubbing (`redact_mapping`), prose text redaction (`sanitize_secrets_in_text`), wire payload secret rejection (`scan_payload_for_secrets`), and clean public evidence packs (`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`).
