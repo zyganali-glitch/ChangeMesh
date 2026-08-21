@@ -299,6 +299,16 @@ Clean-checkout reproducibility from a separate directory outside the canonical w
 | `uv run python scripts/cmd.py integration` | Integration tests | Fails closed by default; zero cloud calls | `FAIL_CLOSED` (requires `--live-write-danger`) |
 | `uv run python scripts/cmd.py e2e\|demo\|deploy\|teardown` | Deferred actions | Fail closed; print `NOT_RUN` | `NOT_RUN` (owning phases pending) |
 
+## Honest Security Limitations & Non-Certification Boundary
+
+ChangeMesh is engineered with defense-in-depth safety, deterministic policy guardians, and cryptographic audit ledgers. In adherence to transparent engineering principles:
+1. **Non-Certification Notice:** ChangeMesh provides governance readiness and automated safety verification; it is **not** an officially certified substitute for accredited third-party compliance audits (e.g., SOC 2, HIPAA, PCI-DSS, FedRAMP).
+2. **Deterministic Code Primacy:** Generative AI models (Gemini 3.6 Flash) provide semantic advice and structural artifact generation. Deterministic code gates and policy guardians maintain absolute veto power over model opinions.
+3. **Draft-Only Pull Requests:** Autonomous agents are restricted to draft pull requests; direct branch push and automated pull request merging are structurally forbidden.
+4. **Cloud Isolation:** High-risk fault rehearsals and scenario attacks are strictly isolated within ShadowLab simulated environments.
+
+*(For detailed threat analysis, residual risks, and mitigation controls, see [Threat Model](docs/THREAT_MODEL.md) and [Non-Goals](docs/NON_GOALS.md)).*
+
 ## Product direction beyond the hackathon
 
 The initial product wedge is **high-risk schema and API change coordination**. A credible post-competition path can expand into regulated release assurance, data-platform change certification, cross-repository migration orchestration, agent capability certification, institutional memory governance, and enterprise-agent fleet control.
@@ -308,3 +318,4 @@ The product should remain focused on proof-carrying change rather than becoming 
 ## License
 
 License decision is pending. It must be resolved before public release and recorded in `docs/DECISION_LOG.md`.
+

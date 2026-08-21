@@ -2018,7 +2018,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-26 — Security, Privacy, and Threat Model
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-26.01 — Write threat model for injection, memory poisoning, confused deputy, privilege escalation, exfiltration, malicious tools, replay, forged evidence, supply chain
 
@@ -2062,12 +2062,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-26.05 — Write honest security limitations/non-certification statement
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Write honest security limitations/non-certification statement.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No absolute safety/compliance claim.
-- **Required evidence:** Claim audit.
-- **Mandatory documentation sync:** README, Devpost.
+- **Required evidence:** Claim audit report `docs/P-26.05_HONEST_SECURITY_LIMITATIONS_REPORT.md`, static auditor `scripts/audit_security_claims.py`, and test suite `tests/test_p26_05_security_limitations.py` (3 tests passing). Verifies absence of absolute, exaggerated claims (e.g. "100% secure", "unhackable") across repository markdown files, presence of explicit non-certification notices in `README.md`, `THREAT_MODEL.md`, and `NON_GOALS.md`, and dedicated Honest Security Limitations section in `README.md`.
+- **Mandatory documentation sync:** `README.md`, `docs/P-26.05_HONEST_SECURITY_LIMITATIONS_REPORT.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-27 — Reliability, Performance, Cost, and Quota

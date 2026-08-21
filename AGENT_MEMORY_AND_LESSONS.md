@@ -530,6 +530,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all autonomous DevOps fleets, GitHub integrations, and database migration agents).
 - Status: `ACTIVE`
 
+### LESSON-20260822-09 — Honest Non-Certification Disclosures and Claim Audits
+- Date/time: 2026-08-22
+- Active task: P-26.05
+- Symptom: AI hackathon and enterprise projects frequently make exaggerated, unverified security assertions ("100% secure", "unhackable", "fully certified") that damage evaluator trust.
+- Root cause: Lack of systematic static claim auditing across documentation and marketing copy.
+- Correct approach:
+  1. Build a static claim auditor (`scripts/audit_security_claims.py`) that scans all markdown files for prohibited absolute claims.
+  2. Maintain explicit, prominent non-certification notices clarifying that ChangeMesh provides automated governance readiness but does not replace accredited third-party audits (SOC 2, HIPAA, PCI).
+  3. Re-affirm deterministic code primacy over model outputs in all public documentation.
+- Prevention rule: Every public artifact must disclose honest boundaries, residual risks, and non-certification notices.
+- Tests/evidence: `scripts/audit_security_claims.py`, `tests/test_p26_05_security_limitations.py` (3 passed); full suite (1686 passed).
+- Affected files: `README.md`, `scripts/audit_security_claims.py`, `tests/test_p26_05_security_limitations.py`, `docs/P-26.05_HONEST_SECURITY_LIMITATIONS_REPORT.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all competition documentation, enterprise marketing copy, and AI evaluation briefs).
+- Status: `ACTIVE`
+
+
 
 
 
