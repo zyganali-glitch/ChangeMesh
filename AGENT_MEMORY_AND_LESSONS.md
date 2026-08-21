@@ -482,6 +482,23 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all autonomous agent fleets, enterprise AI governance, and hackathon threat models).
 - Status: `ACTIVE`
 
+### LESSON-20260822-06 — Defense-in-Depth Secret Scanning and Wire Payload Sanitization
+- Date/time: 2026-08-22
+- Active task: P-26.02
+- Symptom: AI applications risk credential leakage across prompt interpolation, JSON logging, wire event dispatch, or public evidence artifacts.
+- Root cause: Relying on a single perimeter check rather than continuous multi-layered sanitization.
+- Correct approach:
+  1. Enforce pre-SDK privacy scanning via `PolicyGuardian.audit_privacy_text()` before model prompts are formatted.
+  2. Implement recursive dictionary scrubbing (`redact_mapping`) at all persistence and wire boundaries.
+  3. Validate wire messages with `scan_payload_for_secrets` to fail closed before Pub/Sub emission.
+  4. Perform automated CI audits on public JSON evidence packs to guarantee zero unredacted tokens.
+- Prevention rule: Every prompt, message envelope, log line, and evidence entry must undergo deterministic secret scrubbing.
+- Tests/evidence: `tests/test_p26_02_secret_sanitization.py` (8 passed); full repo suite (1686 passed, 1 warning).
+- Affected files: `tests/test_p26_02_secret_sanitization.py`, `docs/P-26.02_SECURITY_SANITIZATION_REPORT.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all multi-tenant agent systems, event-driven architectures, and security audits).
+- Status: `ACTIVE`
+
+
 
 
 

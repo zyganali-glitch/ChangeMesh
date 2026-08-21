@@ -166,6 +166,7 @@
 - P-25.06
 - P-25
 - P-26.01
+- P-26.02
 
 **Blocked:**
 - None
@@ -174,12 +175,13 @@
 - P-26 (Security, Privacy, and Threat Model — IN_PROGRESS)
 
 **Active Task:**
-- P-26.02 — Implement secret scanning, log redaction, evidence sanitization, screenshot review (PENDING)
+- P-26.03 — Review dependency/container vulnerabilities (PENDING)
 
-## Current P-26 State (P-26.01 Threat Model Review Completed)
+## Current P-26 State (P-26.02 Secret Sanitization Completed)
 
 - **P-26.01:** `DONE` — Threat model and security review completed in `docs/THREAT_MODEL.md` and `docs/P-26.01_THREAT_MODEL_REVIEW.md`. Covers all 9 canonical vectors (Prompt Injection, Memory Poisoning, Confused Deputy, Privilege Escalation, Data Exfiltration, Malicious Tools, Replay & Race Conditions, Forged Evidence, Supply Chain Tampering) with STRIDE classifications, 27 mitigating architectural controls, residual risks, and automated regression test mappings across 1686 green tests. Includes honest non-certification compliance notice.
-- **P-26.02:** `PENDING` — Implement secret scanning, log redaction, evidence sanitization, screenshot review (Next eligible micro-task).
+- **P-26.02:** `DONE` — Secret scanning, log redaction, and evidence sanitization security suite implemented and verified in `tests/test_p26_02_secret_sanitization.py` (8 tests collected, 8 passed in 1.72s, 1686 total canonical tests passing) and documented in `docs/P-26.02_SECURITY_SANITIZATION_REPORT.md`. Verifies pre-SDK privacy scanning (`PolicyGuardian.audit_privacy_text`), policy input blocking (`DeterministicPolicyChecker.evaluate`), recursive data structure scrubbing (`redact_mapping`), prose text redaction (`sanitize_secrets_in_text`), wire payload secret rejection (`scan_payload_for_secrets`), and clean public evidence packs (`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`).
+- **P-26.03:** `PENDING` — Review dependency/container vulnerabilities (Next eligible micro-task).
 
 ## Current P-25 State (Phase P-25 Comprehensive Test and Gate Matrix 100% Completed & Verified)
 

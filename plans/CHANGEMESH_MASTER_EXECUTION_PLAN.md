@@ -2032,12 +2032,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-26.02 — Implement secret scanning, log redaction, evidence sanitization, screenshot review
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Implement secret scanning, log redaction, evidence sanitization, screenshot review.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Known secret fixtures caught; public artifacts clean.
-- **Required evidence:** Security tests.
-- **Mandatory documentation sync:** Demo guide.
+- **Required evidence:** Security test suite `tests/test_p26_02_secret_sanitization.py` (8 tests passing in 1.72s, 1686 total canonical tests passing) and report `docs/P-26.02_SECURITY_SANITIZATION_REPORT.md`. Verifies pre-SDK privacy scanning (`PolicyGuardian.audit_privacy_text`), policy input blocking (`DeterministicPolicyChecker.evaluate`), recursive data structure scrubbing (`redact_mapping`), prose text redaction (`sanitize_secrets_in_text`), wire payload secret rejection (`scan_payload_for_secrets`), and clean public evidence packs (`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`).
+- **Mandatory documentation sync:** `docs/P-26.02_SECURITY_SANITIZATION_REPORT.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-26.03 — Review dependency/container vulnerabilities
