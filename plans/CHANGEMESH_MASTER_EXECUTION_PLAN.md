@@ -2150,12 +2150,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-28.03 — Bind source commit, image digest, Cloud revision, config version
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Bind source commit, image digest, Cloud revision, config version.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Judge identifies exact running code.
-- **Required evidence:** Provenance artifact.
-- **Mandatory documentation sync:** Submission manifest.
+- **Required evidence:** Revision provenance artifact `docs/P-28.03_REVISION_PROVENANCE_BINDING.json` and test suite `tests/test_p28_03_revision_provenance.py` (3 tests passing). Binds source Git commit `51076beee4eb10412bfefcf4876a67ca90273e9c`, container image digest `europe-west3-docker.pkg.dev/project-af5e1c99-3bc4-424f-b53/changemesh/backend@sha256:d8c520efebcbb2b9d29ef199e4f0d6118d3fe7c88b22a08a287968db8cbf42e1`, deployed Cloud Run revision `changemesh-p24-e2e-00001-jjp`, canonical model ID `gemini-3.6-flash`, and submission manifest cross-references.
+- **Mandatory documentation sync:** `docs/P-28.03_REVISION_PROVENANCE_BINDING.json`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-28.04 — Run smoke/integration/E2E against deployed services

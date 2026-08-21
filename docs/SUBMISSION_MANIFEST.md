@@ -6,14 +6,15 @@ Status: `NOT_FROZEN`
 - Final release: `NOT_CREATED`
 - Final commit: `NOT_CREATED`
 - Public demo: `NOT_PUBLISHED`
-- Hosted URL: `NOT_AVAILABLE`
-- Cloud project/region: `NOT_RECORDED`
-- Cloud revision: `NOT_RECORDED`
+- Hosted URL: `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`
+- Cloud project/region: `project-af5e1c99-3bc4-424f-b53` / `europe-west3`
+- Cloud revision: `changemesh-p24-e2e-00001-jjp`
 - Architecture diagram: `NOT_FINAL`
 - Devpost text: `NOT_FINAL`
 - Screenshot pack: `NOT_FINAL`
 - Build-period disclosure: `NOT_FINAL`
 - Evidence manifest: `NOT_FINAL`
+- Revision provenance binding: `VERIFIED` ([`docs/P-28.03_REVISION_PROVENANCE_BINDING.json`](P-28.03_REVISION_PROVENANCE_BINDING.json))
 - Clean-checkout reproduction: `VERIFIED` ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](P-06.05_CLEAN_CHECKOUT_LOG.md))
 - Dependency and container audit: `VERIFIED` ([`docs/P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md`](P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md))
 - Final claim audit: `NOT_RUN`

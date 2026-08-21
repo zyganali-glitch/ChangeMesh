@@ -653,6 +653,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all Cloud Run services, microservice health checking, and API routing).
 - Status: `ACTIVE`
 
+### LESSON-20260822-17 — Cryptographic Provenance Binding and Revision Traceability
+- Date/time: 2026-08-22
+- Active task: P-28.03
+- Symptom: Evaluators and enterprise judges cannot easily verify whether a live demo or cloud endpoint corresponds to the exact Git commit in the repository.
+- Root cause: Missing cross-referencing between source Git commit SHAs, container image digests, and cloud revision IDs.
+- Correct approach:
+  1. Generate an immutable JSON provenance binding artifact (`docs/P-28.03_REVISION_PROVENANCE_BINDING.json`).
+  2. Bind the exact 40-character Git commit SHA, the Container Registry SHA-256 digest, the Cloud Run revision ID, and the canonical Gemini model ID (`gemini-3.6-flash`).
+  3. Validate provenance integrity in automated pytest regression suites and cross-link from `docs/SUBMISSION_MANIFEST.md`.
+- Prevention rule: Every public release must publish an explicit provenance binding linking source commit, container digest, and cloud revision.
+- Tests/evidence: `docs/P-28.03_REVISION_PROVENANCE_BINDING.json`, `tests/test_p28_03_revision_provenance.py` (3 passed); full suite (1731 passed).
+- Affected files: `docs/P-28.03_REVISION_PROVENANCE_BINDING.json`, `tests/test_p28_03_revision_provenance.py`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all software provenance, SLSA compliance, and verifiable builds).
+- Status: `ACTIVE`
+
+
 
 
 
