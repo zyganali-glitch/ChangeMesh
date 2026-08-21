@@ -2160,12 +2160,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-28.04 — Run smoke/integration/E2E against deployed services
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Run smoke/integration/E2E against deployed services.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No local-only hidden dependency.
-- **Required evidence:** Cloud test report.
-- **Mandatory documentation sync:** Judging map.
+- **Required evidence:** Cloud test report `docs/P-28.04_DEPLOYED_E2E_CLOUD_REPORT.md` and test suite `tests/test_p28_04_deployed_e2e.py` (2 tests passing). Verifies end-to-end execution of the multi-agent change saga through deployed `/run` and `/run-e2e` HTTP endpoints returning complete status, `fixture-acme-billing-v1`, deterministic `demo_digest`, and terminal state `COMPLETE`.
+- **Mandatory documentation sync:** `docs/P-28.04_DEPLOYED_E2E_CLOUD_REPORT.md`, `docs/JUDGING_MAP.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-28.05 — Verify teardown/low-cost idle mode

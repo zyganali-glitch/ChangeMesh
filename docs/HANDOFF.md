@@ -180,6 +180,7 @@
 - P-28.01
 - P-28.02
 - P-28.03
+- P-28.04
 
 **Blocked:**
 - None
@@ -188,14 +189,15 @@
 - P-28 (Google Cloud Deployment and Revision Parity — IN_PROGRESS)
 
 **Active Task:**
-- P-28.04 — Run smoke/integration/E2E against deployed services (PENDING)
+- P-28.05 — Verify teardown/low-cost idle mode (PENDING)
 
-## Current P-28 State (P-28.03 Revision Provenance Binding Completed)
+## Current P-28 State (P-28.04 Deployed E2E Service Completed)
 
 - **P-28.01:** `DONE` — GCP infrastructure and deployment configuration manifest implemented and verified in `deploy/gcp_infrastructure_manifest.json` and `tests/test_p28_01_infrastructure_config.py` (4 tests collected, 4 passed in 0.10s, 1726 total canonical tests passing) and documented in `docs/P-28.01_INFRASTRUCTURE_DEPLOYMENT_CONFIG_REPORT.md`. Defines declarative infrastructure topology across Cloud Run (europe-west3, port 8080, `gemini-3.6-flash`), Firestore Native mode, Pub/Sub primary backbone and DLQ, and least-privilege IAM service account roles (`roles/aiplatform.user`, `roles/datastore.user`, `roles/pubsub.publisher`).
 - **P-28.02:** `DONE` — Deployed Cloud Run revision health and endpoint verification suite implemented and verified in `tests/test_p28_02_deployed_health.py` (5 tests collected, 5 passed in 2.49s, 1731 total canonical tests passing) and documented in `docs/P-28.02_DEPLOYED_REVISION_HEALTH_REPORT.md`. Verifies deployed Cloud Run service `changemesh-p24-e2e` (revision `changemesh-p24-e2e-00001-jjp`, region `europe-west3`, public URL `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`) exposing healthy `/health`, `/api/dashboard/snapshot`, `/`, `/static/styles.css`, and `/static/app.js` routes under least privilege without disk credential storage.
 - **P-28.03:** `DONE` — Revision provenance and deployment binding artifact implemented and verified in `docs/P-28.03_REVISION_PROVENANCE_BINDING.json` and `tests/test_p28_03_revision_provenance.py` (3 tests collected, 3 passed in 0.09s, 1731 total canonical tests passing) and synchronized in `docs/SUBMISSION_MANIFEST.md`. Binds source Git commit `51076beee4eb10412bfefcf4876a67ca90273e9c`, container image digest `europe-west3-docker.pkg.dev/project-af5e1c99-3bc4-424f-b53/changemesh/backend@sha256:d8c520efebcbb2b9d29ef199e4f0d6118d3fe7c88b22a08a287968db8cbf42e1`, deployed Cloud Run revision `changemesh-p24-e2e-00001-jjp`, canonical model ID `gemini-3.6-flash`, and submission manifest cross-references.
-- **P-28.04:** `PENDING` — Run smoke/integration/E2E against deployed services (Next eligible micro-task).
+- **P-28.04:** `DONE` — Cloud Run deployed E2E service execution suite implemented and verified in `tests/test_p28_04_deployed_e2e.py` (2 tests collected, 2 passed in 2.45s, 1733 total canonical tests passing) and documented in `docs/P-28.04_DEPLOYED_E2E_CLOUD_REPORT.md`. Verifies end-to-end execution of the multi-agent change saga through deployed `/run` and `/run-e2e` HTTP endpoints returning complete status, `fixture-acme-billing-v1`, deterministic `demo_digest`, and terminal state `COMPLETE`.
+- **P-28.05:** `PENDING` — Verify teardown/low-cost idle mode (Next eligible micro-task).
 
 ## Current P-27 State (Phase P-27 Reliability, Performance, Cost, and Quota 100% Completed & Verified)
 

@@ -668,6 +668,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all software provenance, SLSA compliance, and verifiable builds).
 - Status: `ACTIVE`
 
+### LESSON-20260822-18 — Containerized E2E Service Execution and Portability
+- Date/time: 2026-08-22
+- Active task: P-28.04
+- Symptom: Distributed services can fail when invoked over HTTP inside container environments due to undeclared local file assumptions or broken schema deserialization.
+- Root cause: Testing functions directly in Python unit tests rather than dispatching HTTP requests against the container's service endpoints.
+- Correct approach:
+  1. Expose explicit `/run` and `/run-e2e` execution endpoints on the service HTTP server.
+  2. Ensure the demo returns deterministic status, `fixture_id`, and `demo_digest`.
+  3. Validate that all required dependencies are packaged cleanly without external disk leaks.
+- Prevention rule: Container service endpoints must be verified via end-to-end HTTP request testing before declaring deployment readiness.
+- Tests/evidence: `tests/test_p28_04_deployed_e2e.py` (2 passed); full suite (1733 passed).
+- Affected files: `tests/test_p28_04_deployed_e2e.py`, `docs/P-28.04_DEPLOYED_E2E_CLOUD_REPORT.md`, `docs/JUDGING_MAP.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all microservice API testing, container readiness probes, and cloud demo verification).
+- Status: `ACTIVE`
+
+
 
 
 
