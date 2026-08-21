@@ -33,7 +33,9 @@ def lint_cmd(args=None):
 
 def typecheck_cmd(args=None):
     print("Running type-checker (mypy)...")
-    return run_command(["uv", "run", "mypy", "domain", "src", "integrations", "tests"])
+    return run_command(
+        ["uv", "run", "mypy", "domain", "src", "integrations", "tests", "service_app.py"]
+    )
 
 
 def unit_cmd(args=None):
@@ -82,6 +84,14 @@ def demo_cmd(args=None):
         return 1
 
 
+def validate_cmd(args=None):
+    """Run full read-only release gate validation."""
+    from scripts.validate import run_full_validation
+
+    allow_live = getattr(args, "live_write_danger", False) if args else False
+    return run_full_validation(allow_live_write=allow_live)
+
+
 def deploy_cmd(args=None):
     print("Deploy command: NOT_RUN. (Owning phase P-28 pending)")
     return 1
@@ -95,6 +105,17 @@ def teardown_cmd(args=None):
 def build_parser():
     parser = argparse.ArgumentParser(description="ChangeMesh Canonical Command Interface")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Validate (P-25.06 Root Release Gate)
+    parser_validate = subparsers.add_parser(
+        "validate", help="Run full read-only release validation gate"
+    )
+    parser_validate.add_argument(
+        "--live-write-danger",
+        action="store_true",
+        help="Include real Google Cloud live write gate",
+    )
+    parser_validate.set_defaults(func=validate_cmd)
 
     # Format
     parser_format = subparsers.add_parser(
@@ -126,11 +147,11 @@ def build_parser():
     parser_integration.set_defaults(func=integration_cmd)
 
     # E2E
-    parser_e2e = subparsers.add_parser("e2e", help="Run end-to-end tests (deferred)")
+    parser_e2e = subparsers.add_parser("e2e", help="Run end-to-end synthetic demo suite")
     parser_e2e.set_defaults(func=e2e_cmd)
 
     # Demo
-    parser_demo = subparsers.add_parser("demo", help="Run demo (deferred)")
+    parser_demo = subparsers.add_parser("demo", help="Run synthetic enterprise demo")
     parser_demo.set_defaults(func=demo_cmd)
 
     # Deploy

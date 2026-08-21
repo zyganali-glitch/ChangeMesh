@@ -450,5 +450,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all documentation suites, submission packages, and repository governance).
 - Status: `ACTIVE`
 
+### LESSON-20260822-04 — One-Command Root Read-Only Release Validation Gate
+- Date/time: 2026-08-22
+- Active task: P-25.06
+- Symptom: Reviewers and judges are forced to manually orchestrate disparate linting, type-checking, donor auditing, and unit test commands, creating evaluation friction and risk of missed gates.
+- Root cause: Absence of a unified, platform-portable root validation harness.
+- Correct approach:
+  1. Provide a single canonical entry point (`uv run python scripts/cmd.py validate` and `scripts/validate.py`) executing all 7 gates sequentially.
+  2. Enforce clean ASCII output format without platform-dependent terminal encoding issues (e.g. Windows cp1254).
+  3. Output a structured ASCII audit table with Gate Name, Surface, Mode, Status (`PASS`/`NOT_RUN`/`FAIL`), Duration, and Overall Verdict.
+  4. Ensure live cloud mutations remain protected and default to `NOT_RUN`.
+- Prevention rule: Root release gate must be runnable in one command with zero configuration and zero external cost.
+- Tests/evidence: `scripts/validate.py`, `docs/P-25.06_ROOT_VALIDATION_OUTPUT.md`, full suite (1686 passed, 1 warning).
+- Affected files: `scripts/cmd.py`, `scripts/validate.py`, `JUDGE_START_HERE.md`, `docs/P-25.06_ROOT_VALIDATION_OUTPUT.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all root validation commands, CI pipelines, and judge evaluation harnesses).
+- Status: `ACTIVE`
+
+
 
 

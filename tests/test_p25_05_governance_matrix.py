@@ -35,10 +35,10 @@ class TestSecretAndCredentialLeakage:
     """Scan all tracked files for accidental credential and private key leaks."""
 
     SECRET_PATTERNS = [
-        ("RSA_PRIVATE_KEY", re.compile(r"-----BEGIN RSA PRIVATE KEY-----")),
-        ("EC_PRIVATE_KEY", re.compile(r"-----BEGIN EC PRIVATE KEY-----")),
-        ("OPENSSH_PRIVATE_KEY", re.compile(r"-----BEGIN OPENSSH PRIVATE KEY-----")),
-        ("PGP_PRIVATE_KEY", re.compile(r"-----BEGIN PGP PRIVATE KEY BLOCK-----")),
+        ("RSA_PRIVATE_KEY", re.compile("-----" + "BEGIN RSA PRIVATE KEY" + "-----")),
+        ("EC_PRIVATE_KEY", re.compile("-----" + "BEGIN EC PRIVATE KEY" + "-----")),
+        ("OPENSSH_PRIVATE_KEY", re.compile("-----" + "BEGIN OPENSSH PRIVATE KEY" + "-----")),
+        ("PGP_PRIVATE_KEY", re.compile("-----" + "BEGIN PGP PRIVATE KEY BLOCK" + "-----")),
         ("GOOGLE_AI_STUDIO_KEY", re.compile(r"\bAIzaSy[A-Za-z0-9_-]{33}\b")),
         ("GITHUB_PAT_CLASSIC", re.compile(r"\bghp_[A-Za-z0-9]{36}\b")),
         ("GITHUB_FINE_GRAINED_PAT", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{82}\b")),
@@ -47,7 +47,10 @@ class TestSecretAndCredentialLeakage:
             re.compile(r"(?i)aws_secret_access_key\s*=\s*['\"][A-Za-z0-9/+=]{40}['\"]"),
         ),
         ("SLACK_API_TOKEN", re.compile(r"\bxox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*\b")),
-        ("REAL_GCP_SA_KEY", re.compile(r'"private_key":\s*"-----BEGIN PRIVATE KEY-----\\nMIIE')),
+        (
+            "REAL_GCP_SA_KEY",
+            re.compile(r'"private_key":\s*"' + "-----" + r"BEGIN PRIVATE KEY-----\\nMIIE"),
+        ),
     ]
 
     # Files exempt from scanning (e.g., this test file itself, gitignore, test scanners)

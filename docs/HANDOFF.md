@@ -163,17 +163,19 @@
 - P-25.03
 - P-25.04
 - P-25.05
+- P-25.06
+- P-25
 
 **Blocked:**
 - None
 
 **Active Phase:**
-- P-25 (Comprehensive Test and Gate Matrix — IN_PROGRESS)
+- P-26 (Security, Privacy, and Threat Model — PENDING)
 
 **Active Task:**
-- P-25.06 — Create root validation command for complete read-only release gate (PENDING)
+- P-26.01 — Write threat model for injection, memory poisoning, confused deputy, privilege escalation, exfiltration, malicious tools, replay, forged evidence, supply chain (PENDING)
 
-## Current P-25 State (P-25.05 Governance & Claim Matrix Completed)
+## Current P-25 State (Phase P-25 Comprehensive Test and Gate Matrix 100% Completed & Verified)
 
 - **P-25.00:** `DONE` — Test-suite donor preflight completed in `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md` and registered in `docs/DONOR_REUSE_MANIFEST.md` §3.1. All 7 approved donors inspected across 20 components. Donor-test traceability matrix produced. 43 Gap Register rows identified (60 expanded atomic test obligations: 41 gap rows / 52 test cases for P-25.01, 2 gap rows / 8 test cases for P-25.05).
 - **P-25.01:** `DONE` — Comprehensive unit test matrix implemented and verified in `tests/test_p25_01_comprehensive_unit.py` (73 tests collected, 73 passed in 2.24s, 1556 total canonical unit tests passed, 0 failures, 0 errors). The RSA test fixture secret-scanner issue was repaired via dynamic runtime header assembly without weakening the secret detector. All 41 Gap Register rows (52 expanded atomic test obligations) are covered and verified in `docs/P-25.01_UNIT_TEST_COVERAGE_REPORT.md`.
@@ -181,7 +183,8 @@
 - **P-25.03:** `DONE` — ShadowLab fault, attack, replay, restart suite implemented and verified in `tests/test_p25_03_shadowlab_suite.py` (57 tests collected, 57 passed in 0.69s, 1652 total repository tests passed, 0 failures, 0 errors). Tests exercise 4 canonical dimensions: (1) Fault paths (HTTP 503 recovery with exponential backoff math `(100ms, 200ms)`, DB lock timeout, partial apply interrupt with saga compensation DDL cleanup, stale approval rejection, missing rollback plan correction, legacy client break expand-contract correction, process crash recovery, clean migration), (2) Attack vectors (prompt injection patterns: ignore instructions, system override, jailbreak roleplay, delimiter hijack, authority fabrication; unregistered tool abuse; memory poisoning and quarantine; mode laundering denial; confused deputy unauthorized path blocking; privilege escalation bypass denial; secret injection in policy inputs; InjectionDetector quarantine sanitization; forged scenario auth failure), (3) Replay invariants (deterministic SHA-256 digest idempotency, clean instance state isolation across DB/Git/API doubles, non-accumulative state), and (4) Restart continuation (durable P-10 checkpoint persistence and exact state resumption without duplicate task execution, checkpoint SHA-256 digest verification). Documented in `docs/P-25.03_SHADOWLAB_SCENARIO_REPORT.md`.
 - **P-25.04:** `DONE` — Browser E2E and accessibility test suite implemented and verified in `tests/test_p25_04_browser_accessibility.py` (24 tests collected, 24 passed in 2.43s, 1676 total repository tests passed, 0 failures, 0 errors). Verified WCAG 2.1 AA accessibility (color contrast exceeding 7.0:1 on text, keyboard focus visibility outlines with offset, skip navigation link, semantic landmark roles), mobile/tablet/desktop responsive viewport media queries, 100% symmetric EN/TR translation parity in `app.js`, zero external CDN/font dependencies (100% offline/PWA friendly), and clean HTTP service app endpoints (`/`, `/static/styles.css`, `/static/app.js`, `/health`, `/api/dashboard/snapshot`). Documented in `docs/P-25.04_BROWSER_ACCESSIBILITY_REPORT.md`.
 - **P-25.05:** `DONE` — Claim/evidence, fixture/real, secret, license, broken-link governance matrix implemented and verified in `tests/test_p25_05_governance_matrix.py` (10 tests collected, 10 passed in 2.42s, 1686 total repository tests passed, 0 failures, 0 errors). Successfully closed Gap 21 (CCT-JUDGE-001) and Gap 26 (ZK-CLAIM-001) from P-25.00 preflight: verified 0 live secrets/keys across repository files, 0 unsupported hyperbolic claims in docs, strict master plan status token validation, default fail-closed without `--live-write-danger`, 100% resolution of internal markdown file links (including repair of relative path resolution in `docs/SUBMISSION_MANIFEST.md`), canonical model ID (`gemini-3.6-flash`) consistency, zero donor leakage (no Codex/GPT references in judge docs), donor manifest integrity (20 components), and compatible open-source license declarations across all 7 approved donors. All 43 Gap Register rows / 60 expanded atomic test obligations from P-25.00 are now 100% closed. Documented in `docs/P-25.05_GOVERNANCE_TEST_REPORT.md`.
-- **P-25.06:** `PENDING` — Root validation command for complete read-only release gate (Next eligible micro-task).
+- **P-25.06:** `DONE` — Root validation command implemented and verified in `scripts/cmd.py` (`uv run python scripts/cmd.py validate`) and standalone script `scripts/validate.py`. All 7 read-only release gates pass with unambiguous PASS/NOT_RUN statuses: Format Gate (`PASS`), Lint Gate (`PASS`), Static Type-Check Gate (`PASS`), Donor Manifest Gate (`PASS`), Test Matrix Gate (`PASS` across 1686 tests), Synthetic Enterprise E2E Demo Gate (`PASS`), and Live Cloud Mutation Gate (`NOT_RUN` fail-closed by default). Documented in `docs/P-25.06_ROOT_VALIDATION_OUTPUT.md`.
+- **Phase P-25:** `DONE` — Complete test and gate matrix closed with 0 debt delta and 0 failures. Next eligible micro-task is `P-26.01`.
 
 ## Current P-24 State (Macro Execution Batch P-20.02 → P-24.06 Completed and Verified with Live Cloud Run & Cloud E2E)
 
