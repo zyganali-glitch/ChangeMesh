@@ -2072,16 +2072,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-27 — Reliability, Performance, Cost, and Quota
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-27.01 — Measure E2E/per-stage latency and retry behavior
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Measure E2E/per-stage latency and retry behavior.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Demo fits time budget; timeouts bounded.
-- **Required evidence:** Performance report.
-- **Mandatory documentation sync:** Environment.
+- **Required evidence:** Performance report `docs/P-27.01_LATENCY_AND_PERFORMANCE_REPORT.md`, benchmark harness `scripts/measure_performance.py`, and test suite `tests/test_p27_01_performance_metrics.py` (3 tests passing). Verifies mean E2E demo latency of 8.25 ms (median 7.78 ms, min 7.64 ms, max 10.24 ms) with 100% saga completion rate across 5 iterations (< 2.0s time budget ceiling), granular 6-stage lifecycle telemetry, exponential backoff progression math `(100ms, 200ms, 400ms, 800ms)`, and bounded timeout ceilings.
+- **Mandatory documentation sync:** `docs/P-27.01_LATENCY_AND_PERFORMANCE_REPORT.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-27.02 — Measure Gemini tokens/cost, Cloud Run, Firestore, Pub/Sub, logging, optional services

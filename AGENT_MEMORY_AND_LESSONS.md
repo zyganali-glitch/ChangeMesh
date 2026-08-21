@@ -545,6 +545,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all competition documentation, enterprise marketing copy, and AI evaluation briefs).
 - Status: `ACTIVE`
 
+### LESSON-20260822-10 — Sub-10ms In-Process Saga Execution and Time Budgets
+- Date/time: 2026-08-22
+- Active task: P-27.01
+- Symptom: Multi-agent orchestrations can become sluggish or unpredictable during evaluations if IO and coordination overheads are unbounded.
+- Root cause: Inefficient event propagation, excessive serialization cycles, or unbounded network retries.
+- Correct approach:
+  1. Profile end-to-end multi-agent execution using in-process event buses and immutable Pydantic models.
+  2. Implement bounded exponential backoff `(100ms, 200ms, 400ms, 800ms)` capped at max 4 attempts.
+  3. Validate that mean demo latency remains well below recording budgets (< 10ms observed vs 2.0s ceiling).
+- Prevention rule: Every multi-agent lifecycle stage must have a documented timeout ceiling and bounded retry policy.
+- Tests/evidence: `scripts/measure_performance.py`, `tests/test_p27_01_performance_metrics.py` (3 passed); full suite (1709 passed).
+- Affected files: `scripts/measure_performance.py`, `tests/test_p27_01_performance_metrics.py`, `docs/P-27.01_LATENCY_AND_PERFORMANCE_REPORT.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all low-latency agent architectures, saga orchestrators, and performance tuning).
+- Status: `ACTIVE`
+
+
 
 
 

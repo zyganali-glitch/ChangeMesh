@@ -26,6 +26,7 @@ Record actual environment only; do not fill unknown values with guesses.
 - Observability: `VERIFIED / LIVE_E2E_PROVEN` (Cloud Trace live export and API readback proven in P-24.05)
 - GitHub demo repository: `VERIFIED / LIVE_WRITE_PROVEN` (`zyganali-glitch/changemesh-livewrite-demo`, live branch, commit, and draft PR #2 created and idempotency reconciliation proven in P-24.05)
 - Public demo URL: `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`
+- Performance & Latency Baseline (P-27.01): `8.25 ms mean` (7.78 ms median, min 7.64 ms, max 10.24 ms) across 5 iterations of full multi-agent saga execution (time budget < 2.0s). Granular 6-stage lifecycle instrumentation and exponential retry backoff math `(100ms, 200ms, 400ms, 800ms)`. Documented in `docs/P-27.01_LATENCY_AND_PERFORMANCE_REPORT.md`.
 
 ## Rules
 
