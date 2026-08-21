@@ -71,6 +71,7 @@ from src.agents.coordinator import (
     BranchCoordinator,
     BranchPlan,
     BranchSpec,
+    BranchStatus,
     CoordinationResult,
     ExecutionStrategy,
 )
@@ -92,6 +93,7 @@ from src.agents.router import (
 )
 from src.agents.schemas import (
     ImpactScoutInput,
+    ImpactScoutOutput,
     ReleaseStewardInput,
 )
 from src.core.gemini_client import BoundedGeminiClient, ModelResponse
@@ -538,22 +540,23 @@ class TestADKIntegration:
         assert isinstance(spec.routing_request.payload, ImpactScoutInput)
         assert spec.routing_request.payload.target_systems == ["billing-db"]
 
-    def test_adk_zero_external_write_invariant(self) -> None:
-        """Verify routing and coordination through ADK components perform zero provider writes."""
-        spy_firestore_client = MagicMock()
-        spy_pubsub_publisher = MagicMock()
-        spy_genai_models = MagicMock()
-        spy_github_transport = MagicMock()
-
+    @pytest.mark.anyio
+    async def test_adk_local_pipeline_provider_free_execution(self) -> None:
+        """Verify ADK intake, deterministic routing, and branch coordination complete locally
+        without provider dependencies.
+        """
         orchestrator = ChangeOrchestrator()
         router = DeterministicRouter()
-        coordinator = BranchCoordinator()
+        coordinator = BranchCoordinator(router=router)
 
         req = ChangeRequest(
             schema_version="1.0.0",
-            request_id="req-adk-zero-write",
-            title="Zero write verification",
-            description="Verify orchestration makes zero provider writes",
+            request_id="req-adk-local-pipeline",
+            title="Local pipeline verification",
+            description=(
+                "Verify orchestration, routing, and coordination execute "
+                "locally without provider dependencies"
+            ),
             target_systems=["billing-db"],
             data_classification=DataClassLevel.INTERNAL,
             success_criteria=[
@@ -568,29 +571,51 @@ class TestADKIntegration:
             requested_by="engineer@example.com",
             requested_at=datetime.now(timezone.utc),
         )
+        # 1. Orchestrator intake boundary creates in-memory ChangeRuntimeState
         runtime_state = orchestrator.initialize_change(req)
+        assert isinstance(runtime_state, ChangeRuntimeState)
         assert runtime_state.state == ChangeState.RECEIVED
+        assert runtime_state.request_id == "req-adk-local-pipeline"
 
-        route_res = router.route(
-            RoutingRequest(
-                change_id=runtime_state.change_id,
-                required_capabilities=["repository_blast_radius_analysis"],
-                payload=ImpactScoutInput(
-                    schema_version="1.0.0",
-                    change_id=runtime_state.change_id,
-                    target_systems=["billing-db"],
-                    repository_ref="zyganali-glitch/ChangeMesh",
-                ),
-            )
+        # 2. Deterministic routing matches specialist capability and schema in-process
+        scout_payload = ImpactScoutInput(
+            schema_version="1.0.0",
+            change_id=runtime_state.change_id,
+            target_systems=["billing-db"],
+            repository_ref="zyganali-glitch/ChangeMesh",
         )
+        route_req = RoutingRequest(
+            change_id=runtime_state.change_id,
+            required_capabilities=["repository_blast_radius_analysis"],
+            payload=scout_payload,
+        )
+        route_res = router.route(route_req)
+        assert isinstance(route_res, RoutingResult)
         assert route_res.outcome == RoutingOutcome.ROUTED
-        assert coordinator is not None
+        assert route_res.trace.selected_agent_id == "agent-impact-scout"
 
-        # Assert zero external provider mutation calls were dispatched
-        assert spy_firestore_client.collection.call_count == 0
-        assert spy_pubsub_publisher.publish.call_count == 0
-        assert spy_genai_models.generate_content.call_count == 0
-        assert spy_github_transport.execute.call_count == 0
+        # 3. Branch coordinator executes multi-agent plan in-process via InMemorySessionService
+        plan = BranchPlan(
+            plan_id="plan-adk-local-001",
+            change_id=runtime_state.change_id,
+            strategy=ExecutionStrategy.PARALLEL,
+            branches=[
+                BranchSpec(
+                    branch_id="branch-scout-01",
+                    routing_request=route_req,
+                ),
+            ],
+        )
+        coord_result = await coordinator.execute_plan(plan)
+        assert isinstance(coord_result, CoordinationResult)
+        assert coord_result.is_successful is True
+        assert coord_result.effective_strategy == ExecutionStrategy.PARALLEL
+        assert len(coord_result.branch_results) == 1
+        branch_res = coord_result.branch_results[0]
+        assert branch_res.status == BranchStatus.SUCCESS
+        assert branch_res.trace.selected_agent_id == "agent-impact-scout"
+        assert isinstance(branch_res.output, ImpactScoutOutput)
+        assert branch_res.output.conflict_detected is False
 
 
 # =============================================================================
