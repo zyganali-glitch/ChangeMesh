@@ -195,12 +195,12 @@ Commands may be recorded as `VERIFIED` after the owning micro-task executes them
 | Unit tests (P-09.03 Retry & Dead Letter) | `python -m pytest tests/test_p09_03_retry_dead_letter.py -v --tb=short` | `VERIFIED` | `PASS` (10 passed) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-09.04 Local Event Bus) | `python -m pytest tests/test_p09_04_local_event_bus.py -v --tb=short` | `VERIFIED` | `PASS` (14 passed) | Local non-mutating test | 2026-08-16 |
 | Unit tests (P-09.05 Causal Timeline) | `python -m pytest tests/test_p09_05_pubsub_timeline.py -v --tb=short` | `VERIFIED` | `PASS` (14 passed) | Local non-mutating test | 2026-08-16 |
-| Unit tests (Full Suite) | `uv run pytest` | `VERIFIED` | `PASS` (1594 passed, 1 warning, 0 errors) | Local test suite execution | 2026-08-21 |
-| Integration tests (P-25.02 Matrix) | `uv run pytest tests/test_p25_02_integration_matrix.py` | `VERIFIED` | `PASS` (38 passed, 1 warning) | Local non-mutating cost-isolated integration tests | 2026-08-21 |
+| Unit tests (Full Suite) | `uv run pytest` | `VERIFIED` | `PASS` (1595 passed, 1 warning, 0 errors) | Local test suite execution | 2026-08-21 |
+| Integration tests (P-25.02 Matrix) | `uv run pytest tests/test_p25_02_integration_matrix.py` | `VERIFIED` | `PASS` (39 passed, 1 warning) | Local non-mutating cost-isolated integration tests | 2026-08-21 |
 | Format | `uv run python scripts/cmd.py format` | `VERIFIED` | `PASS` (184 files checked, 0 format issues) | Non-mutating (`ruff format --check .`) | 2026-08-21 |
 | Lint | `uv run python scripts/cmd.py lint` | `VERIFIED` | `PASS` (0 lint errors) | Non-mutating (`ruff check .`, no `--fix`) | 2026-08-21 |
 | Type-check | `uv run python scripts/cmd.py type-check` | `VERIFIED` | `PASS` (142 source files checked, 0 issues) | Non-mutating (`mypy src tests domain events integrations`) | 2026-08-21 |
-| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` | `PASS` (1594 passed, 1 warning) | Non-mutating unit & integration test runner | 2026-08-21 |
+| Unit | `uv run python scripts/cmd.py unit` | `VERIFIED` | `PASS` (1595 passed, 1 warning) | Non-mutating unit & integration test runner | 2026-08-21 |
 | Integration | `uv run python scripts/cmd.py integration` | `CLEAN_CHECKOUT_VERIFIED` | `FAIL_CLOSED` (Exit 1, zero cloud access without `--live-write-danger`) | Guarded live writes (`tests/test_gcp_access.py`) | 2026-08-21 |
 | E2E | `uv run python scripts/cmd.py e2e` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24/P-25 pending) | Deferred workflow | 2026-08-21 |
 | Demo | `uv run python scripts/cmd.py demo` | `CLEAN_CHECKOUT_VERIFIED` | `NOT_RUN` (Exit 1, owning phase P-24 pending) | Deferred demo | 2026-08-21 |

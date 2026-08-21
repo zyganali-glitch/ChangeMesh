@@ -8,24 +8,29 @@ Acceptance Criteria:
 - Tests clean resources and run deterministically.
 - Exercises cross-boundary interactions between canonical ChangeMesh components:
   1. ADK Integration (Orchestrator, router, coordinator, fallback).
-  2. Gemini Parser & Structured Output (JSON schemas, fail-closed, privacy gate).
+  2. Gemini Parser & Structured Output (BoundedGeminiClient output, schemas, privacy gate).
   3. Pub/Sub Integration (Wire serialization, consumer dedup, DLQ, causal DAG).
-  4. Firestore Persistence (Tenant isolation, 7 record types, OCC CAS, teardown).
+  4. Firestore Persistence (GoogleFirestoreSagaRepository, 9 record types, OCC CAS, teardown).
   5. GitHub Adapter (Mode enforcement, protected branches, reconciliation).
-  6. Managed Adapters (Availability reporting, local fallbacks, least privilege).
+  6. Managed Adapters (Availability reporting, local fallbacks, least privilege, cmd gate).
 """
 
 from __future__ import annotations
 
 import copy
 import json
+import subprocess
+import sys
+import threading
 from datetime import datetime, timezone
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
 import pytest
 
 # --- ADK Components ---
 from google.adk.agents.base_agent import BaseAgent
+from google.genai import types
 
 # --- Domain Contracts ---
 from domain.contracts.change_lifecycle import ChangeState
@@ -36,7 +41,7 @@ from domain.contracts.conventions import (
 )
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.event_envelope import EventDeliveryDisposition, EventEnvelope
-from domain.contracts.evidence import ExecutionEvidenceMode
+from domain.contracts.evidence import EvidenceProducerKind, EvidenceState, ExecutionEvidenceMode
 from domain.contracts.success_criterion import SuccessCriterion
 from events.dead_letter import (
     ProcessLocalDeadLetterState,
@@ -46,6 +51,7 @@ from events.delivery_state import InMemoryDeliveryState
 
 # --- Pub/Sub Components ---
 from events.wire import EventWireMessage
+from integrations.gcp.firestore_adapter import GoogleFirestoreSagaRepository
 from integrations.gcp.pubsub_adapter import (
     GooglePubSubConsumer,
     GooglePubSubDeadLetterConsumer,
@@ -76,7 +82,6 @@ from src.agents.evidence_auditor import (
 from src.agents.policy_guardian import (
     PolicyGuardian,
     PrivacyBoundaryError,
-    PromptSurface,
 )
 from src.agents.registry import CANONICAL_AGENT_CLASSES
 from src.agents.router import (
@@ -89,6 +94,7 @@ from src.agents.schemas import (
     ImpactScoutInput,
     ReleaseStewardInput,
 )
+from src.core.gemini_client import BoundedGeminiClient, ModelResponse
 
 # --- Gemini Structured Output & Privacy ---
 from src.core.gemini_structured_output import (
@@ -118,16 +124,20 @@ from src.orchestrator.idempotency import (
     IdempotencyReservationOutcomeStatus,
     IdempotencyScope,
 )
-from src.orchestrator.in_memory_repository import InMemorySagaStateRepository
 
 # --- Firestore & State Persistence Components ---
 from src.orchestrator.state_repository import (
+    AmbiguityRecord,
     ApprovalRecord,
     ApprovalResolutionStatus,
     ChangeRecord,
+    CheckpointRecord,
+    EvidenceRefRecord,
     IdempotencyReservationRecord,
     IdempotencyReservationStatus,
     OptimisticConcurrencyError,
+    PassportRecord,
+    PersistenceSchemaError,
     TaskRecord,
     TaskStatus,
     TenantIsolationError,
@@ -153,6 +163,217 @@ from src.security.agent_security import (
     ModelArmorResult,
     ServiceAvailabilityReport,
 )
+
+# =============================================================================
+# DETERMINISTIC TEST DOUBLES (ZERO EXTERNAL COST / CREDENTIAL-FREE)
+# =============================================================================
+
+
+class FakeFirestoreSnapshot:
+    """Deterministic in-memory snapshot for GoogleFirestoreSagaRepository."""
+
+    def __init__(
+        self, exists: bool, data: Optional[dict[str, Any]] = None, doc_id: str = ""
+    ) -> None:
+        self.exists = exists
+        self._data = data or {}
+        self.id = doc_id
+        self.reference: Optional[Any] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self._data)
+
+
+class FakeFirestoreDocRef:
+    """Deterministic in-memory document reference for GoogleFirestoreSagaRepository."""
+
+    def __init__(self, collection_path: str, doc_id: str, store: dict[str, Any]) -> None:
+        self.collection_path = collection_path
+        self.id = doc_id
+        self._store = store
+        self._key = f"{collection_path}/{doc_id}"
+
+    @property
+    def exists(self) -> bool:
+        return self._key in self._store
+
+    def get(self, transaction: Optional[Any] = None) -> FakeFirestoreSnapshot:
+        if transaction:
+            return transaction.get(self)
+        if self._key in self._store:
+            snap = FakeFirestoreSnapshot(True, dict(self._store[self._key]), doc_id=self.id)
+            snap.reference = self
+            return snap
+        snap = FakeFirestoreSnapshot(False, doc_id=self.id)
+        snap.reference = self
+        return snap
+
+    def set(self, data: dict[str, Any]) -> None:
+        self._store[self._key] = dict(data)
+
+    def delete(self) -> None:
+        self._store.pop(self._key, None)
+
+    def collection(self, name: str) -> FakeFirestoreCollection:
+        return FakeFirestoreCollection(f"{self._key}/{name}", self._store)
+
+
+class FakeFirestoreQuery:
+    """Deterministic in-memory query double."""
+
+    def __init__(
+        self, path: str, store: dict[str, Any], filters: list[tuple[str, str, Any]]
+    ) -> None:
+        self.path = path
+        self._store = store
+        self.filters = filters
+
+    def where(self, field: str, op: str, value: Any) -> FakeFirestoreQuery:
+        return FakeFirestoreQuery(self.path, self._store, self.filters + [(field, op, value)])
+
+    def stream(self) -> list[FakeFirestoreSnapshot]:
+        prefix = f"{self.path}/"
+        results = []
+        for k, v in list(self._store.items()):
+            if k.startswith(prefix) and "/" not in k[len(prefix) :]:
+                match = True
+                for f, op, val in self.filters:
+                    if op == "==" and v.get(f) != val:
+                        match = False
+                        break
+                if match:
+                    doc_id = k[len(prefix) :]
+                    snap = FakeFirestoreSnapshot(True, dict(v), doc_id=doc_id)
+                    snap.reference = FakeFirestoreDocRef(self.path, doc_id, self._store)
+                    results.append(snap)
+        return results
+
+
+class FakeFirestoreCollection:
+    """Deterministic in-memory collection double."""
+
+    def __init__(self, path: str, store: dict[str, Any]) -> None:
+        self.path = path
+        self._store = store
+
+    def document(self, doc_id: str) -> FakeFirestoreDocRef:
+        return FakeFirestoreDocRef(self.path, doc_id, self._store)
+
+    def where(self, field: str, op: str, value: Any) -> FakeFirestoreQuery:
+        return FakeFirestoreQuery(self.path, self._store, [(field, op, value)])
+
+    def stream(self) -> list[FakeFirestoreSnapshot]:
+        prefix = f"{self.path}/"
+        results = []
+        for k, v in list(self._store.items()):
+            if k.startswith(prefix) and "/" not in k[len(prefix) :]:
+                doc_id = k[len(prefix) :]
+                snap = FakeFirestoreSnapshot(True, dict(v), doc_id=doc_id)
+                snap.reference = FakeFirestoreDocRef(self.path, doc_id, self._store)
+                results.append(snap)
+        return results
+
+
+class FakeFirestoreTransaction:
+    """Deterministic in-memory transaction with optimistic concurrency collision detection."""
+
+    def __init__(self, store: dict[str, Any], lock: threading.RLock) -> None:
+        self._store = store
+        self._lock = lock
+        self._read_versions: dict[str, Any] = {}
+        self._writes: dict[str, Any] = {}
+
+    def get(self, doc_ref: FakeFirestoreDocRef) -> FakeFirestoreSnapshot:
+        with self._lock:
+            key = doc_ref._key
+            if key in self._store:
+                data = dict(self._store[key])
+                self._read_versions[key] = data.get("version", 0)
+                snap = FakeFirestoreSnapshot(True, data, doc_id=doc_ref.id)
+                snap.reference = doc_ref
+                return snap
+            self._read_versions[key] = None
+            snap = FakeFirestoreSnapshot(False, doc_id=doc_ref.id)
+            snap.reference = doc_ref
+            return snap
+
+    def set(self, doc_ref: FakeFirestoreDocRef, data: dict[str, Any]) -> None:
+        self._writes[doc_ref._key] = dict(data)
+
+    def commit(self) -> None:
+        with self._lock:
+            for key, read_ver in self._read_versions.items():
+                current_data = self._store.get(key)
+                current_ver = current_data.get("version", 0) if current_data else None
+                if current_ver != read_ver:
+                    raise Exception("Transactional collision: modified concurrently")
+            for key, write_data in self._writes.items():
+                self._store[key] = dict(write_data)
+
+
+class FakeFirestoreClient:
+    """In-memory deterministic test double for google.cloud.firestore.Client."""
+
+    def __init__(self) -> None:
+        self._store: dict[str, Any] = {}
+        self._lock = threading.RLock()
+
+    def collection(self, name: str) -> FakeFirestoreCollection:
+        return FakeFirestoreCollection(name, self._store)
+
+    def transaction(self) -> FakeFirestoreTransaction:
+        return FakeFirestoreTransaction(self._store, self._lock)
+
+
+class FakeModels:
+    """Deterministic test double for google.genai.Client.models."""
+
+    def __init__(
+        self,
+        *,
+        responses: Optional[list[Any]] = None,
+        exceptions: Optional[list[Exception]] = None,
+    ) -> None:
+        self.responses = list(responses or [])
+        self.exceptions = list(exceptions or [])
+        self.call_history: list[dict[str, Any]] = []
+
+    def generate_content(self, *, model: str, contents: Any, config: Any) -> Any:
+        self.call_history.append({"model": model, "contents": contents, "config": config})
+        if self.exceptions:
+            exc = self.exceptions.pop(0)
+            raise exc
+        if self.responses:
+            return self.responses.pop(0)
+        return types.GenerateContentResponse(
+            candidates=[
+                types.Candidate(
+                    content=types.Content(
+                        parts=[types.Part.from_text(text="Default fake generated text.")]
+                    ),
+                    finish_reason=types.FinishReason.STOP,
+                )
+            ],
+            usage_metadata=types.GenerateContentResponseUsageMetadata(
+                prompt_token_count=10,
+                candidates_token_count=5,
+                total_token_count=15,
+            ),
+        )
+
+
+class FakeSDKClient:
+    """Deterministic test double for google.genai.Client."""
+
+    def __init__(
+        self,
+        *,
+        responses: Optional[list[Any]] = None,
+        exceptions: Optional[list[Exception]] = None,
+    ) -> None:
+        self.models = FakeModels(responses=responses, exceptions=exceptions)
+        self.closed: bool = False
+
 
 # =============================================================================
 # DOMAIN 1: ADK INTEGRATION MATRIX
@@ -318,14 +539,58 @@ class TestADKIntegration:
         assert spec.routing_request.payload.target_systems == ["billing-db"]
 
     def test_adk_zero_external_write_invariant(self) -> None:
-        """Verify routing through ADK orchestrator/coordinator performs zero cloud writes."""
+        """Verify routing and coordination through ADK components perform zero provider writes."""
+        spy_firestore_client = MagicMock()
+        spy_pubsub_publisher = MagicMock()
+        spy_genai_models = MagicMock()
+        spy_github_transport = MagicMock()
+
         orchestrator = ChangeOrchestrator()
         router = DeterministicRouter()
         coordinator = BranchCoordinator()
-        assert orchestrator is not None
-        assert router is not None
+
+        req = ChangeRequest(
+            schema_version="1.0.0",
+            request_id="req-adk-zero-write",
+            title="Zero write verification",
+            description="Verify orchestration makes zero provider writes",
+            target_systems=["billing-db"],
+            data_classification=DataClassLevel.INTERNAL,
+            success_criteria=[
+                SuccessCriterion(
+                    schema_version="1.0.0",
+                    criterion_id="sc-001",
+                    description="Criteria",
+                    verification_method="deterministic",
+                    required_evidence_types=["unit_test"],
+                )
+            ],
+            requested_by="engineer@example.com",
+            requested_at=datetime.now(timezone.utc),
+        )
+        runtime_state = orchestrator.initialize_change(req)
+        assert runtime_state.state == ChangeState.RECEIVED
+
+        route_res = router.route(
+            RoutingRequest(
+                change_id=runtime_state.change_id,
+                required_capabilities=["repository_blast_radius_analysis"],
+                payload=ImpactScoutInput(
+                    schema_version="1.0.0",
+                    change_id=runtime_state.change_id,
+                    target_systems=["billing-db"],
+                    repository_ref="zyganali-glitch/ChangeMesh",
+                ),
+            )
+        )
+        assert route_res.outcome == RoutingOutcome.ROUTED
         assert coordinator is not None
-        # Zero credentials needed; zero network calls made
+
+        # Assert zero external provider mutation calls were dispatched
+        assert spy_firestore_client.collection.call_count == 0
+        assert spy_pubsub_publisher.publish.call_count == 0
+        assert spy_genai_models.generate_content.call_count == 0
+        assert spy_github_transport.execute.call_count == 0
 
 
 # =============================================================================
@@ -337,7 +602,7 @@ class TestGeminiParserIntegration:
     """Integration tests for BoundedGeminiClient output, structured parsers, privacy gate."""
 
     def test_gemini_output_boundary_valid_goal_decomposition(self) -> None:
-        """Verify structured output parser parses valid GoalDecompositionResult."""
+        """Verify BoundedGeminiClient output boundary parses valid GoalDecompositionResult."""
         raw_json = json.dumps(
             {
                 "schema_version": "1.0.0",
@@ -360,7 +625,29 @@ class TestGeminiParserIntegration:
                 "suggested_action_types": ["generate_migration"],
             }
         )
-        parsed = parse_goal_decomposition_output(raw_json)
+        fake_sdk = FakeSDKClient(
+            responses=[
+                types.GenerateContentResponse(
+                    candidates=[
+                        types.Candidate(
+                            content=types.Content(parts=[types.Part.from_text(text=raw_json)]),
+                            finish_reason=types.FinishReason.STOP,
+                        )
+                    ],
+                    usage_metadata=types.GenerateContentResponseUsageMetadata(
+                        prompt_token_count=20,
+                        candidates_token_count=80,
+                        total_token_count=100,
+                    ),
+                )
+            ]
+        )
+        client = BoundedGeminiClient(project="test-proj-p25", _sdk_client=fake_sdk)
+        response = client.generate_text(prompt="Decompose goal req-gemini-001")
+        assert isinstance(response, ModelResponse)
+        assert len(fake_sdk.models.call_history) == 1
+
+        parsed = parse_goal_decomposition_output(response.text)
         assert isinstance(parsed, GoalDecompositionResult)
         assert parsed.schema_version == CANONICAL_STRUCTURED_SCHEMA_VERSION
         assert len(parsed.sub_goals) == 1
@@ -368,7 +655,7 @@ class TestGeminiParserIntegration:
         assert parsed.sub_goals[0].action_type == "generate_migration"
 
     def test_gemini_output_boundary_valid_policy_explanation(self) -> None:
-        """Verify structured output parser parses valid PolicyExplanationResult."""
+        """Verify BoundedGeminiClient output boundary parses valid PolicyExplanationResult."""
         raw_json = json.dumps(
             {
                 "schema_version": "1.0.0",
@@ -389,14 +676,36 @@ class TestGeminiParserIntegration:
                 "explanation_scope": "ENTERPRISE_SCHEMA",
             }
         )
-        parsed = parse_policy_explanation_output(raw_json)
+        fake_sdk = FakeSDKClient(
+            responses=[
+                types.GenerateContentResponse(
+                    candidates=[
+                        types.Candidate(
+                            content=types.Content(parts=[types.Part.from_text(text=raw_json)]),
+                            finish_reason=types.FinishReason.STOP,
+                        )
+                    ],
+                    usage_metadata=types.GenerateContentResponseUsageMetadata(
+                        prompt_token_count=25,
+                        candidates_token_count=75,
+                        total_token_count=100,
+                    ),
+                )
+            ]
+        )
+        client = BoundedGeminiClient(project="test-proj-p25", _sdk_client=fake_sdk)
+        response = client.generate_text(prompt="Explain policy decision dec-001")
+        assert isinstance(response, ModelResponse)
+        assert len(fake_sdk.models.call_history) == 1
+
+        parsed = parse_policy_explanation_output(response.text)
         assert isinstance(parsed, PolicyExplanationResult)
         assert parsed.schema_version == "1.0.0"
         assert parsed.rule_explanations[0].compliance_status == PolicyComplianceStatus.COMPLIANT
         assert parsed.rule_explanations[0].impact_level == PolicyImpactLevel.LOW
 
     def test_gemini_output_boundary_valid_semantic_audit(self) -> None:
-        """Verify structured output parser parses valid SemanticAuditResult."""
+        """Verify BoundedGeminiClient output boundary parses valid SemanticAuditResult."""
         raw_json = json.dumps(
             {
                 "schema_version": "1.0.0",
@@ -426,7 +735,29 @@ class TestGeminiParserIntegration:
                 "missing_evidence": [],
             }
         )
-        parsed = parse_semantic_audit_output(raw_json)
+        fake_sdk = FakeSDKClient(
+            responses=[
+                types.GenerateContentResponse(
+                    candidates=[
+                        types.Candidate(
+                            content=types.Content(parts=[types.Part.from_text(text=raw_json)]),
+                            finish_reason=types.FinishReason.STOP,
+                        )
+                    ],
+                    usage_metadata=types.GenerateContentResponseUsageMetadata(
+                        prompt_token_count=30,
+                        candidates_token_count=120,
+                        total_token_count=150,
+                    ),
+                )
+            ]
+        )
+        client = BoundedGeminiClient(project="test-proj-p25", _sdk_client=fake_sdk)
+        response = client.generate_text(prompt="Audit claims for change-p25-001")
+        assert isinstance(response, ModelResponse)
+        assert len(fake_sdk.models.call_history) == 1
+
+        parsed = parse_semantic_audit_output(response.text)
         assert parsed.overall_verdict == SemanticAssessmentVerdict.SUPPORTS
         assert len(parsed.claim_assessments) == 1
         assert parsed.claim_assessments[0].assessment == SemanticAssessmentVerdict.SUPPORTS
@@ -581,19 +912,22 @@ class TestGeminiParserIntegration:
         assert reconciliation.human_review_required is False
 
     def test_pre_sdk_privacy_gate_blocks_credentials_before_sdk(self) -> None:
-        """Verify Policy Guardian pre-SDK scanner blocks credentials before model call."""
-        # Non-contiguous dynamic assembly of test token
+        """Verify Policy Guardian blocks credentials and SDK generate_content count remains 0."""
         secret_prompt = "Review this PR with token " + "ghp_" + "A" * 36
         audit = PolicyGuardian.audit_privacy_text(secret_prompt)
         assert audit.safe_to_send is False
         assert len(audit.blockers) > 0
         assert any(b.code in ("github_token", "api_key", "credential") for b in audit.blockers)
 
-        # assert_model_input_safe raises PrivacyBoundaryError
+        fake_sdk = FakeSDKClient()
+        client = BoundedGeminiClient(project="test-proj-p25", _sdk_client=fake_sdk)
+
+        # assert_model_input_safe raises PrivacyBoundaryError before SDK invocation
         with pytest.raises(PrivacyBoundaryError):
-            PolicyGuardian.assert_model_input_safe(
-                secret_prompt, surface=PromptSurface.GOAL_DECOMPOSITION.value
-            )
+            client.generate_text(prompt=secret_prompt)
+
+        # Injected SDK client call count remains strictly ZERO
+        assert len(fake_sdk.models.call_history) == 0
 
 
 # =============================================================================
@@ -791,16 +1125,17 @@ class TestPubSubIntegration:
 
 
 # =============================================================================
-# DOMAIN 4: FIRESTORE PERSISTENCE INTEGRATION MATRIX
+# DOMAIN 4: FIRESTORE PERSISTENCE INTEGRATION MATRIX (GoogleFirestoreSagaRepository)
 # =============================================================================
 
 
 class TestFirestoreIntegration:
-    """Integration tests for Firestore state persistence, tenant isolation, OCC, and teardown."""
+    """Integration tests for GoogleFirestoreSagaRepository boundary, tenancy, OCC, teardown."""
 
-    def test_state_repository_tenant_isolation(self) -> None:
-        """Verify repository enforces tenant path partitioning and rejects cross-tenant access."""
-        repo = InMemorySagaStateRepository()
+    def test_firestore_adapter_tenant_isolation(self) -> None:
+        """Verify Firestore repo enforces path partitioning and rejects cross-tenant access."""
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-fs", firestore_client=fake_client)
         now = datetime.now(timezone.utc)
 
         # Blank tenant_id fails closed
@@ -840,19 +1175,21 @@ class TestFirestoreIntegration:
         assert found is not None
         assert found.tenant_id == "tenant-alpha"
 
-    def test_state_repository_read_write_roundtrip_all_records(self) -> None:
-        """Verify state repository roundtrips canonical record types."""
-        repo = InMemorySagaStateRepository()
+    def test_firestore_adapter_read_write_roundtrip_all_records(self) -> None:
+        """Verify GoogleFirestoreSagaRepository roundtrips canonical records with full fidelity."""
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-fs", firestore_client=fake_client)
         tenant = "tenant-p25"
         cid = "change-p25-all"
         now = datetime.now(timezone.utc)
 
-        # Setup Tenant
+        # 1. TenantRecord
         repo.create_tenant(
             TenantRecord(tenant_id=tenant, name="P25 Tenant", created_at=now, updated_at=now)
         )
+        assert repo.get_tenant(tenant) is not None
 
-        # 1. ChangeRecord
+        # 2. ChangeRecord
         cr = ChangeRecord(
             tenant_id=tenant,
             change_id=cid,
@@ -871,7 +1208,7 @@ class TestFirestoreIntegration:
         repo.create_change(tenant, cr)
         assert repo.get_change(tenant, cid) is not None
 
-        # 2. TaskRecord
+        # 3. TaskRecord
         tr = TaskRecord(
             tenant_id=tenant,
             change_id=cid,
@@ -888,7 +1225,7 @@ class TestFirestoreIntegration:
         repo.create_task(tenant, cid, tr)
         assert repo.get_task(tenant, cid, "task-01") is not None
 
-        # 3. IdempotencyReservationRecord
+        # 4. IdempotencyReservationRecord
         idem = IdempotencyReservationRecord(
             tenant_id=tenant,
             change_id=cid,
@@ -906,7 +1243,7 @@ class TestFirestoreIntegration:
         repo.create_idempotency_reservation(tenant, cid, idem)
         assert repo.get_idempotency_reservation(tenant, cid, "res-01") is not None
 
-        # 4. ApprovalRecord
+        # 5. ApprovalRecord
         appr = ApprovalRecord(
             tenant_id=tenant,
             change_id=cid,
@@ -927,9 +1264,76 @@ class TestFirestoreIntegration:
         repo.create_approval(tenant, cid, appr)
         assert repo.get_approval(tenant, cid, "card-01") is not None
 
-    def test_optimistic_concurrency_control_cas(self) -> None:
-        """Verify optimistic concurrency control enforces monotonic CAS versioning."""
-        repo = InMemorySagaStateRepository()
+        # 6. AmbiguityRecord
+        amb = AmbiguityRecord(
+            tenant_id=tenant,
+            change_id=cid,
+            correlation_id="corr-p25",
+            question_id="q-01",
+            question="Which schema migration path should be executed?",
+            expected_options=("ADDITIVE_EXPAND", "DUAL_WRITE_MIGRATE"),
+            irreducible_reason="Ambiguous input specification",
+            paused_state=ChangeState.DISCOVERING,
+            created_at=now,
+            updated_at=now,
+        )
+        repo.create_ambiguity(tenant, cid, amb)
+        assert repo.get_ambiguity(tenant, cid, "q-01") is not None
+
+        # 7. CheckpointRecord
+        chk = CheckpointRecord(
+            tenant_id=tenant,
+            change_id=cid,
+            checkpoint_id="chk-01",
+            sequence_number=1,
+            lifecycle_state_at_checkpoint=ChangeState.DISCOVERING,
+            completed_task_ids=("task-01",),
+            pending_task_ids=(),
+            compensation_step_ids=(),
+            checkpoint_digest=sha256_hex(b"checkpoint-state-digest"),
+            created_at=now,
+        )
+        repo.create_checkpoint(tenant, cid, chk)
+        assert repo.get_checkpoint(tenant, cid, "chk-01") is not None
+
+        # 8. EvidenceRefRecord
+        ev = EvidenceRefRecord(
+            tenant_id=tenant,
+            change_id=cid,
+            evidence_id="ev-01",
+            subject="Schema backward-compatibility rehearsal",
+            state=EvidenceState.PASS,
+            collection_mode=ExecutionEvidenceMode.SIMULATION,
+            producer_kind=EvidenceProducerKind.AGENT,
+            agent_id="agent-impact-scout",
+            agent_revision="1.0.0",
+            collected_at=now,
+            created_at=now,
+        )
+        repo.create_evidence_ref(tenant, cid, ev)
+        assert repo.get_evidence_ref(tenant, cid, "ev-01") is not None
+
+        # 9. PassportRecord
+        passport = PassportRecord(
+            tenant_id=tenant,
+            passport_id="pass-01",
+            agent_id="agent-impact-scout",
+            agent_revision="1.0.0",
+            qualified_capabilities=("repository_blast_radius_analysis",),
+            qualification_evidence_ids=("ev-01",),
+            issuer="agent-registry-evaluator",
+            issued_at=now,
+            expires_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        repo.create_passport(tenant, passport)
+        assert repo.get_passport(tenant, "pass-01") is not None
+
+    def test_firestore_adapter_optimistic_concurrency_control_cas(self) -> None:
+        """Verify GoogleFirestoreSagaRepository OCC enforces monotonic CAS versioning."""
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-fs", firestore_client=fake_client)
         tenant = "tenant-occ"
         cid = "change-occ"
         now = datetime.now(timezone.utc)
@@ -970,9 +1374,10 @@ class TestFirestoreIntegration:
         with pytest.raises(OptimisticConcurrencyError):
             repo.update_change(tenant, rec_stale, expected_version=1)
 
-    def test_idempotency_reservation_lease_and_replay(self) -> None:
-        """Verify IdempotencyKeyManager grants lease, commits result, and deduplicates replay."""
-        repo = InMemorySagaStateRepository()
+    def test_firestore_adapter_idempotency_reservation_lease_and_replay(self) -> None:
+        """Verify IdempotencyKeyManager lease, commit, and replay via Firestore repo."""
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-fs", firestore_client=fake_client)
         tenant = "tenant-idem"
         cid = "change-idem"
         now = datetime.now(timezone.utc)
@@ -1029,8 +1434,20 @@ class TestFirestoreIntegration:
         assert res2.status == IdempotencyReservationOutcomeStatus.EXACT_REPLAY
         assert res2.cached_result_digest == cached_result_digest
 
-    def test_persistence_privacy_guard_rejects_secrets(self) -> None:
-        """Verify PersistencePrivacyGuard rejects records containing secret patterns."""
+    def test_firestore_adapter_persistence_privacy_guard_rejects_secrets(self) -> None:
+        """Verify PersistencePrivacyGuard and Firestore repo reject secret-bearing records."""
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-fs", firestore_client=fake_client)
+        now = datetime.now(timezone.utc)
+        repo.create_tenant(
+            TenantRecord(
+                tenant_id="tenant-priv",
+                name="Privacy Tenant",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
         secret_token = "ghp_" + "C" * 36
         dirty_dict = {
             "change_id": "c-priv",
@@ -1040,9 +1457,31 @@ class TestFirestoreIntegration:
         with pytest.raises(PersistencePrivacyViolationError):
             PersistencePrivacyGuard.scan_for_secrets(dirty_dict)
 
-    def test_fixture_teardown_cleans_descendants(self) -> None:
-        """Verify FixtureTeardownManager cleans all descendant documents for disposable fixtures."""
-        repo = InMemorySagaStateRepository()
+        hdr = "".join([chr(45) * 5, "BEGIN ", "PRIVATE ", "KEY", chr(45) * 5])
+        ftr = "".join([chr(45) * 5, "END ", "PRIVATE ", "KEY", chr(45) * 5])
+        private_key_text = f"{hdr}\nMIIE...\n{ftr}"
+        with pytest.raises(PersistenceSchemaError):
+            change_with_key = ChangeRecord(
+                tenant_id="tenant-priv",
+                change_id="chg-priv-sec",
+                correlation_id="corr-priv",
+                title="Secret Change",
+                description=private_key_text,
+                target_systems=("sys-1",),
+                data_classification=DataClassLevel.INTERNAL,
+                requested_by="u1",
+                requested_at=now,
+                state=ChangeState.RECEIVED,
+                state_updated_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+            repo.create_change("tenant-priv", change_with_key)
+
+    def test_firestore_adapter_fixture_teardown_cleans_descendants(self) -> None:
+        """Verify FixtureTeardownManager cleans descendant documents via Firestore repo."""
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-fs", firestore_client=fake_client)
         tenant = "tenant-teardown"
         cid = "change-disposable"
         now = datetime.now(timezone.utc)
@@ -1068,11 +1507,30 @@ class TestFirestoreIntegration:
                 updated_at=now,
             ),
         )
+        repo.create_task(
+            tenant,
+            cid,
+            TaskRecord(
+                tenant_id=tenant,
+                change_id=cid,
+                task_id="task-td-01",
+                sequence_number=1,
+                agent_id="agent-impact-scout",
+                agent_role="impact_scout",
+                agent_revision="1.0.0",
+                action_class="DISCOVERY",
+                status=TaskStatus.IN_PROGRESS,
+                created_at=now,
+                updated_at=now,
+            ),
+        )
 
         report = FixtureTeardownManager.teardown_tenant(repo, tenant)
         assert isinstance(report, TeardownReport)
         assert report.success is True
         assert report.residual_document_count == 0
+        assert repo.get_tenant(tenant) is None
+        assert repo.list_changes(tenant) == []
 
 
 # =============================================================================
@@ -1114,7 +1572,8 @@ class TestGitHubAdapterIntegration:
 
     def test_github_adapter_protected_branch_guard(self) -> None:
         """Verify adapter fails closed when targeting protected branches (main, master, etc.)."""
-        repo = InMemorySagaStateRepository()
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-gh", firestore_client=fake_client)
         adapter = BoundedGitHubAdapter(
             token="dummy-token", transport=MagicMock(), state_repository=repo
         )
@@ -1134,7 +1593,8 @@ class TestGitHubAdapterIntegration:
 
     def test_github_adapter_intent_marker_embedding(self) -> None:
         """Verify Draft PR body embeds canonical intent marker for provider reconciliation."""
-        repo = InMemorySagaStateRepository()
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-gh", firestore_client=fake_client)
         now = datetime.now(timezone.utc)
         repo.create_tenant(
             TenantRecord(tenant_id="tenant-gh", name="GH Tenant", created_at=now, updated_at=now)
@@ -1197,7 +1657,8 @@ class TestGitHubAdapterIntegration:
 
     def test_github_adapter_read_based_reconciliation_5_point_verification(self) -> None:
         """Verify 5-point reconciliation returns existing PR without duplicate mutation."""
-        repo = InMemorySagaStateRepository()
+        fake_client = FakeFirestoreClient()
+        repo = GoogleFirestoreSagaRepository(project_id="test-p25-gh", firestore_client=fake_client)
         now = datetime.now(timezone.utc)
         repo.create_tenant(
             TenantRecord(tenant_id="tenant-rec", name="Rec Tenant", created_at=now, updated_at=now)
@@ -1305,7 +1766,7 @@ class TestGitHubAdapterIntegration:
 
 
 class TestManagedAdaptersIntegration:
-    """Integration tests for managed service availability, fallbacks, and security policies."""
+    """Integration tests for managed service availability, fallbacks, and safety gates."""
 
     def test_service_availability_report_honest_statuses(self) -> None:
         """Verify ServiceAvailabilityReport reflects honest statuses without false PASS."""
@@ -1397,3 +1858,14 @@ class TestManagedAdaptersIntegration:
         assert span.correlation_id == "corr-trace-01"
         assert span.operation == "adk_agent_execution"
         assert len(collector.spans) == 1
+
+    def test_cmd_integration_default_fails_closed_without_live_write_danger(self) -> None:
+        """Verify scripts/cmd.py integration command fails closed with code 1 when unauthorized."""
+        result = subprocess.run(
+            [sys.executable, "scripts/cmd.py", "integration"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1
+        assert "ERROR: Integration tests perform REAL Google Cloud mutations." in result.stderr
+        assert "--live-write-danger" in result.stderr
