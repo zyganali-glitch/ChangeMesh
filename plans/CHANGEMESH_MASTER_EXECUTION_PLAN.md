@@ -2042,12 +2042,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-26.03 — Review dependency/container vulnerabilities
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Review dependency/container vulnerabilities.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Critical unresolved findings block release or documented.
-- **Required evidence:** Scan reports.
-- **Mandatory documentation sync:** Submission manifest.
+- **Required evidence:** Dependency audit report `docs/P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md`, automated harness `scripts/audit_dependencies.py`, and test suite `tests/test_p26_03_dependency_audit.py` (4 tests passing). Verifies minimal `python:3.13-slim` base image, zero unpinned/floating dependencies via `uv.lock`, zero Node.js/npm dependencies, exclusion of unmaintained legacy packages (`pycrypto`, `paramiko`), and Python 3.13 strict version pinning.
+- **Mandatory documentation sync:** `docs/P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-26.04 — Test authorization boundaries/external-write restrictions

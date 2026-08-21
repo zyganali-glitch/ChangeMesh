@@ -167,6 +167,7 @@
 - P-25
 - P-26.01
 - P-26.02
+- P-26.03
 
 **Blocked:**
 - None
@@ -175,13 +176,14 @@
 - P-26 (Security, Privacy, and Threat Model — IN_PROGRESS)
 
 **Active Task:**
-- P-26.03 — Review dependency/container vulnerabilities (PENDING)
+- P-26.04 — Test authorization boundaries/external-write restrictions (PENDING)
 
-## Current P-26 State (P-26.02 Secret Sanitization Completed)
+## Current P-26 State (P-26.03 Dependency & Container Audit Completed)
 
 - **P-26.01:** `DONE` — Threat model and security review completed in `docs/THREAT_MODEL.md` and `docs/P-26.01_THREAT_MODEL_REVIEW.md`. Covers all 9 canonical vectors (Prompt Injection, Memory Poisoning, Confused Deputy, Privilege Escalation, Data Exfiltration, Malicious Tools, Replay & Race Conditions, Forged Evidence, Supply Chain Tampering) with STRIDE classifications, 27 mitigating architectural controls, residual risks, and automated regression test mappings across 1686 green tests. Includes honest non-certification compliance notice.
 - **P-26.02:** `DONE` — Secret scanning, log redaction, and evidence sanitization security suite implemented and verified in `tests/test_p26_02_secret_sanitization.py` (8 tests collected, 8 passed in 1.72s, 1686 total canonical tests passing) and documented in `docs/P-26.02_SECURITY_SANITIZATION_REPORT.md`. Verifies pre-SDK privacy scanning (`PolicyGuardian.audit_privacy_text`), policy input blocking (`DeterministicPolicyChecker.evaluate`), recursive data structure scrubbing (`redact_mapping`), prose text redaction (`sanitize_secrets_in_text`), wire payload secret rejection (`scan_payload_for_secrets`), and clean public evidence packs (`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`).
-- **P-26.03:** `PENDING` — Review dependency/container vulnerabilities (Next eligible micro-task).
+- **P-26.03:** `DONE` — Dependency and container vulnerability audit implemented and verified in `scripts/audit_dependencies.py` and `tests/test_p26_03_dependency_audit.py` (4 tests collected, 4 passed in 0.08s, 1686 total canonical tests passing) and documented in `docs/P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md`. Verifies minimal `python:3.13-slim` base image, zero unpinned/floating dependencies via `uv.lock`, zero Node.js/npm dependencies across the repository tree, exclusion of insecure legacy packages (`pycrypto`, `paramiko`), and Python 3.13 strict version pinning. Synced in `docs/SUBMISSION_MANIFEST.md`.
+- **P-26.04:** `PENDING` — Test authorization boundaries/external-write restrictions (Next eligible micro-task).
 
 ## Current P-25 State (Phase P-25 Comprehensive Test and Gate Matrix 100% Completed & Verified)
 

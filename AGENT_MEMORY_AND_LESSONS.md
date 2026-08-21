@@ -498,6 +498,23 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all multi-tenant agent systems, event-driven architectures, and security audits).
 - Status: `ACTIVE`
 
+### LESSON-20260822-07 — Zero-Node Container Minimization and Supply Chain Audits
+- Date/time: 2026-08-22
+- Active task: P-26.03
+- Symptom: Enterprise applications often accumulate unpinned transitive dependencies, complex Node.js build dependencies, or bloated container base images with unnecessary attack surfaces.
+- Root cause: Treating packaging as an infrastructure detail rather than an auditable security contract.
+- Correct approach:
+  1. Mandate minimal `python:3.13-slim` base images and verify zero secrets are copied during container build.
+  2. Enforce 100% locked dependency hashes via `uv.lock`.
+  3. Eliminate Node.js runtime and build tools entirely (zero `package.json` / `node_modules`).
+  4. Write programmatic vulnerability audit scripts (`scripts/audit_dependencies.py`) integrated into CI.
+- Prevention rule: Production containers must remain minimal, lockfile-pinned, and free of unnecessary build toolchains.
+- Tests/evidence: `scripts/audit_dependencies.py`, `tests/test_p26_03_dependency_audit.py` (4 passed); full suite (1686 passed).
+- Affected files: `scripts/audit_dependencies.py`, `tests/test_p26_03_dependency_audit.py`, `docs/P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all containerized microservices, Python agent runtimes, and Cloud Run deployments).
+- Status: `ACTIVE`
+
+
 
 
 

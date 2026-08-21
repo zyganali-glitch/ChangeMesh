@@ -15,4 +15,5 @@ Status: `NOT_FROZEN`
 - Build-period disclosure: `NOT_FINAL`
 - Evidence manifest: `NOT_FINAL`
 - Clean-checkout reproduction: `VERIFIED` ([`docs/P-06.05_CLEAN_CHECKOUT_LOG.md`](P-06.05_CLEAN_CHECKOUT_LOG.md))
+- Dependency and container audit: `VERIFIED` ([`docs/P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md`](P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md))
 - Final claim audit: `NOT_RUN`
