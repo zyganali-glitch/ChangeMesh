@@ -435,4 +435,20 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all judge interfaces, demo web frontends, and accessible dashboards).
 - Status: `ACTIVE`
 
+### LESSON-20260822-03 — Automated Markdown Link and Secret Prevention CI Enforcement
+- Date/time: 2026-08-22
+- Active task: P-25.05
+- Symptom: Markdown links across nested directories (e.g. `docs/SUBMISSION_MANIFEST.md` referring to `docs/P-06.05_CLEAN_CHECKOUT_LOG.md`) can easily create broken relative paths (`docs/docs/...`) if not validated by automated tests.
+- Root cause: Manual authoring of relative paths without a programmatic link-checker gate.
+- Correct approach:
+  1. Implement automated test scanning all markdown files (`README.md`, `docs/*.md`) for internal relative file links and verifying their existence against the local filesystem.
+  2. Implement repository-wide regex scanner in CI to continuously verify zero real secrets (private keys, live service account tokens, API keys) in code, fixtures, and docs.
+  3. Validate master plan task status tokens against a strict closed set of approved tokens.
+- Prevention rule: All relative documentation links and secret scanners must run as part of standard automated pytest gates.
+- Tests/evidence: `tests/test_p25_05_governance_matrix.py` (10 passed); full repo suite (1686 passed, 1 warning).
+- Affected files: `tests/test_p25_05_governance_matrix.py`, `docs/P-25.05_GOVERNANCE_TEST_REPORT.md`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all documentation suites, submission packages, and repository governance).
+- Status: `ACTIVE`
+
+
 

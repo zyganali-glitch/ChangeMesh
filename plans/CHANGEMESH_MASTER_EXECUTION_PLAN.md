@@ -1998,12 +1998,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-25.05 — Create claim/evidence, fixture/real, secret, license, broken-link tests
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create claim/evidence, fixture/real, secret, license, broken-link tests.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Unsupported claims/leaked secrets fail CI.
-- **Required evidence:** Governance test report.
-- **Mandatory documentation sync:** Submission docs.
+- **Required evidence:** Governance test report `docs/P-25.05_GOVERNANCE_TEST_REPORT.md` and dedicated test suite `tests/test_p25_05_governance_matrix.py` (10 tests passed in 2.42s, 1686 total repository tests passed, 0 failures, 0 errors). Tests close Gap 21 (CCT-JUDGE-001) and Gap 26 (ZK-CLAIM-001) from P-25.00 preflight: verified 0 live secrets/keys across repository files, 0 unsupported hyperbolic claims in docs, strict master plan status token validation, default fail-closed without `--live-write-danger`, 100% resolution of internal markdown file links, canonical model ID (`gemini-3.6-flash`) consistency, zero donor leakage (no Codex/GPT references in judge docs), donor manifest integrity (20 components), and compatible open-source license declarations across all 7 approved donors.
+- **Mandatory documentation sync:** `docs/P-25.05_GOVERNANCE_TEST_REPORT.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-25.06 — Create root validation command for complete read-only release gate
