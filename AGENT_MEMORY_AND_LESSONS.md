@@ -575,6 +575,23 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all serverless AI applications, cost modeling, and cloud optimization).
 - Status: `ACTIVE`
 
+### LESSON-20260822-12 — Programmatic Budget Caps and Serverless Lifecycle Governance
+- Date/time: 2026-08-22
+- Active task: P-27.03
+- Symptom: Hackathon and prototype cloud deployments often suffer from unexpected billing spikes due to accidental instance provisioning or unmanaged log/data retention.
+- Root cause: Missing declarative budget thresholds and absent data retention lifecycle policies.
+- Correct approach:
+  1. Define explicit multi-tiered budget alerts in `deploy/budget_and_retention_config.json` with a $25.00 hard monthly cap.
+  2. Enforce Cloud Run `min_instances = 0` and request timeouts capped at 300s to guarantee zero idle billing.
+  3. Bound Firestore and Cloud Logging data retention to 30 days.
+  4. Implement automated teardown routines to cleanly decommission test infrastructure.
+- Prevention rule: Every cloud architecture must possess declarative budget alert specifications and lifecycle policies.
+- Tests/evidence: `deploy/budget_and_retention_config.json`, `tests/test_p27_03_budget_and_retention.py` (4 passed); full suite (1709 passed).
+- Affected files: `deploy/budget_and_retention_config.json`, `tests/test_p27_03_budget_and_retention.py`, `docs/P-27.03_BUDGET_AND_RETENTION_CONFIG_REPORT.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all Google Cloud deployments, serverless governance, and billing safeguards).
+- Status: `ACTIVE`
+
+
 
 
 

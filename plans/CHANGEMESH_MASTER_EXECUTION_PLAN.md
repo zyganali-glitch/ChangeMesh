@@ -2096,12 +2096,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-27.03 — Configure budget alerts, minimum instances, retention, teardown
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Configure budget alerts, minimum instances, retention, teardown.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No accidental long-running expense.
-- **Required evidence:** Sanitized config evidence.
-- **Mandatory documentation sync:** Environment.
+- **Required evidence:** Sanitized configuration manifest `deploy/budget_and_retention_config.json`, test suite `tests/test_p27_03_budget_and_retention.py` (4 tests passing), and report `docs/P-27.03_BUDGET_AND_RETENTION_CONFIG_REPORT.md`. Defines $25.00 USD monthly hard budget cap with 4-tier alerting rules, Cloud Run scale-to-zero enforcement (`min_instances=0`, $0.00 idle), 30-day Firestore/logging retention, and automated teardown protocols.
+- **Mandatory documentation sync:** `docs/P-27.03_BUDGET_AND_RETENTION_CONFIG_REPORT.md`, `AGENT_ENVIRONMENT_AND_API.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-27.04 — Test quota/rate-limit degradation

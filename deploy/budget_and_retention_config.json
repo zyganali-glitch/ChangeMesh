@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project_id": "project-af5e1c99-3bc4-424f-b53",
+  "region": "europe-west3",
+  "budget_alert_policy": {
+    "display_name": "changemesh-hackathon-hard-budget-cap",
+    "currency_code": "USD",
+    "monthly_budget_amount": 25.00,
+    "threshold_rules": [
+      {
+        "threshold_percent": 0.50,
+        "spend_basis": "CURRENT_SPEND",
+        "action": "NOTIFY_EMAIL"
+      },
+      {
+        "threshold_percent": 0.80,
+        "spend_basis": "CURRENT_SPEND",
+        "action": "NOTIFY_EMAIL_AND_PUBSUB"
+      },
+      {
+        "threshold_percent": 1.00,
+        "spend_basis": "CURRENT_SPEND",
+        "action": "ALERT_OPERATOR_HIGH_PRIORITY"
+      },
+      {
+        "threshold_percent": 1.20,
+        "spend_basis": "FORECASTED_SPEND",
+        "action": "DISABLE_WRITEBACK_GATE"
+      }
+    ],
+    "pubsub_notification_topic": "projects/project-af5e1c99-3bc4-424f-b53/topics/changemesh-billing-alerts"
+  },
+  "cloud_run_scaling_policy": {
+    "service_name": "changemesh-backend",
+    "min_instances": 0,
+    "max_instances": 3,
+    "scaling_profile": "SCALE_TO_ZERO",
+    "request_timeout_seconds": 300,
+    "concurrency_per_instance": 80,
+    "idle_cpu_allocation": "THROTTLED",
+    "monthly_idle_cost_usd": 0.00
+  },
+  "retention_and_lifecycle_policies": {
+    "firestore": {
+      "collection_group": "changemesh_demo_records",
+      "ttl_field": "expires_at",
+      "retention_period_days": 30
+    },
+    "pubsub": {
+      "message_retention_duration": "604800s",
+      "retain_acked_messages": false,
+      "dead_letter_policy": {
+        "max_delivery_attempts": 5,
+        "dead_letter_topic": "projects/project-af5e1c99-3bc4-424f-b53/topics/changemesh-dlq"
+      }
+    },
+    "cloud_logging": {
+      "log_bucket": "_Default",
+      "retention_period_days": 30
+    }
+  },
+  "teardown_procedure": {
+    "automated_teardown_supported": true,
+    "cloud_run_action": "DELETE_REVISION_OR_SCALE_ZERO",
+    "firestore_action": "PURGE_DEMO_TENANT_COLLECTIONS",
+    "pubsub_action": "DRAIN_SUBSCRIPTIONS_AND_PURGE",
+    "zero_dangling_resources_guarantee": true
+  }
+}
