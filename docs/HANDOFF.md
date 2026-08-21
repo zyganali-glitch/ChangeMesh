@@ -165,15 +165,21 @@
 - P-25.05
 - P-25.06
 - P-25
+- P-26.01
 
 **Blocked:**
 - None
 
 **Active Phase:**
-- P-26 (Security, Privacy, and Threat Model — PENDING)
+- P-26 (Security, Privacy, and Threat Model — IN_PROGRESS)
 
 **Active Task:**
-- P-26.01 — Write threat model for injection, memory poisoning, confused deputy, privilege escalation, exfiltration, malicious tools, replay, forged evidence, supply chain (PENDING)
+- P-26.02 — Implement secret scanning, log redaction, evidence sanitization, screenshot review (PENDING)
+
+## Current P-26 State (P-26.01 Threat Model Review Completed)
+
+- **P-26.01:** `DONE` — Threat model and security review completed in `docs/THREAT_MODEL.md` and `docs/P-26.01_THREAT_MODEL_REVIEW.md`. Covers all 9 canonical vectors (Prompt Injection, Memory Poisoning, Confused Deputy, Privilege Escalation, Data Exfiltration, Malicious Tools, Replay & Race Conditions, Forged Evidence, Supply Chain Tampering) with STRIDE classifications, 27 mitigating architectural controls, residual risks, and automated regression test mappings across 1686 green tests. Includes honest non-certification compliance notice.
+- **P-26.02:** `PENDING` — Implement secret scanning, log redaction, evidence sanitization, screenshot review (Next eligible micro-task).
 
 ## Current P-25 State (Phase P-25 Comprehensive Test and Gate Matrix 100% Completed & Verified)
 

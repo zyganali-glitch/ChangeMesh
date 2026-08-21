@@ -466,6 +466,23 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all root validation commands, CI pipelines, and judge evaluation harnesses).
 - Status: `ACTIVE`
 
+### LESSON-20260822-05 — Comprehensive STRIDE and OWASP LLM Threat Modeling
+- Date/time: 2026-08-22
+- Active task: P-26.01
+- Symptom: AI agent architectures are frequently deployed with vague security statements that fail to map specific LLM vulnerabilities (indirect injection, memory poisoning, confused deputy, tool abuse) to concrete code controls.
+- Root cause: Treating threat modeling as an afterthought rather than a structural contract.
+- Correct approach:
+  1. Map all 9 canonical agent threat vectors systematically across STRIDE and OWASP Top 10 for LLMs.
+  2. Bind every single threat to concrete code implementations (`InjectionDetector`, `MemoryQuarantineEngine`, `CapabilityPassport`, `DeterministicPolicyChecker`, `EvidenceLedger`).
+  3. Formally document residual risks and link directly to automated regression test suites.
+  4. Include an honest, transparent non-certification boundary statement for evaluators.
+- Prevention rule: Every autonomous capability must have an explicit threat model entry with automated test proof.
+- Tests/evidence: `docs/THREAT_MODEL.md`, `docs/P-26.01_THREAT_MODEL_REVIEW.md`, `tests/test_p25_03_shadowlab_suite.py`, `tests/test_p25_05_governance_matrix.py`.
+- Affected files: `docs/THREAT_MODEL.md`, `docs/P-26.01_THREAT_MODEL_REVIEW.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all autonomous agent fleets, enterprise AI governance, and hackathon threat models).
+- Status: `ACTIVE`
+
+
 
 
 

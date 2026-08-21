@@ -2018,16 +2018,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-26 — Security, Privacy, and Threat Model
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-26.01 — Write threat model for injection, memory poisoning, confused deputy, privilege escalation, exfiltration, malicious tools, replay, forged evidence, supply chain
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Write threat model for injection, memory poisoning, confused deputy, privilege escalation, exfiltration, malicious tools, replay, forged evidence, supply chain.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Threats map to controls, residual risks, tests.
-- **Required evidence:** Threat-model review.
-- **Mandatory documentation sync:** README limitations.
+- **Required evidence:** Threat model review `docs/P-26.01_THREAT_MODEL_REVIEW.md` and complete threat model document `docs/THREAT_MODEL.md`. Maps 9 canonical vectors (Prompt Injection, Memory Poisoning, Confused Deputy, Privilege Escalation, Data Exfiltration, Malicious Tools, Replay & Race Conditions, Forged Evidence, Supply Chain Tampering) across STRIDE classes, concrete architectural controls, residual risks, and automated regression tests in the ChangeMesh test suite. Includes honest non-certification compliance boundary notice.
+- **Mandatory documentation sync:** `docs/THREAT_MODEL.md`, `docs/P-26.01_THREAT_MODEL_REVIEW.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-26.02 — Implement secret scanning, log redaction, evidence sanitization, screenshot review
