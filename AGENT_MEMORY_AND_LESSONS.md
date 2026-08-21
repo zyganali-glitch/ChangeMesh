@@ -514,6 +514,23 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all containerized microservices, Python agent runtimes, and Cloud Run deployments).
 - Status: `ACTIVE`
 
+### LESSON-20260822-08 — Structural Draft-Only PR Ceilings and External-Write Lockdown
+- Date/time: 2026-08-22
+- Active task: P-26.04
+- Symptom: Unconstrained AI agents can inadvertently trigger auto-merges, push directly to production branches, or run destructive DDL statements against enterprise databases.
+- Root cause: Relying on soft system prompts rather than structural type-level and policy-level boundaries.
+- Correct approach:
+  1. Enforce enum-level exclusion of destructive operations (`GitHubAction` excludes MERGE, DELETE_REPO, FORCE_PUSH).
+  2. Implement protected branch validation blocking direct commits to `main`, `master`, `prod`.
+  3. Lock down governance paths (`domain/contracts/`, `.github/`, `.env`) with deterministic policy gates.
+  4. Classify destructive DDLs without rollback plans as `IRREVERSIBLE_DESTRUCTIVE` and halt at human approval boundaries.
+- Prevention rule: Autonomous code agents must be structurally bounded to draft-only pull requests and non-destructive rehearsal.
+- Tests/evidence: `tests/test_p26_04_authorization_boundaries.py` (8 passed); full repo suite (1686 passed).
+- Affected files: `tests/test_p26_04_authorization_boundaries.py`, `docs/P-26.04_AUTHORIZATION_BOUNDARIES_REPORT.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all autonomous DevOps fleets, GitHub integrations, and database migration agents).
+- Status: `ACTIVE`
+
+
 
 
 

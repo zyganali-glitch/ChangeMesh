@@ -2052,12 +2052,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-26.04 — Test authorization boundaries/external-write restrictions
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Test authorization boundaries/external-write restrictions.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No agent merges, production-deploys, or accesses unregistered data.
-- **Required evidence:** Security suite.
-- **Mandatory documentation sync:** Judging map.
+- **Required evidence:** Authorization security suite `tests/test_p26_04_authorization_boundaries.py` (8 tests passing in 0.45s, 1686 total canonical tests passing) and report `docs/P-26.04_AUTHORIZATION_BOUNDARIES_REPORT.md`. Verifies draft-only PR ceiling (`GitHubAction` enum exclusion of merge/delete), protected branch defense on `main`/`master`/`prod`, governance path lockdown on `domain/contracts/` and `.github/`, unregistered tool denial, and fail-closed rejection of destructive DDL operations.
+- **Mandatory documentation sync:** `docs/P-26.04_AUTHORIZATION_BOUNDARIES_REPORT.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-26.05 — Write honest security limitations/non-certification statement
