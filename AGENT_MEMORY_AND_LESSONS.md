@@ -591,6 +591,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all Google Cloud deployments, serverless governance, and billing safeguards).
 - Status: `ACTIVE`
 
+### LESSON-20260822-13 — Model Quota Degradation, Rate-Limiting, and OCC CAS Resilience
+- Date/time: 2026-08-22
+- Active task: P-27.04
+- Symptom: Distributed agent architectures can cascade into retry storms or corrupt database state when model quotas or upstream rate limits (HTTP 429) are encountered.
+- Root cause: Multiple uncontrolled retry authorities (SDK-level retries conflicting with orchestrator retries) and non-atomic state updates.
+- Correct approach:
+  1. Disable underlying SDK retries (`attempts = 1`) and make `BoundedGeminiClient` the single deterministic retry authority.
+  2. Treat HTTP 429 and 503 as retryable with exponential backoff bounded at max 3 attempts.
+  3. When quota is exhausted, fail closed with `ModelRetryExhaustedError` and maintain OCC CAS version integrity in the state repository without corrupting partial progress.
+- Prevention rule: Never allow multiple retry loops to overlap; maintain optimistic concurrency CAS versions across all failure states.
+- Tests/evidence: `tests/test_p27_04_quota_degradation.py` (4 passed); full suite (1709 passed).
+- Affected files: `tests/test_p27_04_quota_degradation.py`, `docs/P-27.04_QUOTA_DEGRADATION_REPORT.md`, `AGENT_MEMORY_AND_LESSONS.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all LLM client wrappers, rate limiting, and fault-tolerant sagas).
+- Status: `ACTIVE`
+
+
 
 
 

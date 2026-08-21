@@ -2106,12 +2106,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-27.04 — Test quota/rate-limit degradation
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Test quota/rate-limit degradation.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** System retries/pauses without corrupting state.
-- **Required evidence:** Fault test.
-- **Mandatory documentation sync:** Lessons.
+- **Required evidence:** Fault test suite `tests/test_p27_04_quota_degradation.py` (4 tests passing) and report `docs/P-27.04_QUOTA_DEGRADATION_REPORT.md`. Verifies HTTP 429 rate limit classification in `RETRYABLE_STATUS_CODES`, transient quota recovery on second attempt via single-authority exponential backoff (`BoundedGeminiClient`), permanent quota failure fail-closed behavior with `ModelRetryExhaustedError`, and saga repository OCC CAS version integrity during aborted or blocked transitions.
+- **Mandatory documentation sync:** `docs/P-27.04_QUOTA_DEGRADATION_REPORT.md`, `AGENT_MEMORY_AND_LESSONS.md`, `docs/HANDOFF.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-27.05 — Remove unnecessary dependencies, logs, polling, resources
