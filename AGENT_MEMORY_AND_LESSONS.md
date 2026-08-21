@@ -401,3 +401,21 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `src/orchestrator/orchestrator_saga.py`, `tests/test_p20_orchestrator_saga.py`, `docs/COMPONENT_PROVENANCE.md`, `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md`, `docs/P-OMEGA_AUDIT_REPORT.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`, `docs/HANDOFF.md`, `README.md`.
 - Reusable beyond this task: Yes (all bounded fixture operations, intent binding validators, and synthetic demo workflows).
 - Status: `ACTIVE`
+
+### LESSON-20260822-01 — ShadowLab Fault, Attack, Replay, and Restart Matrix Isolation
+- Date/time: 2026-08-22
+- Active task: P-25.03
+- Symptom: Rehearsal suites often rely on generic mocks that do not verify actual fault recovery (e.g., verifying backoff delays math or actual compensation DDL rollbacks), or confuse same-process in-memory restart with durable checkpoint restoration.
+- Root cause: Missing adversarial validation for prompt injection, memory poisoning, and mode relabeling within the rehearsal twin.
+- Correct approach:
+  1. Test fault paths by asserting real failure on early attempts before recovery (e.g., HTTP 503 attempt 1 & 2 fail, attempt 3 succeeds with deterministic backoff delays `(100ms, 200ms)`).
+  2. Test attack vectors against code-owned deterministic engines (`MemoryQuarantineEngine`, `DeterministicPolicyChecker`, `InjectionDetector`), ensuring adversarial directives never grant authority.
+  3. Test replay determinism via exact 64-character SHA-256 simulation digests and prove zero cross-run state accumulation in tool doubles.
+  4. Test restart continuation strictly against persisted repository checkpoints (`SagaCheckpointManager` + `InMemorySagaStateRepository`), proving non-duplication of completed tasks.
+  5. Enforce immutable `ExecutionEvidenceMode.SIMULATION` output across all ShadowLab scenarios.
+- Prevention rule: Synthetic twin rehearsals must test real failure dynamics, remain strictly labeled as `SIMULATION`, and prove durable checkpoint recovery.
+- Tests/evidence: `tests/test_p25_03_shadowlab_suite.py` (57 passed); full repo suite (1652 passed, 1 warning).
+- Affected files: `tests/test_p25_03_shadowlab_suite.py`, `docs/P-25.03_SHADOWLAB_SCENARIO_REPORT.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all twin simulations, fault rehearsal engines, and resilience benchmarks).
+- Status: `ACTIVE`
+

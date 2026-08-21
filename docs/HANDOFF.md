@@ -160,6 +160,7 @@
 - P-25.00
 - P-25.01
 - P-25.02
+- P-25.03
 
 **Blocked:**
 - None
@@ -168,15 +169,15 @@
 - P-25 (Comprehensive Test and Gate Matrix — IN_PROGRESS)
 
 **Active Task:**
-- P-25.03 — Create ShadowLab fault, attack, replay, restart suite (PENDING)
+- P-25.04 — Create browser E2E / accessibility tests for judge path (PENDING)
 
-## Current P-25 State (P-25.02 Integration Test Matrix Completed)
+## Current P-25 State (P-25.03 ShadowLab Scenario Suite Completed)
 
 - **P-25.00:** `DONE` — Test-suite donor preflight completed in `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md` and registered in `docs/DONOR_REUSE_MANIFEST.md` §3.1. All 7 approved donors inspected across 20 components. Donor-test traceability matrix produced. 43 Gap Register rows identified (60 expanded atomic test obligations: 41 gap rows / 52 test cases for P-25.01, 2 gap rows / 8 test cases for P-25.05).
 - **P-25.01:** `DONE` — Comprehensive unit test matrix implemented and verified in `tests/test_p25_01_comprehensive_unit.py` (73 tests collected, 73 passed in 2.24s, 1556 total canonical unit tests passed, 0 failures, 0 errors). The RSA test fixture secret-scanner issue was repaired via dynamic runtime header assembly without weakening the secret detector. All 41 Gap Register rows (52 expanded atomic test obligations) are covered and verified in `docs/P-25.01_UNIT_TEST_COVERAGE_REPORT.md`.
 - **P-25.02:** `DONE` — Integration test matrix implemented and verified in `tests/test_p25_02_integration_matrix.py` (39 tests collected, 39 passed in 3.26s, 1595 total repository tests passed, 0 failures, 0 errors). Tests cover all 6 canonical domains with strict zero external cost isolation: (1) ADK orchestration/routing/coordination fallback/zero-write invariant, (2) Gemini structured output parsers via `BoundedGeminiClient.generate_text()` / strict schemas / zero-call privacy gate, (3) Pub/Sub wire serialization / DLQ / causal timeline DAG, (4) Firestore state repository `GoogleFirestoreSagaRepository` via `FakeFirestoreClient` exercising 9 record types / OCC CAS / idempotency / teardown, (5) GitHub bounded adapter / reconciliation / intent markers, and (6) managed service availability / fallbacks / cmd integration safety gate. Historical GCP pytest collection debt in `tests/test_gcp_access.py` resolved with `__test__ = False`. Documented in `docs/P-25.02_INTEGRATION_TEST_REPORT.md`.
-- **P-25.03:** `PENDING` — ShadowLab fault, attack, replay, restart suite (Next eligible micro-task).
-- **P-25.04:** `PENDING` — Browser E2E / accessibility tests for judge path.
+- **P-25.03:** `DONE` — ShadowLab fault, attack, replay, restart suite implemented and verified in `tests/test_p25_03_shadowlab_suite.py` (57 tests collected, 57 passed in 0.69s, 1652 total repository tests passed, 0 failures, 0 errors). Tests exercise 4 canonical dimensions: (1) Fault paths (HTTP 503 recovery with exponential backoff math `(100ms, 200ms)`, DB lock timeout, partial apply interrupt with saga compensation DDL cleanup, stale approval rejection, missing rollback plan correction, legacy client break expand-contract correction, process crash recovery, clean migration), (2) Attack vectors (prompt injection patterns: ignore instructions, system override, jailbreak roleplay, delimiter hijack, authority fabrication; unregistered tool abuse; memory poisoning and quarantine; mode laundering denial; confused deputy unauthorized path blocking; privilege escalation bypass denial; secret injection in policy inputs; InjectionDetector quarantine sanitization; forged scenario auth failure), (3) Replay invariants (deterministic SHA-256 digest idempotency, clean instance state isolation across DB/Git/API doubles, non-accumulative state), and (4) Restart continuation (durable P-10 checkpoint persistence and exact state resumption without duplicate task execution, checkpoint SHA-256 digest verification). Documented in `docs/P-25.03_SHADOWLAB_SCENARIO_REPORT.md`.
+- **P-25.04:** `PENDING` — Browser E2E / accessibility tests for judge path (Next eligible micro-task).
 - **P-25.05:** `PENDING` — Claim/evidence, fixture/real, secret, license, broken-link tests (owns Gaps 21 & 26).
 - **P-25.06:** `PENDING` — Root validation command for complete read-only release gate.
 
