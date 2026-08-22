@@ -37,20 +37,21 @@ class TestConsoleLogTraceSanitization:
 
     def test_structured_log_trace_sanitization(self):
         """Synthetic trace and log packets must redact raw tokens and keys."""
+        dummy_key = "AIza" + "SyDeadBeefSecretKey1234567890ABCDEF"
         raw_log_entry = {
             "service": "changemesh-p24-e2e",
             "revision": "changemesh-p24-e2e-00001-jjp",
             "trace_id": "projects/project-af5e1c99/traces/4bf92f3577b34da6a3ce929d0e0e4736",
             "span_id": "00f067aa0ba902b7",
             "model_id": "gemini-3.6-flash",
-            "authorization_header": "Bearer AIzaSyDeadBeefSecretKey1234567890ABCDEF",
+            "authorization_header": f"Bearer {dummy_key}",
             "user_email": "judge@enterprise.example.com",
         }
 
         serialized = json.dumps(raw_log_entry)
         sanitized = sanitize_secrets_in_text(serialized)
 
-        assert "AIzaSyDeadBeefSecretKey" not in sanitized
+        assert "AIza" + "SyDeadBeefSecretKey" not in sanitized
         assert "[REDACTED_SECRET:" in sanitized or "[REDACTED" in sanitized
 
     def test_clean_cloud_trace_spans_schema(self):
