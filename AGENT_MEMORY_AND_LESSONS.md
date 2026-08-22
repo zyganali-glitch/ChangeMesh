@@ -788,6 +788,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all hackathon post-freeze planning, commercial GTM roadmaps, and investor presentations).
 - Status: `ACTIVE`
 
+### LESSON-20260822-26 — Multi-Tier Pitch Narratives and Grounded Claim Matrices
+- Date/time: 2026-08-22
+- Active task: P-30.01
+- Symptom: Pitch narratives drift away from codebase realities, using inconsistent terminology or claiming unverified cloud capabilities.
+- Root cause: Writing marketing pitches without automated cross-referencing against passing test suites and deployment reports.
+- Correct approach:
+  1. Structure narratives across 3 distinct horizons: 10-second elevator hook, 30-second problem/solution pitch, and 2-minute deep technical walkthrough.
+  2. Maintain an explicit Grounded Claim Verification Matrix linking every claim to a passing test or evidence report.
+  3. Validate all cross-references via automated pytest checks (`tests/test_p30_01_pitch_narratives.py`).
+- Prevention rule: Every public competition narrative must be backed by a verified file link in an automated claim audit matrix.
+- Tests/evidence: `docs/P-30.01_PITCH_NARRATIVES_CLAIM_AUDIT.md`, `tests/test_p30_01_pitch_narratives.py` (3 passed); full suite (1757 passed).
+- Affected files: `docs/P-30.01_PITCH_NARRATIVES_CLAIM_AUDIT.md`, `tests/test_p30_01_pitch_narratives.py`, `README.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all hackathon submissions, Devpost write-ups, and executive pitch decks).
+- Status: `ACTIVE`
+
+
 
 
 

@@ -2244,16 +2244,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-30 — Competition Narrative and Judge Materials
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-30.01 — Finalize ten-second, thirty-second, two-minute narratives from verified behavior
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Finalize ten-second, thirty-second, two-minute narratives from verified behavior.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Narratives consistent/evidence-backed.
-- **Required evidence:** Claim audit.
-- **Mandatory documentation sync:** README, judge start, Devpost.
+- **Required evidence:** Pitch narratives claim audit `docs/P-30.01_PITCH_NARRATIVES_CLAIM_AUDIT.md` and test suite `tests/test_p30_01_pitch_narratives.py` (3 tests passing). Establishes 10s, 30s, and 2m technical narratives grounded in verified Cloud Run deployments (`europe-west3`), Firestore OCC CAS, ShadowLab simulation engines, and zero-custody VPC boundaries.
+- **Mandatory documentation sync:** `docs/P-30.01_PITCH_NARRATIVES_CLAIM_AUDIT.md`, `README.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-30.02 — Finalize JUDGE_START_HERE with fastest evaluation route
