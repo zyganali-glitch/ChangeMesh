@@ -17,17 +17,27 @@ Mandatory documentation sync: Capability passports.
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+import urllib.parse
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
 
 from domain.contracts.change_lifecycle import ChangeState
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.evidence import EvidenceState, ExecutionEvidenceMode
 from domain.contracts.memory import MemoryRecord, MemoryTrustStatus
+from integrations.gcp.firestore_adapter import GoogleFirestoreSagaRepository
 from src.memory.quarantine import MemoryQuarantineEngine
 from src.orchestrator.in_memory_repository import InMemorySagaStateRepository
 from src.orchestrator.saga_checkpoint import SagaCheckpointManager
 from src.orchestrator.state_repository import (
     ChangeRecord,
+    DocumentNotFoundError,
+    PersistenceSchemaError,
     TaskRecord,
     TenantRecord,
     TenantStatus,
@@ -53,6 +63,7 @@ from src.shadowlab.tool_doubles import (
     SimulatedDatabaseClient,
     SimulatedGitClient,
 )
+from tests.support_persistent_firestore import FileBackedFirestoreClient
 
 # ============================================================================
 # SECTION 1: FAULT PATH TESTS
@@ -590,31 +601,30 @@ class TestReplayInvariants:
 class TestRestartContinuation:
     """Verify restart recovery uses persisted durable state, not in-process memory."""
 
-    def test_restart_from_persisted_checkpoint_not_in_memory(self):
-        """Restart must use repository-persisted checkpoint, not same-process variable."""
-        repo = InMemorySagaStateRepository()
+    def test_negative_control_in_memory_repository_cannot_survive_reinitialization(self):
+        """Negative Control: Prove InMemorySagaStateRepository cannot survive runtime restart."""
+        repo_a = InMemorySagaStateRepository()
         now = datetime.now(timezone.utc)
-        tenant_id = "tenant-restart-test-01"
-        change_id = "chg-restart-test-01"
+        tenant_id = "tenant-neg-control-01"
+        change_id = "chg-neg-control-01"
 
-        # Setup tenant and change
-        repo.create_tenant(
+        repo_a.create_tenant(
             TenantRecord(
                 tenant_id=tenant_id,
-                name="Restart Test Org",
+                name="Negative Control Org",
                 status=TenantStatus.ACTIVE,
                 created_at=now,
                 updated_at=now,
             )
         )
-        repo.create_change(
+        repo_a.create_change(
             tenant_id,
             ChangeRecord(
                 tenant_id=tenant_id,
                 change_id=change_id,
-                correlation_id="corr-restart-test",
-                title="Restart Persistence Test",
-                description="Verify restart uses persisted state",
+                correlation_id="corr-neg-01",
+                title="Negative Control Change",
+                description="Demonstrating memory-only loss on reboot",
                 target_systems=("postgres",),
                 data_classification=DataClassLevel.INTERNAL,
                 requested_by="test_runner",
@@ -625,15 +635,234 @@ class TestRestartContinuation:
                 updated_at=now,
             ),
         )
+        cp = SagaCheckpointManager.create_checkpoint(
+            repo=repo_a,
+            tenant_id=tenant_id,
+            change_id=change_id,
+            lifecycle_state=ChangeState.QUALIFYING,
+            completed_task_ids=("task-01-done",),
+            pending_task_ids=("task-02-pending",),
+            now=now,
+        )
+        assert cp.checkpoint_id is not None
 
-        # Create tasks simulating completed and pending work
-        repo.create_task(
+        # Simulate fresh process restart with new repository instance
+        repo_b = InMemorySagaStateRepository()
+
+        # In-memory repository loses all state upon process reboot
+        assert repo_b.get_change(tenant_id, change_id) is None
+        assert repo_b.get_latest_checkpoint(tenant_id, change_id) is None
+
+        with pytest.raises(DocumentNotFoundError) as exc_info:
+            SagaCheckpointManager.resume_from_checkpoint(
+                repo=repo_b,
+                tenant_id=tenant_id,
+                change_id=change_id,
+            )
+        assert "not found" in str(exc_info.value).lower()
+
+    def test_restart_across_subprocess_boundary_with_file_backed_persistence(self, tmp_path: Path):
+        """Process A persists checkpoint to disk; Process B resumes with fresh identities."""
+        storage_dir = str(tmp_path / "firestore_store")
+
+        script_a = """
+import sys, json
+from datetime import datetime, timezone
+from pathlib import Path
+from tests.support_persistent_firestore import FileBackedFirestoreClient
+from integrations.gcp.firestore_adapter import GoogleFirestoreSagaRepository
+from src.orchestrator.state_repository import (
+    TenantRecord, ChangeRecord, TaskRecord, TenantStatus, ChangeState, DataClassLevel
+)
+from src.orchestrator.saga_checkpoint import SagaCheckpointManager
+
+storage_dir = sys.argv[1]
+client = FileBackedFirestoreClient(storage_dir)
+repo = GoogleFirestoreSagaRepository(project_id="test-subprocess", firestore_client=client)
+
+now = datetime.now(timezone.utc)
+tid = "tenant-restart-proc-01"
+cid = "chg-restart-proc-01"
+
+repo.create_tenant(TenantRecord(
+    tenant_id=tid,
+    name="Subprocess A Org",
+    status=TenantStatus.ACTIVE,
+    created_at=now,
+    updated_at=now,
+))
+
+repo.create_change(tid, ChangeRecord(
+    tenant_id=tid,
+    change_id=cid,
+    correlation_id="corr-proc-restart",
+    title="Subprocess Restart Test",
+    description="Proving durable multi-process restart boundary",
+    target_systems=("postgres",),
+    data_classification=DataClassLevel.INTERNAL,
+    requested_by="runner_a",
+    requested_at=now,
+    state=ChangeState.QUALIFYING,
+    state_updated_at=now,
+    created_at=now,
+    updated_at=now,
+))
+
+repo.create_task(tid, cid, TaskRecord(
+    tenant_id=tid,
+    change_id=cid,
+    task_id="task-A-done",
+    sequence_number=1,
+    agent_id="impact_scout",
+    agent_role="Impact Scout",
+    agent_revision="rev-1.0",
+    action_class="ANALYSIS",
+    created_at=now,
+    updated_at=now,
+))
+
+repo.create_task(tid, cid, TaskRecord(
+    tenant_id=tid,
+    change_id=cid,
+    task_id="task-B-done",
+    sequence_number=2,
+    agent_id="policy_guardian",
+    agent_role="Policy Guardian",
+    agent_revision="rev-1.0",
+    action_class="POLICY_CHECK",
+    created_at=now,
+    updated_at=now,
+))
+
+cp = SagaCheckpointManager.create_checkpoint(
+    repo=repo,
+    tenant_id=tid,
+    change_id=cid,
+    lifecycle_state=ChangeState.QUALIFYING,
+    completed_task_ids=("task-A-done", "task-B-done"),
+    pending_task_ids=("task-C-pending", "task-D-pending"),
+    now=now,
+)
+
+print(json.dumps({
+    "status": "PERSISTED",
+    "tenant_id": tid,
+    "change_id": cid,
+    "checkpoint_id": cp.checkpoint_id,
+    "checkpoint_digest": cp.checkpoint_digest,
+}))
+"""
+
+        script_b = """
+import sys, json
+from pathlib import Path
+from tests.support_persistent_firestore import FileBackedFirestoreClient
+from integrations.gcp.firestore_adapter import GoogleFirestoreSagaRepository
+from src.orchestrator.saga_checkpoint import SagaCheckpointManager
+from domain.contracts.change_lifecycle import ChangeState
+
+storage_dir = sys.argv[1]
+client = FileBackedFirestoreClient(storage_dir)
+repo = GoogleFirestoreSagaRepository(project_id="test-subprocess", firestore_client=client)
+
+tid = "tenant-restart-proc-01"
+cid = "chg-restart-proc-01"
+
+resume = SagaCheckpointManager.resume_from_checkpoint(repo=repo, tenant_id=tid, change_id=cid)
+cp = repo.get_latest_checkpoint(tid, cid)
+
+out = {
+    "tenant_id": resume.tenant_id,
+    "change_id": resume.change_id,
+    "lifecycle_state": resume.lifecycle_state.value,
+    "completed_task_ids": list(resume.completed_task_ids),
+    "pending_task_ids": list(resume.pending_task_ids),
+    "resumed_from_checkpoint_id": resume.resumed_from_checkpoint_id,
+    "checkpoint_digest": cp.checkpoint_digest if cp else None,
+    "integrity_verified": SagaCheckpointManager.verify_checkpoint_integrity(cp) if cp else False,
+    "next_safe_action": resume.next_safe_action,
+}
+print(json.dumps(out))
+"""
+
+        # Step 1: Execute Runtime A in separate subprocess
+        proc_a = subprocess.run(
+            [sys.executable, "-c", script_a, storage_dir],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc_a.returncode == 0, f"Subprocess A failed: {proc_a.stderr}"
+        data_a = json.loads(proc_a.stdout.strip())
+        assert data_a["status"] == "PERSISTED"
+        assert len(data_a["checkpoint_digest"]) == 64
+
+        # Step 2: Runtime A is terminated; all memory/objects are destroyed.
+        # Step 3 & 4: Execute Runtime B in fresh separate subprocess, reading from disk
+        proc_b = subprocess.run(
+            [sys.executable, "-c", script_b, storage_dir],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc_b.returncode == 0, f"Subprocess B failed: {proc_b.stderr}"
+        data_b = json.loads(proc_b.stdout.strip())
+
+        # Step 5: Verify exact recovered state
+        assert data_b["tenant_id"] == "tenant-restart-proc-01"
+        assert data_b["change_id"] == "chg-restart-proc-01"
+        assert data_b["lifecycle_state"] == "QUALIFYING"
+        assert data_b["completed_task_ids"] == ["task-A-done", "task-B-done"]
+        assert data_b["pending_task_ids"] == ["task-C-pending", "task-D-pending"]
+        assert data_b["resumed_from_checkpoint_id"] == data_a["checkpoint_id"]
+        assert data_b["checkpoint_digest"] == data_a["checkpoint_digest"]
+        assert data_b["integrity_verified"] is True
+        assert data_b["next_safe_action"] == "EXECUTE_TASK:task-C-pending"
+
+    def test_restart_with_fresh_repository_instance_on_persisted_storage(self, tmp_path: Path):
+        """Fresh repo instance recovers persisted state without shared in-memory references."""
+        client_a = FileBackedFirestoreClient(tmp_path / "fs_store")
+        repo_a = GoogleFirestoreSagaRepository(
+            project_id="test-fresh-inst", firestore_client=client_a
+        )
+        now = datetime.now(timezone.utc)
+        tenant_id = "tenant-fresh-inst-01"
+        change_id = "chg-fresh-inst-01"
+
+        repo_a.create_tenant(
+            TenantRecord(
+                tenant_id=tenant_id,
+                name="Fresh Instance Org",
+                status=TenantStatus.ACTIVE,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        repo_a.create_change(
+            tenant_id,
+            ChangeRecord(
+                tenant_id=tenant_id,
+                change_id=change_id,
+                correlation_id="corr-fresh-inst",
+                title="Fresh Instance Test",
+                description="Verify fresh instance restart",
+                target_systems=("postgres",),
+                data_classification=DataClassLevel.INTERNAL,
+                requested_by="test_runner",
+                requested_at=now,
+                state=ChangeState.DISCOVERING,
+                state_updated_at=now,
+                created_at=now,
+                updated_at=now,
+            ),
+        )
+        repo_a.create_task(
             tenant_id,
             change_id,
             TaskRecord(
                 tenant_id=tenant_id,
                 change_id=change_id,
-                task_id="task-A-done",
+                task_id="task-1-discover",
                 sequence_number=1,
                 agent_id="impact_scout",
                 agent_role="Impact Scout",
@@ -643,60 +872,48 @@ class TestRestartContinuation:
                 updated_at=now,
             ),
         )
-        repo.create_task(
-            tenant_id,
-            change_id,
-            TaskRecord(
-                tenant_id=tenant_id,
-                change_id=change_id,
-                task_id="task-B-done",
-                sequence_number=2,
-                agent_id="policy_guardian",
-                agent_role="Policy Guardian",
-                agent_revision="rev-1.0",
-                action_class="POLICY_CHECK",
-                created_at=now,
-                updated_at=now,
-            ),
-        )
-
-        # Persist checkpoint with completed + pending tasks
         cp = SagaCheckpointManager.create_checkpoint(
-            repo=repo,
+            repo=repo_a,
             tenant_id=tenant_id,
             change_id=change_id,
-            lifecycle_state=ChangeState.QUALIFYING,
-            completed_task_ids=("task-A-done", "task-B-done"),
-            pending_task_ids=("task-C-pending", "task-D-pending"),
+            lifecycle_state=ChangeState.DISCOVERING,
+            completed_task_ids=("task-1-discover",),
+            pending_task_ids=("task-2-qualify",),
             now=now,
         )
-        assert cp.checkpoint_id is not None
-        assert cp.checkpoint_digest is not None
 
-        # SIMULATE RESTART: resume from persisted checkpoint
-        # This reads from the repository, not from in-memory variables
+        # Explicitly destroy reference to repo_a and client_a
+        del repo_a, client_a
+
+        # Construct completely fresh client and repository pointing to same storage
+        client_b = FileBackedFirestoreClient(tmp_path / "fs_store")
+        repo_b = GoogleFirestoreSagaRepository(
+            project_id="test-fresh-inst", firestore_client=client_b
+        )
+
         resume = SagaCheckpointManager.resume_from_checkpoint(
-            repo=repo,
+            repo=repo_b,
             tenant_id=tenant_id,
             change_id=change_id,
         )
 
-        # Verify resumed state matches what was persisted
-        assert resume.lifecycle_state == ChangeState.QUALIFYING
-        assert "task-A-done" in resume.completed_task_ids
-        assert "task-B-done" in resume.completed_task_ids
-        assert "task-C-pending" in resume.pending_task_ids
-        assert "task-D-pending" in resume.pending_task_ids
+        assert resume.tenant_id == tenant_id
+        assert resume.change_id == change_id
+        assert resume.lifecycle_state == ChangeState.DISCOVERING
+        assert resume.completed_task_ids == ("task-1-discover",)
+        assert resume.pending_task_ids == ("task-2-qualify",)
         assert resume.resumed_from_checkpoint_id == cp.checkpoint_id
+        assert resume.next_safe_action == "EXECUTE_TASK:task-2-qualify"
 
-    def test_restart_does_not_duplicate_completed_tasks(self):
-        """Resume must identify completed tasks and not re-execute them."""
-        repo = InMemorySagaStateRepository()
+    def test_restart_does_not_duplicate_completed_tasks_on_persisted_storage(self, tmp_path: Path):
+        """Resume must identify completed tasks and not re-execute them on persisted storage."""
+        client_1 = FileBackedFirestoreClient(tmp_path / "fs_nodup")
+        repo_1 = GoogleFirestoreSagaRepository(project_id="test-no-dup", firestore_client=client_1)
         now = datetime.now(timezone.utc)
         tenant_id = "tenant-no-dup-01"
         change_id = "chg-no-dup-01"
 
-        repo.create_tenant(
+        repo_1.create_tenant(
             TenantRecord(
                 tenant_id=tenant_id,
                 name="No Duplicate Org",
@@ -705,7 +922,7 @@ class TestRestartContinuation:
                 updated_at=now,
             )
         )
-        repo.create_change(
+        repo_1.create_change(
             tenant_id,
             ChangeRecord(
                 tenant_id=tenant_id,
@@ -726,7 +943,7 @@ class TestRestartContinuation:
 
         # Persist checkpoint indicating task-1 and task-2 are already done
         _cp = SagaCheckpointManager.create_checkpoint(
-            repo=repo,
+            repo=repo_1,
             tenant_id=tenant_id,
             change_id=change_id,
             lifecycle_state=ChangeState.REHEARSING,
@@ -735,29 +952,36 @@ class TestRestartContinuation:
             now=now,
         )
 
+        # Fresh instance on restart
+        del repo_1, client_1
+        client_2 = FileBackedFirestoreClient(tmp_path / "fs_nodup")
+        repo_2 = GoogleFirestoreSagaRepository(project_id="test-no-dup", firestore_client=client_2)
+
         resume = SagaCheckpointManager.resume_from_checkpoint(
-            repo=repo,
+            repo=repo_2,
             tenant_id=tenant_id,
             change_id=change_id,
         )
 
-        # Completed tasks are in the completed set, not in pending
+        # Completed tasks are strictly in completed set, never in pending
         assert "task-1-discover" in resume.completed_task_ids
         assert "task-2-qualify" in resume.completed_task_ids
         assert "task-1-discover" not in resume.pending_task_ids
         assert "task-2-qualify" not in resume.pending_task_ids
 
-        # Only the pending task remains
-        assert "task-3-rehearse" in resume.pending_task_ids
+        # Only the pending task remains eligible
+        assert resume.pending_task_ids == ("task-3-rehearse",)
+        assert resume.next_safe_action == "EXECUTE_TASK:task-3-rehearse"
 
-    def test_restart_checkpoint_digest_integrity(self):
-        """Checkpoint digest must be deterministic and verifiable."""
-        repo = InMemorySagaStateRepository()
+    def test_restart_checkpoint_digest_integrity_and_tamper_detection(self, tmp_path: Path):
+        """Checkpoint digest must be deterministic and tamper on disk must fail closed."""
+        client_1 = FileBackedFirestoreClient(tmp_path / "fs_digest")
+        repo_1 = GoogleFirestoreSagaRepository(project_id="test-digest", firestore_client=client_1)
         now = datetime.now(timezone.utc)
         tenant_id = "tenant-digest-01"
         change_id = "chg-digest-01"
 
-        repo.create_tenant(
+        repo_1.create_tenant(
             TenantRecord(
                 tenant_id=tenant_id,
                 name="Digest Test Org",
@@ -766,7 +990,7 @@ class TestRestartContinuation:
                 updated_at=now,
             )
         )
-        repo.create_change(
+        repo_1.create_change(
             tenant_id,
             ChangeRecord(
                 tenant_id=tenant_id,
@@ -786,7 +1010,7 @@ class TestRestartContinuation:
         )
 
         cp = SagaCheckpointManager.create_checkpoint(
-            repo=repo,
+            repo=repo_1,
             tenant_id=tenant_id,
             change_id=change_id,
             lifecycle_state=ChangeState.DISCOVERING,
@@ -798,8 +1022,42 @@ class TestRestartContinuation:
         # Digest must be a valid SHA-256 hex
         assert cp.checkpoint_digest is not None
         assert len(cp.checkpoint_digest) == 64
-        # Verify it's valid hex
         int(cp.checkpoint_digest, 16)
+
+        # Fresh instance verifies integrity cleanly
+        del repo_1, client_1
+        client_2 = FileBackedFirestoreClient(tmp_path / "fs_digest")
+        repo_2 = GoogleFirestoreSagaRepository(project_id="test-digest", firestore_client=client_2)
+        resume = SagaCheckpointManager.resume_from_checkpoint(
+            repo=repo_2,
+            tenant_id=tenant_id,
+            change_id=change_id,
+        )
+        assert resume.resumed_from_checkpoint_id == cp.checkpoint_id
+
+        # Tamper test: direct modification on disk without updating digest
+        key = f"tenants/{tenant_id}/changes/{change_id}/checkpoints/{cp.checkpoint_id}"
+        encoded_name = urllib.parse.quote(key, safe="") + ".json"
+        doc_file = tmp_path / "fs_digest" / encoded_name
+        assert doc_file.exists()
+
+        with open(doc_file, "r", encoding="utf-8") as f:
+            tampered_data = json.load(f)
+
+        tampered_data["completed_task_ids"] = ["task-done-1", "task-injected-hostile"]
+        with open(doc_file, "w", encoding="utf-8") as f:
+            json.dump(tampered_data, f)
+
+        # Resuming from tampered disk data must fail closed
+        client_3 = FileBackedFirestoreClient(tmp_path / "fs_digest")
+        repo_3 = GoogleFirestoreSagaRepository(project_id="test-digest", firestore_client=client_3)
+        with pytest.raises(PersistenceSchemaError) as exc_info:
+            SagaCheckpointManager.resume_from_checkpoint(
+                repo=repo_3,
+                tenant_id=tenant_id,
+                change_id=change_id,
+            )
+        assert "integrity verification failed" in str(exc_info.value).lower()
 
     def test_restart_via_shadowlab_scenario_uses_durable_state(self):
         """The SCENARIO_RESTART_RESUME ShadowLab scenario must use durable P-10 checkpoint."""

@@ -908,35 +908,17 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all hackathon video recordings, live product demos, and webinar preparations).
 - Status: `ACTIVE`
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+### LESSON-20260822-34 — Process-Lifetime Boundary Persistence vs In-Memory Object Continuation
+- Date/time: 2026-08-22
+- Active task: P-25.03
+- Symptom: Calling `resume_from_checkpoint` on the same `InMemorySagaStateRepository` instance in the same Python process does not prove real crash recovery or restart persistence.
+- Root cause: `InMemorySagaStateRepository` stores state only in Python dictionary variables in volatile RAM. Using the same in-memory object instance tests dictionary lookups rather than durable crash survival.
+- Correct approach:
+  1. Test process-boundary restart across separate OS subprocesses (`subprocess.run([sys.executable, ...])`) using durable filesystem-persisted document backing (`FileBackedFirestoreClient` + `GoogleFirestoreSagaRepository`).
+  2. Implement negative controls: prove that an in-memory repository instance loses all state and raises `DocumentNotFoundError` when a fresh instance is constructed.
+  3. Verify deterministic SHA-256 checkpoint digests, task deduplication (completed tasks never re-scheduled), and tamper detection on disk (direct file modifications cause `PersistenceSchemaError`).
+- Prevention rule: Never claim persisted restart from tests that reuse in-memory repository instances. Always test genuine process or object identity boundaries with real storage backing.
+- Tests/evidence: `tests/support_persistent_firestore.py`, `tests/test_p25_03_shadowlab_suite.py` (59 passed); full suite (1787 passed).
+- Affected files: `tests/support_persistent_firestore.py`, `tests/test_p25_03_shadowlab_suite.py`, `docs/P-25.03_SHADOWLAB_SCENARIO_REPORT.md`, `docs/P-OMEGA_AUDIT_REPORT.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all durable workflow engine, saga orchestrator, and crash recovery test architectures).
+- Status: `ACTIVE`
