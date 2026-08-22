@@ -833,6 +833,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all competition judging rubrics, enterprise compliance matrices, and capability audits).
 - Status: `ACTIVE`
 
+### LESSON-20260822-29 — Devpost Submission Text Grounding and Claim Precision
+- Date/time: 2026-08-22
+- Active task: P-30.04
+- Symptom: Devpost descriptions often contain vague generalities, buzzword inflation, or unverified claims that undermine competition judging credibility.
+- Root cause: Writing public submission text independently of the canonical architecture manifests and test reports.
+- Correct approach:
+  1. Author a dedicated, frozen submission markdown document (`docs/DEVPOST_SUBMISSION.md`) covering all 6 official hackathon prompt sections.
+  2. Ground all claims in exact model names (`gemini-3.6-flash`), Google Cloud regions (`europe-west3`), and architecture patterns (OCC CAS, zero-custody VPC boundary, ADK fleet).
+  3. Validate textual completeness and technical terminology with automated pytest checks (`tests/test_p30_04_devpost_submission.py`).
+- Prevention rule: Every public Devpost submission draft must pass automated consistency tests before final platform entry.
+- Tests/evidence: `docs/DEVPOST_SUBMISSION.md`, `tests/test_p30_04_devpost_submission.py` (3 passed); full suite (1766 passed).
+- Affected files: `docs/DEVPOST_SUBMISSION.md`, `tests/test_p30_04_devpost_submission.py`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all hackathon Devpost submissions, product announcements, and competition write-ups).
+- Status: `ACTIVE`
+
+
 
 
 

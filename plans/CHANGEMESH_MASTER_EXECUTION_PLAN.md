@@ -2278,12 +2278,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-30.04 — Finalize Devpost text: problem, functionality, technology, sources, challenges, findings, future
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Finalize Devpost text: problem, functionality, technology, sources, challenges, findings, future.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No unsupported/stale claim.
-- **Required evidence:** Competition claim audit.
-- **Mandatory documentation sync:** Submission manifest.
+- **Required evidence:** Verified Devpost submission document `docs/DEVPOST_SUBMISSION.md` and test suite `tests/test_p30_04_devpost_submission.py` (3 tests passing). Populates all 6 official competition sections (Problem, What it does, How built with Gemini 3.6 Flash / Cloud Run / Firestore / PubSub, Challenges, Accomplishments, and Future roadmap) with zero unsupported claims.
+- **Mandatory documentation sync:** `docs/DEVPOST_SUBMISSION.md`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-30.05 — Finalize architecture/authority/evidence diagrams
