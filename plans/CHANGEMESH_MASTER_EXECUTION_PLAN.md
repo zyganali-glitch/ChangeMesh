@@ -2298,12 +2298,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-30.06 — Finalize build-period disclosure, provenance, licenses, notices
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Finalize build-period disclosure, provenance, licenses, notices.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Reuse transparent/legally compatible.
-- **Required evidence:** License/provenance audit.
-- **Mandatory documentation sync:** Submission manifest.
+- **Required evidence:** Build-period disclosure and provenance record `docs/BUILD_PERIOD_DISCLOSURE.md` and test suite `tests/test_p30_06_licenses_provenance.py` (3 tests passing). Fully discloses all 4 donor components (`ZK-PRIV-001`, `CCT-SEM-001`, `ZK-VALID-001`, `CCT-FLIGHT-001`) with immutable donor commits, third-party library licenses (MIT/Apache 2.0), and Google Cloud managed service APIs.
+- **Mandatory documentation sync:** `docs/BUILD_PERIOD_DISCLOSURE.md`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-30.07 — Prepare optional public build article/social post only after core submission safe

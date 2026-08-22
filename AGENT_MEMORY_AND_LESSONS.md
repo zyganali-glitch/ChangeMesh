@@ -863,6 +863,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all architecture diagrams, authority maps, and technical documentation reviews).
 - Status: `ACTIVE`
 
+### LESSON-20260822-31 — Build-Period Disclosures and Immutable Donor Commit Binding
+- Date/time: 2026-08-22
+- Active task: P-30.06
+- Symptom: AI competition projects risk disqualification or copyright ambiguity if pre-existing ideas or earlier code snippets are not cleanly and transparently disclosed.
+- Root cause: Failing to record immutable commit hashes, license terms, and clean-room reimplementation boundaries.
+- Correct approach:
+  1. Maintain an immutable donor reuse ledger (`docs/BUILD_PERIOD_DISCLOSURE.md` & `docs/DONOR_REUSE_MANIFEST.md`) linking each borrowed concept to an exact commit SHA prior to the build window.
+  2. Document all third-party open-source dependencies (Pydantic, google-genai, pytest, ruff) and verify license compatibility (MIT/Apache 2.0).
+  3. Validate all disclosure entries and component references with automated pytest suites (`tests/test_p30_06_licenses_provenance.py`).
+- Prevention rule: Every donor-derived concept must have an immutable commit pin and transparent clean-room documentation before competition submission.
+- Tests/evidence: `docs/BUILD_PERIOD_DISCLOSURE.md`, `tests/test_p30_06_licenses_provenance.py` (3 passed); full suite (1772 passed).
+- Affected files: `docs/BUILD_PERIOD_DISCLOSURE.md`, `tests/test_p30_06_licenses_provenance.py`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all hackathon IP disclosures, open-source audits, and legal compliance reviews).
+- Status: `ACTIVE`
+
+
 
 
 
