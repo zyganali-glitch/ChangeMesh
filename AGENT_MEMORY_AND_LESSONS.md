@@ -848,6 +848,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all hackathon Devpost submissions, product announcements, and competition write-ups).
 - Status: `ACTIVE`
 
+### LESSON-20260822-30 — Cross-Surface Architecture and Authority Diagram Reconciliation
+- Date/time: 2026-08-22
+- Active task: P-30.05
+- Symptom: System architecture diagrams often drift from actual deployed code, showing obsolete queue technologies or conflicting authority tier rankings.
+- Root cause: Treating diagrams as decorative illustrations rather than verifiable architectural assertions.
+- Correct approach:
+  1. Author a dedicated, audited diagram manifesto (`docs/P-30.05_ARCHITECTURE_AND_EVIDENCE_DIAGRAMS.md`) containing ascii/mermaid visualizations.
+  2. Enforce 100% terminology reconciliation across the 4 core diagrams: Google Cloud Serverless Architecture, 6-Stage Saga Lifecycle, 4-Lane Authority Hierarchy, and Proof-Carrying Evidence Ledger.
+  3. Validate diagram definitions against deployed services and codebase enums with automated pytest checks (`tests/test_p30_05_diagrams_audit.py`).
+- Prevention rule: Every architectural diagram must be test-verified against canonical deployment manifests.
+- Tests/evidence: `docs/P-30.05_ARCHITECTURE_AND_EVIDENCE_DIAGRAMS.md`, `tests/test_p30_05_diagrams_audit.py` (3 passed); full suite (1769 passed).
+- Affected files: `docs/P-30.05_ARCHITECTURE_AND_EVIDENCE_DIAGRAMS.md`, `tests/test_p30_05_diagrams_audit.py`, `README.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all architecture diagrams, authority maps, and technical documentation reviews).
+- Status: `ACTIVE`
+
+
 
 
 

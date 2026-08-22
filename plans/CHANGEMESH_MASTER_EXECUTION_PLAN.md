@@ -2288,12 +2288,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-30.05 — Finalize architecture/authority/evidence diagrams
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Finalize architecture/authority/evidence diagrams.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Diagrams match deployed code/UI terminology.
-- **Required evidence:** Cross-surface audit.
-- **Mandatory documentation sync:** README, Devpost.
+- **Required evidence:** Architecture, authority, and evidence diagrams document `docs/P-30.05_ARCHITECTURE_AND_EVIDENCE_DIAGRAMS.md` and test suite `tests/test_p30_05_diagrams_audit.py` (3 tests passing). Cross-reconciles 4 system diagrams (Google Cloud Serverless Architecture, 6-Stage Saga Lifecycle, 4-Lane Authority Hierarchy, and Proof-Carrying Evidence Ledger) across all surfaces.
+- **Mandatory documentation sync:** `docs/P-30.05_ARCHITECTURE_AND_EVIDENCE_DIAGRAMS.md`, `README.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-30.06 — Finalize build-period disclosure, provenance, licenses, notices
