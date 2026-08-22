@@ -2190,7 +2190,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-29 — Independent Productization Foundations
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-29.01 — Define post-hackathon separation between control plane, adapters, policy packs, customer data plane
 
@@ -2234,12 +2234,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-29.05 — Create 90-day roadmap after competition freeze
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Create 90-day roadmap after competition freeze.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Competition plan remains achievable; future work separate.
-- **Required evidence:** Roadmap.
-- **Mandatory documentation sync:** README.
+- **Required evidence:** 90-day post-competition roadmap `docs/P-29.05_90_DAY_ROADMAP.md` and test suite `tests/test_p29_05_roadmap_integrity.py` (3 tests passing). Defines 3 execution horizons (Days 1–30 Alpha & VPC Runner Packaging, Days 31–60 Enterprise Cloud & Compliance, Days 61–90 Commercial Launch & IDE Tools) with strict separation from competition MVP deliverables.
+- **Mandatory documentation sync:** `docs/P-29.05_90_DAY_ROADMAP.md`, `README.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-30 — Competition Narrative and Judge Materials

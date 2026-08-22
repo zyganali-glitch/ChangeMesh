@@ -773,6 +773,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all plugin systems, MCP servers, SDK extensions, and tool runtime sandboxing).
 - Status: `ACTIVE`
 
+### LESSON-20260822-25 — 90-Day Post-Competition Roadmap Boundaries
+- Date/time: 2026-08-22
+- Active task: P-29.05
+- Symptom: Hackathon projects often blur current deliverables with future aspirational features, confusing judges and eroding evaluation credibility.
+- Root cause: Failing to separate current frozen code from future commercial roadmap horizons.
+- Correct approach:
+  1. Clearly establish 30-day, 60-day, and 90-day post-competition milestones in a dedicated document (`docs/P-29.05_90_DAY_ROADMAP.md`).
+  2. Ground future deliverables in concrete enterprise building blocks (VPC runner packaging, SOC 2 compliance, plugin marketplaces).
+  3. Reiterate strict code freeze on current competition MVP.
+- Prevention rule: Every commercial roadmap must cleanly separate current verified evidence from future post-freeze milestones.
+- Tests/evidence: `docs/P-29.05_90_DAY_ROADMAP.md`, `tests/test_p29_05_roadmap_integrity.py` (3 passed); full suite (1754 passed).
+- Affected files: `docs/P-29.05_90_DAY_ROADMAP.md`, `tests/test_p29_05_roadmap_integrity.py`, `README.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all hackathon post-freeze planning, commercial GTM roadmaps, and investor presentations).
+- Status: `ACTIVE`
+
+
 
 
 
