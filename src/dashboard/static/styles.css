@@ -98,7 +98,10 @@ body {
 }
 
 /* Keyboard Focus Outline (WCAG 2.4.7) */
-*:focus-visible {
+*:focus-visible,
+.btn:focus-visible,
+.card:focus-visible,
+a:focus-visible {
   outline: 3px solid var(--border-focus);
   outline-offset: 2px;
 }
@@ -315,6 +318,7 @@ body {
   padding: 1.25rem;
   box-shadow: var(--shadow-sm);
   transition: border-color 0.15s ease;
+  min-width: 0;
 }
 
 .card:hover {
@@ -352,13 +356,17 @@ body {
 /* Two Column Layout */
 .two-column-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1.5rem;
+}
+
+.column {
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
   .two-column-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -624,6 +632,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .cloud-proof-list {
@@ -641,6 +650,7 @@ body {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .cloud-service-icon {
@@ -651,6 +661,14 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cloud-proof-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Badges */
@@ -722,9 +740,11 @@ body {
 
 /* Responsive Viewport Queries */
 @media (max-width: 640px) {
+  .container { padding: 0 1rem; }
   .app-title { font-size: 1.25rem; }
-  .header-container { flex-direction: column; align-items: flex-start; }
-  .header-controls { width: 100%; justify-content: space-between; }
+  .header-container { flex-direction: column; align-items: flex-start; padding: 0 1rem; }
+  .header-controls { width: 100%; justify-content: flex-start; gap: 0.5rem; flex-wrap: wrap; }
   .metrics-grid { grid-template-columns: 1fr; }
   .shadowlab-grid { grid-template-columns: 1fr; }
+  .approval-details-grid { grid-template-columns: 1fr; }
 }

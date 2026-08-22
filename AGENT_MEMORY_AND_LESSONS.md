@@ -922,3 +922,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Affected files: `tests/support_persistent_firestore.py`, `tests/test_p25_03_shadowlab_suite.py`, `docs/P-25.03_SHADOWLAB_SCENARIO_REPORT.md`, `docs/P-OMEGA_AUDIT_REPORT.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
 - Reusable beyond this task: Yes (all durable workflow engine, saga orchestrator, and crash recovery test architectures).
 - Status: `ACTIVE`
+
+### LESSON-20260822-35 — Real Browser Engine Headless Execution, Viewport Overflow, and Focus Timing
+- Date/time: 2026-08-22
+- Active task: P-25.04
+- Symptom: Static regex and HTTP urllib assertions passed, but real browser rendering on 375px mobile exposed horizontal scroll overflow (`scrollWidth > clientWidth`), and keyboard navigation assertions failed because CSS transitions were still animating.
+- Root cause:
+  1. Static HTML/CSS parsing cannot evaluate real layout geometry, CSS grid shrink behavior, or client JavaScript execution.
+  2. CSS Grid children default to `min-width: auto`, allowing wide flex items to overflow their grid parent horizontally on narrow viewports unless explicitly constrained with `min-width: 0` and `minmax(0, 1fr)`.
+  3. CSS transitions (`transition: top 0.2s ease`, `transition: all 0.15s ease-in-out`) mean `window.getComputedStyle` immediately following a `Tab` keypress samples intermediate values unless a brief settling delay is provided.
+- Correct approach:
+  1. Execute dynamic E2E tests using a genuine headless browser engine (Chromium via Playwright) executing real V8 JavaScript.
+  2. Test multiple target viewports (375px, 768px, 1280px, 1920x1080) and assert `scrollWidth <= clientWidth` to machine-verify zero horizontal overflow.
+  3. Add `min-width: 0` to grid/flex child cards and set grid columns to `minmax(0, 1fr)` to ensure clean responsive wrapping.
+  4. Allow transition settling time (`wait_for_timeout(250)`) when testing CSS transition states like skip-link elevation and focus rings.
+- Prevention rule: Never present static string or regex checks as browser-E2E proof. Always test dashboard UIs with real headless browser engines across target viewports.
+- Tests/evidence: `tests/test_p25_04_browser_accessibility.py` (39 passed); full suite (1693 passed from P-00 through P-25.04).
+- Affected files: `src/dashboard/static/styles.css`, `tests/test_p25_04_browser_accessibility.py`, `docs/P-25.04_BROWSER_ACCESSIBILITY_REPORT.md`, `docs/P-OMEGA_AUDIT_REPORT.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all frontend E2E, mobile responsiveness, and WCAG accessibility testing).
+- Status: `ACTIVE`
