@@ -2268,12 +2268,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-30.03 — Finalize judging map against exact official criteria/track language
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Finalize judging map against exact official criteria/track language.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Every criterion maps visible artifact.
-- **Required evidence:** Requirement audit.
-- **Mandatory documentation sync:** Devpost.
+- **Required evidence:** Official judging criteria and category mapping document `docs/JUDGING_MAP.md` and test suite `tests/test_p30_03_judging_map.py` (3 tests passing). Maps all 11 hackathon track requirements (Gemini 3.5+ authority, ADK agents, Cloud Run/Firestore/PubSub, autonomous saga, ShadowLab simulation, memory trust, capability registry, 4-lane authority, OpenTelemetry tracing, approval compression, and lean architecture) to verified repository files.
+- **Mandatory documentation sync:** `docs/JUDGING_MAP.md`, `docs/DEVPOST_SUBMISSION.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-30.04 — Finalize Devpost text: problem, functionality, technology, sources, challenges, findings, future

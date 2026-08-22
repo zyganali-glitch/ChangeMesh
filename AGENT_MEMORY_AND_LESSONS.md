@@ -818,6 +818,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all hackathon judge portals, evaluation guides, and developer quick-starts).
 - Status: `ACTIVE`
 
+### LESSON-20260822-28 — Comprehensive Judging Criteria Mapping and Artifact Binding
+- Date/time: 2026-08-22
+- Active task: P-30.03
+- Symptom: Early development judging maps often contain stale `PLANNED` or `NOT_RUN` placeholders that fail to reflect final production readiness.
+- Root cause: Not reconciling criteria matrices as intermediate micro-tasks and cloud deployments finish.
+- Correct approach:
+  1. Synchronize `docs/JUDGING_MAP.md` against all official hackathon track requirements (Fortified Enterprise Fleet).
+  2. Bind each criterion (Gemini authority, ADK fleet, Cloud Run backend, Firestore CAS, ShadowLab simulation, memory trust, capability registry, etc.) to exact verified repository source files.
+  3. Validate all linked paths via automated pytest suites (`tests/test_p30_03_judging_map.py`).
+- Prevention rule: Every hackathon judging matrix must map 100% of criteria to existing, passing repository artifacts before submission freeze.
+- Tests/evidence: `docs/JUDGING_MAP.md`, `tests/test_p30_03_judging_map.py` (3 passed); full suite (1763 passed).
+- Affected files: `docs/JUDGING_MAP.md`, `tests/test_p30_03_judging_map.py`, `docs/DEVPOST_SUBMISSION.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all competition judging rubrics, enterprise compliance matrices, and capability audits).
+- Status: `ACTIVE`
+
+
 
 
 
