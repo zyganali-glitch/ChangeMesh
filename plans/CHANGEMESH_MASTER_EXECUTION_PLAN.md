@@ -3053,46 +3053,50 @@ The following additive `P-xx.00` tasks do not replace the existing `P-xx.01+` ta
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-26.00 — Security donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-26.01` task or any implementation in this phase, run the donor-reuse preflight for D-ZEROKIT, D-CCT, D-CONTEXTSEAL, D-QWEN. Inspect privacy boundary, preflight, evidence integrity, writeback, and memory-poisoning risks; merge into one threat model.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Threat/control/test source map and residual-risk list.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Evidence:** Preflight report completed in `docs/P-26.00_SECURITY_DONOR_PREFLIGHT.md` (Late Governance Repair) and registered in `docs/DONOR_REUSE_MANIFEST.md` Table §3.1. Donors D-ZEROKIT, D-CCT, D-CONTEXTSEAL, D-QWEN audited across privacy sanitization, claim honesty, blast-radius preflight, container worktree boundary, and model armor. Zero forbidden carry-over; 100% license compliance verified.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-29.00 — Productization donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-29.01` task or any implementation in this phase, run the donor-reuse preflight for D-UAOS, D-CONTEXTSEAL, D-CCT, D-ZEROKIT. Separate reusable platform patterns from competition/demo-specific code and documents; avoid recreating donor products wholesale.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Product boundary/originality memo and extension-contract decisions.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Evidence:** Preflight report completed in `docs/P-29.00_PRODUCTIZATION_DONOR_PREFLIGHT.md` (Late Governance Repair) and registered in `docs/DONOR_REUSE_MANIFEST.md` Table §3.1. Donors D-UAOS, D-CONTEXTSEAL, D-CCT, D-ZEROKIT audited across 4-plane separation, VPC isolation, extensibility contracts, and zero-custody patterns. Clean separation between current implementation vs target post-hackathon architecture.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-30.00 — Competition-document donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-30.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-UIPATH. Inspect judge-start, judging map, build delta, claim audit, evidence manifest, and disclosure documents; reuse structure, never stale claims or numbers.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** Judge-document source map and stale-claim denylist.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Evidence:** Preflight report completed in `docs/P-30.00_COMPETITION_DOCUMENT_DONOR_PREFLIGHT.md` (Late Governance Repair) and registered in `docs/DONOR_REUSE_MANIFEST.md` Table §3.1. Donors D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-UIPATH audited across judging maps, claim audit, architecture diagrams, and build period disclosures. Clean-room authoring, zero local file links, and 100% claim-evidence parity verified.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-31.00 — Demo-production donor preflight
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Before the existing `P-31.01` task or any implementation in this phase, run the donor-reuse preflight for D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-UIPATH. Inspect demo scripts, timing plans, screenshot guides, captions, and recording runbooks; adapt only production discipline and evidence sequencing.
 - **Mandatory inputs:** `docs/DONOR_REUSE_MANIFEST.md`, the frozen donor pins, exact allowlisted source paths, the active phase contracts, and current architecture.
 - **Required outputs:** ChangeMesh-specific shot list, timing map, and prohibited donor visuals/names.
 - **Forbidden shortcuts:** Do not write product code during the preflight; do not inspect unpinned or non-allowlisted donor paths without first registering them; do not copy wholesale; do not skip because the agent “already knows” the donor.
 - **Acceptance criteria:** Every relevant component has approved method, exact source paths, target mapping, forbidden carry-over, and required tests; the donor-reuse auditor returns no unresolved blocking finding.
 - **Required evidence:** Preflight report stored/referenced in the manifest and plan evidence, plus read-only auditor output.
+- **Evidence:** Preflight report completed in `docs/P-31.00_DEMO_PRODUCTION_DONOR_PREFLIGHT.md` (Late Governance Repair) and registered in `docs/DONOR_REUSE_MANIFEST.md` Table §3.1. Donors D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-UIPATH audited across walkthrough script flow, secret screening, draft PR ceiling, and human authority moment. Explicit fallback disclosure invariant codified. P-31.02 remains untouched.
 - **Mandatory documentation sync:** Donor manifest, component provenance, active phase notes, architecture/lessons/decision log as applicable, and handoff.
 - **Closure:** Run the donor-provenance gate, the task-specific gates, `P-DΩ`, and then the ordinary `P-Ω` phase. Update `docs/HANDOFF.md` before progression.
 ## P-32.00 — Final donor provenance freeze

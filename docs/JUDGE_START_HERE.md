@@ -4,7 +4,7 @@
 **Canonical Model:** `gemini-3.6-flash` (Vertex AI / official `google-genai` SDK)  
 **Deployed GCP Region:** `europe-west3`  
 **Live Service URL:** `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`  
-**Revision Digest:** `changemesh-p24-e2e-00001-jjp`  
+**Revision Digest:** `changemesh-p24-e2e-00002-bqc`  
 
 ---
 
@@ -37,7 +37,7 @@ git clone https://github.com/zyganali-glitch/ChangeMesh.git
 cd ChangeMesh
 uv sync
 
-# 2. Run Full Canonical Test Suite (1,750+ tests in ~15s)
+# 2. Run Full Canonical Test Suite
 uv run pytest -v
 
 # 3. Launch Local Dashboard Server
@@ -51,8 +51,8 @@ uv run python service_app.py --port 8080
 
 | Category | Primary Artifact | Description |
 |---|---|---|
-| **Judging Map** | [`docs/JUDGING_MAP.md`](file:///c:/Users/MEHMET/.gemini/antigravity/scratch/ChangeMesh/docs/JUDGING_MAP.md) | Line-by-line alignment to hackathon scoring criteria |
-| **Live Cloud Evidence** | [`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`](file:///c:/Users/MEHMET/.gemini/antigravity/scratch/ChangeMesh/docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json) | Immutable multi-stage saga execution telemetry |
-| **Revision Provenance** | [`docs/P-28.03_REVISION_PROVENANCE_BINDING.json`](file:///c:/Users/MEHMET/.gemini/antigravity/scratch/ChangeMesh/docs/P-28.03_REVISION_PROVENANCE_BINDING.json) | Binds Git commit, container digest, and Cloud Run revision |
-| **Submission Manifest** | [`docs/SUBMISSION_MANIFEST.md`](file:///c:/Users/MEHMET/.gemini/antigravity/scratch/ChangeMesh/docs/SUBMISSION_MANIFEST.md) | Single submission truth: repo, video, model, and accounts |
-| **Demo Script** | [`docs/DEMO_SCRIPT.md`](file:///c:/Users/MEHMET/.gemini/antigravity/scratch/ChangeMesh/docs/DEMO_SCRIPT.md) | 4-minute timestamped walkthrough script |
+| **Judging Map** | [`docs/JUDGING_MAP.md`](JUDGING_MAP.md) | Line-by-line alignment to hackathon scoring criteria |
+| **Live Cloud Evidence** | [`docs/P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json`](P-24.05_LIVE_CLOUD_E2E_EVIDENCE.json) | Immutable multi-stage saga execution telemetry |
+| **Revision Provenance** | [`docs/P-28.03_REVISION_PROVENANCE_BINDING.json`](P-28.03_REVISION_PROVENANCE_BINDING.json) | Binds Git commit, container digest, and Cloud Run revision |
+| **Submission Manifest** | [`docs/SUBMISSION_MANIFEST.md`](SUBMISSION_MANIFEST.md) | Single submission truth: repo, video, model, and accounts |
+| **Demo Script** | [`docs/DEMO_SCRIPT.md`](DEMO_SCRIPT.md) | 4-minute timestamped walkthrough script |

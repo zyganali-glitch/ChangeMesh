@@ -38,7 +38,7 @@ class TestDemoManifestFreeze:
         text = MANIFEST_PATH.read_text(encoding="utf-8")
 
         assert "changemesh-p24-e2e" in text
-        assert "changemesh-p24-e2e-00001-jjp" in text
+        assert "changemesh-p24-e2e-00002-bqc" in text
         assert "europe-west3" in text
         assert "project-af5e1c99-3bc4-424f-b53" in text
 

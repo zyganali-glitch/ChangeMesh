@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "binding_version": "1.0.0",
-  "generated_at": "2026-08-22T01:33:00Z",
+  "generated_at": "2026-08-22T18:45:33Z",
   "provenance": {
     "project_id": "project-af5e1c99-3bc4-424f-b53",
     "canonical_region": "europe-west3",
     "cloud_run_service": "changemesh-p24-e2e",
-    "cloud_run_revision": "changemesh-p24-e2e-00001-jjp",
+    "cloud_run_revision": "changemesh-p24-e2e-00002-bqc",
     "cloud_run_url": "https://changemesh-p24-e2e-764732742797.europe-west3.run.app",
-    "container_image_digest": "europe-west3-docker.pkg.dev/project-af5e1c99-3bc4-424f-b53/changemesh/backend@sha256:d8c520efebcbb2b9d29ef199e4f0d6118d3fe7c88b22a08a287968db8cbf42e1",
-    "source_commit_sha": "51076beee4eb10412bfefcf4876a67ca90273e9c",
+    "container_image_digest": "europe-west3-docker.pkg.dev/project-af5e1c99-3bc4-424f-b53/cloud-run-source-deploy/changemesh-p24-e2e@sha256:dcf16bb2f3c2d4b8eca66683e9f48e4da992a544f06bbf05c39999eed3e02cae",
+    "source_commit_sha": "70a745eb22d6d77d0a932a372b3cad3df7005357",
     "model_authority": {
       "model_id": "gemini-3.6-flash",
       "provider": "vertexai",

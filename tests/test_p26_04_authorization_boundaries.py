@@ -3,10 +3,14 @@
 Acceptance criteria from master plan:
   - No agent merges, production-deploys, or accesses unregistered data.
   - Verification of GitHub adapter draft-only boundaries and protected branch enforcement.
-  - Verification that Release Steward cannot trigger live production deployments
-    without explicit cryptographic human authority tokens.
+  - Verification that Release Steward cannot trigger live production deployments or self-authorize.
   - Verification that deterministic policy guardian blocks attempts to access
     unregistered tables or unauthorized paths.
+  - Verification that organizational policy (not LLM confidence) governs autonomy class.
+  - Verification that LIVE_WRITE != HUMAN_AUTHORITY_REQUIRED.
+  - Verification that Gemini uncertainty cannot manufacture human authority.
+  - Verification that invalid/expired/scope-mismatched authority tokens fail closed.
+  - Verification that waiting for authority (AWAITING_AUTHORITY) is distinct from BLOCKED.
 
 Required evidence: Security suite (docs/P-26.04_AUTHORIZATION_BOUNDARIES_REPORT.md).
 Mandatory documentation sync: Judging map.
@@ -14,11 +18,12 @@ Mandatory documentation sync: Judging map.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
 
+from domain.contracts.autonomy import AutonomyClass
 from domain.contracts.change_request import ChangeRequest
 from domain.contracts.data_class import DataClassLevel
 from domain.contracts.evidence import ExecutionEvidenceMode
@@ -28,9 +33,19 @@ from integrations.github.github_adapter import (
     GitHubAction,
     GitHubRequest,
 )
+from src.audit.reconciliation import DeterministicReconciler, ReconciliationOutcome
+from src.audit.semantic_auditor import ClaimAuditResult, SemanticVerdict
+from src.gate.policy_guardian_gate import PolicyGuardianGate
 from src.gate.reversibility import (
+    DeterministicPolicyInputs,
+    NoveltyTier,
+    PrivilegeLevel,
+    RehearsalStatus,
     ReversibilityClass,
     ReversibilityClassifier,
+)
+from src.gate.token import (
+    VerifiedAuthorityDecision,
 )
 from src.orchestrator.orchestrator_saga import (
     validate_supported_change_intent,
@@ -143,8 +158,8 @@ class TestPolicyGuardianAuthorizationBoundaries:
         assert any(f.category == PolicyFindingCategory.UNREGISTERED_TOOL for f in decision.findings)
 
 
-class TestReversibilityAndDeploymentBoundaries:
-    """Verify that dangerous or irreversible actions halt at human authority boundaries."""
+class TestReversibilityAndAuthorityBoundaries:
+    """Verify 4-lane authority boundaries, token validation, and human decision slots."""
 
     def test_destructive_sql_operations_fail_intent_validation(self):
         """validate_supported_change_intent must reject destructive DROP/DELETE operations."""
@@ -196,7 +211,6 @@ class TestReversibilityAndDeploymentBoundaries:
 
     def test_destructive_sql_classified_as_irreversible_or_human_intervention(self):
         """ReversibilityClassifier must classify destructive DDLs appropriately."""
-        # Destructive without down migration -> IRREVERSIBLE_DESTRUCTIVE
         assessment_no_down = ReversibilityClassifier.classify_sql(
             change_id="chg-rev-01",
             sql_up="ALTER TABLE billing_accounts DROP COLUMN balance;",
@@ -205,7 +219,6 @@ class TestReversibilityAndDeploymentBoundaries:
         assert assessment_no_down.reversibility_class == ReversibilityClass.IRREVERSIBLE_DESTRUCTIVE
         assert assessment_no_down.has_down_migration is False
 
-        # Destructive with down migration -> HUMAN_INTERVENTION_REQUIRED
         assessment_with_down = ReversibilityClassifier.classify_sql(
             change_id="chg-rev-02",
             sql_up="ALTER TABLE billing_accounts DROP COLUMN balance;",
@@ -216,3 +229,149 @@ class TestReversibilityAndDeploymentBoundaries:
             == ReversibilityClass.HUMAN_INTERVENTION_REQUIRED
         )
         assert assessment_with_down.has_down_migration is True
+
+    def test_release_steward_cannot_self_authorize(self):
+        """VerifiedAuthorityDecision must reject executor/steward identities as approvers."""
+        now = datetime.now(timezone.utc)
+        forbidden_approvers = [
+            "release_steward",
+            "release-steward",
+            "gemini",
+            "orchestrator",
+            "system",
+            "auto",
+        ]
+        for bad_approver in forbidden_approvers:
+            with pytest.raises(ValidationError, match="cannot self-authorize"):
+                VerifiedAuthorityDecision(
+                    schema_version="1.0.0",
+                    decision_id=f"dec-{bad_approver}",
+                    envelope_id="env-1",
+                    approver_id=bad_approver,
+                    authority_slot_ref="slot-prod-release",
+                    plan_hash="hash-12345678",
+                    action_scope="scope-1",
+                    issued_at=now,
+                    expires_at=now + timedelta(hours=1),
+                )
+
+    def test_gemini_uncertainty_cannot_manufacture_human_authority(self):
+        """Model disagreement or uncertainty must not create required human review slots."""
+        reconciler = DeterministicReconciler()
+
+        audit_result = ClaimAuditResult(
+            claim_id="claim-001",
+            verdict=SemanticVerdict.CONTRADICTS,  # Model disagrees with deterministic fact
+            reasoning="Model disagrees with deterministic result",
+        )
+
+        recon_res = reconciler.reconcile(
+            audit_result=audit_result,
+            deterministic_state="PASS",
+            change_id="chg-001",
+        )
+
+        # Disagreement is recorded, but outcome is ADVISORY_REVIEW, not ESCALATION
+        assert recon_res.disagreement_detected is True
+        assert recon_res.outcome == ReconciliationOutcome.ADVISORY_REVIEW
+        assert recon_res.deterministic_state == "PASS"
+        assert recon_res.deterministic_state_preserved is True
+
+    def test_invalid_expired_scope_mismatched_token_rejected(self):
+        """VerifiedAuthorityDecision must reject expired or scope-mismatched decisions."""
+        now = datetime.now(timezone.utc)
+
+        # 1. Valid decision
+        decision = VerifiedAuthorityDecision(
+            schema_version="1.0.0",
+            decision_id="dec-001",
+            envelope_id="env-001",
+            approver_id="human:vp-eng-alice",
+            authority_slot_ref="slot-schema-change",
+            plan_hash="plan-hash-abc",
+            action_scope="billing-db",
+            issued_at=now - timedelta(minutes=10),
+            expires_at=now + timedelta(hours=1),
+        )
+        assert (
+            decision.is_active_for(
+                plan_hash="plan-hash-abc",
+                authority_slot_ref="slot-schema-change",
+                action_scope="billing-db",
+                now=now,
+            )
+            is True
+        )
+
+        # 2. Plan hash mismatch
+        assert (
+            decision.is_active_for(
+                plan_hash="plan-hash-WRONG",
+                authority_slot_ref="slot-schema-change",
+                action_scope="billing-db",
+                now=now,
+            )
+            is False
+        )
+
+        # 3. Scope mismatch
+        assert (
+            decision.is_active_for(
+                plan_hash="plan-hash-abc",
+                authority_slot_ref="slot-schema-change",
+                action_scope="auth-db",
+                now=now,
+            )
+            is False
+        )
+
+        # 4. Expired decision
+        expired_decision = VerifiedAuthorityDecision(
+            schema_version="1.0.0",
+            decision_id="dec-002",
+            envelope_id="env-002",
+            approver_id="human:vp-eng-alice",
+            authority_slot_ref="slot-schema-change",
+            plan_hash="plan-hash-abc",
+            action_scope="billing-db",
+            issued_at=now - timedelta(hours=2),
+            expires_at=now - timedelta(hours=1),
+        )
+        assert (
+            expired_decision.is_active_for(
+                plan_hash="plan-hash-abc",
+                authority_slot_ref="slot-schema-change",
+                action_scope="billing-db",
+                now=now,
+            )
+            is False
+        )
+
+    def test_awaiting_authority_distinct_from_blocked_and_retains_autonomy(self):
+        """AWAITING_AUTHORITY halts for human sign-off without marking change BLOCKED."""
+        gate = PolicyGuardianGate()
+        now = datetime.now(timezone.utc)
+
+        # Change requiring human authority with qualifying evidence digests
+        from domain.contracts.evidence import EvidenceState
+
+        inputs = DeterministicPolicyInputs(
+            change_id="chg-await-01",
+            reversibility_class=ReversibilityClass.HUMAN_INTERVENTION_REQUIRED,
+            blast_radius_score=0.45,
+            novelty_tier=NoveltyTier.NOVEL_UNVERIFIED,
+            privilege_level=PrivilegeLevel.STANDARD_WRITE,
+            data_classification=DataClassLevel.INTERNAL,
+            rehearsal_status=RehearsalStatus.REHEARSAL_PASSED,
+            has_down_migration=True,
+            rollback_summary="Execute down migration",
+            evidence_state=EvidenceState.PASS,
+            evidence_digests=["a" * 64],
+        )
+
+        res = gate.evaluate_inputs(inputs, now=now)
+        assert res.autonomy_class == AutonomyClass.HUMAN_AUTHORITY_REQUIRED
+        assert res.is_authorized is False
+        assert res.compression_card is not None
+        assert res.compression_card.decision_question != ""
+        assert res.autonomy_class != AutonomyClass.BLOCKED

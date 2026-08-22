@@ -7,6 +7,7 @@ and produces a clear, auditable summary with explicit PASS / FAIL / NOT_RUN stat
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import time
@@ -41,13 +42,19 @@ def run_gate(cmd: List[str], name: str, target: str, mode: str) -> GateResult:
         )
         duration = time.perf_counter() - start_time
         if proc.returncode == 0:
+            details = "Completed cleanly with 0 errors."
+            # Extract pytest count if present
+            if "passed" in proc.stdout:
+                m = re.search(r"(\d+)\s+passed", proc.stdout)
+                if m:
+                    details = f"{m.group(1)} tests passed, 0 errors."
             return GateResult(
                 name=name,
                 target=target,
                 mode=mode,
                 status="PASS",
                 duration_s=duration,
-                details="Completed cleanly with 0 errors.",
+                details=details,
             )
         else:
             first_err = (
@@ -103,12 +110,13 @@ def run_e2e_demo_gate() -> GateResult:
 
 def run_full_validation(allow_live_write: bool = False) -> int:
     """Execute all release gates and output clean audit report."""
+    mode_str = "LIVE_WRITE_INCLUDED" if allow_live_write else "READ-ONLY (Zero Cloud Mutation)"
     print("=" * 80)
     print(" CHANGEMESH -- ROOT RELEASE VALIDATION & GOVERNANCE GATE (P-25.06)")
     print("=" * 80)
     print(f" Repository Root : {REPO_ROOT}")
     print(" Canonical Model : gemini-3.6-flash")
-    print(" Execution Mode  : READ-ONLY (Zero Cloud Mutation)")
+    print(f" Execution Mode  : {mode_str}")
     print("=" * 80)
 
     gates: List[GateResult] = []
@@ -155,11 +163,11 @@ def run_full_validation(allow_live_write: bool = False) -> int:
     print(f"      -> {g4.status} ({g4.duration_s:.2f}s)")
 
     # 5. Canonical Unit & Resilience Test Suite Gate
-    print("[5/7] Running Test Suite Gate (pytest 1686 tests)...")
+    print("[5/7] Running Test Suite Gate (pytest full suite)...")
     g5 = run_gate(
         ["uv", "run", "pytest", "tests/", "--ignore=tests/test_gcp_access.py", "-q", "--tb=short"],
         "Test Matrix Gate",
-        "tests/ (P-05 through P-25)",
+        "tests/",
         "FIXTURE / SIMULATION",
     )
     gates.append(g5)

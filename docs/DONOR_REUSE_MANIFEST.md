@@ -61,6 +61,10 @@ A blank or inferred field is invalid. Unknown license, source pin, source path, 
 | P-20.00 | Long-running orchestration saga donor preflight | `docs/P-20.00_ORCHESTRATOR_SAGA_DONOR_PREFLIGHT.md` | `PASS` |
 | P-24.00 | Synthetic enterprise demo donor preflight | `docs/P-24.00_SYNTHETIC_DEMO_DONOR_PREFLIGHT.md` | `PASS` |
 | **P-25.00 — Test-suite donor preflight** | Comprehensive test-suite traceability matrix across all 7 donors (20 components) | `docs/P-25.00_TEST_SUITE_DONOR_PREFLIGHT.md` | `PASS` |
+| **P-26.00 — Security donor preflight** | Security, privacy, and authorization hardening preflight across D-ZEROKIT, D-CCT, D-CONTEXTSEAL, D-QWEN (Late Governance Repair) | `docs/P-26.00_SECURITY_DONOR_PREFLIGHT.md` | `PASS` |
+| **P-29.00 — Productization donor preflight** | Independent productization foundations preflight across D-UAOS, D-CONTEXTSEAL, D-CCT, D-ZEROKIT (Late Governance Repair) | `docs/P-29.00_PRODUCTIZATION_DONOR_PREFLIGHT.md` | `PASS` |
+| **P-30.00 — Competition-doc donor preflight** | Competition narrative, judging map, and claim audit preflight across D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-UIPATH (Late Governance Repair) | `docs/P-30.00_COMPETITION_DOCUMENT_DONOR_PREFLIGHT.md` | `PASS` |
+| **P-31.00 — Demo-production donor preflight** | Demonstration freeze and recording preflight across D-CCT, D-ZEROKIT, D-CONTEXTSEAL, D-UIPATH (Late Governance Repair) | `docs/P-31.00_DEMO_PRODUCTION_DONOR_PREFLIGHT.md` | `PASS` |
 
 ## 4. Component record schema
 

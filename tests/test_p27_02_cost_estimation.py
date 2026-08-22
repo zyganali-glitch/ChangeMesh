@@ -1,10 +1,11 @@
 """ChangeMesh P-27.02 — Token and Cloud Cost Estimation Security and Economics Suite.
 
 Acceptance criteria from master plan:
-  - Expected demo/idle cost documented.
+  - Expected demo/idle cost documented with explicit provenance taxonomy.
   - Verification that per-saga Gemini 3.6 Flash token cost is under $0.01 (< 1 cent per run).
   - Verification that scale-to-zero serverless architecture incurs $0.00 / month idle cost.
   - Verification of Firestore and Pub/Sub free-tier alignment.
+  - Verification of MEASURED / RECORDED / ESTIMATED / CONFIGURED provenance tags.
 
 Required evidence: Cost report (docs/P-27.02_COST_AND_TOKEN_ESTIMATION_REPORT.md).
 Mandatory documentation sync: README/Devpost.
@@ -13,13 +14,14 @@ Mandatory documentation sync: README/Devpost.
 from __future__ import annotations
 
 from scripts.estimate_cost import (
+    ProvenanceKind,
     calculate_cloud_infrastructure_cost,
     calculate_saga_token_cost,
 )
 
 
 class TestTokenAndCostEstimation:
-    """Verify unit economics, token consumption, and idle cloud costs."""
+    """Verify unit economics, token consumption, provenance tags, and idle cloud costs."""
 
     def test_saga_gemini_cost_under_one_cent(self):
         """A complete multi-agent change saga must cost less than $0.005 in Gemini tokens."""
@@ -27,6 +29,9 @@ class TestTokenAndCostEstimation:
         assert tokens["total_tokens"] < 10_000
         assert tokens["total_gemini_cost_usd"] < 0.005
         assert tokens["total_gemini_cost_usd"] > 0.0
+        assert tokens["provenance_token_counts"] == ProvenanceKind.MEASURED.value
+        assert tokens["provenance_rates"] == ProvenanceKind.RECORDED.value
+        assert tokens["provenance_costs"] == ProvenanceKind.ESTIMATED.value
 
     def test_serverless_idle_cost_is_zero(self):
         """Monthly idle infrastructure cost must be strictly $0.00."""
@@ -34,9 +39,11 @@ class TestTokenAndCostEstimation:
         assert infra["total_idle_cost_monthly_usd"] == 0.0
         assert infra["cloud_run"]["min_instances"] == 0
         assert infra["cloud_run"]["scale_to_zero"] is True
+        assert infra["cloud_run"]["provenance"] == ProvenanceKind.CONFIGURED.value
 
     def test_firestore_and_pubsub_within_free_tier(self):
         """Demo operations must fit completely within serverless free tier allowances."""
         infra = calculate_cloud_infrastructure_cost()
         assert infra["firestore"]["free_tier_covered"] is True
         assert infra["pubsub"]["free_tier_covered"] is True
+        assert infra["firestore"]["provenance"] == ProvenanceKind.ESTIMATED.value

@@ -47,27 +47,16 @@ class TestJudgingMapCriteriaAlignment:
         assert "11. Reproducibility & Lean Footprint" in text
 
     def test_all_evidence_links_exist(self):
-        """Every file link in the criteria table must point to an existing repository artifact."""
+        """Every file link in criteria table must point to existing artifact without file:///."""
         text = JUDGING_MAP_PATH.read_text(encoding="utf-8")
+        assert "file:///" not in text, "JUDGING_MAP.md must not contain local file:/// links"
 
-        for line in text.splitlines():
-            if "|" in line and (
-                "src/" in line
-                or "docs/" in line
-                or "events/" in line
-                or "tests/" in line
-                or "deploy/" in line
-            ):
-                # Extract markdown links or backtick file references
-                parts = [p.strip() for p in line.split("|") if p.strip()]
-                for part in parts:
-                    if "`" in part:
-                        ref = part.replace("`", "").strip()
-                        if (REPO_ROOT / ref).exists():
-                            break
-                    if "file:///" in part:
-                        # Extract relative path from file link
-                        start_idx = part.find("ChangeMesh/")
-                        if start_idx != -1:
-                            rel_path = part[start_idx + len("ChangeMesh/") :].split(")")[0]
-                            assert (REPO_ROOT / rel_path).exists(), f"Broken file link: {rel_path}"
+        import re
+
+        links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", text)
+        for label, target in links:
+            if target.startswith(("http://", "https://", "mailto:", "#")):
+                continue
+            # Resolve relative to docs directory
+            resolved = (JUDGING_MAP_PATH.parent / target).resolve()
+            assert resolved.exists(), f"Broken link in JUDGING_MAP.md: {target}"

@@ -78,14 +78,22 @@ All components derived from earlier repositories are declared in [`docs/DONOR_RE
 
 ## 3. Third-Party Open Source Libraries & Licensing
 
-| Package | Version Range | License | Role in ChangeMesh |
-|---|---|---|---|
-| `pydantic` | `>=2.10.0` | MIT License | Strict domain schema validation and immutable state containers |
-| `google-genai` | `>=1.0.0` | Apache License 2.0 | Official Google GenAI SDK for Gemini 3.6 Flash invocations |
-| `google-cloud-firestore` | `>=2.19.0` | Apache License 2.0 | Cloud Firestore client for OCC CAS persistence |
-| `google-cloud-pubsub` | `>=2.26.0` | Apache License 2.0 | Cloud Pub/Sub client for distributed eventing |
-| `pytest` | `>=8.3.0` | MIT License | Test framework executing the 1,760+ canonical test suite |
-| `ruff` | `>=0.8.0` | MIT License | High-speed Python linter and code formatter |
+The table below discloses all canonical direct runtime and development/test dependencies declared in `pyproject.toml` and locked in `uv.lock`:
+
+| Package | Category | Version Specifier | Resolved Lock Version | License | Role in ChangeMesh |
+|---|---|---|---|---|---|
+| `google-adk` | Direct Runtime | `>=2.6.0` | `2.6.0` | Apache-2.0 | Google Agent Development Kit framework topology |
+| `google-genai` | Direct Runtime | `>=0.1.0` | `2.18.1` | Apache-2.0 | Official Google GenAI SDK for Gemini 3.6 Flash |
+| `pydantic` | Direct Runtime | `>=2.0.0` | `2.12.5` | MIT License | Strict domain schema validation and immutable state |
+| `google-cloud-firestore` | Direct Runtime | `>=2.15.0` | `2.23.0` | Apache-2.0 | Cloud Firestore client for OCC CAS persistence |
+| `google-cloud-pubsub` | Direct Runtime | `>=2.20.0` | `2.34.0` | Apache-2.0 | Cloud Pub/Sub client for distributed event backbone |
+| `pytest` | Direct Dev/Test | `>=8.0.0` | `9.1.1` | MIT License | Canonical test runner executing the complete test suite |
+| `pyyaml` | Direct Dev/Test | `>=6.0.0` | `6.0.3` | MIT License | YAML parsing for donor manifest linting |
+| `google-auth` | Direct Dev/Test | `>=2.0.0` | `2.49.0` | Apache-2.0 | Google Application Default Credentials library |
+| `google-cloud-run` | Direct Dev/Test | `>=0.10.0` | `0.11.4` | Apache-2.0 | Google Cloud Run management client |
+| `ruff` | Direct Dev/Test | `>=0.5.0` | `0.15.2` | MIT License | Python code formatting and linting tool |
+| `mypy` | Direct Dev/Test | `>=1.10.0` | `1.19.1` | MIT License | Static type checker for Python domain contracts |
+| `playwright` | Direct Dev/Test | `>=1.40.0` | `1.58.0` | Apache-2.0 | Headless Chromium browser E2E & accessibility testing |
 
 ---
 

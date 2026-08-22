@@ -2,7 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project_id": "project-af5e1c99-3bc4-424f-b53",
   "region": "europe-west3",
+  "provenance_note": "Distinguishes declared desired policies from verified live GCP resource state and documented teardown procedures.",
   "budget_alert_policy": {
+    "status": "DECLARED_DESIRED_POLICY",
+    "gcp_api_state": "billingbudgets.googleapis.com is NOT_ENABLED / requires project billing permission",
     "display_name": "changemesh-hackathon-hard-budget-cap",
     "currency_code": "USD",
     "monthly_budget_amount": 25.00,
@@ -31,7 +34,8 @@
     "pubsub_notification_topic": "projects/project-af5e1c99-3bc4-424f-b53/topics/changemesh-billing-alerts"
   },
   "cloud_run_scaling_policy": {
-    "service_name": "changemesh-backend",
+    "status": "VERIFIED_LIVE_GCP",
+    "service_name": "changemesh-p24-e2e",
     "min_instances": 0,
     "max_instances": 3,
     "scaling_profile": "SCALE_TO_ZERO",
@@ -42,11 +46,13 @@
   },
   "retention_and_lifecycle_policies": {
     "firestore": {
+      "status": "DECLARED_POLICY",
       "collection_group": "changemesh_demo_records",
       "ttl_field": "expires_at",
       "retention_period_days": 30
     },
     "pubsub": {
+      "status": "VERIFIED_LIVE_GCP",
       "message_retention_duration": "604800s",
       "retain_acked_messages": false,
       "dead_letter_policy": {
@@ -55,11 +61,13 @@
       }
     },
     "cloud_logging": {
+      "status": "VERIFIED_LIVE_GCP",
       "log_bucket": "_Default",
       "retention_period_days": 30
     }
   },
   "teardown_procedure": {
+    "status": "TEARDOWN_PLAN_DOCUMENTED",
     "automated_teardown_supported": true,
     "cloud_run_action": "DELETE_REVISION_OR_SCALE_ZERO",
     "firestore_action": "PURGE_DEMO_TENANT_COLLECTIONS",

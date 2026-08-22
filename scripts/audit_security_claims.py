@@ -24,6 +24,10 @@ PROHIBITED_CLAIM_PATTERNS = [
     r"\bfully\s+certified\s+for\s+(?:soc2|hipaa|fedramp|pci)\b",
     r"\bofficially\s+soc2\s+certified\b",
     r"\bofficially\s+hipaa\s+certified\b",
+    r"\bguaranteed\s+zero\s+race\s+conditions\b",
+    r"\bmathematical\s+and\s+cryptographic\s+guarantees\b",
+    r"\bmathematically\s+prove\s+backward\b",
+    r"\bzero\s+risk\s+guarantee\b",
 ]
 
 DOC_EXTENSIONS = {".md", ".rst", ".txt"}

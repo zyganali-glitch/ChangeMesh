@@ -53,7 +53,7 @@
 - **GCP Project ID:** `project-af5e1c99-3bc4-424f-b53`
 - **Region:** `europe-west3` (Frankfurt)
 - **Service Name:** `changemesh-p24-e2e`
-- **Deployed Revision:** `changemesh-p24-e2e-00001-jjp`
+- **Deployed Revision:** `changemesh-p24-e2e-00002-bqc`
 - **Live Endpoint:** `https://changemesh-p24-e2e-764732742797.europe-west3.run.app`
 - **Canonical Model:** `gemini-3.6-flash` via Vertex AI
 
@@ -61,8 +61,10 @@
 
 ## 🛡️ 5. Fallback Recording & Fault Contingency Plan
 
-| Failure Mode | Detection Signal | Automated Contingency Procedure |
-|---|---|---|
-| Cloud Run Cold Start / Network Latency (>3s) | HTTP 504 / timeout on curl | Switch smoothly to local Python server (`http://localhost:8000`) |
-| Vertex AI Quota / 429 Backoff Spike | Exponential backoff notification | Seamless fallback to deterministic fixture replay (`tests/fixtures/`) |
-| OBS Screen Recording Frame Drop | OBS dropped frame alert | Re-record individual scene chunk using standardized timestamps |
+> **Transparency Invariant:** No silent fallbacks. If a contingency is triggered during demonstration, the mode change must be visually and verbally explicit (e.g. clearly labeled as `SIMULATION` or `FIXTURE` mode rather than live cloud execution).
+
+| Failure Mode | Detection Signal | Automated Contingency Procedure | Mode Disclosure |
+|---|---|---|---|
+| Cloud Run Cold Start / Network Latency (>3s) | HTTP 504 / timeout on curl | Switch explicitly to local Python server (`http://localhost:8080`) | Labeled as `SIMULATION` / Local Demo |
+| Vertex AI Quota / 429 Backoff Spike | Exponential backoff notification | Switch explicitly to deterministic fixture replay (`tests/fixtures/`) | Labeled as `FIXTURE` Replay |
+| OBS Screen Recording Frame Drop | OBS dropped frame alert | Re-record individual scene chunk using standardized timestamps | Seamless retake |

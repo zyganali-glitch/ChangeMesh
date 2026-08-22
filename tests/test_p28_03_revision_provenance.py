@@ -38,7 +38,7 @@ class TestRevisionProvenanceBinding:
         assert prov["project_id"] == "project-af5e1c99-3bc4-424f-b53"
         assert prov["canonical_region"] == "europe-west3"
         assert prov["cloud_run_service"] == "changemesh-p24-e2e"
-        assert prov["cloud_run_revision"] == "changemesh-p24-e2e-00001-jjp"
+        assert prov["cloud_run_revision"] == "changemesh-p24-e2e-00002-bqc"
         assert "europe-west3.run.app" in prov["cloud_run_url"]
         assert len(prov["source_commit_sha"]) == 40
 

@@ -131,7 +131,7 @@ ChangeMesh is an autonomous agent fleet designed to safely orchestrate complex e
   1. `ExecutionEvidenceMode` Enum: Strict immutability for `SIMULATION`, `FIXTURE`, `RECORDED_CLOUD`, `LIVE_WRITE`.
   2. `EvidenceLedger` (`src/evidence/evidence_record.py`): Cryptographic SHA-256 hash chaining where each entry binds `(index, prev_hash, payload_digest, timestamp)`. Mutating any intermediate entry breaks the chain.
   3. **Frozen Rehearsal Outcomes:** Pydantic `ConfigDict(frozen=True)` prevents in-memory outcome alteration.
-- **Residual Risk:** None; SHA-256 preimage resistance guarantees cryptographic integrity.
+- **Residual Risk:** Hash chaining provides tamper-evidence for canonicalized recorded bytes, but does not by itself prove source authenticity, producer honesty, correctness of the original fact, absence of malicious but correctly hashed evidence, or uncompromised root/provenance authority.
 - **Test Evidence:** `tests/test_p22_evidence_ledger.py`, `tests/test_p25_03_shadowlab_suite.py::TestAttackVectors::test_evidence_fabrication_blocked_by_mode_label`.
 
 ---

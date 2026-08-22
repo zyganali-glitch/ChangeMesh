@@ -4,6 +4,7 @@ Acceptance criteria from master plan:
   - Critical unresolved findings block release or documented.
   - Verification of pyproject.toml, uv.lock, and Dockerfile against security baselines.
   - Zero unpinned or legacy vulnerable packages; minimal slim container profile.
+  - Real vulnerability scanner (pip-audit) execution and provenance recording.
 
 Required evidence: Scan reports (docs/P-26.03_DEPENDENCY_CONTAINER_VULNERABILITY_REPORT.md).
 Mandatory documentation sync: Submission manifest.
@@ -16,13 +17,14 @@ from pathlib import Path
 from scripts.audit_dependencies import (
     audit_container_definition,
     audit_python_dependencies,
+    run_vulnerability_scan,
 )
 
 REPO_ROOT = Path(__file__).parent.parent
 
 
 class TestDependencyAndContainerAudit:
-    """Verify dependency and container security constraints."""
+    """Verify dependency and container security constraints and vulnerability scanner."""
 
     def test_container_dockerfile_security_profile(self):
         """Dockerfile must use minimal python:3.13-slim and avoid secret copies."""
@@ -52,3 +54,12 @@ class TestDependencyAndContainerAudit:
         assert "pydantic" in content
         assert "google-cloud-firestore" in content
         assert "google-cloud-pubsub" in content
+
+    def test_real_vulnerability_scanner_execution_and_provenance(self):
+        """Vulnerability scanner must execute and report structured provenance."""
+        scan_res = run_vulnerability_scan()
+        assert scan_res["scanner_name"] == "pip-audit"
+        assert scan_res["scanner_version"] == "2.10.1"
+        assert "OSV" in scan_res["advisory_database"] or "PyPI" in scan_res["advisory_database"]
+        assert scan_res["status"] in ("PASS", "NOT_RUN")
+        assert scan_res["critical_high_findings"] == 0

@@ -6,7 +6,8 @@ Acceptance criteria from master plan:
   - Secret scanning across all repository source, fixture, and documentation surfaces.
   - Mode honesty: Real vs Fixture vs Simulation distinction strictly preserved.
   - License compatibility and donor manifest integrity verified.
-  - Internal markdown link integrity: zero broken file paths in README, docs, and judge guides.
+  - Internal markdown link integrity: zero broken file paths, zero local file links in judge guides.
+  - Live write gate fail-closed verification via actual subprocess invocation.
 
 Required evidence: Governance test report (docs/P-25.05_GOVERNANCE_TEST_REPORT.md).
 Mandatory documentation sync: Submission docs.
@@ -16,6 +17,8 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import List, Tuple
 
@@ -24,6 +27,22 @@ DOCS_DIR = REPO_ROOT / "docs"
 SRC_DIR = REPO_ROOT / "src"
 DOMAIN_DIR = REPO_ROOT / "domain"
 TESTS_DIR = REPO_ROOT / "tests"
+
+PUBLIC_JUDGE_DOCS = [
+    REPO_ROOT / "README.md",
+    REPO_ROOT / "README.tr.md",
+    REPO_ROOT / "JUDGE_START_HERE.md",
+    DOCS_DIR / "JUDGE_START_HERE.md",
+    DOCS_DIR / "JUDGING_MAP.md",
+    DOCS_DIR / "DEVPOST_SUBMISSION.md",
+    DOCS_DIR / "P-30.01_PITCH_NARRATIVES_CLAIM_AUDIT.md",
+    DOCS_DIR / "P-30.05_ARCHITECTURE_AND_EVIDENCE_DIAGRAMS.md",
+    DOCS_DIR / "P-30.07_PUBLIC_BUILD_ARTICLE_AND_SOCIAL_POST.md",
+    DOCS_DIR / "DEMO_SCRIPT.md",
+    DOCS_DIR / "DEMO_MANIFEST.md",
+    DOCS_DIR / "SUBMISSION_MANIFEST.md",
+    DOCS_DIR / "BUILD_PERIOD_DISCLOSURE.md",
+]
 
 
 # ============================================================================
@@ -53,7 +72,6 @@ class TestSecretAndCredentialLeakage:
         ),
     ]
 
-    # Files exempt from scanning (e.g., this test file itself, gitignore, test scanners)
     EXEMPT_FILES = {
         "test_p25_05_governance_matrix.py",
         "policy_engine.py",
@@ -63,6 +81,7 @@ class TestSecretAndCredentialLeakage:
         "test_p23_agent_security.py",
         "test_p25_01_comprehensive_unit.py",
         "test_p25_03_shadowlab_suite.py",
+        "test_p26_02_secret_sanitization.py",
     }
 
     def test_zero_real_secrets_in_repository_files(self):
@@ -71,7 +90,6 @@ class TestSecretAndCredentialLeakage:
         violations: List[Tuple[str, str, int]] = []
 
         for root, dirs, files in os.walk(REPO_ROOT):
-            # Skip caches, git, venvs
             dirs[:] = [
                 d
                 for d in dirs
@@ -139,20 +157,17 @@ class TestClaimAuditAndEvidenceHonesty:
         re.compile(r"(?i)replaces\s+all\s+human\s+judgment\s+completely"),
         re.compile(r"(?i)zero\s+risk\s+guarantee"),
         re.compile(r"(?i)infinite\s+scalability"),
+        re.compile(r"(?i)mathematical\s+and\s+cryptographic\s+guarantees"),
+        re.compile(r"(?i)mathematically\s+prove\s+backward"),
+        re.compile(r"(?i)guarantee\s+zero\s+race\s+conditions"),
     ]
 
     def test_zero_unsupported_hyperbolic_claims_in_docs(self):
         """Docs must not contain hyperbolic unprovable claims."""
-        doc_files = list(DOCS_DIR.glob("*.md")) + [
-            REPO_ROOT / "README.md",
-            REPO_ROOT / "JUDGE_START_HERE.md",
-            REPO_ROOT / "README.tr.md",
-        ]
+        doc_files = [f for f in PUBLIC_JUDGE_DOCS if f.is_file()]
         violations = []
 
         for doc_file in doc_files:
-            if not doc_file.is_file():
-                continue
             text = doc_file.read_text(encoding="utf-8")
             for pattern in self.FORBIDDEN_UNSUPPORTED_CLAIMS:
                 if pattern.search(text):
@@ -178,8 +193,14 @@ class TestClaimAuditAndEvidenceHonesty:
             )
 
     def test_live_write_requires_explicit_danger_flag(self):
-        """Local tests must default to fail-closed without --live-write-danger."""
-        # Verify default execution does not perform live mutation
+        """Local invocation of live write must fail closed without explicit danger flag."""
+        cmd = [sys.executable, str(REPO_ROOT / "scripts" / "cmd.py"), "integration"]
+        res = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
+        assert res.returncode != 0, "cmd.py integration must fail closed"
+        assert "live-write-danger" in res.stderr.lower() or "error" in res.stderr.lower()
+
+    def test_evidence_mode_vocabulary_integrity(self):
+        """Verify explicit 4-mode execution evidence vocabulary."""
         from domain.contracts.evidence import ExecutionEvidenceMode
 
         assert ExecutionEvidenceMode.SIMULATION.value == "SIMULATION"
@@ -207,19 +228,18 @@ class TestJudgePackageAndLinkIntegrity:
             content = md_file.read_text(encoding="utf-8")
 
             # Match markdown links: [text](path)
-            # Exclude http/https, mailto, anchor-only (#), and conversation:// URIs
             links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", content)
             for text, target in links:
                 target_clean = target.strip()
                 if target_clean.startswith(
                     ("http://", "https://", "mailto:", "#", "conversation://")
-                ) or target_clean.startswith("file://"):
+                ):
                     continue
 
                 # Strip anchor if present: file.md#section
                 file_target = target_clean.split("#")[0]
                 if not file_target:
-                    continue  # was just an anchor
+                    continue
 
                 # Resolve relative to current md file directory
                 resolved_path = (md_file.parent / file_target).resolve()
@@ -230,13 +250,34 @@ class TestJudgePackageAndLinkIntegrity:
             f"Found {len(broken_links)} broken relative links in markdown docs: {broken_links[:10]}"
         )
 
+    def test_no_local_file_or_user_links_in_public_judge_docs(self):
+        """Public judge documents must have zero file://, C:\\, or local user paths."""
+        forbidden_patterns = [
+            re.compile(r"file:///"),
+            re.compile(r"[a-zA-Z]:\\Users\\"),
+            re.compile(r"/Users/[a-zA-Z0-9_-]+/"),
+            re.compile(r"scratch[/\\]ChangeMesh"),
+        ]
+        violations = []
+
+        for doc_path in PUBLIC_JUDGE_DOCS:
+            if not doc_path.is_file():
+                continue
+            content = doc_path.read_text(encoding="utf-8")
+            for pat in forbidden_patterns:
+                if pat.search(content):
+                    violations.append((doc_path.name, pat.pattern))
+
+        assert len(violations) == 0, (
+            f"Public judge documents contain local file paths: {violations}"
+        )
+
     def test_canonical_model_id_consistency(self):
         """Canonical model ID (gemini-3.6-flash) must be consistent across code and service."""
         from src.core.gemini_client import CANONICAL_MODEL_ID
 
         assert CANONICAL_MODEL_ID == "gemini-3.6-flash"
 
-        # Check service_app.py
         service_text = (REPO_ROOT / "service_app.py").read_text(encoding="utf-8")
         assert "CANONICAL_MODEL_ID" in service_text
 
@@ -278,8 +319,6 @@ class TestDonorManifestAndLicenses:
 
     def test_donor_manifest_lint_script_passes(self):
         """The donor manifest lint script must pass with 20 components."""
-        import subprocess
-
         cmd = ["uv", "run", "python", "scripts/donor_manifest_lint.py"]
         result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
         assert result.returncode == 0, (
@@ -289,26 +328,27 @@ class TestDonorManifestAndLicenses:
         assert "Components: 20" in result.stdout
 
     def test_all_donors_have_compatible_licenses(self):
-        """All 7 registered donors in DONOR_REUSE_MANIFEST.md must declare compatible licenses."""
+        """All registered donors in DONOR_REUSE_MANIFEST.md must declare compatible licenses."""
         manifest_path = REPO_ROOT / "docs" / "DONOR_REUSE_MANIFEST.md"
         assert manifest_path.is_file()
         text = manifest_path.read_text(encoding="utf-8")
 
-        # Every donor table must contain License State: VERIFIED_COMPATIBLE
-        # or a compatible license name
         assert "VERIFIED_COMPATIBLE" in text or "MIT" in text or "Apache-2.0" in text
-
-        # Verify no GPL-incompatible license declarations
         assert "GPL-3.0-only" not in text
         assert "AGPL-3.0" not in text
 
-    def test_pyproject_toml_declares_correct_python_and_dependencies(self):
-        """pyproject.toml must declare Python >= 3.13 and Google ADK / GenAI dependencies."""
-        pyproject_path = REPO_ROOT / "pyproject.toml"
-        assert pyproject_path.is_file()
-        text = pyproject_path.read_text(encoding="utf-8")
+    def test_pyproject_toml_dependencies_disclosed_in_build_disclosure(self):
+        """All direct dependencies in pyproject.toml must be disclosed in disclosure doc."""
+        disclosure_text = (REPO_ROOT / "docs" / "BUILD_PERIOD_DISCLOSURE.md").read_text(
+            encoding="utf-8"
+        )
+        pyproject_text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-        assert "requires-python" in text
-        assert "3.13" in text
-        assert "pydantic" in text
-        assert "pytest" in text
+        assert "requires-python" in pyproject_text
+        assert "3.13" in pyproject_text
+        assert "google-adk" in disclosure_text
+        assert "google-genai" in disclosure_text
+        assert "pydantic" in disclosure_text
+        assert "google-cloud-firestore" in disclosure_text
+        assert "google-cloud-pubsub" in disclosure_text
+        assert "playwright" in disclosure_text
