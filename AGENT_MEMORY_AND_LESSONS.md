@@ -758,6 +758,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all enterprise hybrid architectures, customer runner daemons, and SOC2/HIPAA compliance architectures).
 - Status: `ACTIVE`
 
+### LESSON-20260822-24 — Monotonic Safety Locks in Agentic Plugin Architectures
+- Date/time: 2026-08-22
+- Active task: P-29.04
+- Symptom: Third-party extensions, custom tools, or user-supplied policy plugins can introduce backdoors or weaken orchestrator safety and verification guarantees.
+- Root cause: Untrusted plugins overriding core security handlers or bypassing human approval gates.
+- Correct approach:
+  1. Enforce a monotonic safety invariant: plugins may only introduce additional constraints, richer evidence artifacts, or specialized change type handlers; they can never weaken base invariants.
+  2. Require custom tool adapters to declare capability passports verified by cryptographic digest.
+  3. Ensure all custom change handlers implement deterministic reversibility assessment and compensation generators before execution.
+- Prevention rule: Extensibility points must be monotonic and strictly additive to safety constraints.
+- Tests/evidence: `docs/P-29.04_EXTENSIBILITY_CONTRACT.md`, `tests/test_p29_04_extensibility_contract.py` (3 passed); full suite (1751 passed).
+- Affected files: `docs/P-29.04_EXTENSIBILITY_CONTRACT.md`, `tests/test_p29_04_extensibility_contract.py`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all plugin systems, MCP servers, SDK extensions, and tool runtime sandboxing).
+- Status: `ACTIVE`
+
+
 
 
 

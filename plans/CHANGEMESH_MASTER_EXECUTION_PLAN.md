@@ -2224,12 +2224,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-29.04 — Define extensibility contract for change types, tools, scenarios, policies
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Define extensibility contract for change types, tools, scenarios, policies.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Extensions cannot weaken evidence/authority contracts.
-- **Required evidence:** Plugin contract.
-- **Mandatory documentation sync:** Architecture.
+- **Required evidence:** Plugin contract specification `docs/P-29.04_EXTENSIBILITY_CONTRACT.md` and test suite `tests/test_p29_04_extensibility_contract.py` (3 tests passing). Establishes formal plugin interfaces (`IChangeTypeHandler`, `IToolAdapter`, `IPolicyRule`), monotonic safety locks (extensions may only add restrictions), and mandatory capability passport validation.
+- **Mandatory documentation sync:** `docs/P-29.04_EXTENSIBILITY_CONTRACT.md`, `AGENT_ARCHITECTURE_AND_PATTERNS.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-29.05 — Create 90-day roadmap after competition freeze
