@@ -803,6 +803,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all hackathon submissions, Devpost write-ups, and executive pitch decks).
 - Status: `ACTIVE`
 
+### LESSON-20260822-27 — Friction-Free Judge Quick-Start Pathways
+- Date/time: 2026-08-22
+- Active task: P-30.02
+- Symptom: Hackathon judges have limited evaluation time (<5 minutes per project) and get stuck if repositories require complex local setups, proprietary API keys, or long build pipelines.
+- Root cause: Missing standalone entry-point documentation optimized for rapid verification.
+- Correct approach:
+  1. Author a dedicated `docs/JUDGE_START_HERE.md` at repository root level.
+  2. Offer a 60-second zero-install HTTP curl verification path against the live deployed Cloud Run service (`/health`, `/api/dashboard/snapshot`, `/run-e2e`).
+  3. Offer a 3-minute local python/pytest track that runs cleanly without Node.js or npm dependencies.
+- Prevention rule: Every hackathon repository must provide a sub-60-second evaluation path that requires zero local environment setup.
+- Tests/evidence: `docs/JUDGE_START_HERE.md`, `tests/test_p30_02_judge_start_here.py` (3 passed); full suite (1760 passed).
+- Affected files: `docs/JUDGE_START_HERE.md`, `tests/test_p30_02_judge_start_here.py`, `README.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all hackathon judge portals, evaluation guides, and developer quick-starts).
+- Status: `ACTIVE`
+
+
 
 
 

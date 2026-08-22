@@ -2258,12 +2258,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-30.02 — Finalize JUDGE_START_HERE with fastest evaluation route
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Finalize JUDGE_START_HERE with fastest evaluation route.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Judge verifies value without entire repo.
-- **Required evidence:** Fresh-reader test.
-- **Mandatory documentation sync:** README links.
+- **Required evidence:** Judge quick-start evaluation guide `docs/JUDGE_START_HERE.md` and test suite `tests/test_p30_02_judge_start_here.py` (3 tests passing). Provides two rapid verification routes: a 60-second live Cloud Run curl track (`/health`, `/api/dashboard/snapshot`, `/run-e2e`) and a 3-minute local Python/pytest track with zero Node.js dependencies.
+- **Mandatory documentation sync:** `docs/JUDGE_START_HERE.md`, `README.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-30.03 — Finalize judging map against exact official criteria/track language

@@ -191,6 +191,7 @@
 - P-29.05
 - P-29
 - P-30.01
+- P-30.02
 
 **Blocked:**
 - None
@@ -199,12 +200,13 @@
 - P-30 (Competition Narrative and Judge Materials — IN_PROGRESS)
 
 **Active Task:**
-- P-30.02 — Finalize JUDGE_START_HERE with fastest evaluation route (PENDING)
+- P-30.03 — Finalize judging map against exact official criteria/track language (PENDING)
 
-## Current P-30 State (P-30.01 Pitch Narratives & Claim Audit Completed)
+## Current P-30 State (P-30.02 Judge Start Here Guide Completed)
 
 - **P-30.01:** `DONE` — Pitch narratives and claim audit implemented and verified in `docs/P-30.01_PITCH_NARRATIVES_CLAIM_AUDIT.md` and `tests/test_p30_01_pitch_narratives.py` (3 tests collected, 3 passed in 0.15s, 1757 total canonical tests passing). Establishes 10s, 30s, and 2m technical narratives grounded in verified Cloud Run deployments (`europe-west3`), Firestore OCC CAS, ShadowLab simulation engines, and zero-custody VPC boundaries.
-- **P-30.02:** `PENDING` — Finalize JUDGE_START_HERE with fastest evaluation route (Next eligible micro-task).
+- **P-30.02:** `DONE` — Judge quick-start evaluation guide implemented and verified in `docs/JUDGE_START_HERE.md` and `tests/test_p30_02_judge_start_here.py` (3 tests collected, 3 passed in 0.10s, 1760 total canonical tests passing). Provides two rapid verification routes: a 60-second live Cloud Run curl track (`/health`, `/api/dashboard/snapshot`, `/run-e2e`) and a 3-minute local Python/pytest track with zero Node.js dependencies.
+- **P-30.03:** `PENDING` — Finalize judging map against exact official criteria/track language (Next eligible micro-task).
 
 ## Current P-29 State (Phase P-29 Independent Productization Foundations 100% Completed & Verified)
 
