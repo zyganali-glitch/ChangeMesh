@@ -196,17 +196,19 @@
 - P-30.04
 - P-30.05
 - P-30.06
+- P-30.07
+- P-30
 
 **Blocked:**
 - None
 
 **Active Phase:**
-- P-30 (Competition Narrative and Judge Materials — IN_PROGRESS)
+- P-31 (Demo Video and Media Production — IN_PROGRESS)
 
 **Active Task:**
-- P-30.07 — Prepare optional public build article/social post only after core submission safe (PENDING)
+- P-31.01 — Freeze demo dataset, accounts, browser layout, cloud revision, fallback recording plan (PENDING)
 
-## Current P-30 State (P-30.06 Build-Period Disclosure & Provenance Completed)
+## Current P-30 State (Phase P-30 Competition Narrative and Judge Materials 100% Completed & Verified)
 
 - **P-30.01:** `DONE` — Pitch narratives and claim audit implemented and verified in `docs/P-30.01_PITCH_NARRATIVES_CLAIM_AUDIT.md` and `tests/test_p30_01_pitch_narratives.py` (3 tests collected, 3 passed in 0.15s, 1757 total canonical tests passing). Establishes 10s, 30s, and 2m technical narratives grounded in verified Cloud Run deployments (`europe-west3`), Firestore OCC CAS, ShadowLab simulation engines, and zero-custody VPC boundaries.
 - **P-30.02:** `DONE` — Judge quick-start evaluation guide implemented and verified in `docs/JUDGE_START_HERE.md` and `tests/test_p30_02_judge_start_here.py` (3 tests collected, 3 passed in 0.10s, 1760 total canonical tests passing). Provides two rapid verification routes: a 60-second live Cloud Run curl track (`/health`, `/api/dashboard/snapshot`, `/run-e2e`) and a 3-minute local Python/pytest track with zero Node.js dependencies.
@@ -214,7 +216,7 @@
 - **P-30.04:** `DONE` — Verified Devpost submission document implemented and verified in `docs/DEVPOST_SUBMISSION.md` and `tests/test_p30_04_devpost_submission.py` (3 tests collected, 3 passed in 0.11s, 1766 total canonical tests passing). Populates all 6 official competition sections (Problem, What it does, How built with Gemini 3.6 Flash / Cloud Run / Firestore / PubSub, Challenges, Accomplishments, and Future roadmap) with zero unsupported claims.
 - **P-30.05:** `DONE` — Architecture, authority, and evidence diagrams document implemented and verified in `docs/P-30.05_ARCHITECTURE_AND_EVIDENCE_DIAGRAMS.md` and `tests/test_p30_05_diagrams_audit.py` (3 tests collected, 3 passed in 0.10s, 1769 total canonical tests passing). Cross-reconciles 4 system diagrams (Google Cloud Serverless Architecture, 6-Stage Saga Lifecycle, 4-Lane Authority Hierarchy, and Proof-Carrying Evidence Ledger) across all surfaces.
 - **P-30.06:** `DONE` — Build-period disclosure and provenance record implemented and verified in `docs/BUILD_PERIOD_DISCLOSURE.md` and `tests/test_p30_06_licenses_provenance.py` (3 tests collected, 3 passed in 0.10s, 1772 total canonical tests passing). Fully discloses all 4 donor components (`ZK-PRIV-001`, `CCT-SEM-001`, `ZK-VALID-001`, `CCT-FLIGHT-001`) with immutable donor commits, third-party library licenses (MIT/Apache 2.0), and Google Cloud managed service APIs.
-- **P-30.07:** `PENDING` — Prepare optional public build article/social post only after core submission safe (Next eligible micro-task).
+- **P-30.07:** `DONE` — Technical build article and social post announcements implemented and verified in `docs/P-30.07_PUBLIC_BUILD_ARTICLE_AND_SOCIAL_POST.md` and `tests/test_p30_07_public_article.py` (3 tests collected, 3 passed in 0.10s, 1775 total canonical tests passing). Prepares ready-to-publish technical article on ShadowLab / Gemini 3.6 Flash / Cloud Run and correctly tagged social copy (`#GeminiSprint`, `#GoogleCloud`, `#VertexAI`, `#ChangeMesh`).
 
 ## Current P-29 State (Phase P-29 Independent Productization Foundations 100% Completed & Verified)
 

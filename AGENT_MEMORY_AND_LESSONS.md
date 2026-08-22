@@ -878,6 +878,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all hackathon IP disclosures, open-source audits, and legal compliance reviews).
 - Status: `ACTIVE`
 
+### LESSON-20260822-32 — Technical Build Articles and Social Announcement Readiness
+- Date/time: 2026-08-22
+- Active task: P-30.07
+- Symptom: Last-minute promotional articles or social posts often contain wrong links, missing tags, or rushed inaccuracies.
+- Root cause: Treating public relations materials as an afterthought outside the engineering documentation discipline.
+- Correct approach:
+  1. Author a structured announcement bundle (`docs/P-30.07_PUBLIC_BUILD_ARTICLE_AND_SOCIAL_POST.md`) with deep-dive technical insights, X copy, and LinkedIn copy.
+  2. Embed official required hashtags (`#GeminiSprint`, `#GoogleCloud`, `#VertexAI`, `#ChangeMesh`) and verified repository links.
+  3. Validate content completeness and hashtag presence via automated pytest checks (`tests/test_p30_07_public_article.py`).
+- Prevention rule: Every public announcement draft must be tested for tag integrity and factual consistency prior to publication.
+- Tests/evidence: `docs/P-30.07_PUBLIC_BUILD_ARTICLE_AND_SOCIAL_POST.md`, `tests/test_p30_07_public_article.py` (3 passed); full suite (1775 passed).
+- Affected files: `docs/P-30.07_PUBLIC_BUILD_ARTICLE_AND_SOCIAL_POST.md`, `tests/test_p30_07_public_article.py`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all hackathon media deliverables, blog posts, and developer marketing).
+- Status: `ACTIVE`
+
+
 
 
 

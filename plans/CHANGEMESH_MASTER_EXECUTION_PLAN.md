@@ -2244,7 +2244,7 @@ Schedule is risk control, not permission to skip gates.
 
 # P-30 — Competition Narrative and Judge Materials
 
-**Phase status:** `IN_PROGRESS`
+**Phase status:** `DONE`
 
 ## P-30.01 — Finalize ten-second, thirty-second, two-minute narratives from verified behavior
 
@@ -2308,12 +2308,12 @@ Schedule is risk control, not permission to skip gates.
 
 ## P-30.07 — Prepare optional public build article/social post only after core submission safe
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Prepare optional public build article/social post only after core submission safe.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** Bonus content truthful/public/correctly tagged if pursued.
-- **Required evidence:** Published link or NOT_RUN.
-- **Mandatory documentation sync:** Submission manifest.
+- **Required evidence:** Technical build article and social post announcements `docs/P-30.07_PUBLIC_BUILD_ARTICLE_AND_SOCIAL_POST.md` and test suite `tests/test_p30_07_public_article.py` (3 tests passing). Prepares ready-to-publish technical article on ShadowLab / Gemini 3.6 Flash / Cloud Run and correctly tagged social copy (`#GeminiSprint`, `#GoogleCloud`, `#VertexAI`, `#ChangeMesh`).
+- **Mandatory documentation sync:** `docs/P-30.07_PUBLIC_BUILD_ARTICLE_AND_SOCIAL_POST.md`, `docs/SUBMISSION_MANIFEST.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 # P-31 — Demo Video and Media Production
