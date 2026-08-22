@@ -198,6 +198,7 @@
 - P-30.06
 - P-30.07
 - P-30
+- P-31.01
 
 **Blocked:**
 - None
@@ -206,7 +207,12 @@
 - P-31 (Demo Video and Media Production — IN_PROGRESS)
 
 **Active Task:**
-- P-31.01 — Freeze demo dataset, accounts, browser layout, cloud revision, fallback recording plan (PENDING)
+- P-31.02 — Record full rehearsal and measure scene timing (PENDING — Macro Batch Boundary Reached)
+
+## Current P-31 State (P-31.01 Demo Video Manifest & Recording Freeze Completed)
+
+- **P-31.01:** `DONE` — Demo video manifest and recording freeze document implemented and verified in `docs/DEMO_MANIFEST.md` and `tests/test_p31_01_demo_manifest.py` (3 tests collected, 3 passed in 0.10s, 1778 total canonical tests passing). Freezes demo dataset (v1 to v2 customer billing address schema with 1,000 synthetic records), persona boundaries (draft PR ceiling), viewport standards (1920x1080 dark mode), deployed Cloud Run revision binding (`changemesh-p24-e2e-00001-jjp` in `europe-west3`), and recording fault fallback contingencies.
+- **P-31.02:** `PENDING` — Record full rehearsal and measure scene timing (Next eligible micro-task).
 
 ## Current P-30 State (Phase P-30 Competition Narrative and Judge Materials 100% Completed & Verified)
 

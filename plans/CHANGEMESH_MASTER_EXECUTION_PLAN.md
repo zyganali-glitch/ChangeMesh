@@ -2318,16 +2318,16 @@ Schedule is risk control, not permission to skip gates.
 
 # P-31 — Demo Video and Media Production
 
-**Phase status:** `PENDING`
+**Phase status:** `IN_PROGRESS`
 
 ## P-31.01 — Freeze demo dataset, accounts, browser layout, cloud revision, fallback recording plan
 
-- **Status:** `PENDING`
+- **Status:** `DONE`
 - **Required action:** Freeze demo dataset, accounts, browser layout, cloud revision, fallback recording plan.
 - **Forbidden shortcuts:** Do not infer completion from generated text; do not skip dependencies; do not widen scope; do not use an unlabeled mock as real evidence.
 - **Acceptance criteria:** No last-minute hidden state changes.
-- **Required evidence:** Demo manifest.
-- **Mandatory documentation sync:** Handoff.
+- **Required evidence:** Demo video manifest and recording freeze document `docs/DEMO_MANIFEST.md` and test suite `tests/test_p31_01_demo_manifest.py` (3 tests passing). Freezes demo dataset (v1 to v2 customer billing address schema with 1,000 synthetic records), persona boundaries (draft PR ceiling), viewport standards (1920x1080 dark mode), deployed Cloud Run revision binding (`changemesh-p24-e2e-00001-jjp` in `europe-west3`), and recording fault fallback contingencies.
+- **Mandatory documentation sync:** `docs/DEMO_MANIFEST.md`, `docs/HANDOFF.md`, `AGENT_MEMORY_AND_LESSONS.md`.
 - **Closure:** Run task-specific gates, then P-Ω; record next eligible task in `docs/HANDOFF.md`.
 
 ## P-31.02 — Record full rehearsal and measure scene timing

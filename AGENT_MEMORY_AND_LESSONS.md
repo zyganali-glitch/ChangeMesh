@@ -893,6 +893,22 @@ This is the durable minefield and lessons record, not a chronological chat log.
 - Reusable beyond this task: Yes (all hackathon media deliverables, blog posts, and developer marketing).
 - Status: `ACTIVE`
 
+### LESSON-20260822-33 — Demo Manifest Freeze, Viewport Standards, and Recording Fault Contingencies
+- Date/time: 2026-08-22
+- Active task: P-31.01
+- Symptom: Demo recordings often fail or look inconsistent due to unplanned screen resolution shifts, unexpected live endpoint cold starts, or live quota timeouts during recording.
+- Root cause: Not formalizing the demo environment state before pressing record.
+- Correct approach:
+  1. Author a dedicated demo manifest (`docs/DEMO_MANIFEST.md`) freezing the exact dataset (v1 to v2 customer billing address schema with 1,000 synthetic records), browser viewport (1920x1080 dark mode), and live Cloud Run revision (`changemesh-p24-e2e-00001-jjp`).
+  2. Define an explicit fallback contingency matrix covering cold start latency (>3s local failover), Vertex AI quota spikes (fixture replay), and OBS frame drops.
+  3. Validate all manifest invariants with automated pytest tests (`tests/test_p31_01_demo_manifest.py`).
+- Prevention rule: Every video demo must be backed by a frozen demo manifest and automated fault contingencies before recording begins.
+- Tests/evidence: `docs/DEMO_MANIFEST.md`, `tests/test_p31_01_demo_manifest.py` (3 passed); full suite (1778 passed).
+- Affected files: `docs/DEMO_MANIFEST.md`, `tests/test_p31_01_demo_manifest.py`, `docs/HANDOFF.md`, `plans/CHANGEMESH_MASTER_EXECUTION_PLAN.md`.
+- Reusable beyond this task: Yes (all hackathon video recordings, live product demos, and webinar preparations).
+- Status: `ACTIVE`
+
+
 
 
 
